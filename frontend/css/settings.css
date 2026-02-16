@@ -1,0 +1,179 @@
+/* ===== SETTINGS PAGE STYLES ===== */
+
+.settings-section {
+  margin-bottom: 2rem;
+}
+.settings-section h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0.75rem;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-info {
+  flex: 1;
+}
+.setting-info h4 {
+  font-size: 0.95rem;
+  margin-bottom: 0.15rem;
+}
+.setting-info p {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Toggle switch */
+.toggle {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--color-border);
+  border-radius: 26px;
+  transition: 0.3s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.toggle input:checked + .toggle-slider {
+  background: var(--color-primary);
+}
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(22px);
+}
+.toggle input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Theme selector */
+.theme-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: 1rem;
+}
+.theme-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  border: 2px solid var(--color-border);
+  cursor: pointer;
+  transition: all var(--transition);
+  background: var(--color-bg-card);
+  font-family: inherit;
+}
+.theme-option:hover {
+  border-color: var(--color-primary);
+}
+.theme-option.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lightest);
+}
+.theme-option svg { width: 20px; height: 20px; }
+
+/* Danger zone */
+.danger-zone {
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  background: #FDF5F5;
+}
+[data-theme="dark"] .danger-zone {
+  background: #331A1A;
+}
+.danger-zone h2 {
+  color: var(--color-danger);
+}
+
+/* Mode badge */
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.mode-badge-anon {
+  background: #FFF3E0;
+  color: #b07020;
+}
+.mode-badge-account {
+  background: var(--color-secondary-light);
+  color: #2d6930;
+}
+
+/* Avatar selector grid */
+.avatar-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.avatar-option {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  background: var(--color-bg-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: all var(--transition);
+}
+.avatar-option:hover {
+  border-color: var(--color-primary);
+  transform: scale(1.1);
+}
+.avatar-option.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lightest);
+  box-shadow: 0 0 0 3px rgba(212, 116, 154, 0.2);
+}
+.current-avatar-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.current-avatar-large {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-lightest);
+  border: 2px solid var(--color-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+}

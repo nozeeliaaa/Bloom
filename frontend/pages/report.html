@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bloom — Report for Doctor</title>
+
+  <link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/pages.css">
+
+</head>
+<body>
+  <div id="banner-area"></div>
+
+  <main class="page">
+    <header class="page-header">
+      <div class="page-title">
+        <span class="title-icon" aria-hidden="true">
+          <!-- document icon -->
+          <svg viewBox="0 0 24 24"><path d="M6 2h8l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V7h3.5L14 3.5zM8 10h8v2H8v-2zm0 4h8v2H8v-2zm0 4h6v2H8v-2z"/></svg>
+        </span>
+        <h1>Report for Doctor</h1>
+      </div>
+      <p class="page-subtitle">Preview your cycle history and download a readable report you can share.</p>
+    </header>
+
+    <section class="grid-2">
+      <div class="card">
+        <h2>Preview</h2>
+        <p class="muted">A quick summary based on your logged period days.</p>
+
+        <div id="report-preview" class="stack" style="margin-top:0.75rem;">
+          <p class="muted">Loading cycle summary…</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Download</h2>
+        <p class="muted">Exports your cycle history in a clean, human-readable PDF.</p>
+
+        <div class="btn-row" style="margin-top:0.9rem;">
+          <button id="download-report" class="btn-primary" type="button">
+            Download Health Report
+          </button>
+          <a class="btn-outline" href="/pages/dashboard.html">Back to Dashboard</a>
+        </div>
+
+        <p class="muted" style="margin-top:0.75rem;">
+          Bloom is educational and does not provide medical diagnoses.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/report.js"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bloom — Privacy Policy</title>
+
+  <link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/pages.css">
+
+</head>
+<body>
+  <div id="banner-area"></div>
+
+  <main class="page">
+    <header class="page-header">
+      <div class="page-title">
+        <span class="title-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4z"/></svg>
+        </span>
+        <h1>Privacy Policy</h1>
+      </div>
+      <p class="page-subtitle">Placeholder page — you can replace this with a full policy later.</p>
+    </header>
+
+    <section class="card">
+      <h2>What we store (Demo)</h2>
+      <p>In this demo version, your cycle logs and preferences are stored locally in your browser using <strong>localStorage</strong>.</p>
+      <p class="muted">No cloud sync is enabled unless you add it.</p>
+    </section>
+
+    <section class="card">
+      <h2>Sharing</h2>
+      <p>Bloom does not share your data automatically. Reports are downloaded only when you click the download button.</p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
+    renderNav("");
+    renderFooter();
+    renderBloomieFab();
+    renderModeBanner(document.getElementById("banner-area"));
+  </script>
+</body>
+</html>

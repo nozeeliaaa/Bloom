@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Bloom</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <style>
+
+    .dash-top {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    @media (min-width: 800px) {
+      .dash-top {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .dash-mid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      align-items: stretch;
+      margin-bottom: 1.25rem;
+    }
+    @media (min-width: 980px) {
+      .dash-mid {
+        grid-template-columns: 1fr 1.25fr; /* left insights, right history/trends */
+      }
+    }
+
+    .insight-box .insight-item {
+      padding: 0.85rem 0;
+      border-bottom: 1px solid var(--color-border);
+      font-size: 0.93rem;
+      line-height: 1.5;
+    }
+    .insight-box .insight-item:last-child {
+      border-bottom: none;
+    }
+    .insight-box .insight-item strong {
+      color: var(--color-primary-dark);
+    }
+
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--color-primary);
+      line-height: 1.1;
+      margin-top: 0.25rem;
+    }
+
+    .muted-line {
+      margin-top: 0.25rem;
+      color: var(--color-text-muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    /* Right big panel inner sections */
+    .right-panel section + section {
+      margin-top: 1rem;
+    }
+
+    .section-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+
+    /* make the chart area look like a framed box inside the big panel */
+    .chart-frame {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      background: var(--color-bg-card);
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <div id="banner-area"></div>
+
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Your cycle at a glance</p>
+    </div>
+
+    <!-- ===== TOP ROW: 3 small cards ===== -->
+    <div class="dash-top">
+      <!-- 1) Cycle Snapshot -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div>
+            <div class="card-title">Cycle Snapshot</div>
+            <div class="card-subtitle">Your current cycle day</div>
+          </div>
+        </div>
+        <div class="card-body" id="cycle-snapshot">
+          <p class="text-muted">Log a period in the calendar to see your cycle day.</p>
+        </div>
+      </div>
+
+      <!-- 2) Cycle Phase -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <div>
+            <div class="card-title">Cycle Phase</div>
+            <div class="card-subtitle">Estimated from your logs</div>
+          </div>
+        </div>
+        <div class="card-body" id="cycle-phase">
+          <p class="text-muted">Not enough data yet. Keep logging to estimate your phase.</p>
+        </div>
+      </div>
+
+      <!-- 3) Next Period -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div>
+            <div class="card-title">Next Period</div>
+            <div class="card-subtitle">Estimated start date</div>
+          </div>
+        </div>
+        <div class="card-body" id="next-period">
+          <p class="text-muted">Not enough data yet. Keep logging to get an estimate.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MIDDLE: Left insights (stacked) + Right big panel ===== -->
+    <div class="dash-mid">
+
+      <!-- LEFT STACK -->
+      <div class="left-panel">
+        <!-- Today's Insight -->
+        <div class="card insight-box mb-3">
+          <div class="card-header">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </div>
+            <div class="card-title">Today's Insight</div>
+          </div>
+
+          
+          <div id="insights">
+            <div class="insight-item"><strong>Hydration reminder:</strong> Drinking enough water can help reduce bloating and cramps during your cycle.</div>
+            <div class="insight-item"><strong>Track consistently:</strong> Logging daily, even on non-period days, helps identify patterns more accurately.</div>
+            <div class="insight-item"><strong>Listen to your body:</strong> Every body is unique. What's normal for someone else may not be your normal, and that's okay.</div>
+          </div>
+        </div>
+
+        <!-- Advanced Insight -->
+        <div class="card insight-box">
+          <div class="card-header">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <div class="card-title">Advanced Insight</div>
+          </div>
+
+          <div id="advanced-insights">
+            <p class="text-muted">Loading insights...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT BIG PANEL -->
+      <div class="card right-panel">
+        <section>
+          <div class="section-title-row">
+            <h2 class="no-margin">Cycle History</h2>
+            <button class="btn btn-outline" id="export-pdf">Export as PDF</button>
+          </div>
+          <div class="cycle-dots" id="cycle-dots"></div>
+        </section>
+
+        <section>
+          <h2 class="cycle-trends-title">Cycle Trends</h2>
+          <div class="chart-frame">
+            <canvas id="cycleChart" height="120"></canvas>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Footer is rendered by utils.js -->
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <script type="module" src="/js/dashboard.js"></script>
+</body>
+</html>

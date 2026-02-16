@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bloom — Terms of Use</title>
+
+ <link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/pages.css">
+
+</head>
+<body>
+  <div id="banner-area"></div>
+
+  <main class="page">
+    <header class="page-header">
+      <div class="page-title">
+        <span class="title-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M6 2h10l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/></svg>
+        </span>
+        <h1>Terms of Use</h1>
+      </div>
+      <p class="page-subtitle">Placeholder terms — update this with your official terms later.</p>
+    </header>
+
+    <section class="card">
+      <h2>Educational Use</h2>
+      <p>Bloom is an educational tracking tool and does not provide medical diagnoses or emergency guidance.</p>
+    </section>
+
+    <section class="card">
+      <h2>Responsibility</h2>
+      <p>You are responsible for how you use information in the app. If you have concerns, contact a qualified healthcare provider.</p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
+    renderNav("");
+    renderFooter();
+    renderBloomieFab();
+    renderModeBanner(document.getElementById("banner-area"));
+  </script>
+</body>
+</html>

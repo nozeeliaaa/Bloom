@@ -1,0 +1,255 @@
+/* ===== Shared "Info Pages" styling (Report/Settings/Help/About/Policy pages) ===== */
+
+.page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.title-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(233, 107, 170, 0.14);
+  border: 1px solid var(--color-border);
+}
+
+.title-icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  fill: var(--color-primary);
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 2.25rem;
+  color: var(--color-text);
+}
+
+.page-subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  max-width: 70ch;
+}
+
+.card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.card + .card {
+  margin-top: 1rem;
+}
+
+.card h2 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.1rem;
+}
+
+.card p {
+  margin: 0.35rem 0;
+  color: var(--color-text);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .grid-2 {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.btn-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-primary,
+.btn-outline {
+  border-radius: 999px;
+  padding: 0.75rem 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  filter: brightness(0.97);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn-outline:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: rgba(233, 107, 170, 0.08);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 0.6rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.kv div {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.kv .k {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.kv .v {
+  color: var(--color-text);
+}
+
+.list-clean {
+  margin: 0.25rem 0 0 1.1rem;
+}
+
+.link-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 700px) {
+  .link-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.link-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: rgba(255,255,255,0.55);
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .link-card {
+  background: rgba(0,0,0,0.12);
+}
+
+.link-card:hover {
+  transform: translateY(-1px);
+}
+
+.link-card .mini-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(74, 163, 255, 0.12);
+  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.link-card .mini-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: #4AA3FF;
+}
+
+.faq-item {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 0.9rem;
+  background: rgba(255,255,255,0.55);
+}
+
+[data-theme="dark"] .faq-item {
+  background: rgba(0,0,0,0.12);
+}
+
+.faq-q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.faq-q strong {
+  font-size: 1rem;
+}
+
+.faq-a {
+  margin-top: 0.6rem;
+  color: var(--color-text-muted);
+  display: none;
+}
+
+.faq-item.open .faq-a {
+  display: block;
+}

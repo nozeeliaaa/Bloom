@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile - Bloom</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <style>
+    .profile-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 1rem;
+    }
+
+    .profile-mini{
+      display:flex;
+      align-items:center;
+      gap: 0.85rem;
+      margin-top: 0.75rem;
+    }
+
+    .profile-mini-avatar{
+      width: 54px;
+      height: 54px;
+      border-radius: 999px;
+      display:grid;
+      place-items:center;
+      border: 1px solid var(--color-border);
+      background: var(--color-card);
+      font-size: 26px;
+      -webkit-user-select:none;
+      user-select:none;
+    }
+
+    .profile-mini-name{
+      font-weight: 800;
+      margin: 0;
+      line-height: 1.1;
+    }
+
+    .profile-mini-sub{
+      margin: 0.2rem 0 0;
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+    }
+
+    .pill-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 10px;
+    }
+
+    .pill{
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--color-border);
+      background: var(--color-card);
+      font-weight: 700;
+      cursor: default;
+    }
+
+    .list-card{
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .list-link{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--color-border);
+      text-decoration:none;
+      color: var(--color-text);
+      font-weight: 700;
+    }
+    .list-link:last-child{ border-bottom:none; }
+
+    .legal-links{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 0.75rem 1rem;
+      justify-content:center;
+      padding: 1rem 0 0.25rem;
+      font-size: 0.92rem;
+    }
+    .legal-links a{
+      color: var(--color-text-muted);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .legal-links a:hover{ color: var(--color-primary); }
+
+    .disclaimer-card{
+      margin-top: 1rem;
+      text-align:center;
+    }
+
+    .disclaimer-card p{
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <div id="banner-area"></div>
+
+    <div class="page-header profile-header">
+      <div>
+        <h1 style="margin-bottom:0.25rem;">Your Profile</h1>
+        <p class="text-muted" style="margin:0;">Quick access to your profile, settings, and support.</p>
+
+        <div class="profile-mini">
+          <div class="profile-mini-avatar" id="mini-avatar">👤</div>
+          <div>
+            <p class="profile-mini-name" id="mini-name">Guest</p>
+            <p class="profile-mini-sub" id="mini-sub">Tap “View Profile” to edit details</p>
+          </div>
+        </div>
+      </div>
+
+      <a class="btn btn-outline" href="/pages/profile-view.html">View Profile</a>
+    </div>
+
+    <section class="card">
+      <h2 style="margin-top:0;">Goals</h2>
+      <div class="pill-row">
+        <span class="pill">Track Cycle</span>
+        <span class="pill">Manage Symptoms</span>
+        <span class="pill">Learn & Understand</span>
+        <span class="pill">Get Pregnant</span>
+        <span class="pill">Track Pregnancy</span>
+      </div>
+    </section>
+
+    <div class="card list-card">
+      <a class="list-link" href="/pages/report.html">
+        Report for a Doctor
+        <span aria-hidden="true">→</span>
+      </a>
+      <a class="list-link" href="/pages/settings.html">
+        Settings
+        <span aria-hidden="true">→</span>
+      </a>
+      <a class="list-link" href="/pages/help.html">
+        Help
+        <span aria-hidden="true">→</span>
+      </a>
+      <a class="list-link" href="/pages/about.html">
+        About Bloom
+        <span aria-hidden="true">→</span>
+      </a>
+    </div>
+
+    <div class="legal-links">
+      <a href="/pages/privacy.html">Privacy Policy</a>
+      <a href="/pages/terms.html">Terms of Use</a>
+      <a href="/pages/accessibility.html">Accessibility</a>
+    </div>
+
+    <div class="card disclaimer-card">
+      <p>
+        <strong>Disclaimer:</strong> Bloom is for educational tracking support and is not a substitute for professional medical advice.
+        If you have health concerns, consult a qualified healthcare provider.
+      </p>
+    </div>
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner } from "/js/utils.js";
+    import { onAuthChange } from "/js/auth.js";
+
+    renderNav("profile");
+    renderFooter();
+    renderModeBanner(document.getElementById("banner-area"));
+
+    // Mini profile display (frontend-only fields)
+    const LS_PROFILE = "bloom_profile";
+    const LS_AVATAR  = "bloom_avatar";
+
+    function loadProfile(){
+      try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
+      catch { return {}; }
+    }
+
+    function updateMiniProfile(user){
+      const avatar = localStorage.getItem(LS_AVATAR) || "👤";
+      document.getElementById("mini-avatar").textContent = avatar;
+
+      const p = loadProfile();
+      const nickname = (p.nickname || "").trim();
+
+      const name = nickname || (user?.email ? user.email.split("@")[0] : "Guest");
+      document.getElementById("mini-name").textContent = name;
+
+      document.getElementById("mini-sub").textContent =
+        user ? "Signed in • View Profile to edit details" : "Not signed in • View Profile to edit details";
+    }
+
+    onAuthChange(updateMiniProfile);
+  </script>
+</body>
+</html>

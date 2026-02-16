@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bloom — Accessibility</title>
+
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/pages.css">
+
+
+</head>
+<body>
+  <div id="banner-area"></div>
+
+  <main class="page">
+    <header class="page-header">
+      <div class="page-title">
+        <span class="title-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 7h10a1 1 0 0 1 0 2h-3l1 12a1 1 0 0 1-2 .2L12 15l-1 6.2a1 1 0 0 1-2-.2l1-12H7a1 1 0 0 1 0-2z"/></svg>
+        </span>
+        <h1>Accessibility</h1>
+      </div>
+      <p class="page-subtitle">Placeholder page — document your accessibility choices here.</p>
+    </header>
+
+    <section class="card">
+      <h2>Commitments</h2>
+      <ul class="list-clean">
+        <li>Readable contrast and consistent spacing</li>
+        <li>Keyboard-friendly navigation where possible</li>
+        <li>Clear labels and non-technical language</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Feedback</h2>
+      <p>If you find something hard to use, we’ll improve it in future iterations.</p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
+    renderNav("");
+    renderFooter();
+    renderBloomieFab();
+    renderModeBanner(document.getElementById("banner-area"));
+  </script>
+</body>
+</html>

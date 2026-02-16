@@ -1,0 +1,139 @@
+/* Header with avatar */
+.dashboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.dashboard-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.avatar-display {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-lightest);
+  border: 2px solid var(--color-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.avatar-display:hover {
+  border-color: var(--color-primary);
+  transform: scale(1.05);
+}
+.avatar-emoji {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  line-height: 1.2;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+@media (min-width: 640px) {
+  .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 900px) {
+  .dashboard-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+@media (min-width: 640px) {
+  .quick-actions { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 900px) {
+  .quick-actions { grid-template-columns: repeat(5, 1fr); }
+}
+.quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem 0.75rem;
+  text-decoration: none;
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.quick-action:hover {
+  transform: translateY(-2px);
+  color: var(--color-primary-dark);
+}
+.quick-action .card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
+}
+
+.insight-item {
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.93rem;
+}
+.insight-item:last-child { border-bottom: none; }
+.insight-item strong {
+  color: var(--color-primary-dark);
+}
+
+.phase-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+.phase-menstrual { background: #FDEAEA; color: #D94F4F; }
+.phase-follicular { background: #E8F5E9; color: #388E3C; }
+.phase-ovulation { background: #FFF3E0; color: #E8A838; }
+.phase-luteal { background: #F3E5F5; color: #8E24AA; }
+.phase-unknown { background: #F4EEF0; color: var(--color-text-muted); }
+
+.phase-icon {
+  background: var(--color-primary-lightest);
+}
+
+.row-between{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap: 1rem;
+}
+
+.cycle-dots{
+  display:flex;
+  flex-wrap:wrap;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.dot{
+  width: 14px;
+  height: 14px;
+  border-radius: 6px;
+  background: var(--color-border);
+}
+
+.dot-period{ background: #ff5c93; }
+.dot-fertile{ background: #4aa3ff; }

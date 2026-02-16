@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bloom — About</title>
+
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/pages.css">
+
+</head>
+<body>
+  <div id="banner-area"></div>
+
+  <main class="page">
+    <header class="page-header">
+      <div class="page-title">
+        <span class="title-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2l1.3 3.8L17 5l-2.8 2.2L15 11l-3-1.9L9 11l.8-3.8L7 5l3.7.8L12 2zm0 11c-4.4 0-8 2.2-8 5v3h16v-3c0-2.8-3.6-5-8-5z"/></svg>
+        </span>
+        <h1>About Bloom</h1>
+      </div>
+      <p class="page-subtitle">Bloom supports cycle awareness for Caribbean users through simple tracking and educational insights.</p>
+    </header>
+
+    <section class="card">
+      <h2>Our Mission</h2>
+      <p>
+        Bloom empowers individuals to understand their cycle, track patterns, and make informed health decisions in a supportive and private environment.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Our Values</h2>
+      <ul class="list-clean">
+        <li><strong>Privacy & Security</strong> — you control your data.</li>
+        <li><strong>Education & Transparency</strong> — clear explanations, no fear tactics.</li>
+        <li><strong>Empowerment through data</strong> — patterns that help you advocate for yourself.</li>
+        <li><strong>Inclusive design</strong> — accessible, culturally aware, easy to use.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Learn more</h2>
+      <div class="link-grid margin-top-small">
+        <a class="link-card" href="/pages/privacy.html">
+          <span class="mini-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4zm0 6a3 3 0 0 0-3 3v2H8v6h8v-6h-1v-2a3 3 0 0 0-3-3zm-1 5v-2a1 1 0 0 1 2 0v2h-2z"/></svg>
+          </span>
+          <div><strong>Privacy Policy</strong><div class="muted">How data is handled</div></div>
+        </a>
+
+        <a class="link-card" href="/pages/terms.html">
+          <span class="mini-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M6 2h10l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm9 1.5V7h3.5L15 3.5zM8 10h10v2H8v-2zm0 4h10v2H8v-2zm0 4h7v2H8v-2z"/></svg>
+          </span>
+          <div><strong>Terms of Use</strong><div class="muted">Using Bloom responsibly</div></div>
+        </a>
+
+        <a class="link-card" href="/pages/accessibility.html">
+          <span class="mini-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 7h10a1 1 0 0 1 0 2h-3l1 12a1 1 0 0 1-2 .2L12 15l-1 6.2a1 1 0 0 1-2-.2l1-12H7a1 1 0 0 1 0-2z"/></svg>
+          </span>
+          <div><strong>Accessibility</strong><div class="muted">Inclusive design notes</div></div>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
+    renderNav("about");
+    renderFooter();
+    renderBloomieFab();
+    renderModeBanner(document.getElementById("banner-area"));
+  </script>
+</body>
+</html>

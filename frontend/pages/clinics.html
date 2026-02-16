@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clinic Finder - Bloom</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet (map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- Option A (single entry stylesheet) -->
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <!-- Page-specific styles (kept here because you asked for full edited file). -->
+  <style>
+    .clinic-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .clinic-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .clinic-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 640px) {
+      .clinic-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .clinic-card h3 {
+      font-size: 1.05rem;
+      margin-bottom: 0.5rem;
+      color: var(--color-primary-dark);
+    }
+
+    .clinic-detail {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      margin-bottom: 0.35rem;
+      color: var(--color-text);
+    }
+    .clinic-detail svg {
+      flex-shrink: 0;
+      margin-top: 2px;
+      color: var(--color-primary);
+    }
+
+    .clinic-services {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: 0.75rem;
+    }
+
+    .clinic-empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--color-text-muted);
+      grid-column: 1 / -1;
+    }
+
+    /* Map card */
+    .map-card {
+      padding: 0;
+      overflow: hidden;
+      margin-bottom: 1rem;
+      border-radius: 16px;
+    }
+    #clinic-map { height: 360px; }
+
+    /* Small status line */
+    .status-line {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Distance badge */
+    .badge-distance {
+      background: rgba(0,0,0,0.06);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <div id="banner-area"></div>
+
+    <div class="page-header">
+      <h1>Clinic Finder</h1>
+      <p>Find reproductive health clinics in Jamaica </p>
+    </div>
+
+    <!-- Filters -->
+    <div class="clinic-filters">
+      <select class="form-select" id="filter-parish" aria-label="Filter by parish">
+        <option value="all">All parishes</option>
+      </select>
+
+      <select class="form-select" id="filter-service" aria-label="Filter by service">
+        <option value="all">All services</option>
+      </select>
+    </div>
+
+    <!-- Actions -->
+    <div class="clinic-actions">
+      <button class="btn btn-outline" id="btn-locate" type="button">Use my location</button>
+      <span class="status-line" id="loc-status">Tip: Allow location to sort clinics near you.</span>
+    </div>
+
+    <!-- Map -->
+    <div class="card map-card">
+      <div id="clinic-map"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="clinic-grid" id="clinic-grid">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="card card-centered">
+      <p class="note-text">
+        <strong>Note:</strong> This directory uses sample clinic data. In a real product, clinic details and exact coordinates would be verified and updated regularly.
+        Always confirm details with the clinic before visiting.
+      </p>
+    </div>
+  </main>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script type="module">
+    /**
+     * Clinic Finder Page (Frontend-only)
+     *
+     * - Loads clinic data from /data/clinics.json (your demo file).
+     * - Renders a real map (Leaflet + OpenStreetMap tiles).
+     * - Adds pins for clinics (uses parish-based coordinates fallback).
+     * - Requests user location (optional) to show "You are here" and sort by distance.
+     * - Filters by parish and service.
+     *
+     * NOTE:
+     * Your clinics.json doesn't include latitude/longitude. For a frontend demo, we map each
+     * parish to a representative coordinate. If you later add exact lat/lng per clinic, the
+     * map will become precise.
+     */
+    import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
+
+    renderNav('clinics');
+    renderFooter();
+    renderModeBanner(document.getElementById('banner-area'));
+
+    // Representative coordinates per parish (approx) — Jamaica-focused
+    const parishCoords = {
+      "Kingston": [17.997, -76.793],
+      "St. Andrew": [18.012, -76.80],
+      "St. Catherine": [17.996, -76.95],
+      "Clarendon": [17.95, -77.24],
+      "Manchester": [18.05, -77.51],
+      "St. Elizabeth": [18.05, -77.77],
+      "Westmoreland": [18.28, -78.15],
+      "Hanover": [18.41, -78.13],
+      "St. James": [18.476, -77.893],   // Montego Bay
+      "Trelawny": [18.35, -77.65],
+      "St. Ann": [18.44, -77.20],
+      "St. Mary": [18.31, -76.97],
+      "Portland": [18.18, -76.45],
+      "St. Thomas": [17.92, -76.40],
+    };
+
+    const JAMAICA_CENTER = [18.1096, -77.2975];
+
+    let clinics = [];
+    let map, markersLayer;
+    let userLocation = null; // { lat, lng }
+
+    // ----- Utilities -----
+    function toRad(x) { return x * Math.PI / 180; }
+
+    // Haversine distance in km
+    function distanceKm(lat1, lng1, lat2, lng2) {
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function attachCoords(clinic) {
+      // If you later add clinic.lat/clinic.lng to clinics.json, we’ll use that automatically.
+      if (typeof clinic.lat === 'number' && typeof clinic.lng === 'number') return clinic;
+
+      const coords = parishCoords[clinic.parish] || JAMAICA_CENTER;
+      return { ...clinic, lat: coords[0], lng: coords[1] };
+    }
+
+    function getFilters() {
+      return {
+        parish: document.getElementById('filter-parish').value,
+        service: document.getElementById('filter-service').value,
+      };
+    }
+
+    function getFilteredClinics() {
+      const { parish, service } = getFilters();
+
+      let filtered = clinics;
+
+      if (parish !== 'all') filtered = filtered.filter(c => c.parish === parish);
+      if (service !== 'all') filtered = filtered.filter(c => (c.services || []).includes(service));
+
+      // If user location exists, compute distance + sort near->far
+      if (userLocation) {
+        filtered = filtered
+          .map(c => ({
+            ...c,
+            distance: distanceKm(userLocation.lat, userLocation.lng, c.lat, c.lng)
+          }))
+          .sort((a, b) => (a.distance ?? 999999) - (b.distance ?? 999999));
+      } else {
+        filtered = filtered.map(c => ({ ...c, distance: null }));
+      }
+
+      return filtered;
+    }
+
+    // ----- Map -----
+    function initMap() {
+      map = L.map("clinic-map").setView(JAMAICA_CENTER, 8);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap"
+      }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+    }
+
+    function renderMarkers(filtered) {
+      if (!markersLayer) return;
+      markersLayer.clearLayers();
+
+      filtered.forEach(c => {
+        const popup = `
+          <strong>${c.name}</strong><br>
+          ${c.address}${c.parish ? ", " + c.parish : ""}<br>
+          ${c.phone ? c.phone + "<br>" : ""}
+          ${c.hours ? "<em>" + c.hours + "</em>" : ""}
+        `;
+        L.marker([c.lat, c.lng]).addTo(markersLayer).bindPopup(popup);
+      });
+
+      // Add user marker (if available)
+      if (userLocation) {
+        L.circleMarker([userLocation.lat, userLocation.lng], { radius: 8 })
+          .addTo(markersLayer)
+          .bindPopup("You are here");
+      }
+    }
+
+    // ----- UI Rendering -----
+    function renderClinics() {
+      const grid = document.getElementById('clinic-grid');
+      const filtered = getFilteredClinics();
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `<div class="clinic-empty"><p>No clinics match your filters.</p></div>`;
+        renderMarkers([]);
+        return;
+      }
+
+      // Update grid
+      grid.innerHTML = filtered.map(c => `
+        <div class="card clinic-card" data-lat="${c.lat}" data-lng="${c.lng}">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;">
+            <h3 style="margin:0;">${c.name}</h3>
+            ${userLocation && typeof c.distance === 'number'
+              ? `<span class="badge badge-distance">${c.distance.toFixed(1)} km</span>`
+              : ``}
+          </div>
+
+          <div class="clinic-detail" style="margin-top:0.5rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>${c.address}${c.parish ? ", " + c.parish : ""}</span>
+          </div>
+
+          ${c.phone ? `
+            <div class="clinic-detail">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <span>${c.phone}</span>
+            </div>
+          ` : ''}
+
+          ${c.hours ? `
+            <div class="clinic-detail">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>${c.hours}</span>
+            </div>
+          ` : ''}
+
+          <div class="clinic-services">
+            ${(c.services || []).map(s => `<span class="badge badge-primary">${s}</span>`).join('')}
+          </div>
+
+          <div style="margin-top:0.9rem;">
+            <button class="btn btn-outline btn-sm btn-focus-map" type="button">View on map</button>
+          </div>
+        </div>
+      `).join('');
+
+      // Update markers
+      renderMarkers(filtered);
+
+      // Card action: focus on map
+      grid.querySelectorAll(".btn-focus-map").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const card = e.target.closest(".clinic-card");
+          const lat = Number(card.dataset.lat);
+          const lng = Number(card.dataset.lng);
+          if (map && Number.isFinite(lat) && Number.isFinite(lng)) {
+            map.setView([lat, lng], 12);
+          }
+        });
+      });
+    }
+
+    function populateFilters() {
+      const parishSelect = document.getElementById('filter-parish');
+      const serviceSelect = document.getElementById('filter-service');
+
+      // Parishes from data (Jamaica)
+      const parishes = [...new Set(clinics.map(c => c.parish).filter(Boolean))].sort();
+      parishes.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        parishSelect.appendChild(opt);
+      });
+
+      // Services from data
+      const services = [...new Set(clinics.flatMap(c => c.services || []))].sort();
+      services.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        serviceSelect.appendChild(opt);
+      });
+    }
+
+    // ----- Location -----
+    function setStatus(msg) {
+      const el = document.getElementById("loc-status");
+      if (el) el.textContent = msg;
+    }
+
+    function requestUserLocation() {
+      if (!navigator.geolocation) {
+        setStatus("Location is not supported in this browser.");
+        return;
+      }
+
+      setStatus("Requesting your location…");
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setStatus("Location enabled. Showing clinics near you.");
+
+          // Center map on user
+          if (map) map.setView([userLocation.lat, userLocation.lng], 11);
+
+          // Re-render to sort by distance + update markers
+          renderClinics();
+        },
+        () => {
+          setStatus("Location permission denied. Showing all clinics.");
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    // ----- Events -----
+    document.getElementById('filter-parish').addEventListener('change', renderClinics);
+    document.getElementById('filter-service').addEventListener('change', renderClinics);
+    document.getElementById('btn-locate').addEventListener('click', requestUserLocation);
+
+    // ----- Init -----
+    async function init() {
+      const res = await fetch('/data/clinics.json');
+      clinics = (await res.json())
+        .map(attachCoords)
+        // If your data contains other countries, keep only Jamaica for this page
+        .filter(c => !c.country || String(c.country).toLowerCase().includes("jamaica"));
+
+      initMap();
+      populateFilters();
+      renderClinics();
+
+      // Optional: auto-prompt location once (comment out if you prefer button-only)
+      // requestUserLocation();
+    }
+
+    init();
+  </script>
+</body>
+</html>

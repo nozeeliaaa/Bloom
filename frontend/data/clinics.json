@@ -1,0 +1,102 @@
+[
+  {
+    "id": "1",
+    "name": "Kingston Women's Health Centre",
+    "country": "Jamaica",
+    "parish": "Kingston",
+    "services": ["Gynecology", "Family Planning", "Prenatal Care", "STI Screening"],
+    "address": "12 Hope Road, Kingston 6",
+    "phone": "(876) 555-0101",
+    "hours": "Mon-Fri 8AM-5PM, Sat 9AM-1PM"
+  },
+  {
+    "id": "2",
+    "name": "Montego Bay Reproductive Health Clinic",
+    "country": "Jamaica",
+    "parish": "St. James",
+    "services": ["Gynecology", "Family Planning", "Menopause Support"],
+    "address": "45 Church Street, Montego Bay",
+    "phone": "(876) 555-0202",
+    "hours": "Mon-Fri 9AM-4PM"
+  },
+  {
+    "id": "3",
+    "name": "Trinidad Women's Wellness Centre",
+    "country": "Trinidad and Tobago",
+    "parish": "Port of Spain",
+    "services": ["Gynecology", "Prenatal Care", "Family Planning", "Menopause Support", "STI Screening"],
+    "address": "88 Frederick Street, Port of Spain",
+    "phone": "(868) 555-0303",
+    "hours": "Mon-Fri 7:30AM-4:30PM"
+  },
+  {
+    "id": "4",
+    "name": "San Fernando Community Health Centre",
+    "country": "Trinidad and Tobago",
+    "parish": "San Fernando",
+    "services": ["Gynecology", "Family Planning", "STI Screening"],
+    "address": "22 High Street, San Fernando",
+    "phone": "(868) 555-0404",
+    "hours": "Mon-Fri 8AM-3PM"
+  },
+  {
+    "id": "5",
+    "name": "Bridgetown Family Planning Association",
+    "country": "Barbados",
+    "parish": "St. Michael",
+    "services": ["Family Planning", "STI Screening", "Counseling", "Gynecology"],
+    "address": "Bay Street, Bridgetown",
+    "phone": "(246) 555-0505",
+    "hours": "Mon-Fri 8:30AM-4:30PM"
+  },
+  {
+    "id": "6",
+    "name": "Nassau Women's Health Clinic",
+    "country": "Bahamas",
+    "parish": "Nassau",
+    "services": ["Gynecology", "Prenatal Care", "Family Planning"],
+    "address": "Collins Avenue, Nassau",
+    "phone": "(242) 555-0606",
+    "hours": "Mon-Fri 9AM-5PM"
+  },
+  {
+    "id": "7",
+    "name": "Georgetown Reproductive Health Services",
+    "country": "Guyana",
+    "parish": "Georgetown",
+    "services": ["Gynecology", "Family Planning", "STI Screening", "Prenatal Care"],
+    "address": "Main Street, Georgetown",
+    "phone": "(592) 555-0707",
+    "hours": "Mon-Fri 8AM-4PM"
+  },
+  {
+    "id": "8",
+    "name": "Castries Women's Wellness Clinic",
+    "country": "Saint Lucia",
+    "parish": "Castries",
+    "services": ["Gynecology", "Family Planning", "Menopause Support"],
+    "address": "Bridge Street, Castries",
+    "phone": "(758) 555-0808",
+    "hours": "Mon-Fri 8AM-3:30PM"
+  },
+  {
+    "id": "9",
+    "name": "Spanish Town Community Health",
+    "country": "Jamaica",
+    "parish": "St. Catherine",
+    "services": ["Gynecology", "Family Planning", "STI Screening"],
+    "address": "Bourkes Road, Spanish Town",
+    "phone": "(876) 555-0909",
+    "hours": "Mon-Fri 8:30AM-4PM"
+  },
+  {
+    "id": "10",
+    "name": "St. George's Reproductive Care",
+    "country": "Grenada",
+    "parish": "St. George",
+    "services": ["Gynecology", "Prenatal Care", "Family Planning", "Counseling"],
+    "address": "Grand Anse, St. George's",
+    "phone": "(473) 555-1010",
+    "hours": "Mon-Fri 8AM-4PM, Sat 9AM-12PM"
+  }
+]

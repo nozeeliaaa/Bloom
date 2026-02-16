@@ -1,0 +1,117 @@
+@import url("./theme.css");
+@import url("./base.css");
+@import url("./components.css");
+
+@import url("./dashboard.css");
+@import url("./calendar.css");
+@import url("./settings.css");
+@import url("./survey.css");
+
+.page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.page-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+/* ===== Bloom Loading Overlay ===== */
+.bloom-loading-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.bloom-fall{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  opacity: 0.9;
+}
+
+.bloom-petal{
+  position:absolute;
+  top: -12vh;
+  opacity: 0.85;
+  animation-name: bloomFall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  filter: saturate(1.05);
+}
+
+@keyframes bloomFall{
+  0%{
+    transform: translate3d(0, -15vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10%{
+    opacity: 1;
+  }
+  100%{
+    transform: translate3d(var(--drift, 0px), 120vh, 0)
+               rotate(var(--spin, 90deg));
+    opacity: 0;
+  }
+}
+
+.bloom-loading-card{
+  width: min(520px, 92vw);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.6rem 1.4rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+.bloom-loading-icon{
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display:grid;
+  place-items:center;
+  margin: 0 auto 0.75rem;
+  background: rgba(233, 107, 170, 0.12);
+  font-size: 28px;
+}
+
+.bloom-loading-title{ margin: 0; color: var(--color-primary-dark); }
+.bloom-loading-sub{ margin: 0.35rem 0 1.25rem; color: var(--color-text-muted); }
+
+.bloom-loading-bar{
+  height: 8px;
+  background: rgba(233, 107, 170, 0.18);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bloom-loading-bar-fill{
+  height: 100%;
+  width: 0%;
+  background: var(--color-primary);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+.bloom-loading-tiny{
+  margin-top: 0.8rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}

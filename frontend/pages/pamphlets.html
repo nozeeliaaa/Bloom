@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Educational Pamphlets - Bloom</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Use Option A (single entry stylesheet) -->
+  <link rel="stylesheet" href="/css/main.css" />
+
+  
+  <style>
+    .pamphlet-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* BOOK GRID */
+    .pamphlet-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 640px) {
+      .pamphlet-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 980px) {
+      .pamphlet-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    /* BOOK CARD */
+    .book-card {
+      position: relative;
+      cursor: pointer;
+      border-radius: 14px;
+      border: 1px solid var(--color-border);
+      background: var(--color-card);
+      padding: 18px 16px 14px 18px;
+      min-height: 140px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .book-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.10);
+    }
+
+    .book-spine {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 16px;
+      background: var(--color-primary);
+      opacity: 0.9;
+    }
+
+    .book-top {
+      padding-left: 10px;
+    }
+
+    .book-title {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.2;
+      font-weight: 800;
+      color: var(--color-text);
+    }
+
+    .book-summary {
+      margin: 0.5rem 0 0;
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+
+    .book-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      padding-left: 10px;
+      margin-top: 0.9rem;
+    }
+
+    /* Read view */
+    .pamphlet-reader {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .pamphlet-reader h2 {
+      font-size: 1.5rem;
+      margin: 1.5rem 0 0.75rem;
+      color: var(--color-primary-dark);
+    }
+    .pamphlet-reader h3 {
+      font-size: 1.15rem;
+      margin: 1.25rem 0 0.5rem;
+    }
+    .pamphlet-reader p {
+      margin-bottom: 0.75rem;
+      line-height: 1.7;
+    }
+    .pamphlet-reader ul, .pamphlet-reader ol {
+      margin-bottom: 0.75rem;
+      padding-left: 1.5rem;
+    }
+    .pamphlet-reader li {
+      margin-bottom: 0.35rem;
+      line-height: 1.6;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <div id="banner-area"></div>
+
+    <!-- LIST VIEW -->
+    <div id="list-view">
+      <div class="page-header">
+        <h1>Educational Pamphlets</h1>
+        <p>Read-only health articles on periods, fertility, menopause, and more</p>
+      </div>
+
+      <div class="pamphlet-filters" id="category-filters">
+        <button class="chip selected" data-cat="all">All</button>
+      </div>
+
+      <div class="pamphlet-grid" id="pamphlet-grid">
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <!-- READER VIEW (hidden by default) -->
+    <div id="reader-view" class="hidden">
+      <a href="#" class="back-link" id="back-to-list">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Pamphlets
+      </a>
+
+      <div class="pamphlet-reader">
+        <h1 id="reader-title"></h1>
+        <div class="pamphlet-meta" id="reader-meta"></div>
+        <hr class="section-divider">
+        <div id="reader-content"></div>
+        <hr class="section-divider">
+        <div class="card" style="text-align:center; margin-top:1.5rem;">
+          <p style="margin:0;"><strong>Disclaimer:</strong> This information is educational and is not a substitute for professional medical advice. If you have health concerns, please consult a qualified healthcare provider.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    /**
+     * Pamphlets Page
+     *
+     * Loads pamphlet data from /data/pamphlets.json (static file).
+     * Two views: list (book grid with category filter) and reader (full article).
+     * Sensitive pamphlets are hidden unless user enabled sensitive content in Settings.
+     */
+    import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
+
+    renderNav('pamphlets');
+    renderFooter();
+    renderModeBanner(document.getElementById('banner-area'));
+
+    let pamphlets = [];
+    let activeCategory = 'all';
+
+    async function init() {
+      const res = await fetch('/data/pamphlets.json');
+      pamphlets = await res.json();
+
+      const sensitiveEnabled = localStorage.getItem('bloom_sensitive_enabled') === 'true';
+      if (!sensitiveEnabled) pamphlets = pamphlets.filter(p => !p.sensitive);
+
+      buildCategoryFilters();
+      renderGrid();
+
+      if (window.location.hash) {
+        const id = window.location.hash.slice(1);
+        const pamphlet = pamphlets.find(p => p.id === id);
+        if (pamphlet) openReader(pamphlet);
+      }
+    }
+
+    function buildCategoryFilters() {
+      const cats = [...new Set(pamphlets.map(p => p.category))];
+      const container = document.getElementById('category-filters');
+
+      cats.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = 'chip';
+        btn.textContent = cat;
+        btn.dataset.cat = cat;
+        btn.addEventListener('click', () => {
+          activeCategory = cat;
+          updateFilterChips();
+          renderGrid();
+        });
+        container.appendChild(btn);
+      });
+
+      container.querySelector('[data-cat="all"]').addEventListener('click', () => {
+        activeCategory = 'all';
+        updateFilterChips();
+        renderGrid();
+      });
+    }
+
+    function updateFilterChips() {
+      document.querySelectorAll('#category-filters .chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.cat === activeCategory);
+      });
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('pamphlet-grid');
+      const filtered = activeCategory === 'all'
+        ? pamphlets
+        : pamphlets.filter(p => p.category === activeCategory);
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `<p class="text-muted" style="grid-column:1/-1;text-align:center;padding:2rem;">No pamphlets found for this category.</p>`;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(p => `
+        <div class="book-card" role="button" tabindex="0" data-id="${p.id}" aria-label="Open pamphlet ${p.title}">
+          <span class="book-spine" aria-hidden="true"></span>
+
+          <div class="book-top">
+            <h3 class="book-title">${p.title}</h3>
+            <p class="book-summary">${p.summary}</p>
+          </div>
+
+          <div class="book-meta">
+            <span class="badge badge-primary">${p.category}</span>
+            <span>${p.readTime} read</span>
+            ${p.sensitive ? '<span class="badge badge-warning">Sensitive</span>' : ''}
+          </div>
+        </div>
+      `).join('');
+
+      // Click + keyboard handlers
+      grid.querySelectorAll('.book-card').forEach(card => {
+        const open = () => {
+          const pamphlet = pamphlets.find(p => p.id === card.dataset.id);
+          if (pamphlet) openReader(pamphlet);
+        };
+
+        card.addEventListener('click', open);
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            open();
+          }
+        });
+      });
+    }
+
+    function openReader(pamphlet) {
+      document.getElementById('list-view').classList.add('hidden');
+      document.getElementById('reader-view').classList.remove('hidden');
+
+      document.getElementById('reader-title').textContent = pamphlet.title;
+      document.getElementById('reader-meta').innerHTML = `
+        <span class="badge badge-primary">${pamphlet.category}</span>
+        <span>${pamphlet.readTime} read</span>
+      `;
+      document.getElementById('reader-content').innerHTML = pamphlet.content;
+
+      window.location.hash = pamphlet.id;
+      window.scrollTo(0, 0);
+    }
+
+    document.getElementById('back-to-list').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('reader-view').classList.add('hidden');
+      document.getElementById('list-view').classList.remove('hidden');
+      window.location.hash = '';
+    });
+
+    init();
+  </script>
+</body>
+</html>

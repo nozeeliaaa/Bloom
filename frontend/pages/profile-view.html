@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>View Profile - Bloom</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <style>
+    .profile-layout{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 900px){
+      .profile-layout{
+        grid-template-columns: 1.2fr 0.8fr;
+        align-items:start;
+      }
+    }
+
+    .avatar-card{
+      display:flex;
+      flex-direction:column;
+      gap: 1rem;
+      align-items:center;
+      text-align:center;
+      padding: 1.25rem;
+    }
+
+    .avatar-big{
+      width: 160px;
+      height: 160px;
+      border-radius: 999px;
+      display:grid;
+      place-items:center;
+      border: 1px solid var(--color-border);
+      background: var(--color-card);
+      font-size: 72px;
+      -webkit-user-select:none;
+      user-select:none;
+    }
+
+    .avatar-picker{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 0.5rem;
+      justify-content:center;
+    }
+    .avatar-btn{
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      cursor:pointer;
+      font-size: 20px;
+      display:grid;
+      place-items:center;
+    }
+    .avatar-btn.active{
+      outline: 2px solid var(--color-primary);
+      background: var(--color-card);
+    }
+
+    .form-grid{
+      display:grid;
+      gap: 0.85rem;
+    }
+
+    .danger-zone{
+      border: 1px solid rgba(255,0,0,0.25);
+      background: rgba(255,0,0,0.03);
+    }
+
+    .row-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 0.75rem;
+      align-items:center;
+      justify-content:flex-end;
+      margin-top: 0.75rem;
+    }
+
+    .tiny{
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+    }
+
+    .status{
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--color-border);
+      background: var(--color-card);
+      margin-bottom: 1rem;
+      display:none;
+    }
+    .status.show{ display:block; }
+  </style>
+</head>
+
+<body>
+  <main>
+    <div id="banner-area"></div>
+
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+      <div>
+        <h1 style="margin-bottom:0.25rem;">Profile</h1>
+        <p class="text-muted" style="margin:0;">Edit your Bloom profile info.</p>
+      </div>
+      <a class="btn btn-outline" href="/pages/profile.html">Back</a>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <div class="profile-layout">
+      <!-- LEFT: Big Avatar + quick choices -->
+      <section class="card avatar-card">
+        <div id="avatar-big" class="avatar-big">👤</div>
+        <div class="tiny">Tap an avatar to change your profile photo.</div>
+
+        <div class="avatar-picker" id="avatar-picker">
+          <!-- filled by JS -->
+        </div>
+
+        <div class="tiny" id="account-line">Checking account…</div>
+      </section>
+
+      <!-- RIGHT: Editable fields -->
+      <section class="card">
+        <h2 style="margin-top:0;">Your Details</h2>
+
+        <div class="form-grid">
+          <label class="form-label">
+            Nickname
+            <input class="form-input" id="nickname" type="text" placeholder="e.g., Jahzara" maxlength="40">
+          </label>
+
+          <label class="form-label">
+            Year of Birth
+            <input class="form-input" id="yob" type="number" placeholder="e.g., 2006" min="1900" max="2100">
+          </label>
+
+          <label class="form-label">
+            Notes (optional)
+            <textarea class="form-input" id="notes" rows="3" placeholder="Anything you'd like to remember…"></textarea>
+          </label>
+        </div>
+
+        <div class="row-actions">
+          <button class="btn btn-primary" id="save-btn" type="button">Save</button>
+          <button class="btn btn-outline" id="logout-btn" type="button">Log out</button>
+        </div>
+      </section>
+
+      <!-- FULL WIDTH: Danger Zone -->
+      <section class="card danger-zone" style="grid-column:1/-1;">
+        <h2 style="margin-top:0;">Danger Zone</h2>
+        <p class="tiny" style="margin-top:0.25rem;">
+          Deleting your account removes your Firebase account access for Bloom.
+        </p>
+
+        <div class="row-actions" style="justify-content:space-between;">
+          <div class="tiny" id="delete-hint">You must be logged in to delete your account.</div>
+          <button class="btn" id="delete-btn" type="button" style="background:#ff3b6a;color:white;border:none;" disabled>
+            Delete Account
+          </button>
+        </div>
+      </section>
+
+      <div class="card" style="grid-column:1/-1; text-align:center;">
+        <p style="margin:0;" class="tiny">
+          <strong>Disclaimer:</strong> Bloom is not a substitute for professional medical advice. If you have health concerns, consult a qualified healthcare provider.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner } from "/js/utils.js";
+    import { logout, onAuthChange, getCurrentUser } from "/js/auth.js";
+    import { setMode } from "/js/mode.js";
+    import { getFirebaseAuth, isFirebaseConfigured } from "/js/firebase.js";
+
+    renderNav("profile");
+    renderFooter();
+    renderModeBanner(document.getElementById("banner-area"));
+
+    // ----- Keys (localStorage) -----
+    const LS_PROFILE = "bloom_profile";
+    const LS_AVATAR  = "bloom_avatar";
+
+    // ----- Elements -----
+    const statusEl = document.getElementById("status");
+    const avatarBig = document.getElementById("avatar-big");
+    const avatarPicker = document.getElementById("avatar-picker");
+    const nicknameEl = document.getElementById("nickname");
+    const yobEl = document.getElementById("yob");
+    const notesEl = document.getElementById("notes");
+    const saveBtn = document.getElementById("save-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+    const deleteBtn = document.getElementById("delete-btn");
+    const deleteHint = document.getElementById("delete-hint");
+    const accountLine = document.getElementById("account-line");
+
+    // ----- Helpers -----
+    function showStatus(msg) {
+      statusEl.textContent = msg;
+      statusEl.classList.add("show");
+      setTimeout(() => statusEl.classList.remove("show"), 3500);
+    }
+
+    function loadProfile() {
+      try {
+        return JSON.parse(localStorage.getItem(LS_PROFILE)) || {};
+      } catch {
+        return {};
+      }
+    }
+
+    function saveProfile(profile) {
+      localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+    }
+
+    function setAvatar(emoji) {
+      localStorage.setItem(LS_AVATAR, emoji);
+      avatarBig.textContent = emoji;
+      document.querySelectorAll(".avatar-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.avatar === emoji);
+      });
+    }
+
+    function initAvatarPicker() {
+      const options = ["🌸","👤","😊","🧸","🌺","✨","🌙","🦋","🍓","🩷"];
+      const current = localStorage.getItem(LS_AVATAR) || "👤";
+
+      avatarPicker.innerHTML = options.map(a => `
+        <button class="avatar-btn ${a === current ? "active" : ""}" type="button" data-avatar="${a}" aria-label="Choose avatar ${a}">
+          ${a}
+        </button>
+      `).join("");
+
+      avatarBig.textContent = current;
+
+      avatarPicker.querySelectorAll(".avatar-btn").forEach(btn => {
+        btn.addEventListener("click", () => setAvatar(btn.dataset.avatar));
+      });
+    }
+
+    function fillFields() {
+      const p = loadProfile();
+      nicknameEl.value = p.nickname || "";
+      yobEl.value = p.yob || "";
+      notesEl.value = p.notes || "";
+    }
+
+    function validateYob(value) {
+      if (!value) return true;
+      const n = Number(value);
+      return Number.isFinite(n) && n >= 1900 && n <= 2100;
+    }
+
+    // ----- Save -----
+    saveBtn.addEventListener("click", () => {
+      const nickname = nicknameEl.value.trim();
+      const yob = yobEl.value.trim();
+      const notes = notesEl.value.trim();
+
+      if (!validateYob(yob)) {
+        showStatus("Year of Birth must be between 1900 and 2100.");
+        return;
+      }
+
+      const profile = {
+        nickname,
+        yob: yob ? Number(yob) : "",
+        notes
+      };
+
+      saveProfile(profile);
+      showStatus("Profile saved ✅");
+    });
+
+    // ----- Logout -----
+    logoutBtn.addEventListener("click", async () => {
+      await logout();
+      showStatus("Logged out.");
+      // Keep UI consistent
+      setMode("anon");
+      window.location.href = "/index.html";
+    });
+
+    // ----- Delete account (Firebase Auth) -----
+    async function deleteAccount() {
+      // Only possible if Firebase configured + user logged in
+      const user = await getCurrentUser();
+      if (!user) {
+        showStatus("You must be logged in to delete your account.");
+        return;
+      }
+
+      const ok = confirm("Are you sure you want to delete your account? This cannot be undone.");
+      if (!ok) return;
+
+      try {
+        if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
+        const auth = await getFirebaseAuth();
+        const { deleteUser } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+
+        await deleteUser(auth.currentUser);
+
+        // optional: clear local profile on delete
+        localStorage.removeItem(LS_PROFILE);
+        localStorage.removeItem(LS_AVATAR);
+
+        showStatus("Account deleted.");
+        setMode("anon");
+        window.location.href = "/index.html";
+      } catch (err) {
+        const msg = String(err?.message || err);
+
+        // Common Firebase error: requires recent login
+        if (msg.toLowerCase().includes("requires-recent-login")) {
+          showStatus("For security, please log out, log back in, then try delete again.");
+          return;
+        }
+
+        showStatus("Delete failed: " + msg);
+      }
+    }
+
+    deleteBtn.addEventListener("click", deleteAccount);
+
+    // ----- Auth state UI -----
+    async function updateAuthUI(user) {
+      if (user) {
+        deleteBtn.disabled = false;
+        deleteHint.textContent = "Deleting will remove your Bloom account access.";
+        accountLine.textContent = user.email ? `Signed in as ${user.email}` : "Signed in";
+      } else {
+        deleteBtn.disabled = true;
+        deleteHint.textContent = "You must be logged in to delete your account.";
+        accountLine.textContent = "Not signed in";
+      }
+    }
+
+    // Init
+    initAvatarPicker();
+    fillFields();
+
+    // Watch auth changes
+    onAuthChange(updateAuthUI);
+  </script>
+</body>
+</html>

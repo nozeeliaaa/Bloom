@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log History - Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+
+<style>
+    /* Filter controls */
+    .log-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .log-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .log-entry-symptoms .badge {
+      margin-right: 0.35rem;
+      margin-bottom: 0.25rem;
+    }
+    .log-entry-notes {
+      font-size: 0.88rem;
+      color: var(--color-text-muted);
+      font-style: italic;
+      margin-top: 0.35rem;
+    }
+    .log-empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--color-text-muted);
+    }
+    .log-empty p { margin-bottom: 1rem; }
+    .flow-badge-spotting { background: #FCE8EF; color: #B85C82; }
+    .flow-badge-light { background: #F5D5E0; color: #B85C82; }
+    .flow-badge-medium { background: #E8A0BF; color: #3D1F33; }
+    .flow-badge-heavy { background: #D4749A; color: #FFFFFF; }
+  </style>
+    <link rel="stylesheet" href="/css/main.css" />
+  </head>
+<body>
+  <main>
+    <div id="banner-area"></div>
+
+    <div class="page-header">
+      <h1>Log History</h1>
+      <p>View and filter all your logged entries</p>
+    </div>
+
+    <!-- Filters: flow type and date sort -->
+    <div class="log-filters">
+      <select class="form-select" id="filter-flow" aria-label="Filter by flow">
+        <option value="all">All flows</option>
+        <option value="heavy">Heavy</option>
+        <option value="medium">Medium</option>
+        <option value="light">Light</option>
+        <option value="spotting">Spotting</option>
+        <option value="none">No flow</option>
+      </select>
+      <select class="form-select" id="filter-sort" aria-label="Sort order">
+        <option value="desc">Newest first</option>
+        <option value="asc">Oldest first</option>
+      </select>
+    </div>
+
+    <div id="log-list" class="log-list">
+      <div class="spinner"></div>
+    </div>
+  </main>
+
+  <script type="module">
+    /**
+     * Log History Page
+     * Reads all daily logs from localStorage (anon) or Firestore (account),
+     * then renders them as a scrollable, filterable list.
+     */
+    import { renderNav, renderFooter, renderModeBanner, formatDate } from '/js/utils.js';
+    import { getAllLogs } from '/js/db.js';
+
+    renderNav('log');
+    renderFooter();
+    renderModeBanner(document.getElementById('banner-area'));
+
+    let allEntries = []; // [ [dateKey, data], ... ]
+
+    // Load all logs and render
+    async function init() {
+      const logs = await getAllLogs();
+      allEntries = Object.entries(logs);
+      renderList();
+    }
+
+    // Re-render when filters change
+    document.getElementById('filter-flow').addEventListener('change', renderList);
+    document.getElementById('filter-sort').addEventListener('change', renderList);
+
+    function renderList() {
+      const container = document.getElementById('log-list');
+      const flowFilter = document.getElementById('filter-flow').value;
+      const sortOrder = document.getElementById('filter-sort').value;
+
+      // Filter
+      let filtered = allEntries;
+      if (flowFilter !== 'all') {
+        filtered = filtered.filter(([, d]) => d.flow === flowFilter);
+      }
+
+      // Sort
+      filtered.sort(([a], [b]) => sortOrder === 'desc' ? b.localeCompare(a) : a.localeCompare(b));
+
+      // Empty state
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="log-empty">
+            <p>${allEntries.length === 0 ? 'No entries logged yet.' : 'No entries match your filter.'}</p>
+            <a href="/pages/calendar.html" class="btn btn-primary">Log on Calendar</a>
+          </div>`;
+        return;
+      }
+
+      // Render entries
+      container.innerHTML = filtered.map(([dateKey, data]) => {
+        const flowBadge = data.flow && data.flow !== 'none'
+          ? `<span class="badge flow-badge-${data.flow}">${data.flow.charAt(0).toUpperCase() + data.flow.slice(1)}</span>`
+          : `<span class="badge badge-muted">No flow</span>`;
+
+        const symptoms = (data.symptoms && data.symptoms.length)
+          ? `<div class="log-entry-symptoms">${data.symptoms.map(s => `<span class="badge badge-primary">${s}</span>`).join('')}</div>`
+          : '';
+
+        const severity = data.severity && data.severity > 1
+          ? `<span class="badge badge-warning">Severity: ${data.severity}/5</span>`
+          : '';
+
+        const notes = data.notes
+          ? `<div class="log-entry-notes">"${data.notes}"</div>`
+          : '';
+
+        return `
+          <div class="log-entry">
+            <div class="log-entry-date">${formatDate(dateKey)}</div>
+            <div class="log-entry-details">
+              <div style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.35rem;">
+                ${flowBadge} ${severity}
+              </div>
+              ${symptoms}
+              ${notes}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    init();
+  </script>
+</body>
+</html>

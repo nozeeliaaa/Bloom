@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bloom — Help</title>
+
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/pages.css">
+
+</head>
+<body>
+  <div id="banner-area"></div>
+
+  <main class="page">
+    <header class="page-header">
+      <div class="page-title">
+        <span class="title-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 17a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 19zm1.4-6.7c-.9.6-1.1.9-1.1 1.7v.3h-2v-.5c0-1.6.7-2.4 2-3.2.9-.6 1.4-1 1.4-1.8 0-.8-.6-1.3-1.5-1.3-1 0-1.6.6-1.7 1.6l-2-.2c.2-2 1.7-3.3 3.8-3.3 2.2 0 3.6 1.2 3.6 3.2 0 1.7-1 2.6-2.5 3.5z"/></svg>
+        </span>
+        <h1>Help</h1>
+      </div>
+      <p class="page-subtitle">Quick answers to common questions about using Bloom.</p>
+    </header>
+
+    <section class="card">
+      <h2>FAQs</h2>
+
+      <div class="stack stack-margin-top">
+        <div class="faq-item">
+          <div class="faq-q"><strong>How do I log my period?</strong><span class="muted">+</span></div>
+          <div class="faq-a">Go to <strong>Calendar</strong>, tap a day, choose your flow, symptoms, then save.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q"><strong>How is my cycle length calculated?</strong><span class="muted">+</span></div>
+          <div class="faq-a">Bloom detects your period <strong>start days</strong> from your flow logs, then measures the days between starts.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q"><strong>Is my data private?</strong><span class="muted">+</span></div>
+          <div class="faq-a">Your logs stay on your device in this demo (localStorage). In a full version, we’d add secure storage + consent controls.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q"><strong>How do I download a report?</strong><span class="muted">+</span></div>
+          <div class="faq-a">Open <strong>Report for Doctor</strong> and click <strong>Download Health Report</strong>.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
+    renderNav("help");
+    renderFooter();
+    renderBloomieFab();
+    renderModeBanner(document.getElementById("banner-area"));
+
+    document.querySelectorAll(".faq-item").forEach(item => {
+      item.querySelector(".faq-q").addEventListener("click", () => {
+        item.classList.toggle("open");
+      });
+    });
+  </script>
+</body>
+</html>

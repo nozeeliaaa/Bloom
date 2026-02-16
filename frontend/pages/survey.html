@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bloom • Survey</title>
+
+    <!-- Use the SAME styling stack as the rest of the app -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+
+
+    <link rel="stylesheet" href="/css/main.css" />
+  </head>
+
+  <body>
+    <main id="app"></main>
+
+    <!-- Optional safety: if they already onboarded, don’t let them sit on survey -->
+    <script>
+     const params = new URLSearchParams(window.location.search);
+     const force = params.get("force") === "1";
+     if (!force && localStorage.getItem("bloom_onboarded") === "1") {
+        window.location.replace("/pages/pdashboard.html");
+      }
+    </script>
+
+    <!-- Load the survey via ES module -->
+    <script type="module" src="/js/survey-page.js"></script>
+  </body>
+</html>

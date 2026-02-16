@@ -1,0 +1,110 @@
+/* ===== BLOOM THEME - Light Mode (default) ===== */
+:root {
+  --color-primary: #D4749A;
+  --color-primary-dark: #B85C82;
+  --color-primary-light: #F5D5E0;
+  --color-primary-lightest: #FFF0F5;
+
+  --color-secondary: #7BAE7F;
+  --color-secondary-light: #D4EDCF;
+
+  --color-bg: #FFF8FA;
+  --color-bg-card: #FFFFFF;
+  --color-bg-hover: #FFF0F5;
+
+  --color-text: #3D1F33;
+  --color-text-muted: #8B6B7D;
+  --color-text-inverse: #FFFFFF;
+
+  --color-border: #F0D6E0;
+  --color-border-dark: #D4A0B8;
+
+  --color-danger: #D94F4F;
+  --color-warning: #E8A838;
+  --color-success: #5BA865;
+  --color-info: #5B9BD5;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 4px rgba(180, 100, 140, 0.06);
+  --shadow: 0 2px 12px rgba(180, 100, 140, 0.08);
+  --shadow-lg: 0 4px 24px rgba(180, 100, 140, 0.12);
+  --shadow-xl: 0 8px 40px rgba(180, 100, 140, 0.16);
+
+  --transition: 0.2s ease;
+}
+
+/* ===== DARK MODE ===== */
+[data-theme="dark"] {
+  --color-primary: #E08AAF;
+  --color-primary-dark: #F5B0CC;
+  --color-primary-light: #4A2640;
+  --color-primary-lightest: #2D1A26;
+
+  --color-secondary: #6CA870;
+  --color-secondary-light: #1E3320;
+
+  --color-bg: #1A1118;
+  --color-bg-card: #261A22;
+  --color-bg-hover: #33222C;
+
+  --color-text: #F0E4EA;
+  --color-text-muted: #A08894;
+  --color-text-inverse: #1A1118;
+
+  --color-border: #3D2A36;
+  --color-border-dark: #5A3D4E;
+
+  --color-danger: #F06060;
+  --color-warning: #F0B848;
+  --color-success: #6CC070;
+  --color-info: #6CAAE0;
+
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.15);
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 8px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Dark mode specific overrides for elements with hardcoded colors */
+[data-theme="dark"] .disclaimer-card {
+  background: #332A1A;
+  border-color: var(--color-warning);
+}
+[data-theme="dark"] .disclaimer-card p {
+  color: #F0D088;
+}
+[data-theme="dark"] .danger-zone {
+  background: #331A1A;
+  border-color: var(--color-danger);
+}
+[data-theme="dark"] .mode-badge-anon {
+  background: #332A1A;
+  color: #F0B848;
+}
+[data-theme="dark"] .mode-badge-account {
+  background: var(--color-secondary-light);
+  color: #6CC070;
+}
+[data-theme="dark"] .flow-badge-spotting { background: #3D2235; color: #E08AAF; }
+[data-theme="dark"] .flow-badge-light { background: #3D2235; color: #E08AAF; }
+[data-theme="dark"] .flow-badge-medium { background: #4A2640; color: #F5B0CC; }
+[data-theme="dark"] .flow-badge-heavy { background: #5A2040; color: #FFFFFF; }
+[data-theme="dark"] .banner-warning {
+  background: #332A1A;
+  border-color: #5A4A20;
+  color: #F0D088;
+}
+
+/* Subtle floral background pattern - light */
+body {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4749A' fill-opacity='0.04'%3E%3Cpath d='M30 20c-2 0-4 2-4 4s2 4 4 4 4-2 4-4-2-4-4-4zm-6 6c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5zm12 0c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5zm-6 4c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+/* Dark mode: reduce pattern visibility */
+[data-theme="dark"] body {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23E08AAF' fill-opacity='0.02'%3E%3Cpath d='M30 20c-2 0-4 2-4 4s2 4 4 4 4-2 4-4-2-4-4-4zm-6 6c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5zm12 0c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5zm-6 4c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
