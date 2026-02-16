@@ -1,0 +1,8 @@
+# Firebase service account (if using JSON)
+serviceAccountKey.json
+
+# Environment variables
+.env
+
+# Node modules (always ignore)
+node_modules/
