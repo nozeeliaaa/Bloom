@@ -1,20 +1,29 @@
 // server.js
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-import userRoutes from "./routes/user.js"; // import the user routes
-
-dotenv.config();
+import cycleLogRoutes from "./routes/cycleLogs.js";
+import symptomLogRoutes from "./routes/symptomLogs.js";
+import consentRoutes from "./routes/consent.js";
+import catalogRoutes from "./routes/catalog.js";
+import userRoutes from "./routes/user.js";
+import authRoutes from "./routes/auth.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Register your user routes under /api/user
+app.use("/api/cycle", cycleLogRoutes);
+app.use("/api/symptoms", symptomLogRoutes);
+app.use("/api/consent", consentRoutes);
+app.use("/api/catalog", catalogRoutes);
+
+app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 
-// Example health route
 app.get("/health", (req, res) => {
   res.json({ ok: true, message: "Backend is running 🚀" });
 });

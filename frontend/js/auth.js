@@ -46,3 +46,8 @@ export async function onAuthChange(callback) {
   const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
   return onAuthStateChanged(auth, callback);
 }
+export async function getIdToken() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return await user.getIdToken();
+}

@@ -7,6 +7,8 @@
  * For production, use environment variables or a build step to inject these.
  * This file should be in .gitignore for security.
  */
+window.BLOOM_API_BASE = "http://localhost:4000";
+
 export const firebaseConfig = {
   apiKey: "AIzaSyCoY7010ONRgfc9ic6orCefKgSFAbAaOtg",
   authDomain: "bloom-8401a.firebaseapp.com",
