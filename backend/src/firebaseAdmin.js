@@ -1,26 +1,34 @@
+// src/firebaseAdmin.js
 import admin from "firebase-admin";
 import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+function initAdmin() {
+  // Prevent re-init on hot reload or in tests
+  if (admin.apps.length) return admin.app();
 
-// serviceAccountKey.json is in /backend (one level above /src)
-const keyPath = path.join(__dirname, "../serviceAccountKey.json");
+  let credential;
 
-if (!fs.existsSync(keyPath)) {
-  throw new Error(`Missing serviceAccountKey.json at: ${keyPath}`);
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // Production / hosted environment: full JSON string in env var
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    credential = admin.credential.cert(serviceAccount);
+  } else if (fs.existsSync("./serviceAccountKey.json")) {
+    // Local dev fallback: key file on disk
+    const serviceAccount = JSON.parse(
+      fs.readFileSync("./serviceAccountKey.json", "utf8")
+    );
+    credential = admin.credential.cert(serviceAccount);
+  } else {
+    // Platform-managed credentials (e.g. Google Cloud Run, App Engine)
+    credential = admin.credential.applicationDefault();
+  }
+
+  admin.initializeApp({ credential });
+  return admin.app();
 }
 
-const serviceAccount = JSON.parse(fs.readFileSync(keyPath, "utf8"));
+initAdmin();
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-}
-
-export const auth = admin.auth();
+export { admin };
 export const db = admin.firestore();
-export default admin;
+export const auth = admin.auth();
