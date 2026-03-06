@@ -3,7 +3,7 @@ import express from "express";
 import admin from "firebase-admin";
 import { db, auth } from "../firebaseAdmin.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
-import { validateConsentRequest, validateConsentUpdate } from "../validators/validateconsent.js";
+import { validateConsentRequest, validateConsentUpdate } from "../validators/validateConsent.js";
 
 const router = express.Router();
 

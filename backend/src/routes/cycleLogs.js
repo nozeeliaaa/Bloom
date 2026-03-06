@@ -2,7 +2,7 @@
 import express from "express";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
-import { validateCycleLog } from "../validators/validatecyclelog.js";
+import { validateCycleLog } from "../validators/validateCycleLog.js";
 
 const router = express.Router();
 

@@ -3,7 +3,7 @@ import express from "express";
 import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
-import { validateUserProfile } from "../validators/validateuser.js";
+import { validateUserProfile } from "../validators/validateUser.js";
 
 const router = express.Router();
 
