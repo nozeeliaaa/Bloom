@@ -1,0 +1,542 @@
+[
+  {
+    "key": "VAGINAL_BLEEDING",
+    "label": "Vaginal bleeding",
+    "category": "Bleeding",
+    "description": "Period flow present today",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "SPOTTING",
+    "label": "Spotting",
+    "category": "Bleeding",
+    "description": "Light bleeding outside of period",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "HEAVY_FLOW",
+    "label": "Heavy flow",
+    "category": "Bleeding",
+    "description": "Soaking a pad or tampon quickly",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "LARGE_CLOTS",
+    "label": "Large clots",
+    "category": "Bleeding",
+    "description": "Passing clots larger than a quarter — consider speaking to a provider",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CRAMPS",
+    "label": "Cramps",
+    "category": "Pain",
+    "description": "Pelvic or uterine cramping",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "PELVIC_PAIN",
+    "label": "Pelvic pain",
+    "category": "Pain",
+    "description": "Pain or pressure in the lower abdomen",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "OVULATION_PAIN",
+    "label": "Ovulation pain",
+    "category": "Pain",
+    "description": "Mild one-sided pain around mid-cycle (mittelschmerz)",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "HEADACHE",
+    "label": "Headache",
+    "category": "Pain",
+    "description": "Head pain or pressure",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "JOINT_PAIN",
+    "label": "Joint or muscle pain",
+    "category": "Pain",
+    "description": "Aches in joints or muscles",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "BREAST_TENDERNESS",
+    "label": "Breast tenderness",
+    "category": "Pain",
+    "description": "Sore or tender breasts",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "BLOATING",
+    "label": "Bloating",
+    "category": "Digestion",
+    "description": "Feeling of fullness or swelling in the abdomen",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "GASSY",
+    "label": "Gassy",
+    "category": "Digestion",
+    "description": "Increased gas or wind",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "HEARTBURN",
+    "label": "Heartburn",
+    "category": "Digestion",
+    "description": "Burning sensation in the chest or throat",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "NAUSEA",
+    "label": "Nausea",
+    "category": "Digestion",
+    "description": "Feeling of sickness or urge to vomit",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CONSTIPATION",
+    "label": "Constipation",
+    "category": "Stool",
+    "description": "Difficulty passing stools",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "DIARRHEA",
+    "label": "Diarrhea",
+    "category": "Stool",
+    "description": "Loose or frequent stools",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "DISCHARGE_NONE",
+    "label": "No discharge",
+    "category": "Discharge",
+    "description": "No vaginal discharge today",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "DISCHARGE_STICKY",
+    "label": "Sticky discharge",
+    "category": "Discharge",
+    "description": "Dry or sticky vaginal discharge",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "DISCHARGE_CREAMY",
+    "label": "Creamy discharge",
+    "category": "Discharge",
+    "description": "White or creamy vaginal discharge",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "DISCHARGE_EGGWHITE",
+    "label": "Egg-white discharge",
+    "category": "Discharge",
+    "description": "Clear, stretchy discharge — often a sign of ovulation",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "UNUSUAL_DISCHARGE",
+    "label": "Unusual discharge",
+    "category": "Discharge",
+    "description": "Discharge that looks or smells different from normal",
+    "teenSafe": true,
+    "sensitive": true,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "FATIGUE",
+    "label": "Fatigue",
+    "category": "Energy",
+    "description": "Feeling tired or low on energy",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "FLUID_RETENTION",
+    "label": "Fluid retention",
+    "category": "Physical",
+    "description": "Feeling puffy or swollen, especially in hands or feet",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "ACNE",
+    "label": "Acne",
+    "category": "Skin",
+    "description": "Breakouts or skin flare-ups",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "DRY_SKIN",
+    "label": "Dry skin",
+    "category": "Skin",
+    "description": "Skin feeling dry or tight",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "HAIR_THINNING",
+    "label": "Hair thinning",
+    "category": "Hair",
+    "description": "Noticeable hair loss or thinning",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "HOT_FLASHES",
+    "label": "Hot flashes",
+    "category": "Temperature",
+    "description": "Sudden feeling of intense heat",
+    "teenSafe": false,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "NIGHT_SWEATS",
+    "label": "Night sweats",
+    "category": "Temperature",
+    "description": "Sweating heavily during sleep",
+    "teenSafe": false,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "COLD_FLASHES",
+    "label": "Cold flashes",
+    "category": "Temperature",
+    "description": "Sudden feeling of intense cold",
+    "teenSafe": false,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "BBT_SHIFT",
+    "label": "Basal temp shift",
+    "category": "Temperature",
+    "description": "Slight rise in basal body temperature — often indicates ovulation has occurred",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "MOOD_SWINGS",
+    "label": "Mood swings",
+    "category": "Mood",
+    "description": "Rapid or unexpected changes in mood",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "IRRITABILITY",
+    "label": "Irritability",
+    "category": "Mood",
+    "description": "Feeling easily annoyed or frustrated",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "ANXIETY",
+    "label": "Anxiety",
+    "category": "Mood",
+    "description": "Feeling worried, nervous, or on edge",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "DEPRESSION",
+    "label": "Low mood",
+    "category": "Mood",
+    "description": "Feeling down, hopeless, or emotionally flat",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CRYING_SPELLS",
+    "label": "Crying spells",
+    "category": "Mood",
+    "description": "Feeling tearful or crying more than usual",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CALM",
+    "label": "Calm",
+    "category": "Mood",
+    "description": "Feeling settled and at ease",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "STRESSED",
+    "label": "Stressed",
+    "category": "Mood",
+    "description": "Feeling under pressure or overwhelmed",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "BRAIN_FOG",
+    "label": "Brain fog",
+    "category": "Mind",
+    "description": "Difficulty thinking clearly or concentrating",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "FORGETFUL",
+    "label": "Forgetfulness",
+    "category": "Mind",
+    "description": "Having trouble remembering things",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "POOR_CONCENTRATION",
+    "label": "Poor concentration",
+    "category": "Mind",
+    "description": "Difficulty focusing on tasks",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "INSOMNIA",
+    "label": "Insomnia",
+    "category": "Sleep",
+    "description": "Difficulty falling or staying asleep",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "SOCIABLE",
+    "label": "Sociable",
+    "category": "Social",
+    "description": "Feeling outgoing and connected to others",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "WITHDRAWN",
+    "label": "Withdrawn",
+    "category": "Social",
+    "description": "Wanting to avoid social interaction",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CRAVING_SWEET",
+    "label": "Sweet cravings",
+    "category": "Cravings",
+    "description": "Strong desire for sweet foods",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CRAVING_SALTY",
+    "label": "Salty cravings",
+    "category": "Cravings",
+    "description": "Strong desire for salty foods",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CRAVING_GREASY",
+    "label": "Greasy food cravings",
+    "category": "Cravings",
+    "description": "Strong desire for fried or greasy foods",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CRAVING_SPICY",
+    "label": "Spicy food cravings",
+    "category": "Cravings",
+    "description": "Strong desire for spicy foods",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "APPETITE_INCREASE",
+    "label": "Increased appetite",
+    "category": "Cravings",
+    "description": "Feeling hungrier than usual",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "APPETITE_DECREASE",
+    "label": "Decreased appetite",
+    "category": "Cravings",
+    "description": "Less interest in eating than usual",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "INCREASED_LIBIDO",
+    "label": "Increased libido",
+    "category": "Fertility",
+    "description": "Heightened sexual desire — common around ovulation",
+    "teenSafe": false,
+    "sensitive": true,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "DECREASED_LIBIDO",
+    "label": "Decreased libido",
+    "category": "Fertility",
+    "description": "Reduced sexual desire",
+    "teenSafe": false,
+    "sensitive": true,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "CERVICAL_MUCUS_CHANGE",
+    "label": "Cervical mucus change",
+    "category": "Fertility",
+    "description": "Noticeable change in vaginal discharge related to fertility",
+    "teenSafe": false,
+    "sensitive": true,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "VAGINAL_DRYNESS",
+    "label": "Vaginal dryness",
+    "category": "Fertility",
+    "description": "Dryness or discomfort in the vaginal area",
+    "teenSafe": false,
+    "sensitive": true,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "PAIN_DURING_SEX",
+    "label": "Pain during sex",
+    "category": "Fertility",
+    "description": "Discomfort or pain during sexual intercourse",
+    "teenSafe": false,
+    "sensitive": true,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "MISSED_PERIOD",
+    "label": "Missed period",
+    "category": "Cycle",
+    "description": "Expected period did not arrive",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "IRREGULAR_PERIOD",
+    "label": "Irregular period",
+    "category": "Cycle",
+    "description": "Period came earlier or later than expected",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "FREQUENT_URINATION",
+    "label": "Frequent urination",
+    "category": "Physical",
+    "description": "Needing to urinate more often than usual",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "WEIGHT_CHANGE",
+    "label": "Weight change",
+    "category": "Weight",
+    "description": "Noticeable change in body weight",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "SMELL_SENSITIVITY",
+    "label": "Smell sensitivity",
+    "category": "Physical",
+    "description": "Heightened sensitivity to smells",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  },
+  {
+    "key": "NASAL_CONGESTION",
+    "label": "Nasal congestion",
+    "category": "Physical",
+    "description": "Stuffy or blocked nose",
+    "teenSafe": true,
+    "sensitive": false,
+    "severityScale": { "min": 0, "max": 5 }
+  }
+]
