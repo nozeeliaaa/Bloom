@@ -1,7 +1,7 @@
 /**
  * Shared utility functions: nav, footer, date helpers
  */
-import { getMode, isAccountMode } from "./mode.js";
+import { isAccountMode } from "./mode.js";
 import { initTheme } from "./theme-manager.js";
 
 // ✅ Single source of truth for this key
@@ -19,21 +19,9 @@ export const ICONS = {
   chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
   book: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
   mapPin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
-  settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
-  logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
-  login: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>`,
   menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`,
-  x: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
-  cloud: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>`,
   shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
-  plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
-  chevLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`,
-  chevRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`,
-  edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
-  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
-  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
-  alert: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z"/><path d="M9 12l2 2 4-4"/></svg>`,
 };
 
 export function icon(name, size = 18) {
@@ -43,32 +31,35 @@ export function icon(name, size = 18) {
 
 /* ===== NAVIGATION ===== */
 export function renderNav(activePage = "") {
-  const mode = getMode();
   const nav = document.createElement("nav");
   nav.className = "navbar";
   nav.setAttribute("role", "navigation");
   nav.setAttribute("aria-label", "Main navigation");
 
   const links = [
-  { href: "/pages/dashboard.html", label: "Dashboard", icon: "home", page: "dashboard" },
-  { href: "/pages/calendar.html", label: "Calendar", icon: "calendar", page: "calendar" },
-  { href: "/pages/assistant.html", label: "Bloomie", icon: "chat", page: "assistant" },
-  { href: "/pages/pamphlets.html", label: "Learn", icon: "book", page: "pamphlets" },
-  { href: "/pages/clinics.html", label: "Clinics", icon: "mapPin", page: "clinics" },
-];
+    { href: "/pages/dashboard.html", label: "Dashboard", icon: "home", page: "dashboard" },
+    { href: "/pages/calendar.html", label: "Calendar", icon: "calendar", page: "calendar" },
+    { href: "/pages/assistant.html", label: "Bloomie", icon: "chat", page: "assistant" },
+    { href: "/pages/pamphlets.html", label: "Learn", icon: "book", page: "pamphlets" },
+    { href: "/pages/clinics.html", label: "Clinics", icon: "mapPin", page: "clinics" },
+  ];
 
-const avatar = localStorage.getItem("bloom_avatar") || "👤"; // emoji avatar fallback
-const profileBtn = `
-  <a href="/pages/profile.html" class="nav-avatar ${activePage === "profile" ? "active" : ""}" aria-label="Open profile">
-    <span class="nav-avatar-circle">${avatar}</span>
-  </a>
-`;
+  // ✅ Admin link: account-only + cached flag set by auth.js
+  const showAdmin = isAccountMode() && localStorage.getItem("bloom_is_admin") === "1";
+  if (showAdmin) links.push({ href: "/pages/admin.html", label: "Admin", icon: "admin", page: "admin" });
 
+  const avatar = localStorage.getItem("bloom_avatar") || "👤";
+  const profileBtn = `
+    <a href="/pages/profile.html" class="nav-avatar ${activePage === "profile" ? "active" : ""}" aria-label="Open profile">
+      <span class="nav-avatar-circle">${avatar}</span>
+    </a>
+  `;
 
   nav.innerHTML = `
     <div class="navbar-inner">
-      <a href="/frontend/index.html" class="navbar-brand" aria-label="Bloom home">
-        ${icon("flower", 28)} Bloom
+      <a href="/index.html" class="navbar-brand" aria-label="Bloom home">
+        <img src="/assets/bloom-logo.png" alt="Bloom" class="navbar-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
+        <span class="navbar-brand-text" style="display:none;">${icon("flower", 28)} Bloom</span>
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
         ${icon("menu", 24)}
@@ -77,9 +68,9 @@ const profileBtn = `
         ${links
           .map(
             (l) =>
-              `<a href="${l.href}" role="menuitem" class="${
-                activePage === l.page ? "active" : ""
-              }">${icon(l.icon, 16)} ${l.label}</a>`
+              `<a href="${l.href}" role="menuitem" class="${activePage === l.page ? "active" : ""}">
+                ${icon(l.icon, 16)} ${l.label}
+              </a>`
           )
           .join("")}
         <span class="nav-spacer" aria-hidden="true"></span>
@@ -90,7 +81,6 @@ const profileBtn = `
 
   document.body.prepend(nav);
 
-  // Mobile toggle
   const toggle = nav.querySelector(".nav-toggle");
   const linkContainer = nav.querySelector(".navbar-links");
 
@@ -99,7 +89,6 @@ const profileBtn = `
     toggle.setAttribute("aria-expanded", String(open));
   });
 
-  // Close on click (mobile)
   linkContainer.querySelectorAll("a").forEach((a) => {
     a.addEventListener("click", () => linkContainer.classList.remove("open"));
   });
@@ -111,11 +100,8 @@ export function renderFooter() {
   footer.className = "footer";
   footer.setAttribute("role", "contentinfo");
   footer.innerHTML = `
-    <p class="footer-disclaimer">${icon(
-      "shield",
-      14
-    )} Bloom is an educational tool and does not provide medical diagnoses. Always consult a qualified healthcare provider for medical advice.</p>
-    <p>&copy; ${new Date().getFullYear()} Bloom &mdash; Caribbean Reproductive Health Support</p>
+    <p class="footer-disclaimer">${icon("shield", 14)} Bloom is an educational tool and does not provide medical diagnoses. Always consult a qualified healthcare provider for medical advice.</p>
+    <p>&copy; ${new Date().getFullYear()} Bloom &mdash; Jamaican Reproductive Health Support</p>
   `;
   document.body.appendChild(footer);
 }
@@ -124,16 +110,13 @@ export function renderFooter() {
 export function renderModeBanner(container) {
   if (!container) return;
 
-  // Only show if flag is set
   if (localStorage.getItem(MODE_BANNER_ONCE_KEY) !== "1") {
     container.innerHTML = "";
     return;
   }
 
-  // clear it so it won't show again
   localStorage.removeItem(MODE_BANNER_ONCE_KEY);
 
-  // show only for account mode
   if (!isAccountMode()) {
     container.innerHTML = "";
     return;
@@ -166,18 +149,8 @@ export function toDateKey(date) {
 
 export function getMonthName(monthIndex) {
   return [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
   ][monthIndex];
 }
 
@@ -190,26 +163,15 @@ export function getFirstDayOfWeek(year, month) {
 }
 
 /* ===== SYMPTOM LIST ===== */
-export const SYMPTOMS = [
-  "Cramps",
-  "Bloating",
-  "Headache",
-  "Fatigue",
-  "Mood swings",
-  "Breast tenderness",
-  "Back pain",
-  "Nausea",
-  "Acne",
-  "Insomnia",
-  "Hot flashes",
-  "Night sweats",
-  "Dizziness",
-  "Food cravings",
-  "Joint pain",
-  "Anxiety",
-  "Irritability",
-  "Brain fog",
-];
+export const SYMPTOM_CATEGORIES = {
+  "Pain & Discomfort": ["Cramps", "Back pain", "Headache", "Joint pain", "Pelvic pain", "Muscle aches"],
+  "Digestive": ["Bloating", "Nausea", "Food cravings", "Appetite changes", "Constipation", "Diarrhea"],
+  "Energy & Sleep": ["Fatigue", "Insomnia", "Brain fog", "Dizziness", "Low energy", "Oversleeping"],
+  "Mood & Mental": ["Mood swings", "Anxiety", "Irritability", "Depression", "Stress", "Low motivation"],
+  "Skin & Body": ["Acne", "Breast tenderness", "Hot flashes", "Night sweats", "Swelling", "Hair changes"],
+};
+
+export const SYMPTOMS = Object.values(SYMPTOM_CATEGORIES).flat();
 
 export const FLOW_OPTIONS = ["none", "spotting", "light", "medium", "heavy"];
 
@@ -268,14 +230,11 @@ export function showToast(message, type = "success") {
   setTimeout(() => toast.remove(), 2800);
 }
 
-// Add toast animation
 const style = document.createElement("style");
 style.textContent = `@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`;
 document.head.appendChild(style);
 
-
 export function renderBloomieFab() {
-  // Avoid duplicates if multiple scripts call it
   if (document.getElementById("bloomie-fab")) return;
 
   const fab = document.createElement("button");
@@ -311,4 +270,3 @@ export function renderBloomieFab() {
     if (t && t.dataset && t.dataset.close) close();
   });
 }
-

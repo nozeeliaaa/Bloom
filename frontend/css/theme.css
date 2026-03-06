@@ -1,28 +1,41 @@
 /* ===== BLOOM THEME - Light Mode (default) ===== */
 :root {
-  --color-primary: #D4749A;
-  --color-primary-dark: #B85C82;
-  --color-primary-light: #F5D5E0;
-  --color-primary-lightest: #FFF0F5;
+  /* Primary pink matched to logo's vibrant hot pink */
+  --color-primary: #D4187A;
+  --color-primary-dark: #D4187A;
+  --color-primary-light: #F5C5DC;
+  --color-primary-lightest: #FFF0F7;
 
   --color-secondary: #7BAE7F;
   --color-secondary-light: #D4EDCF;
 
-  --color-bg: #FFF8FA;
-  --color-bg-card: #FFFFFF;
-  --color-bg-hover: #FFF0F5;
+  --color-bg: #FFF7FA;
+  --color-bg-card: #FFFEFB;
+  --color-bg-hover: #F5F0E8;
 
-  --color-text: #3D1F33;
-  --color-text-muted: #8B6B7D;
+  --color-text: #3D1530;
+  --color-text-muted: #8A5A72;
   --color-text-inverse: #FFFFFF;
 
-  --color-border: #F0D6E0;
-  --color-border-dark: #D4A0B8;
+  --color-border: #F0D0E4;
+  --color-border-dark: #D4A0C0;
 
   --color-danger: #D94F4F;
   --color-warning: #E8A838;
   --color-success: #5BA865;
   --color-info: #5B9BD5;
+
+  /* Phase colors */
+  --phase-menstrual:    #E05C7A;
+  --phase-menstrual-bg: #FFF0F3;
+  --phase-follicular:    #5B9BD5;
+  --phase-follicular-bg: #EEF5FF;
+  --phase-ovulation:    #5BA865;
+  --phase-ovulation-bg: #EEF9EF;
+  --phase-luteal:       #E8A838;
+  --phase-luteal-bg:    #FFF8EC;
+  --phase-unknown:      #8B6B7D;
+  --phase-unknown-bg:   #F5EFF3;
 
   --radius-sm: 8px;
   --radius: 12px;
@@ -39,72 +52,76 @@
 
 /* ===== DARK MODE ===== */
 [data-theme="dark"] {
-  --color-primary: #E08AAF;
-  --color-primary-dark: #F5B0CC;
-  --color-primary-light: #4A2640;
-  --color-primary-lightest: #2D1A26;
+  --color-primary: #F060A0;
+  --color-primary-dark: #F8A0CC;
+  --color-primary-light: #3A1430;
+  --color-primary-lightest: #231020;
 
   --color-secondary: #6CA870;
-  --color-secondary-light: #1E3320;
+  --color-secondary-light: #1C3020;
 
-  --color-bg: #1A1118;
-  --color-bg-card: #261A22;
-  --color-bg-hover: #33222C;
+  /* Near-black with a barely-there warm tint — not wine/purple */
+  --color-bg: #141214;
+  --color-bg-card: #1E1B1E;
+  --color-bg-hover: #272428;
 
-  --color-text: #F0E4EA;
-  --color-text-muted: #A08894;
-  --color-text-inverse: #1A1118;
+  --color-text: #EDE0E8;
+  --color-text-muted: #9A8896;
+  --color-text-inverse: #141214;
 
-  --color-border: #3D2A36;
-  --color-border-dark: #5A3D4E;
+  --color-border: #2C2830;
+  --color-border-dark: #423848;
 
   --color-danger: #F06060;
   --color-warning: #F0B848;
   --color-success: #6CC070;
   --color-info: #6CAAE0;
 
-  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.15);
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.25);
-  --shadow-xl: 0 8px 40px rgba(0, 0, 0, 0.3);
+  /* Phase colors (dark mode) — slightly more vibrant on dark bg */
+  --phase-menstrual:    #F07090;
+  --phase-menstrual-bg: #2A1620;
+  --phase-follicular:    #6CAAE0;
+  --phase-follicular-bg: #142030;
+  --phase-ovulation:    #6CC070;
+  --phase-ovulation-bg: #142018;
+  --phase-luteal:       #F0B848;
+  --phase-luteal-bg:    #271E08;
+  --phase-unknown:      #9A8896;
+  --phase-unknown-bg:   #201C22;
+
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.25);
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
 
 /* Dark mode specific overrides for elements with hardcoded colors */
 [data-theme="dark"] .disclaimer-card {
-  background: #332A1A;
+  background: #271E08;
   border-color: var(--color-warning);
 }
 [data-theme="dark"] .disclaimer-card p {
   color: #F0D088;
 }
 [data-theme="dark"] .danger-zone {
-  background: #331A1A;
+  background: #2A1414;
   border-color: var(--color-danger);
 }
 [data-theme="dark"] .mode-badge-anon {
-  background: #332A1A;
+  background: #271E08;
   color: #F0B848;
 }
 [data-theme="dark"] .mode-badge-account {
   background: var(--color-secondary-light);
   color: #6CC070;
 }
-[data-theme="dark"] .flow-badge-spotting { background: #3D2235; color: #E08AAF; }
-[data-theme="dark"] .flow-badge-light { background: #3D2235; color: #E08AAF; }
-[data-theme="dark"] .flow-badge-medium { background: #4A2640; color: #F5B0CC; }
-[data-theme="dark"] .flow-badge-heavy { background: #5A2040; color: #FFFFFF; }
+[data-theme="dark"] .flow-badge-spotting { background: #301828; color: #E08AAF; }
+[data-theme="dark"] .flow-badge-light    { background: #301828; color: #E08AAF; }
+[data-theme="dark"] .flow-badge-medium   { background: #3C1E34; color: #F5B0CC; }
+[data-theme="dark"] .flow-badge-heavy    { background: #501838; color: #FFFFFF; }
 [data-theme="dark"] .banner-warning {
-  background: #332A1A;
-  border-color: #5A4A20;
+  background: #27200A;
+  border-color: #4A3C18;
   color: #F0D088;
 }
 
-/* Subtle floral background pattern - light */
-body {
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4749A' fill-opacity='0.04'%3E%3Cpath d='M30 20c-2 0-4 2-4 4s2 4 4 4 4-2 4-4-2-4-4-4zm-6 6c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5zm12 0c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5zm-6 4c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  background-repeat: repeat;
-}
-/* Dark mode: reduce pattern visibility */
-[data-theme="dark"] body {
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23E08AAF' fill-opacity='0.02'%3E%3Cpath d='M30 20c-2 0-4 2-4 4s2 4 4 4 4-2 4-4-2-4-4-4zm-6 6c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5zm12 0c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5zm-6 4c-1.5 0-3 1-3 2.5s1.5 2.5 3 2.5 3-1 3-2.5-1.5-2.5-3-2.5z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-}

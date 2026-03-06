@@ -7,8 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-
-
 <style>
     .calendar-wrapper {
       max-width: 600px;
@@ -35,10 +33,6 @@
     .flow-light { background: #E8A0BF; }
     .flow-medium { background: #D4749A; }
     .flow-heavy { background: #B85C82; }
-    .modal-symptoms {
-      max-height: 200px;
-      overflow-y: auto;
-    }
     .key-heading {
       margin-top: 0;
     }
@@ -46,6 +40,131 @@
       margin-right: auto;
       display: none;
     }
+
+    /* ── Page header row ── */
+    .page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .page-header-row > div { flex: 1; min-width: 0; }
+
+    /* ── Symptom search ── */
+    .symptom-search-wrap {
+      margin-bottom: 0.5rem;
+    }
+    .symptom-search-wrap input {
+      width: 100%;
+      padding: 0.45rem 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      background: var(--color-bg);
+      color: var(--color-text);
+      box-sizing: border-box;
+    }
+    .symptom-search-wrap input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    /* ── Symptom categories ── */
+    .symptom-categories-scroll {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .symptom-cat { margin-bottom: 0.6rem; }
+    .symptom-cat:last-child { margin-bottom: 0; }
+    .symptom-cat-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    /* ── Per-symptom severity ── */
+    .severity-panel { margin-top: 0; }
+    .severity-panel-list { margin-top: 0.25rem; }
+    .severity-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .severity-row:last-child { border-bottom: none; }
+    .severity-symptom-name {
+      font-size: 0.88rem;
+      color: var(--color-text);
+      flex: 1;
+      min-width: 0;
+    }
+    .severity-btns { display: flex; gap: 0.25rem; flex-shrink: 0; }
+    .severity-btn {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg);
+      color: var(--color-text-muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+    .severity-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .severity-btn.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+    }
+
+    /* ── Prediction panel ── */
+    .pred-section { margin-top: 1rem; }
+    .pred-section-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); }
+    .pred-section-h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+    .pred-row-space { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; }
+    .pred-msg { margin: 0 0 0.25rem; font-size: 0.9rem; color: var(--color-text-muted); }
+    .pred-cycles-note { margin: 0; font-size: 0.85rem; color: var(--color-text-muted); }
+
+    /* Confidence badge */
+    .conf-badge { font-size: 0.78rem; font-weight: 800; padding: 0.2em 0.65em; border-radius: 99px; }
+    .conf-high   { background: #d4f7e7; color: #1a7a4a; }
+    .conf-medium { background: #fff0d4; color: #9a6200; }
+    .conf-low    { background: var(--phase-menstrual-bg, #fff0f3); color: var(--phase-menstrual, #e05c7a); }
+
+    /* Phase pills row */
+    .phase-pills-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+    .phase-pill { font-size: 0.82rem; font-weight: 700; padding: 0.25em 0.75em; border-radius: 99px; background: var(--color-bg-subtle, #f5f0f3); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+    .phase-pill--active { color: #fff; border-color: transparent; }
+    .phase-pill--active.phase-menstrual  { background: var(--phase-menstrual,  #e05c7a); }
+    .phase-pill--active.phase-follicular { background: var(--phase-follicular, #5b9bd5); }
+    .phase-pill--active.phase-ovulation  { background: var(--phase-ovulation,  #5ba865); }
+    .phase-pill--active.phase-luteal     { background: var(--phase-luteal,     #e8a838); }
+
+    /* Cycle cards */
+    .pred-cycle-card { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 0.6rem; }
+    .pred-cycle-card:last-child { margin-bottom: 0; }
+    .pred-cycle-title { font-weight: 800; font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--color-primary); }
+    .pred-window { font-size: 0.78rem; font-weight: 600; color: var(--color-text-muted); }
+    .pred-cycle-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; padding: 0.2rem 0; color: var(--color-text); }
+    .pred-cycle-row:not(:last-child) { border-bottom: 1px solid var(--color-border); }
+
+    /* Comparison rows */
+    .pred-comparison-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; padding: 0.3rem 0; border-bottom: 1px solid var(--color-border); }
+    .pred-comparison-row:last-of-type { border-bottom: none; }
+    .pred-disclaimer { margin: 0.75rem 0 0; font-size: 0.8rem; color: var(--color-text-muted); font-style: italic; line-height: 1.5; }
+    .clear-logs-btn { flex-shrink: 0; margin-top: 0.25rem; }
+    .severity-panel { display: none; }
+    .severity-hint { font-weight: 400; color: var(--color-text-muted); font-size: 0.82rem; }
   </style>
     <link rel="stylesheet" href="/css/main.css" />
   </head>
@@ -54,8 +173,13 @@
     <div id="banner-area"></div>
 
     <div class="page-header">
-      <h1>Calendar</h1>
-      <p>Tap a day to log your flow, symptoms, and notes</p>
+      <div class="page-header-row">
+        <div>
+          <h1>Calendar</h1>
+          <p>Tap a day to log your flow, symptoms, and notes</p>
+        </div>
+        <button class="btn btn-outline btn-sm clear-logs-btn" id="clear-all-logs-btn">Clear All Logs</button>
+      </div>
     </div>
 
     <div class="calendar-wrapper">
@@ -86,12 +210,14 @@
       <section class="card">
         <h3 class="key-heading">Key</h3>
         <div class="key-grid">
-          <div class="key-item"><span class="key-swatch swatch-period"></span> Logged period day</div>
-          <div class="key-item"><span class="key-swatch swatch-predicted"></span> Predicted period day</div>
-          <div class="key-item"><span class="key-swatch swatch-ovulation"></span> Ovulation day</div>
-          <div class="key-item"><span class="key-swatch swatch-fertile"></span> Fertility days</div>
+          <div class="key-item"><span class="key-swatch swatch-period"></span> Period (logged)</div>
+          <div class="key-item"><span class="key-swatch swatch-predicted"></span> Period (predicted)</div>
+          <div class="key-item"><span class="key-swatch swatch-fertile"></span> Fertile window</div>
+          <div class="key-item"><span class="key-swatch swatch-ovulation"></span> Ovulation</div>
         </div>
       </section>
+
+      <div id="prediction-panel"></div>
     </div>
   </main>
 
@@ -113,16 +239,17 @@
 
         <div class="form-group">
           <label class="form-label">Symptoms</label>
-          <div class="chip-group modal-symptoms" id="symptom-chips"></div>
+          <div class="symptom-search-wrap">
+            <input type="text" id="symptom-search" placeholder="Search symptoms..." autocomplete="off" />
+          </div>
+          <div class="symptom-categories-scroll">
+            <div id="symptom-categories"></div>
+          </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="severity">Overall Severity (1-5)</label>
-          <div class="severity-input">
-            <span class="severity-label">1</span>
-            <input type="range" id="severity" min="1" max="5" value="1">
-            <span class="severity-label" id="severity-value">1</span>
-          </div>
+        <div class="form-group severity-panel" id="severity-panel">
+          <label class="form-label">Severity per symptom <span class="severity-hint">(1 = mild, 5 = severe)</span></label>
+          <div class="severity-panel-list" id="symptom-severity-list"></div>
         </div>
 
         <div class="form-group">

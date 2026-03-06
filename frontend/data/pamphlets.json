@@ -44,16 +44,40 @@
     "title": "When to Seek Medical Help",
     "category": "When to seek medical help",
     "summary": "A clear guide on symptoms and situations that warrant a visit to a healthcare provider.",
-    "content": "<h2>Signs You Should See a Provider</h2><p>While many cycle variations are normal, certain symptoms may need medical attention. Consider making an appointment if you experience:</p><h3>Urgent Signs</h3><ul><li>Extremely heavy bleeding (soaking through a pad/tampon every hour)</li><li>Severe pelvic pain that doesn't improve with over-the-counter pain relief</li><li>Fever with pelvic pain</li><li>Sudden, severe abdominal pain</li></ul><h3>Worth Discussing</h3><ul><li>Periods consistently lasting more than 7 days</li><li>Cycles shorter than 21 days or longer than 35 days</li><li>Missing 3 or more periods in a row (if not pregnant)</li><li>Significant changes in your usual pattern</li><li>Bleeding after menopause</li><li>Pain that interferes with daily activities</li><li>New or unusual discharge with odor</li></ul><h2>How to Prepare for Your Visit</h2><ol><li>Bring your cycle tracking data (Bloom logs can help!)</li><li>Note when symptoms started and how often they occur</li><li>List any medications or supplements you take</li><li>Write down your questions beforehand</li></ol><h2>Caribbean Health Resources</h2><p>Check our Clinics directory for healthcare facilities in your area that offer reproductive health services.</p>",
+    "content": "<h2>Signs You Should See a Provider</h2><p>While many cycle variations are normal, certain symptoms may need medical attention. Consider making an appointment if you experience:</p><h3>Urgent Signs</h3><ul><li>Extremely heavy bleeding (soaking through a pad/tampon every hour)</li><li>Severe pelvic pain that doesn't improve with over-the-counter pain relief</li><li>Fever with pelvic pain</li><li>Sudden, severe abdominal pain</li></ul><h3>Worth Discussing</h3><ul><li>Periods consistently lasting more than 7 days</li><li>Cycles shorter than 21 days or longer than 35 days</li><li>Missing 3 or more periods in a row (if not pregnant)</li><li>Significant changes in your usual pattern</li><li>Bleeding after menopause</li><li>Pain that interferes with daily activities</li><li>New or unusual discharge with odor</li></ul><h2>How to Prepare for Your Visit</h2><ol><li>Bring your cycle tracking data (Bloom logs can help!)</li><li>Note when symptoms started and how often they occur</li><li>List any medications or supplements you take</li><li>Write down your questions beforehand</li></ol><h2>Jamaican Health Resources</h2><p>Check our Clinics directory for healthcare facilities in your area that offer reproductive health services.</p>",
     "readTime": "3 min"
   },
   {
     "id": "sexual-health-basics",
     "title": "Sexual Health & Birth Control Basics",
     "category": "Sexual health & birth control basics",
-    "summary": "An overview of sexual health essentials and common birth control methods available in the Caribbean.",
+    "summary": "An overview of sexual health essentials and common birth control methods available in Jamaica.",
     "content": "<h2>Understanding Your Options</h2><p>There are many birth control methods available, each with different effectiveness rates and considerations. Here's a brief overview:</p><h3>Barrier Methods</h3><ul><li><strong>Condoms (external/internal):</strong> Also protect against STIs. 85-98% effective with proper use.</li><li><strong>Diaphragm:</strong> Used with spermicide. Requires fitting by a provider.</li></ul><h3>Hormonal Methods</h3><ul><li><strong>Birth control pills:</strong> Taken daily. 91-99% effective.</li><li><strong>Injectable (Depo-Provera):</strong> Every 3 months. 94-99% effective.</li><li><strong>Implant:</strong> Placed under the skin. Lasts up to 3 years. 99%+ effective.</li><li><strong>Hormonal IUD:</strong> Placed in the uterus. Lasts 3-7 years. 99%+ effective.</li></ul><h3>Non-Hormonal Methods</h3><ul><li><strong>Copper IUD:</strong> Lasts up to 10 years. 99%+ effective.</li><li><strong>Fertility awareness methods:</strong> Tracking your cycle to identify fertile days. Requires careful tracking.</li></ul><h2>STI Prevention</h2><p>Condoms are the only method that protect against both pregnancy and sexually transmitted infections. Regular STI screening is recommended for sexually active individuals.</p><h2>Making a Choice</h2><p>The best method is one that fits your lifestyle and health needs. Discuss options with a healthcare provider to find what works for you.</p><p><em>Note: This content is part of Bloom's sensitive module and can be toggled in Settings.</em></p>",
     "readTime": "5 min",
     "sensitive": true
+  },
+  {
+    "id": "cope-with-cramps",
+    "title": "How to Cope With Menstrual Cramps",
+    "category": "Period basics",
+    "summary": "Practical guidance on managing menstrual cramp pain through heat therapy, lifestyle adjustments, and knowing when to seek help.",
+    "readTime": "5 min",
+    "pdf": "/assets/How to Cope With Menstrual Cramps.pdf"
+  },
+  {
+    "id": "three-stages-menopause",
+    "title": "The Three Stages of Menopause",
+    "category": "Menopause & perimenopause",
+    "summary": "A detailed look at perimenopause, menopause, and postmenopause — what to expect at each stage and how to manage symptoms.",
+    "readTime": "6 min",
+    "pdf": "/assets/The three stages of menopause.pdf"
+  },
+  {
+    "id": "menopause-in-ja",
+    "title": "Menopause in Jamaica",
+    "category": "Menopause & perimenopause",
+    "summary": "Understanding menopause in the Jamaican context, including cultural perspectives, local resources, and practical support.",
+    "readTime": "4 min",
+    "pdf": "/assets/Menopause In JA.pdf"
   }
 ]

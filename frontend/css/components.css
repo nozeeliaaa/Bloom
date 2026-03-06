@@ -26,6 +26,8 @@
 }
 .navbar-brand:hover { color: var(--color-primary-dark); }
 .navbar-brand svg { width: 28px; height: 28px; }
+.navbar-logo { height: 60px; width: auto; display: block; object-fit: contain; }
+.navbar-brand-text { display: inline-flex; align-items: center; gap: 0.4rem; }
 
 .navbar-links {
   display: flex;

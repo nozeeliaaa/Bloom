@@ -1,47 +1,47 @@
 /**
- * Firebase initialization
- * Lazily loads Firebase SDK from CDN and initializes once
+ * Firebase initialization (Vite / npm SDK)
+ * - Single source of truth (NO CDN imports)
+ * - Sync exports for auth + db
  */
-import { firebaseConfig } from './firebaseConfig.js';
+
+import { initializeApp, getApps } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { firebaseConfig } from "./firebaseConfig.js";
 
 let app = null;
 let auth = null;
 let db = null;
-let firebaseReady = false;
 
 function isConfigured() {
-  return firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY';
+  return firebaseConfig?.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
 }
 
-async function loadFirebaseSDK() {
-  if (firebaseReady) return;
+function initFirebase() {
   if (!isConfigured()) {
-    console.warn('[Bloom] Firebase not configured. Running in anonymous-only mode.');
+    console.warn("[Bloom] Firebase not configured. Running in anonymous-only mode.");
     return;
   }
 
-  try {
-    // Dynamic import from CDN
-    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-    const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
-    const { getFirestore } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-
+  // Prevent double-init in Vite HMR
+  if (!getApps().length) {
     app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    firebaseReady = true;
-  } catch (err) {
-    console.error('[Bloom] Failed to load Firebase:', err);
+  } else {
+    app = getApps()[0];
   }
+
+  auth = getAuth(app);
+  db = getFirestore(app);
 }
 
-export async function getFirebaseAuth() {
-  await loadFirebaseSDK();
+// init immediately
+initFirebase();
+
+export function getFirebaseAuth() {
   return auth;
 }
 
-export async function getFirebaseDB() {
-  await loadFirebaseSDK();
+export function getFirebaseDB() {
   return db;
 }
 
@@ -49,4 +49,5 @@ export function isFirebaseConfigured() {
   return isConfigured();
 }
 
-export { firebaseReady };
+// Optional: quick flag (kept for compatibility)
+export const firebaseReady = !!auth && !!db;

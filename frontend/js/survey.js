@@ -1,4 +1,5 @@
 import { isAnonMode } from "./mode.js";
+import { setUserGoal } from "./goals.js";
 
 export function Survey() {
   return `
@@ -645,6 +646,7 @@ function loadAnswers() {
 }
 function saveAnswers(obj) {
   localStorage.setItem("bloom_profile", JSON.stringify(obj || {}));
+  setUserGoal(answers.focusGoal);
 }
 
 /* ------------------ safety helpers ------------------ */

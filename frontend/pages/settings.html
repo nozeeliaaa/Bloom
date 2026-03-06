@@ -3,66 +3,140 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bloom — Settings</title>
+  <title>Settings - Bloom</title>
 
-  <link rel="stylesheet" href="../css/base.css">
-<link rel="stylesheet" href="../css/main.css">
-<link rel="stylesheet" href="../css/pages.css">
-<link rel="stylesheet" href="../css/settings.css"> 
-
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="/css/settings.css" />
 </head>
+
 <body>
   <div id="banner-area"></div>
 
-  <main class="page">
-    <header class="page-header">
-      <div class="page-title">
-        <span class="title-icon" aria-hidden="true">
-          <!-- gear icon -->
-          <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.06 7.06 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.51.4 1.05.71 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/></svg>
-        </span>
-        <h1>Settings</h1>
-      </div>
-      <p class="page-subtitle">Manage your preferences. You can reset anytime.</p>
-    </header>
+  <main>
+    <div class="page-header">
+      <h1>Settings</h1>
+      <p>Manage your preferences and appearance</p>
+    </div>
 
-    <section class="card">
-      <h2>Preferences</h2>
+    <!-- Appearance -->
+    <section class="card settings-card">
+      <h2 class="settings-section-title">Appearance</h2>
 
-      <div class="stack" style="margin-top:0.75rem;">
-        <label style="display:flex; flex-direction:column; gap:0.35rem; max-width:260px;">
-          <strong>Theme</strong>
-          <select id="pref-theme">
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="system">System</option>
-          </select>
-        </label>
-
-        <label style="display:flex; align-items:center; gap:0.6rem;">
-          <input type="checkbox" id="pref-hide-sensitive" />
-          Hide sensitive content
-        </label>
-
-        <label style="display:flex; align-items:center; gap:0.6rem;">
-          <input type="checkbox" id="pref-reminders" />
-          Enable reminders (demo)
-        </label>
-
-        <div class="btn-row" style="margin-top:0.5rem;">
-          <button id="save-prefs" class="btn-primary" type="button">Save Preferences</button>
-          <button id="reset-prefs" class="btn-outline" type="button">Reset Preferences</button>
+      <div class="setting-row">
+        <div class="setting-info">
+          <h4>Theme</h4>
+          <p>Choose how Bloom looks on your device</p>
         </div>
-
-        <p id="prefs-status" class="muted" style="margin:0;"></p>
+        <div class="theme-selector">
+          <button type="button" class="theme-option" id="theme-light" title="Light" aria-label="Light theme">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          </button>
+          <button type="button" class="theme-option" id="theme-dark" title="Dark" aria-label="Dark theme">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+          <button type="button" class="theme-option" id="theme-system" title="System" aria-label="Use system theme">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </section>
 
-    <section class="card">
-      <h2>Danger Zone</h2>
-      <p class="muted">Reset only your preferences (does not delete your cycle logs).</p>
-      <div class="btn-row" style="margin-top:0.75rem;">
-        <button id="reset-prefs-2" class="btn-outline" type="button">Reset Preferences</button>
+    <!-- Notifications -->
+    <section class="card settings-card">
+      <h2 class="settings-section-title">Notifications</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <h4>Period reminders</h4>
+          <p>Get notified a few days before your next period is expected</p>
+        </div>
+        <label class="toggle" aria-label="Period reminders">
+          <input type="checkbox" id="pref-period-reminder" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <h4>Daily logging reminder</h4>
+          <p>A nudge to log your flow and symptoms each day</p>
+        </div>
+        <label class="toggle" aria-label="Daily logging reminder">
+          <input type="checkbox" id="pref-reminders" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <h4>Fertile window alerts</h4>
+          <p>Notify when your estimated fertile window begins</p>
+        </div>
+        <label class="toggle" aria-label="Fertile window alerts">
+          <input type="checkbox" id="pref-fertile-alert" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Privacy & Content -->
+    <section class="card settings-card">
+      <h2 class="settings-section-title">Privacy &amp; Content</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <h4>Hide sensitive content</h4>
+          <p>Hides birth control and sexual health articles from the pamphlets page</p>
+        </div>
+        <label class="toggle" aria-label="Hide sensitive content">
+          <input type="checkbox" id="pref-hide-sensitive" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <h4>Compact view</h4>
+          <p>Reduce spacing and show more content on screen at once</p>
+        </div>
+        <label class="toggle" aria-label="Compact view">
+          <input type="checkbox" id="pref-compact" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Save + Reset -->
+    <section class="card settings-card">
+      <div class="settings-action-row">
+        <div class="settings-btn-group">
+          <button id="save-prefs" class="btn btn-primary" type="button">Save Preferences</button>
+          <button id="reset-prefs" class="btn btn-outline" type="button">Reset to Defaults</button>
+        </div>
+        <p id="prefs-status" class="text-muted prefs-status"></p>
+      </div>
+    </section>
+
+    <!-- Danger Zone -->
+    <section class="danger-zone">
+      <h2>Data</h2>
+      <p class="text-muted danger-zone-note">Preferences reset does not delete your cycle logs. Use the Calendar to manage logged data.</p>
+      <div class="settings-btn-group">
+        <a class="btn btn-outline" href="/pages/dashboard.html">Go to Dashboard</a>
+        <a class="btn btn-outline" href="/pages/calendar.html">Open Calendar</a>
       </div>
     </section>
   </main>

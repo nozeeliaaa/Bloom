@@ -197,3 +197,30 @@ export async function deleteAllLocalData() {
   localStorage.removeItem(ASSIST_KEY);
   // Keep auth/session storage untouched
 }
+
+export async function clearAllLogs() {
+  // Clear locally first
+  writeJSON(LOGS_KEY, {});
+
+  if (!isAccountMode()) return;
+
+  // Account mode: fetch all log keys then delete each from cloud
+  try {
+    const headers = await authHeaders();
+    if (!headers) return;
+
+    const res = await fetch(apiUrl("/api/logs"), { headers });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const logs = data?.logs && typeof data.logs === "object" ? data.logs : {};
+
+    await Promise.all(
+      Object.keys(logs).map((dateKey) =>
+        fetch(apiUrl(`/api/logs/${encodeURIComponent(dateKey)}`), { method: "DELETE", headers })
+      )
+    );
+  } catch (e) {
+    console.warn("Cloud clear error:", e);
+  }
+}

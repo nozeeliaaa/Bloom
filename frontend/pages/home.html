@@ -4,27 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bloom - Reproductive Health Support</title>
-  <meta name="description" content="Bloom is a Caribbean-focused reproductive health support app. Track your cycle, learn about your body, and access guided health education.">
+  <meta name="description" content="Bloom is a Jamaican-focused reproductive health support app. Track your cycle, learn about your body, and access guided health education.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
 
 <style>
     .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       text-align: center;
       padding: 3rem 0 2rem;
     }
-    .hero-icon {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 1.25rem;
-      color: var(--color-primary);
+    .hero-logo {
+      width: 160px;
+      height: auto;
+      margin: 0 0 0.5rem;
+      object-fit: contain;
+      display: block;
     }
-    .hero h1 {
-      font-size: 2.5rem;
+    .hero-title {
+      font-size: 3rem;
       font-weight: 800;
-      margin-bottom: 0.5rem;
+      margin: 0 0 0.5rem;
       color: var(--color-primary-dark);
+      line-height: 1;
+    }
+    @media (min-width: 768px) {
+      .hero-title { font-size: 3.75rem; }
     }
     .hero .tagline {
       font-size: 1.15rem;
@@ -112,21 +120,9 @@
   <main>
     <!-- Hero -->
     <section class="hero">
-      <div class="hero-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.3"/>
-          <path d="M12 2c1.5 0 3 1.5 3 4s-1.5 4-3 4-3-1.5-3-4 1.5-4 3-4z"/>
-          <path d="M19.1 4.9c1.1 1.1.7 3.1-1 4.8s-3.7 2.1-4.8 1-0.7-3.1 1-4.8 3.7-2.1 4.8-1z"/>
-          <path d="M22 12c0 1.5-1.5 3-4 3s-4-1.5-4-3 1.5-3 4-3 4 1.5 4 3z"/>
-          <path d="M19.1 19.1c-1.1 1.1-3.1.7-4.8-1s-2.1-3.7-1-4.8 3.1-.7 4.8 1 2.1 3.7 1 4.8z"/>
-          <path d="M12 22c-1.5 0-3-1.5-3-4s1.5-4 3-4 3 1.5 3 4-1.5 4-3 4z"/>
-          <path d="M4.9 19.1c-1.1-1.1-.7-3.1 1-4.8s3.7-2.1 4.8-1 .7 3.1-1 4.8-3.7 2.1-4.8 1z"/>
-          <path d="M2 12c0-1.5 1.5-3 4-3s4 1.5 4 3-1.5 3-4 3-4-1.5-4-3z"/>
-          <path d="M4.9 4.9c1.1-1.1 3.1-.7 4.8 1s2.1 3.7 1 4.8-3.1.7-4.8-1-2.1-3.7-1-4.8z"/>
-        </svg>
-      </div>
-      <h1>Bloom</h1>
-      <p class="tagline">Your Caribbean reproductive health companion. Track your cycle, understand your body, and access trusted health education.</p>
+      <img src="/assets/bloom-logo.png" alt="Bloom logo" class="hero-logo" />
+      <h1 class="hero-title">Bloom</h1>
+      <p class="tagline">Your Jamaican reproductive health companion. Track your cycle, understand your body, and access trusted health education.</p>
       <div class="hero-buttons">
         <a href="/pages/dashboard.html" class="btn btn-primary btn-lg" id="btn-anon">Continue Anonymously</a>
         <a href="/pages/register.html" class="btn btn-secondary btn-lg">Create Account (18+)</a>
@@ -137,13 +133,13 @@
     <!-- Overview -->
     <section class="overview-card card">
       <h2>What is Bloom?</h2>
-      <p>Bloom combines period and symptom tracking with guided health education. It supports menstruation, fertility awareness, and menopause/perimenopause symptom tracking for Caribbean communities.</p>
+      <p>Bloom combines period and symptom tracking with guided health education. It supports menstruation, fertility awareness, and menopause/perimenopause symptom tracking for Jamaican communities.</p>
       <ul style="color: var(--color-text); font-size: 0.95rem; line-height: 2;">
         <li>Track your period, flow intensity, and symptoms day by day</li>
         <li>View your cycle on an interactive calendar</li>
         <li>Chat with Bloomie, our guided health assistant</li>
-        <li>Read educational pamphlets written for Caribbean audiences</li>
-        <li>Find reproductive health clinics across the Caribbean</li>
+        <li>Read educational pamphlets written for Jamaican audiences</li>
+        <li>Find reproductive health clinics across Jamaica</li>
         <li>Choose to stay anonymous or create an account for cloud sync</li>
       </ul>
     </section>
@@ -176,7 +172,7 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         </div>
         <h3>Clinic Finder</h3>
-        <p>Locate reproductive health clinics across Caribbean countries.</p>
+        <p>Locate reproductive health clinics across Jamaica.</p>
       </div>
       <div class="card feature-card">
         <div class="card-icon">

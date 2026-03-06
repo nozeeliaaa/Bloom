@@ -1,4 +1,12 @@
-import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "./utils.js";
+import {
+  renderNav,
+  renderFooter,
+  renderModeBanner,
+  renderBloomieFab,
+  showToast,
+} from "./utils.js";
+
+import { getTheme, setTheme } from "./theme-manager.js";
 
 renderNav("settings");
 renderFooter();
@@ -8,43 +16,47 @@ renderModeBanner(document.getElementById("banner-area"));
 const KEY = "bloom_preferences";
 
 const els = {
-  theme: document.getElementById("pref-theme"),
-  hideSensitive: document.getElementById("pref-hide-sensitive"),
-  reminders: document.getElementById("pref-reminders"),
-  save: document.getElementById("save-prefs"),
-  reset: document.getElementById("reset-prefs"),
-  reset2: document.getElementById("reset-prefs-2"),
-  status: document.getElementById("prefs-status"),
+  hideSensitive:  document.getElementById("pref-hide-sensitive"),
+  reminders:      document.getElementById("pref-reminders"),
+  periodReminder: document.getElementById("pref-period-reminder"),
+  fertileAlert:   document.getElementById("pref-fertile-alert"),
+  compact:        document.getElementById("pref-compact"),
+  save:           document.getElementById("save-prefs"),
+  reset:          document.getElementById("reset-prefs"),
+  status:         document.getElementById("prefs-status"),
+  themeBtns: {
+    light:  document.getElementById("theme-light"),
+    dark:   document.getElementById("theme-dark"),
+    system: document.getElementById("theme-system"),
+  },
 };
 
 function getPrefs() {
-  try {
-    return JSON.parse(localStorage.getItem(KEY)) || {};
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(localStorage.getItem(KEY)) || {}; }
+  catch { return {}; }
 }
 
 function setPrefs(prefs) {
   localStorage.setItem(KEY, JSON.stringify(prefs));
 }
 
-function applyTheme(theme) {
-  // "system" means remove explicit theme and let your base handle it
-  if (theme === "system") {
-    document.documentElement.removeAttribute("data-theme");
-    return;
-  }
-  document.documentElement.setAttribute("data-theme", theme);
+function updateThemeButtons(current) {
+  Object.entries(els.themeBtns).forEach(([key, btn]) => {
+    if (btn) btn.classList.toggle("active", key === current);
+  });
 }
 
 function loadUI() {
   const prefs = getPrefs();
-  els.theme.value = prefs.theme || "light";
-  els.hideSensitive.checked = !!prefs.hideSensitive;
-  els.reminders.checked = !!prefs.reminders;
+  const currentTheme = getTheme();
 
-  applyTheme(els.theme.value);
+  updateThemeButtons(currentTheme);
+
+  if (els.hideSensitive)  els.hideSensitive.checked  = !!prefs.hideSensitive;
+  if (els.reminders)      els.reminders.checked      = !!prefs.reminders;
+  if (els.periodReminder) els.periodReminder.checked = !!prefs.periodReminder;
+  if (els.fertileAlert)   els.fertileAlert.checked   = !!prefs.fertileAlert;
+  if (els.compact)        els.compact.checked        = !!prefs.compact;
 }
 
 function showStatus(msg) {
@@ -53,27 +65,34 @@ function showStatus(msg) {
   setTimeout(() => (els.status.textContent = ""), 2500);
 }
 
-els.save?.addEventListener("click", () => {
-  const prefs = {
-    theme: els.theme.value,
-    hideSensitive: els.hideSensitive.checked,
-    reminders: els.reminders.checked,
-  };
-  setPrefs(prefs);
-  applyTheme(prefs.theme);
-  showStatus("Saved!");
+// Theme button clicks — live preview + highlight active
+Object.entries(els.themeBtns).forEach(([key, btn]) => {
+  btn?.addEventListener("click", () => {
+    setTheme(key);
+    updateThemeButtons(key);
+  });
 });
 
-function doReset() {
+// Save
+els.save?.addEventListener("click", () => {
+  const prefs = {
+    hideSensitive:  els.hideSensitive?.checked  ?? false,
+    reminders:      els.reminders?.checked      ?? false,
+    periodReminder: els.periodReminder?.checked ?? false,
+    fertileAlert:   els.fertileAlert?.checked   ?? false,
+    compact:        els.compact?.checked        ?? false,
+  };
+  setPrefs(prefs);
+  showStatus("Saved!");
+  showToast("Preferences saved.");
+});
+
+// Reset
+els.reset?.addEventListener("click", () => {
   localStorage.removeItem(KEY);
   loadUI();
-  showStatus("Preferences reset.");
-}
-
-els.reset?.addEventListener("click", doReset);
-els.reset2?.addEventListener("click", doReset);
-
-// live preview theme
-els.theme?.addEventListener("change", () => applyTheme(els.theme.value));
+  showStatus("Reset to defaults.");
+  showToast("Preferences reset.", "info");
+});
 
 loadUI();

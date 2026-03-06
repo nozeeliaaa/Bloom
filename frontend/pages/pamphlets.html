@@ -53,6 +53,32 @@
       box-shadow: 0 18px 40px rgba(0,0,0,0.10);
     }
 
+    /* Search bar */
+    .pamphlet-search-wrap {
+      position: relative;
+      margin-bottom: 1rem;
+    }
+    .pamphlet-search-wrap svg {
+      position: absolute;
+      left: 0.85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-text-muted);
+      pointer-events: none;
+    }
+    .pamphlet-search {
+      width: 100%;
+      padding: 0.6rem 0.85rem 0.6rem 2.5rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: var(--color-card);
+      color: var(--color-text);
+      box-sizing: border-box;
+    }
+    .pamphlet-search:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
     .book-spine {
       position: absolute;
       left: 0;
@@ -62,6 +88,10 @@
       background: var(--color-primary);
       opacity: 0.9;
     }
+    .book-card.is-pdf .book-spine { background: var(--color-secondary, #5C8DD4); }
+    .reader-disclaimer { text-align: center; margin-top: 1.5rem; }
+    .reader-disclaimer p { margin: 0; }
+    .no-results { grid-column: 1 / -1; text-align: center; padding: 2rem; }
 
     .book-top {
       padding-left: 10px;
@@ -141,8 +171,15 @@
         <p>Read-only health articles on periods, fertility, menopause, and more</p>
       </div>
 
+      <div class="pamphlet-search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="search" class="pamphlet-search" id="pamphlet-search" placeholder="Search pamphlets…" aria-label="Search pamphlets">
+      </div>
+
       <div class="pamphlet-filters" id="category-filters">
-        <button class="chip selected" data-cat="all">All</button>
+        <button type="button" class="chip selected" data-cat="all">All</button>
       </div>
 
       <div class="pamphlet-grid" id="pamphlet-grid">
@@ -163,8 +200,8 @@
         <hr class="section-divider">
         <div id="reader-content"></div>
         <hr class="section-divider">
-        <div class="card" style="text-align:center; margin-top:1.5rem;">
-          <p style="margin:0;"><strong>Disclaimer:</strong> This information is educational and is not a substitute for professional medical advice. If you have health concerns, please consult a qualified healthcare provider.</p>
+        <div class="card reader-disclaimer">
+          <p><strong>Disclaimer:</strong> This information is educational and is not a substitute for professional medical advice. If you have health concerns, please consult a qualified healthcare provider.</p>
         </div>
       </div>
     </div>
@@ -186,6 +223,7 @@
 
     let pamphlets = [];
     let activeCategory = 'all';
+    let searchQuery = '';
 
     async function init() {
       const res = await fetch('/data/pamphlets.json');
@@ -200,8 +238,13 @@
       if (window.location.hash) {
         const id = window.location.hash.slice(1);
         const pamphlet = pamphlets.find(p => p.id === id);
-        if (pamphlet) openReader(pamphlet);
+        if (pamphlet && !pamphlet.pdf) openReader(pamphlet);
       }
+
+      document.getElementById('pamphlet-search').addEventListener('input', (e) => {
+        searchQuery = e.target.value.trim().toLowerCase();
+        renderGrid();
+      });
     }
 
     function buildCategoryFilters() {
@@ -210,6 +253,7 @@
 
       cats.forEach(cat => {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = 'chip';
         btn.textContent = cat;
         btn.dataset.cat = cat;
@@ -234,19 +278,29 @@
       });
     }
 
+    function getFiltered() {
+      let list = activeCategory === 'all' ? pamphlets : pamphlets.filter(p => p.category === activeCategory);
+      if (searchQuery) {
+        list = list.filter(p =>
+          p.title.toLowerCase().includes(searchQuery) ||
+          p.summary.toLowerCase().includes(searchQuery) ||
+          p.category.toLowerCase().includes(searchQuery)
+        );
+      }
+      return list;
+    }
+
     function renderGrid() {
       const grid = document.getElementById('pamphlet-grid');
-      const filtered = activeCategory === 'all'
-        ? pamphlets
-        : pamphlets.filter(p => p.category === activeCategory);
+      const filtered = getFiltered();
 
       if (filtered.length === 0) {
-        grid.innerHTML = `<p class="text-muted" style="grid-column:1/-1;text-align:center;padding:2rem;">No pamphlets found for this category.</p>`;
+        grid.innerHTML = `<p class="text-muted no-results">No pamphlets found.</p>`;
         return;
       }
 
       grid.innerHTML = filtered.map(p => `
-        <div class="book-card" role="button" tabindex="0" data-id="${p.id}" aria-label="Open pamphlet ${p.title}">
+        <div class="book-card${p.pdf ? ' is-pdf' : ''}" role="button" tabindex="0" data-id="${p.id}" aria-label="Open pamphlet ${p.title}">
           <span class="book-spine" aria-hidden="true"></span>
 
           <div class="book-top">
@@ -257,6 +311,7 @@
           <div class="book-meta">
             <span class="badge badge-primary">${p.category}</span>
             <span>${p.readTime} read</span>
+            ${p.pdf ? '<span class="badge">PDF</span>' : ''}
             ${p.sensitive ? '<span class="badge badge-warning">Sensitive</span>' : ''}
           </div>
         </div>
@@ -266,7 +321,12 @@
       grid.querySelectorAll('.book-card').forEach(card => {
         const open = () => {
           const pamphlet = pamphlets.find(p => p.id === card.dataset.id);
-          if (pamphlet) openReader(pamphlet);
+          if (!pamphlet) return;
+          if (pamphlet.pdf) {
+            window.open(pamphlet.pdf, '_blank', 'noopener');
+          } else {
+            openReader(pamphlet);
+          }
         };
 
         card.addEventListener('click', open);

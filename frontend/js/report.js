@@ -6,6 +6,7 @@
 
 import { renderNav, renderFooter, renderModeBanner, renderBloomieFab, formatDate, toDateKey } from "./utils.js";
 import { getAllLogs } from "./db.js";
+import { computeCyclePhase } from "./phase.js";
 
 renderNav("report");
 renderFooter();
@@ -62,151 +63,120 @@ function average(nums) {
   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
 }
 
-function setupExportCycleHistoryPDF(getReportData) {
-  const btn = document.getElementById("download-report");
-  if (!btn) return;
+function generateCyclePDF(cycle, logsByDate) {
+  if (!window.jspdf) { alert("PDF library not loaded. Check your connection and try again."); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
 
-  btn.addEventListener("click", async () => {
-    if (!window.jspdf) {
-      alert("jsPDF not loaded.");
-      return;
+  const cycleStarts = cycle.cycleStarts || [];
+  const cycleLengths = [];
+  for (let i = 1; i < cycleStarts.length; i++) {
+    cycleLengths.push(diffDays(cycleStarts[i - 1], cycleStarts[i]));
+  }
+  const avg = cycleLengths.length
+    ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+    : null;
+
+  const pageW = 210, margin = 18, cW = pageW - margin * 2;
+  let y = 0;
+
+  // ── Header band ──
+  doc.setFillColor(212, 116, 154);
+  doc.rect(0, 0, pageW, 20, "F");
+  doc.setFontSize(15); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+  doc.text("Bloom — Health Report for Doctor", margin, 13);
+
+  y = 28;
+  doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(140, 110, 140);
+  doc.text(`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, margin, y);
+  y += 4;
+  doc.setDrawColor(212, 116, 154); doc.line(margin, y, pageW - margin, y);
+  y += 7;
+
+  // ── Summary ──
+  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(184, 92, 130);
+  doc.text("CYCLE SUMMARY", margin, y); y += 6;
+  doc.setFont("helvetica", "normal"); doc.setTextColor(60, 40, 60);
+  if (avg) { doc.text(`Average cycle length: ${avg} days`, margin, y); y += 5; }
+  doc.text(`Cycles tracked: ${cycleStarts.length}`, margin, y); y += 5;
+  if (cycleStarts.length) {
+    doc.text(`Data from: ${formatDate(cycleStarts[0])}`, margin, y); y += 5;
+  }
+  y += 2;
+  doc.setDrawColor(220, 200, 220); doc.line(margin, y, pageW - margin, y); y += 7;
+
+  // ── Cycle details ──
+  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(184, 92, 130);
+  doc.text("CYCLE DETAILS", margin, y); y += 7;
+
+  const todayKey = toDateKey(new Date());
+
+  [...cycleStarts].reverse().forEach((start, revIdx) => {
+    const i = cycleStarts.length - 1 - revIdx;
+    const cycleLen = cycleLengths[i];
+    const isCurrent = cycleLen == null;
+    const nextStart = isCurrent ? null : cycleStarts[i + 1];
+    const cycleEndKey = nextStart ? addDays(nextStart, -1) : todayKey;
+
+    if (y > 258) { doc.addPage(); y = 20; }
+
+    const daysSoFar = diffDays(start, todayKey) + 1;
+    const heading = isCurrent
+      ? `Current cycle — Day ${daysSoFar} (started ${formatDate(start)})`
+      : `${cycleLen} days — ${formatDate(start)} to ${formatDate(cycleEndKey)}`;
+
+    doc.setFontSize(10.5); doc.setFont("helvetica", "bold"); doc.setTextColor(60, 40, 60);
+    doc.text(heading, margin, y); y += 5;
+
+    if (!isCurrent && nextStart) {
+      const ov  = addDays(nextStart, -14);
+      const fws = addDays(nextStart, -19);
+      const fwe = addDays(nextStart, -13);
+      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 80, 100);
+      doc.text(`Ovulation (est.): ${formatDate(ov)}   Fertile window: ${formatDate(fws)} – ${formatDate(fwe)}`, margin + 3, y);
+      y += 5;
     }
 
-    const { jsPDF } = window.jspdf;
-    const report = await getReportData();
-
-    if (!report) {
-      alert("No cycle history data yet. Log period days on the calendar first.");
-      return;
+    // Symptoms logged in this cycle
+    const symptoms = [];
+    let d = 0;
+    while (d <= 60) {
+      const dk = addDays(start, d);
+      if (dk > cycleEndKey) break;
+      const log = logsByDate[dk];
+      if (log?.symptoms?.length) symptoms.push(`${formatDate(dk)}: ${log.symptoms.join(", ")}`);
+      if (log?.notes) symptoms.push(`${formatDate(dk)} (note): ${log.notes}`);
+      d++;
     }
 
-    const { generatedOn, cycleCount, avgCycleLength, cycles, periodStarts, periodDays } = report;
-
-    const pdf = new jsPDF("p", "pt", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 40;
-    let y = margin;
-
-    function ensureSpace(minSpace = 60) {
-      if (y > pageHeight - margin - minSpace) {
-        pdf.addPage();
-        y = margin;
-      }
+    if (symptoms.length) {
+      doc.setFontSize(9); doc.setFont("helvetica", "italic"); doc.setTextColor(120, 100, 120);
+      symptoms.forEach((s) => {
+        if (y > 268) { doc.addPage(); y = 20; }
+        const lines = doc.splitTextToSize(`  ${s}`, cW - 6);
+        doc.text(lines, margin + 4, y);
+        y += lines.length * 4.2;
+      });
     }
 
-    function addTitle(text) {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(18);
-      pdf.text(text, margin, y);
-      y += 20;
-    }
-
-    function addSub(text) {
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
-      pdf.setTextColor(80);
-      pdf.text(text, margin, y);
-      pdf.setTextColor(0);
-      y += 16;
-    }
-
-    function addSectionHeader(text) {
-      ensureSpace(80);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(13);
-      pdf.text(text, margin, y);
-      y += 10;
-      pdf.setDrawColor(220);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 16;
-    }
-
-    function addParagraph(text) {
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
-      const lines = pdf.splitTextToSize(text, pageWidth - margin * 2);
-      for (const line of lines) {
-        ensureSpace(20);
-        pdf.text(line, margin, y);
-        y += 14;
-      }
-    }
-
-    function addKeyValueRow(key, value) {
-      ensureSpace(20);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.text(key, margin, y);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(String(value), margin + 180, y);
-      y += 14;
-    }
-
-    function fmt(iso) {
-      try { return formatDate(iso); } catch { return iso; }
-    }
-
-    addTitle("Bloom — Cycle History Report");
-    addSub(`Generated on: ${generatedOn}`);
-    addSub("Based on the period logs you entered in the Bloom calendar.");
-
-    addSectionHeader("Summary");
-    addKeyValueRow("Cycles tracked:", cycleCount);
-    addKeyValueRow("Average cycle length:", avgCycleLength ? `${avgCycleLength} days` : "Not enough data yet");
-    addKeyValueRow("Period starts found:", periodStarts.length);
-    addKeyValueRow("Period days logged:", periodDays.length);
-
-    addSectionHeader("Cycle History (Start → Next Start)");
-    if (!cycles.length) {
-      addParagraph("Not enough data to compute cycles yet. Log at least two separate periods (two start dates).");
-    } else {
-      ensureSpace(80);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.text("Cycle Start", margin, y);
-      pdf.text("Next Start", margin + 210, y);
-      pdf.text("Length", margin + 380, y);
-      y += 10;
-
-      pdf.setDrawColor(220);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 16;
-
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
-
-      for (const c of cycles) {
-        ensureSpace(30);
-        pdf.text(fmt(c.start), margin, y);
-        pdf.text(fmt(c.next), margin + 210, y);
-        pdf.text(`${c.length} days`, margin + 380, y);
-        y += 16;
-      }
-    }
-
-    addSectionHeader("Recent Period Days Logged");
-    if (!periodDays.length) {
-      addParagraph("No period days logged yet.");
-    } else {
-      const last = periodDays.slice(-30);
-      addParagraph(`Showing the most recent ${last.length} logged period day${last.length !== 1 ? "s" : ""}:`);
-      addParagraph(last.map(fmt).join(", "));
-    }
-
-    addSectionHeader("Disclaimer");
-    addParagraph(
-      "Bloom provides educational tracking support and is not a substitute for professional medical advice. " +
-      "If you have health concerns, consult a qualified healthcare provider."
-    );
-
-    pdf.save("Bloom-Health-Report.pdf");
+    y += 3;
+    doc.setDrawColor(230, 215, 230); doc.line(margin, y, pageW - margin, y); y += 5;
   });
+
+  // ── Disclaimer ──
+  if (y > 255) { doc.addPage(); y = 20; }
+  y += 2;
+  doc.setFontSize(8); doc.setFont("helvetica", "italic"); doc.setTextColor(160, 140, 160);
+  const disc = "This report is for personal reference only and is not a medical document. Always consult a qualified healthcare provider for medical advice. Bloom is an educational tool.";
+  doc.text(doc.splitTextToSize(disc, cW), margin, y);
+
+  doc.save(`bloom-health-report-${todayKey}.pdf`);
 }
 
 async function loadPreview() {
   const previewEl = document.getElementById("report-preview");
   const logsByDate = await getAllLogs();
+  const cycle = computeCyclePhase(logsByDate);
 
   const periodStarts = getPeriodStartsFromLogs(logsByDate);
   const cycles = getCycles(periodStarts);
@@ -215,37 +185,59 @@ async function loadPreview() {
 
   if (!periodDays.length) {
     previewEl.innerHTML = `
-      <span class="badge">No data yet</span>
-      <p class="muted">Log period days in the Calendar to generate a report.</p>
+      <p class="text-muted">Log period days in the Calendar to generate a report.</p>
+      <a class="btn btn-outline" href="/pages/calendar.html" style="display:inline-block;margin-top:0.5rem;">Open Calendar</a>
     `;
   } else {
     const lastStart = periodStarts.length ? periodStarts[periodStarts.length - 1] : null;
     const nextDate = (avgCycleLength && lastStart) ? addDays(lastStart, avgCycleLength) : null;
 
+    const cycleRows = cycles.slice(-5).reverse().map(c => `
+      <tr>
+        <td>${formatDate(c.start)}</td>
+        <td>${formatDate(c.next)}</td>
+        <td class="${c.length < 21 || c.length > 35 ? "out-of-range" : ""}">${c.length} days</td>
+      </tr>`).join("");
+
     previewEl.innerHTML = `
-      <div class="kv">
-        <div class="k">Cycles tracked</div><div class="v">${cycles.length}</div>
-        <div class="k">Avg cycle length</div><div class="v">${avgCycleLength ? `${avgCycleLength} days` : "Not enough data"}</div>
-        <div class="k">Last period start</div><div class="v">${lastStart ? formatDate(lastStart) : "Unknown"}</div>
-        <div class="k">Next expected</div><div class="v">${nextDate ? formatDate(nextDate) : "Not enough data"}</div>
+      <div class="stat-row">
+        <div class="stat-tile">
+          <div class="stat-tile-label">Cycles tracked</div>
+          <div class="stat-tile-value">${cycles.length}</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">Avg cycle length</div>
+          <div class="stat-tile-value">${avgCycleLength ? `${avgCycleLength}d` : "—"}</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">Last period</div>
+          <div class="stat-tile-value" style="font-size:1rem;">${lastStart ? formatDate(lastStart) : "—"}</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">Next expected</div>
+          <div class="stat-tile-value" style="font-size:1rem;">${nextDate ? formatDate(nextDate) : "—"}</div>
+        </div>
       </div>
-      <p class="muted" style="margin-top:0.75rem;">Most recent period days:</p>
-      <p>${periodDays.slice(-10).map(d => formatDate(d)).join(", ")}</p>
+      ${cycleRows ? `
+        <p class="text-muted" style="font-size:0.85rem;margin-bottom:0.5rem;">Recent cycles (newest first):</p>
+        <table class="cycle-table">
+          <thead><tr><th>Period Start</th><th>Next Start</th><th>Length</th></tr></thead>
+          <tbody>${cycleRows}</tbody>
+        </table>` : ""}
     `;
   }
 
-  // export uses current computed data
-  setupExportCycleHistoryPDF(async () => {
-    if (!periodDays.length) return null;
-    return {
-      generatedOn: new Date().toLocaleString(),
-      cycleCount: cycles.length,
-      avgCycleLength,
-      cycles,
-      periodStarts,
-      periodDays
+  // Wire up download button
+  const btn = document.getElementById("download-report");
+  if (btn) {
+    btn.onclick = () => {
+      if (!periodDays.length) {
+        alert("No cycle history data yet. Log period days on the calendar first.");
+        return;
+      }
+      generateCyclePDF(cycle, logsByDate);
     };
-  });
+  }
 }
 
 loadPreview();

@@ -7,7 +7,6 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-
   <link rel="stylesheet" href="/css/main.css" />
 
   <style>
@@ -50,37 +49,110 @@
       color: var(--color-text-muted);
     }
 
-    .pill-row{
-      display:flex;
-      flex-wrap:wrap;
-      gap: 10px;
+    /* Goals */
+    .goals-grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    @media (min-width: 860px){
+      .goals-grid{
+        grid-template-columns: 1fr 1fr;
+      }
     }
 
-    .pill{
-      padding: 8px 12px;
-      border-radius: 999px;
+    .goal-card{
       border: 1px solid var(--color-border);
       background: var(--color-card);
-      font-weight: 700;
-      cursor: default;
+      border-radius: var(--radius);
+      padding: 0.9rem 1rem;
+      text-align:left;
+      cursor:pointer;
+      transition: transform 0.06s ease, border-color 0.12s ease;
+      display:flex;
+      gap: 0.85rem;
+      align-items:flex-start;
     }
+    .goal-card:hover{ transform: translateY(-1px); }
+    .goal-card.active{
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(216, 90, 152, 0.15);
+    }
+
+    .goal-badge{
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display:grid;
+      place-items:center;
+      background: rgba(216, 90, 152, 0.10);
+      color: var(--color-primary);
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+    .goal-badge svg { width: 22px; height: 22px; }
+
+    .goal-title{
+      margin: 0;
+      font-weight: 900;
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+    .goal-desc{
+      margin: 0.25rem 0 0;
+      color: var(--color-text-muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .goal-meta{
+      margin-top: 0.75rem;
+      color: var(--color-text-muted);
+      font-size: 0.92rem;
+    }
+    .goal-meta-desc { margin-top: 0.25rem; }
+    .goal-meta-actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
     .list-card{
       padding: 0;
       overflow: hidden;
+      margin-top: 1rem;
     }
 
     .list-link{
       display:flex;
       justify-content:space-between;
       align-items:center;
-      padding: 14px 16px;
+      padding: 15px 18px;
       border-bottom: 1px solid var(--color-border);
       text-decoration:none;
       color: var(--color-text);
       font-weight: 700;
+      transition: background 0.12s ease;
     }
+    .list-link:hover { background: var(--color-bg-hover); }
     .list-link:last-child{ border-bottom:none; }
+    .list-link-left {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .list-link-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--color-primary-lightest);
+      color: var(--color-primary);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .list-link-icon svg { width: 18px; height: 18px; }
+    .list-link-arrow {
+      color: var(--color-text-muted);
+      font-size: 1.1rem;
+    }
 
     .legal-links{
       display:flex;
@@ -117,8 +189,8 @@
 
     <div class="page-header profile-header">
       <div>
-        <h1 style="margin-bottom:0.25rem;">Your Profile</h1>
-        <p class="text-muted" style="margin:0;">Quick access to your profile, settings, and support.</p>
+        <h1>Your Profile</h1>
+        <p class="text-muted">Quick access to your profile, settings, and support.</p>
 
         <div class="profile-mini">
           <div class="profile-mini-avatar" id="mini-avatar">👤</div>
@@ -133,32 +205,66 @@
     </div>
 
     <section class="card">
-      <h2 style="margin-top:0;">Goals</h2>
-      <div class="pill-row">
-        <span class="pill">Track Cycle</span>
-        <span class="pill">Manage Symptoms</span>
-        <span class="pill">Learn & Understand</span>
-        <span class="pill">Get Pregnant</span>
-        <span class="pill">Track Pregnancy</span>
-      </div>
+      <h2>Goal</h2>
+      <p class="text-muted">
+        Your dashboard and tools change based on the goal you pick. Switching goals does <strong>not</strong> delete your previous logs.
+      </p>
+
+      <div class="goals-grid" id="goals-grid"></div>
+
+      <div class="goal-meta" id="goal-meta"></div>
     </section>
 
     <div class="card list-card">
       <a class="list-link" href="/pages/report.html">
-        Report for a Doctor
-        <span aria-hidden="true">→</span>
+        <span class="list-link-left">
+          <span class="list-link-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </span>
+          Report for a Doctor
+        </span>
+        <svg class="list-link-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
       <a class="list-link" href="/pages/settings.html">
-        Settings
-        <span aria-hidden="true">→</span>
+        <span class="list-link-left">
+          <span class="list-link-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </span>
+          Settings
+        </span>
+        <svg class="list-link-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
       <a class="list-link" href="/pages/help.html">
-        Help
-        <span aria-hidden="true">→</span>
+        <span class="list-link-left">
+          <span class="list-link-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </span>
+          Help
+        </span>
+        <svg class="list-link-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
       <a class="list-link" href="/pages/about.html">
-        About Bloom
-        <span aria-hidden="true">→</span>
+        <span class="list-link-left">
+          <span class="list-link-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </span>
+          About Bloom
+        </span>
+        <svg class="list-link-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
     </div>
 
@@ -177,8 +283,9 @@
   </main>
 
   <script type="module">
-    import { renderNav, renderFooter, renderModeBanner } from "/js/utils.js";
+    import { renderNav, renderFooter, renderModeBanner, showToast } from "/js/utils.js";
     import { onAuthChange } from "/js/auth.js";
+    import { GOALS, getUserGoal, setUserGoal, goalLabel, goalDesc } from "/js/goals.js";
 
     renderNav("profile");
     renderFooter();
@@ -208,6 +315,79 @@
     }
 
     onAuthChange(updateMiniProfile);
+
+    // Goal cards
+    const grid = document.getElementById("goals-grid");
+    const meta = document.getElementById("goal-meta");
+
+    const GOAL_ICONS = {
+      period: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+      ttc:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
+      no_period: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
+      pregnancy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+      perimenopause: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+    };
+    function goalIcon(goalId){ return GOAL_ICONS[goalId] || GOAL_ICONS.period; }
+
+    function renderGoals(){
+      const current = getUserGoal();
+      grid.innerHTML = "";
+
+      GOALS.forEach(g => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "goal-card" + (g.id === current ? " active" : "");
+        btn.innerHTML = `
+          <div class="goal-badge">${goalIcon(g.id)}</div>
+          <div>
+            <p class="goal-title">${g.title}</p>
+            <p class="goal-desc">${g.desc}</p>
+          </div>
+        `;
+
+        btn.addEventListener("click", () => {
+          const now = getUserGoal();
+          if (g.id === now) return;
+
+          // Special confirmation when leaving the pregnancy goal
+          if (now === "pregnancy") {
+            const ok = confirm(
+              "Are you no longer pregnant?\n\nSwitching away from the pregnancy goal will clear your saved LMP date and pregnancy tracking data. Your other logs will NOT be deleted.\n\nTap OK to confirm."
+            );
+            if (!ok) return;
+            // Clear pregnancy-specific data
+            localStorage.removeItem("bloom_lmp");
+          } else {
+            const ok = confirm(
+              `Switch goal to: "${g.title}"?\n\nYour previous logs will NOT be deleted.\nYour dashboard + tools will update based on this goal.`
+            );
+            if (!ok) return;
+          }
+
+          setUserGoal(g.id);
+          showToast("Goal updated. Your dashboard will now reflect this goal.");
+          renderGoals();
+          updateMeta();
+        });
+
+        grid.appendChild(btn);
+      });
+    }
+
+    function updateMeta(){
+      const current = getUserGoal();
+      meta.innerHTML = `
+        <strong>Current goal:</strong> ${goalLabel(current)}
+        <div class="goal-meta-desc">${goalDesc(current)}</div>
+        <div class="goal-meta-actions">
+          <a class="btn btn-primary" href="/pages/dashboard.html">Go to Dashboard</a>
+          <a class="btn btn-outline" href="/pages/calendar.html">Open Calendar</a>
+        </div>
+      `;
+    }
+
+    renderGoals();
+    updateMeta();
   </script>
 </body>
 </html>

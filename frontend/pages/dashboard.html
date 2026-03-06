@@ -10,7 +10,6 @@
   <link rel="stylesheet" href="/css/main.css" />
 
   <style>
-
     .dash-top {
       display: grid;
       grid-template-columns: 1fr;
@@ -32,7 +31,7 @@
     }
     @media (min-width: 980px) {
       .dash-mid {
-        grid-template-columns: 1fr 1.25fr; /* left insights, right history/trends */
+        grid-template-columns: 1fr 1.25fr;
       }
     }
 
@@ -42,12 +41,8 @@
       font-size: 0.93rem;
       line-height: 1.5;
     }
-    .insight-box .insight-item:last-child {
-      border-bottom: none;
-    }
-    .insight-box .insight-item strong {
-      color: var(--color-primary-dark);
-    }
+    .insight-box .insight-item:last-child { border-bottom: none; }
+    .insight-box .insight-item strong { color: var(--color-primary-dark); }
 
     .stat-number {
       font-size: 2rem;
@@ -64,10 +59,7 @@
       line-height: 1.45;
     }
 
-    /* Right big panel inner sections */
-    .right-panel section + section {
-      margin-top: 1rem;
-    }
+    .right-panel section + section { margin-top: 1rem; }
 
     .section-title-row {
       display: flex;
@@ -78,13 +70,104 @@
       margin-bottom: 0.75rem;
     }
 
-    /* make the chart area look like a framed box inside the big panel */
     .chart-frame {
       border: 1px solid var(--color-border);
       border-radius: var(--radius);
       padding: 0.75rem;
       background: var(--color-bg-card);
     }
+
+    /* Cycle history dot cards */
+    .cycle-legend {
+      display: flex; gap: 1rem; flex-wrap: wrap;
+      margin-bottom: 0.85rem;
+    }
+    .cycle-legend-item {
+      display: flex; align-items: center; gap: 0.35rem;
+      font-size: 0.82rem; color: var(--color-text-muted);
+    }
+    .cycle-card {
+      padding: 0.65rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .cycle-card:last-child { border-bottom: none; }
+    .cycle-card-title {
+      display: block; font-size: 1rem; font-weight: 800;
+      color: var(--color-text); margin-bottom: 0.1rem;
+    }
+    .cycle-card-subtitle {
+      display: block; font-size: 0.82rem;
+      color: var(--color-text-muted); margin-bottom: 0.45rem;
+    }
+    .cycle-dot-row { display: flex; flex-wrap: wrap; gap: 3px; }
+    .cycle-dot-item {
+      width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+    }
+    .dot-period     { background: #E8597A; }
+    .dot-fertile    { background: #7EC8C8; }
+    .dot-ovulation  { background: #1A8080; }
+    .dot-follicular { background: #A8C8E8; }
+    .dot-luteal     { background: #E8B86D; }
+    .dot-other      { background: #DDD4E8; }
+    .cycle-chart-container { width: 100%; height: 260px; }
+    .goal-change-btn { margin-left: auto; }
+
+    .goal-strip{
+      display:flex;
+      gap: 0.75rem;
+      align-items: baseline;
+      flex-wrap: wrap;
+      margin-top: 0.35rem;
+    }
+    .goal-pill{
+      display:inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--color-border);
+      background: var(--color-card);
+      font-weight: 800;
+      font-size: 0.9rem;
+      color: var(--color-primary);
+    }
+    .goal-desc{
+      color: var(--color-text-muted);
+      font-size: 0.92rem;
+    }
+
+    /* Phase badge */
+    .phase-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+    .phase-menstrual  { background: var(--phase-menstrual-bg);  color: var(--phase-menstrual); }
+    .phase-follicular { background: var(--phase-follicular-bg); color: var(--phase-follicular); }
+    .phase-ovulation  { background: var(--phase-ovulation-bg);  color: var(--phase-ovulation); }
+    .phase-luteal     { background: var(--phase-luteal-bg);     color: var(--phase-luteal); }
+    .phase-unknown    { background: var(--phase-unknown-bg);    color: var(--phase-unknown); }
+    .phase-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+    /* Goal sections — hidden by default, shown by JS */
+    .goal-section { margin-top: 1rem; display: none; }
+    .pregnancy-card { border-left: 4px solid var(--color-secondary); }
+    .ttc-card       { border-left: 4px solid var(--phase-ovulation); }
+
+    .baby-size-display { text-align: center; padding: 0.75rem 0; }
+    .baby-size-emoji  { font-size: 2.6rem; line-height: 1.2; }
+    .baby-size-label  { font-size: 1rem; font-weight: 800; color: var(--color-primary); margin-top: 0.25rem; }
+    .baby-size-week   { font-size: 0.85rem; color: var(--color-text-muted); }
+
+    .fertility-conf {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 3px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 800;
+    }
+    .conf-high   { background: var(--phase-ovulation-bg);  color: var(--phase-ovulation); }
+    .conf-medium { background: var(--phase-luteal-bg);     color: var(--phase-luteal); }
+    .conf-low    { background: var(--phase-menstrual-bg);  color: var(--phase-menstrual); }
   </style>
 </head>
 
@@ -95,11 +178,16 @@
     <div class="page-header">
       <h1>Dashboard</h1>
       <p>Your cycle at a glance</p>
+
+      <!-- ✅ Goal badge -->
+      <div class="goal-strip">
+        <span class="goal-pill" id="goal-badge">—</span>
+        <span class="goal-desc" id="goal-desc"></span>
+        <a class="btn btn-outline goal-change-btn" href="/pages/profile.html">Change goal</a>
+      </div>
     </div>
 
-    <!-- ===== TOP ROW: 3 small cards ===== -->
     <div class="dash-top">
-      <!-- 1) Cycle Snapshot -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon">
@@ -120,7 +208,6 @@
         </div>
       </div>
 
-      <!-- 2) Cycle Phase -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon">
@@ -138,7 +225,6 @@
         </div>
       </div>
 
-      <!-- 3) Next Period -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon">
@@ -148,22 +234,58 @@
             </svg>
           </div>
           <div>
-            <div class="card-title">Next Period</div>
-            <div class="card-subtitle">Estimated start date</div>
+            <div class="card-title">Goal Tool</div>
+            <div class="card-subtitle">Changes with your goal</div>
           </div>
         </div>
-        <div class="card-body" id="next-period">
-          <p class="text-muted">Not enough data yet. Keep logging to get an estimate.</p>
+        <div class="card-body" id="goal-tool">
+          <p class="text-muted">Loading…</p>
         </div>
       </div>
     </div>
 
-    <!-- ===== MIDDLE: Left insights (stacked) + Right big panel ===== -->
-    <div class="dash-mid">
+    <!-- Goal-specific sections (shown/hidden by JS based on selected goal) -->
+    <div id="pregnancy-tools" class="card pregnancy-card goal-section">
+      <div class="card-header">
+        <div class="card-icon">🤱</div>
+        <div>
+          <div class="card-title">Pregnancy Tracker</div>
+          <div class="card-subtitle">EDD, trimester &amp; milestones</div>
+        </div>
+      </div>
+      <div class="card-body" id="pregnancy-tools-body">
+        <p class="text-muted">Loading…</p>
+      </div>
+    </div>
 
-      <!-- LEFT STACK -->
+    <div id="ttc-tools" class="card ttc-card goal-section">
+      <div class="card-header">
+        <div class="card-icon">🌿</div>
+        <div>
+          <div class="card-title">Conception Tools</div>
+          <div class="card-subtitle">Fertility window, confidence &amp; testing guidance</div>
+        </div>
+      </div>
+      <div class="card-body" id="ttc-tools-body">
+        <p class="text-muted">Loading…</p>
+      </div>
+    </div>
+
+    <div id="symptom-tools" class="card goal-section">
+      <div class="card-header">
+        <div class="card-icon">📋</div>
+        <div>
+          <div class="card-title">Symptom Log</div>
+          <div class="card-subtitle">Recent symptom entries</div>
+        </div>
+      </div>
+      <div class="card-body" id="symptom-tools-body">
+        <p class="text-muted">Loading…</p>
+      </div>
+    </div>
+
+    <div class="dash-mid">
       <div class="left-panel">
-        <!-- Today's Insight -->
         <div class="card insight-box mb-3">
           <div class="card-header">
             <div class="card-icon">
@@ -176,15 +298,9 @@
             <div class="card-title">Today's Insight</div>
           </div>
 
-          
-          <div id="insights">
-            <div class="insight-item"><strong>Hydration reminder:</strong> Drinking enough water can help reduce bloating and cramps during your cycle.</div>
-            <div class="insight-item"><strong>Track consistently:</strong> Logging daily, even on non-period days, helps identify patterns more accurately.</div>
-            <div class="insight-item"><strong>Listen to your body:</strong> Every body is unique. What's normal for someone else may not be your normal, and that's okay.</div>
-          </div>
+          <div id="insights"></div>
         </div>
 
-        <!-- Advanced Insight -->
         <div class="card insight-box">
           <div class="card-header">
             <div class="card-icon">
@@ -201,12 +317,11 @@
         </div>
       </div>
 
-      <!-- RIGHT BIG PANEL -->
       <div class="card right-panel">
         <section>
           <div class="section-title-row">
             <h2 class="no-margin">Cycle History</h2>
-            <button class="btn btn-outline" id="export-pdf">Export as PDF</button>
+            <button type="button" class="btn btn-outline" id="export-pdf">Export as PDF</button>
           </div>
           <div class="cycle-dots" id="cycle-dots"></div>
         </section>
@@ -214,18 +329,15 @@
         <section>
           <h2 class="cycle-trends-title">Cycle Trends</h2>
           <div class="chart-frame">
-            <canvas id="cycleChart" height="120"></canvas>
+            <div id="cycleChart" class="cycle-chart-container"></div>
           </div>
         </section>
       </div>
     </div>
-
-    <!-- Footer is rendered by utils.js -->
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-
   <script type="module" src="/js/dashboard.js"></script>
 </body>
 </html>
