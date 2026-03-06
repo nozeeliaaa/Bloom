@@ -3,19 +3,33 @@ import { resolve } from "path";
 
 export default defineConfig({
   root: "frontend",
-  publicDir: false, 
+  publicDir: false,
   server: {
     host: true,
     port: 5173,
+
+    // Proxy /api requests to the backend (avoids CORS + JSON parse errors)
+    proxy: {
+      "/api": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+      },
+    },
+
+    // Allow imports from outside /frontend
+    fs: {
+      allow: [
+        resolve(__dirname, "frontend"),
+        resolve(__dirname, "algorithms"),
+      ],
+    },
   },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        
         index: resolve(__dirname, "frontend/index.html"),
-
         dashboard: resolve(__dirname, "frontend/pages/dashboard.html"),
         calendar: resolve(__dirname, "frontend/pages/calendar.html"),
         log: resolve(__dirname, "frontend/pages/log.html"),
@@ -26,6 +40,7 @@ export default defineConfig({
         clinics: resolve(__dirname, "frontend/pages/clinics.html"),
         pamphlets: resolve(__dirname, "frontend/pages/pamphlets.html"),
         assistant: resolve(__dirname, "frontend/pages/assistant.html"),
+        profile: resolve(__dirname, "frontend/pages/profile.html"),
       },
     },
   },

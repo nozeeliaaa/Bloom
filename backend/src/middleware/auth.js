@@ -67,3 +67,11 @@ export function requireConsentApproved() {
     }
   };
 }
+/**
+ * Set admin custom claim on a Firebase user.
+ * Call this once from a setup script or seed route to promote the first admin.
+ * Usage: await setAdminClaim(uid)
+ */
+export async function setAdminClaim(uid) {
+  await auth.setCustomUserClaims(uid, { role: "admin" });
+}
