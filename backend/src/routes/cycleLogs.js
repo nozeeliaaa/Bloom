@@ -1,6 +1,8 @@
+// src/routes/cycleLogs.js
 import express from "express";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
+import { validateCycleLog } from "../validators/validateCycleLog.js";
 
 const router = express.Router();
 
@@ -9,26 +11,9 @@ function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 }
 
-function asNumberOrNull(v) {
-  if (v === null || v === undefined || v === "") return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function assertNonNegativeOrNull(n, fieldName) {
-  if (n === null) return;
-  if (!Number.isFinite(n) || n < 0) {
-    throw new Error(`${fieldName} must be a non-negative number`);
-  }
-}
-
-function assertBool(v, fieldName) {
-  if (typeof v !== "boolean") throw new Error(`${fieldName} must be boolean`);
-}
-
 // Collection path: cycleLogs/{uid}/entries/{dateKey}
 
-// Create/Update one day’s cycle log
+// Create/Update one day's cycle log
 router.put("/:dateKey", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -38,32 +23,28 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
     }
 
-    // Example cycle fields (keep minimal; you can expand later)
-    // You can adjust these based on your UI.
-    const periodDay = asNumberOrNull(req.body.periodDay); // e.g., 1..N
-    const flowLevel = asNumberOrNull(req.body.flowLevel); // 0..3 (example)
-    const hadSex = req.body.hadSex; // boolean
-    const contraceptionUsed = req.body.contraceptionUsed; // boolean
-    const notes = typeof req.body.notes === "string" ? req.body.notes.trim().slice(0, 500) : "";
+    // ---- Validate body ----
+    const validation = validateCycleLog(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
 
-    assertNonNegativeOrNull(periodDay, "periodDay");
-    assertNonNegativeOrNull(flowLevel, "flowLevel");
-    if (hadSex !== undefined) assertBool(hadSex, "hadSex");
-    if (contraceptionUsed !== undefined) assertBool(contraceptionUsed, "contraceptionUsed");
-
-    const docRef = db.collection("cycleLogs").doc(uid).collection("entries").doc(dateKey);
+    const docRef = db
+      .collection("cycleLogs")
+      .doc(uid)
+      .collection("entries")
+      .doc(dateKey);
 
     const payload = {
       dateKey,
-      periodDay,
-      flowLevel,
-      hadSex: hadSex ?? false,
-      contraceptionUsed: contraceptionUsed ?? false,
-      notes,
+      periodDay: req.body.periodDay ?? null,
+      flowLevel: req.body.flowLevel ?? null,
+      hadSex: req.body.hadSex ?? false,
+      contraceptionUsed: req.body.contraceptionUsed ?? false,
+      notes: typeof req.body.notes === "string" ? req.body.notes.trim() : "",
       updatedAt: new Date(),
     };
 
-    // If doc doesn’t exist, also set createdAt
     const snap = await docRef.get();
     if (!snap.exists) payload.createdAt = new Date();
 
@@ -71,57 +52,91 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
 
     return res.json({ ok: true, entry: payload });
   } catch (err) {
-    return res.status(400).json({ error: err.message || "Invalid request" });
+    console.error("PUT /cycle-logs/:dateKey error:", err);
+    return res.status(500).json({ error: "Failed to save cycle log" });
   }
 });
 
-// Get one day’s cycle log
+// Get one day's cycle log
 router.get("/:dateKey", requireAuth, async (req, res) => {
-  const uid = req.user.uid;
-  const { dateKey } = req.params;
+  try {
+    const uid = req.user.uid;
+    const { dateKey } = req.params;
 
-  if (!isValidDateKey(dateKey)) {
-    return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
+    if (!isValidDateKey(dateKey)) {
+      return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
+    }
+
+    const doc = await db
+      .collection("cycleLogs")
+      .doc(uid)
+      .collection("entries")
+      .doc(dateKey)
+      .get();
+
+    if (!doc.exists) return res.json(null);
+    return res.json(doc.data());
+  } catch (err) {
+    console.error("GET /cycle-logs/:dateKey error:", err);
+    return res.status(500).json({ error: "Failed to fetch cycle log" });
   }
-
-  const doc = await db.collection("cycleLogs").doc(uid).collection("entries").doc(dateKey).get();
-  if (!doc.exists) return res.json(null);
-
-  return res.json(doc.data());
 });
 
-// List range (simple)
+// List range
 router.get("/", requireAuth, async (req, res) => {
-  const uid = req.user.uid;
-  const start = req.query.start; // YYYY-MM-DD
-  const end = req.query.end;     // YYYY-MM-DD
+  try {
+    const uid = req.user.uid;
+    const { start, end } = req.query;
 
-  if (start && !isValidDateKey(start)) return res.status(400).json({ error: "Invalid start" });
-  if (end && !isValidDateKey(end)) return res.status(400).json({ error: "Invalid end" });
+    if (start && !isValidDateKey(start)) {
+      return res.status(400).json({ error: "Invalid start date. Use YYYY-MM-DD" });
+    }
+    if (end && !isValidDateKey(end)) {
+      return res.status(400).json({ error: "Invalid end date. Use YYYY-MM-DD" });
+    }
 
-  let q = db.collection("cycleLogs").doc(uid).collection("entries").orderBy("dateKey", "desc").limit(60);
+    let q = db
+      .collection("cycleLogs")
+      .doc(uid)
+      .collection("entries")
+      .orderBy("dateKey", "desc")
+      .limit(60);
 
-  // Range filter (optional)
-  if (start) q = q.where("dateKey", ">=", start);
-  if (end) q = q.where("dateKey", "<=", end);
+    if (start) q = q.where("dateKey", ">=", start);
+    if (end) q = q.where("dateKey", "<=", end);
 
-  const snap = await q.get();
-  const items = snap.docs.map((d) => d.data());
+    const snap = await q.get();
+    const items = snap.docs.map((d) => d.data());
 
-  return res.json({ ok: true, items });
+    return res.json({ ok: true, items });
+  } catch (err) {
+    console.error("GET /cycle-logs error:", err);
+    return res.status(500).json({ error: "Failed to fetch cycle logs" });
+  }
 });
 
 // Delete one day
 router.delete("/:dateKey", requireAuth, async (req, res) => {
-  const uid = req.user.uid;
-  const { dateKey } = req.params;
+  try {
+    const uid = req.user.uid;
+    const { dateKey } = req.params;
 
-  if (!isValidDateKey(dateKey)) {
-    return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
+    if (!isValidDateKey(dateKey)) {
+      return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
+    }
+
+    await db
+      .collection("cycleLogs")
+      .doc(uid)
+      .collection("entries")
+      .doc(dateKey)
+      .delete();
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /cycle-logs/:dateKey error:", err);
+    return res.status(500).json({ error: "Failed to delete cycle log" });
   }
-
-  await db.collection("cycleLogs").doc(uid).collection("entries").doc(dateKey).delete();
-  return res.json({ ok: true });
 });
 
 export default router;

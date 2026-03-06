@@ -1,6 +1,7 @@
+// src/routes/symptomLogs.js
 import express from "express";
 import { db } from "../firebaseAdmin.js";
-import { requireAuth, requireConsentApproved } from "../middleware/auth.js";
+import { requireAuth, requireSensitiveAccess } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -10,7 +11,6 @@ function isValidDateKey(dateKey) {
 }
 
 function isValidSeverity(n) {
-  // Example: 0..5 scale
   return Number.isInteger(n) && n >= 0 && n <= 5;
 }
 
@@ -20,14 +20,10 @@ function sanitizeText(s, max = 300) {
 }
 
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
-// Document shape (example):
-// {
-//   dateKey,
-//   items: [{ code: "cramps", severity: 3, note: "..." }, ...],
-//   updatedAt, createdAt
-// }
+// Each doc holds an items[] array — multiple symptoms per day
 
-router.put("/:dateKey", requireAuth, requireConsentApproved(), async (req, res) => {
+// Create/Update symptoms for a day
+router.put("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { dateKey } = req.params;
@@ -38,27 +34,64 @@ router.put("/:dateKey", requireAuth, requireConsentApproved(), async (req, res) 
 
     const items = Array.isArray(req.body.items) ? req.body.items : [];
 
-    // Validate items
-    const cleaned = items.map((it, idx) => {
-      const code = typeof it.code === "string" ? it.code.trim() : "";
+    if (items.length === 0) {
+      return res.status(400).json({ error: "items array is required and cannot be empty" });
+    }
+
+    if (items.length > 40) {
+      return res.status(400).json({ error: "Too many symptom items for one day (max 40)" });
+    }
+
+    // Validate and clean each item
+    const cleaned = [];
+    for (let idx = 0; idx < items.length; idx++) {
+      const it = items[idx];
+
+      // code is required and must be a non-empty string
+      if (!it.code || typeof it.code !== "string") {
+        return res.status(400).json({ error: `items[${idx}].code is required` });
+      }
+
+      const code = it.code.trim().toUpperCase();
+
+      // Verify code exists in symptomCatalog
+      const catalogDoc = await db.collection("symptomCatalog").doc(code).get();
+      if (!catalogDoc.exists) {
+        return res.status(400).json({
+          error: `items[${idx}].code "${code}" is not a valid symptom key`,
+        });
+      }
+
+      // If teen, block sensitive symptoms without consent
+      // (requireSensitiveAccess already blocks teens without consent,
+      // but we double-check at the item level for sensitive symptoms)
+      const catalogData = catalogDoc.data();
+      if (catalogData.sensitive && req.user.ageBand === "13-17") {
+        return res.status(403).json({
+          error: `Symptom "${code}" requires guardian consent`,
+        });
+      }
+
+      // severity: required, 0-5
       const severity = Number(it.severity);
+      if (!isValidSeverity(severity)) {
+        return res.status(400).json({
+          error: `items[${idx}].severity must be an integer between 0 and 5`,
+        });
+      }
 
-      if (!code) throw new Error(`items[${idx}].code is required`);
-      if (!isValidSeverity(severity)) throw new Error(`items[${idx}].severity must be 0..5`);
-
-      return {
+      cleaned.push({
         code,
         severity,
         note: sanitizeText(it.note, 200),
-      };
-    });
-
-    // Optional: limit how many symptoms per day
-    if (cleaned.length > 40) {
-      return res.status(400).json({ error: "Too many symptom items for one day" });
+      });
     }
 
-    const docRef = db.collection("symptomLogs").doc(uid).collection("entries").doc(dateKey);
+    const docRef = db
+      .collection("symptomLogs")
+      .doc(uid)
+      .collection("entries")
+      .doc(dateKey);
 
     const payload = {
       dateKey,
@@ -73,53 +106,91 @@ router.put("/:dateKey", requireAuth, requireConsentApproved(), async (req, res) 
 
     return res.json({ ok: true, entry: payload });
   } catch (err) {
-    return res.status(400).json({ error: err.message || "Invalid request" });
+    console.error("PUT /symptom-logs/:dateKey error:", err);
+    return res.status(500).json({ error: "Failed to save symptom log" });
   }
 });
 
-router.get("/:dateKey", requireAuth, requireConsentApproved(), async (req, res) => {
-  const uid = req.user.uid;
-  const { dateKey } = req.params;
+// Get one day's symptom log
+router.get("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { dateKey } = req.params;
 
-  if (!isValidDateKey(dateKey)) {
-    return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
+    if (!isValidDateKey(dateKey)) {
+      return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
+    }
+
+    const doc = await db
+      .collection("symptomLogs")
+      .doc(uid)
+      .collection("entries")
+      .doc(dateKey)
+      .get();
+
+    if (!doc.exists) return res.json(null);
+    return res.json(doc.data());
+  } catch (err) {
+    console.error("GET /symptom-logs/:dateKey error:", err);
+    return res.status(500).json({ error: "Failed to fetch symptom log" });
   }
-
-  const doc = await db.collection("symptomLogs").doc(uid).collection("entries").doc(dateKey).get();
-  if (!doc.exists) return res.json(null);
-
-  return res.json(doc.data());
 });
 
-router.get("/", requireAuth, requireConsentApproved(), async (req, res) => {
-  const uid = req.user.uid;
-  const start = req.query.start; // YYYY-MM-DD
-  const end = req.query.end;     // YYYY-MM-DD
+// List range
+router.get("/", requireAuth, requireSensitiveAccess, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { start, end } = req.query;
 
-  if (start && !isValidDateKey(start)) return res.status(400).json({ error: "Invalid start" });
-  if (end && !isValidDateKey(end)) return res.status(400).json({ error: "Invalid end" });
+    if (start && !isValidDateKey(start)) {
+      return res.status(400).json({ error: "Invalid start date. Use YYYY-MM-DD" });
+    }
+    if (end && !isValidDateKey(end)) {
+      return res.status(400).json({ error: "Invalid end date. Use YYYY-MM-DD" });
+    }
 
-  let q = db.collection("symptomLogs").doc(uid).collection("entries").orderBy("dateKey", "desc").limit(60);
+    let q = db
+      .collection("symptomLogs")
+      .doc(uid)
+      .collection("entries")
+      .orderBy("dateKey", "desc")
+      .limit(60);
 
-  if (start) q = q.where("dateKey", ">=", start);
-  if (end) q = q.where("dateKey", "<=", end);
+    if (start) q = q.where("dateKey", ">=", start);
+    if (end) q = q.where("dateKey", "<=", end);
 
-  const snap = await q.get();
-  const items = snap.docs.map((d) => d.data());
+    const snap = await q.get();
+    const items = snap.docs.map((d) => d.data());
 
-  return res.json({ ok: true, items });
+    return res.json({ ok: true, items });
+  } catch (err) {
+    console.error("GET /symptom-logs error:", err);
+    return res.status(500).json({ error: "Failed to fetch symptom logs" });
+  }
 });
 
-router.delete("/:dateKey", requireAuth, requireConsentApproved(), async (req, res) => {
-  const uid = req.user.uid;
-  const { dateKey } = req.params;
+// Delete one day
+router.delete("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { dateKey } = req.params;
 
-  if (!isValidDateKey(dateKey)) {
-    return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
+    if (!isValidDateKey(dateKey)) {
+      return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
+    }
+
+    await db
+      .collection("symptomLogs")
+      .doc(uid)
+      .collection("entries")
+      .doc(dateKey)
+      .delete();
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /symptom-logs/:dateKey error:", err);
+    return res.status(500).json({ error: "Failed to delete symptom log" });
   }
-
-  await db.collection("symptomLogs").doc(uid).collection("entries").doc(dateKey).delete();
-  return res.json({ ok: true });
 });
 
 export default router;
