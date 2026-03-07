@@ -114,6 +114,14 @@
         <option value="all">All parishes</option>
       </select>
 
+      <select class="form-select" id="filter-type" aria-label="Filter by type">
+        <option value="all">All types</option>
+        <option value="hospital">Hospital</option>
+        <option value="health_center">Health Centre</option>
+        <option value="private">Private Practice</option>
+        <option value="hotline">Hotline / Info</option>
+      </select>
+
       <select class="form-select" id="filter-service" aria-label="Filter by service">
         <option value="all">All services</option>
       </select>
@@ -137,8 +145,7 @@
 
     <div class="card card-centered">
       <p class="note-text">
-        <strong>Note:</strong> This directory uses sample clinic data. In a real product, clinic details and exact coordinates would be verified and updated regularly.
-        Always confirm details with the clinic before visiting.
+        <strong>Note:</strong> Clinic details are sourced from public health authority directories. Always confirm hours and services directly with the clinic before visiting.
       </p>
     </div>
   </main>
@@ -147,20 +154,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script type="module">
-    /**
-     * Clinic Finder Page (Frontend-only)
-     *
-     * - Loads clinic data from /data/clinics.json (your demo file).
-     * - Renders a real map (Leaflet + OpenStreetMap tiles).
-     * - Adds pins for clinics (uses parish-based coordinates fallback).
-     * - Requests user location (optional) to show "You are here" and sort by distance.
-     * - Filters by parish and service.
-     *
-     * NOTE:
-     * Your clinics.json doesn't include latitude/longitude. For a frontend demo, we map each
-     * parish to a representative coordinate. If you later add exact lat/lng per clinic, the
-     * map will become precise.
-     */
     import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
 
     renderNav('clinics');
@@ -215,19 +208,45 @@
       return { ...clinic, lat: coords[0], lng: coords[1] };
     }
 
+    const SERVICE_LABELS = {
+      OBGYN: "OB/GYN", Maternity: "Maternity", Paediatrics: "Paediatrics",
+      Emergency: "Emergency", Surgery: "Surgery", MentalHealth: "Mental Health",
+      Pharmacy: "Pharmacy", Radiology: "Radiology", Laboratory: "Laboratory",
+      Physiotherapy: "Physiotherapy", Orthopaedics: "Orthopaedics",
+      GeneralMedicine: "General Medicine", FamilyPlanning: "Family Planning",
+      TeenFriendly: "Teen Friendly", HighRiskObstetrics: "High-Risk Obstetrics",
+      GynecologicOncology: "Gynecologic Oncology", MinimallyInvasive: "Minimally Invasive",
+      CosmeticGynecology: "Cosmetic Gynecology", Laparoscopy: "Laparoscopy",
+      Ultrasound: "Ultrasound", HealthInformation: "Health Information", Referral: "Referral",
+    };
+
+    const TYPE_LABELS = {
+      hospital: "Hospital", health_center: "Health Centre",
+      private: "Private Practice", hotline: "Hotline",
+    };
+
+    function serviceLabel(s) { return SERVICE_LABELS[s] || s; }
+    function typeLabel(t) { return TYPE_LABELS[t] || t; }
+    function clinicPhone(c) {
+      if (Array.isArray(c.phones) && c.phones.length) return c.phones[0];
+      return c.phone || "";
+    }
+
     function getFilters() {
       return {
         parish: document.getElementById('filter-parish').value,
+        type: document.getElementById('filter-type').value,
         service: document.getElementById('filter-service').value,
       };
     }
 
     function getFilteredClinics() {
-      const { parish, service } = getFilters();
+      const { parish, type, service } = getFilters();
 
       let filtered = clinics;
 
       if (parish !== 'all') filtered = filtered.filter(c => c.parish === parish);
+      if (type !== 'all') filtered = filtered.filter(c => c.type === type);
       if (service !== 'all') filtered = filtered.filter(c => (c.services || []).includes(service));
 
       // If user location exists, compute distance + sort near->far
@@ -290,13 +309,18 @@
       }
 
       // Update grid
-      grid.innerHTML = filtered.map(c => `
+      grid.innerHTML = filtered.map(c => {
+        const phone = clinicPhone(c);
+        return `
         <div class="card clinic-card" data-lat="${c.lat}" data-lng="${c.lng}">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
             <h3 style="margin:0;">${c.name}</h3>
-            ${userLocation && typeof c.distance === 'number'
-              ? `<span class="badge badge-distance">${c.distance.toFixed(1)} km</span>`
-              : ``}
+            <div style="display:flex;gap:0.35rem;flex-wrap:wrap;align-items:center;">
+              ${c.type ? `<span class="badge" style="background:var(--color-bg-hover);color:var(--color-text-muted);">${typeLabel(c.type)}</span>` : ''}
+              ${userLocation && typeof c.distance === 'number'
+                ? `<span class="badge badge-distance">${c.distance.toFixed(1)} km</span>`
+                : ''}
+            </div>
           </div>
 
           <div class="clinic-detail" style="margin-top:0.5rem;">
@@ -304,10 +328,10 @@
             <span>${c.address}${c.parish ? ", " + c.parish : ""}</span>
           </div>
 
-          ${c.phone ? `
+          ${phone ? `
             <div class="clinic-detail">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-              <span>${c.phone}</span>
+              <span>${phone}</span>
             </div>
           ` : ''}
 
@@ -319,14 +343,14 @@
           ` : ''}
 
           <div class="clinic-services">
-            ${(c.services || []).map(s => `<span class="badge badge-primary">${s}</span>`).join('')}
+            ${(c.services || []).map(s => `<span class="badge badge-primary">${serviceLabel(s)}</span>`).join('')}
           </div>
 
           <div style="margin-top:0.9rem;">
             <button class="btn btn-outline btn-sm btn-focus-map" type="button">View on map</button>
           </div>
         </div>
-      `).join('');
+      `}).join('');
 
       // Update markers
       renderMarkers(filtered);
@@ -348,7 +372,6 @@
       const parishSelect = document.getElementById('filter-parish');
       const serviceSelect = document.getElementById('filter-service');
 
-      // Parishes from data (Jamaica)
       const parishes = [...new Set(clinics.map(c => c.parish).filter(Boolean))].sort();
       parishes.forEach(p => {
         const opt = document.createElement('option');
@@ -357,12 +380,11 @@
         parishSelect.appendChild(opt);
       });
 
-      // Services from data
       const services = [...new Set(clinics.flatMap(c => c.services || []))].sort();
       services.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s;
-        opt.textContent = s;
+        opt.textContent = serviceLabel(s);
         serviceSelect.appendChild(opt);
       });
     }
@@ -401,6 +423,7 @@
 
     // ----- Events -----
     document.getElementById('filter-parish').addEventListener('change', renderClinics);
+    document.getElementById('filter-type').addEventListener('change', renderClinics);
     document.getElementById('filter-service').addEventListener('change', renderClinics);
     document.getElementById('btn-locate').addEventListener('click', requestUserLocation);
 
@@ -408,9 +431,8 @@
     async function init() {
       const res = await fetch('/data/clinics.json');
       clinics = (await res.json())
-        .map(attachCoords)
-        // If your data contains other countries, keep only Jamaica for this page
-        .filter(c => !c.country || String(c.country).toLowerCase().includes("jamaica"));
+        .filter(c => c.status === 'active')
+        .map(attachCoords);
 
       initMap();
       populateFilters();

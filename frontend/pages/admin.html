@@ -200,6 +200,15 @@
           <label class="form-label">Address
             <input class="form-input" id="clinic-address" type="text" maxlength="200" />
           </label>
+          <label class="form-label">Type
+            <select class="form-input" id="clinic-type">
+              <option value="">-- Select type --</option>
+              <option value="hospital">Hospital</option>
+              <option value="health_center">Health Centre</option>
+              <option value="private">Private Practice</option>
+              <option value="hotline">Hotline / Info</option>
+            </select>
+          </label>
           <label class="form-label">Phone
             <input class="form-input" id="clinic-phone" type="text" maxlength="40" />
           </label>
@@ -208,7 +217,7 @@
           </label>
           <label class="form-label">Services (comma-separated)
             <input class="form-input" id="clinic-services" type="text"
-              placeholder="e.g., Gynecology, Family Planning, STI Screening" />
+              placeholder="e.g., OBGYN, FamilyPlanning, Maternity" />
           </label>
         </div>
         <p id="clinic-modal-error" class="admin-error" hidden></p>

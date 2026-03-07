@@ -101,7 +101,6 @@ export function renderFooter() {
   footer.setAttribute("role", "contentinfo");
   footer.innerHTML = `
     <p class="footer-disclaimer">${icon("shield", 14)} Bloom is an educational tool and does not provide medical diagnoses. Always consult a qualified healthcare provider for medical advice.</p>
-    <p>&copy; ${new Date().getFullYear()} Bloom &mdash; Jamaican Reproductive Health Support</p>
   `;
   document.body.appendChild(footer);
 }
@@ -164,11 +163,19 @@ export function getFirstDayOfWeek(year, month) {
 
 /* ===== SYMPTOM LIST ===== */
 export const SYMPTOM_CATEGORIES = {
-  "Pain & Discomfort": ["Cramps", "Back pain", "Headache", "Joint pain", "Pelvic pain", "Muscle aches"],
-  "Digestive": ["Bloating", "Nausea", "Food cravings", "Appetite changes", "Constipation", "Diarrhea"],
-  "Energy & Sleep": ["Fatigue", "Insomnia", "Brain fog", "Dizziness", "Low energy", "Oversleeping"],
-  "Mood & Mental": ["Mood swings", "Anxiety", "Irritability", "Depression", "Stress", "Low motivation"],
-  "Skin & Body": ["Acne", "Breast tenderness", "Hot flashes", "Night sweats", "Swelling", "Hair changes"],
+  "Bleeding":       ["Vaginal bleeding", "Spotting", "Heavy flow", "Large clots"],
+  "Pain":           ["Cramps", "Pelvic pain", "Ovulation pain", "Headache", "Joint or muscle pain", "Breast tenderness"],
+  "Digestive":      ["Bloating", "Gassy", "Heartburn", "Nausea", "Constipation", "Diarrhea"],
+  "Discharge":      ["No discharge", "Sticky discharge", "Creamy discharge", "Egg-white discharge", "Unusual discharge"],
+  "Energy & Sleep": ["Fatigue", "Insomnia", "Brain fog", "Forgetfulness", "Poor concentration"],
+  "Mood":           ["Mood swings", "Irritability", "Anxiety", "Low mood", "Crying spells", "Calm", "Stressed"],
+  "Skin & Hair":    ["Acne", "Dry skin", "Hair thinning"],
+  "Temperature":    ["Hot flashes", "Night sweats", "Cold flashes", "Basal temp shift"],
+  "Cravings":       ["Sweet cravings", "Salty cravings", "Greasy food cravings", "Spicy food cravings", "Increased appetite", "Decreased appetite"],
+  "Physical":       ["Fluid retention", "Frequent urination", "Smell sensitivity", "Nasal congestion", "Weight change"],
+  "Social":         ["Sociable", "Withdrawn"],
+  "Cycle":          ["Missed period", "Irregular period"],
+  "Fertility":      ["Increased libido", "Decreased libido", "Cervical mucus change", "Vaginal dryness", "Pain during sex"],
 };
 
 export const SYMPTOMS = Object.values(SYMPTOM_CATEGORIES).flat();

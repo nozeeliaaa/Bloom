@@ -7,6 +7,19 @@ import express from "express";
 import admin from "firebase-admin";
 import { db, auth } from "../firebaseAdmin.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function loadClinicsJSON() {
+  try {
+    return JSON.parse(readFileSync(join(__dirname, "../../data/clinics.json"), "utf8"));
+  } catch {
+    return [];
+  }
+}
 
 const router = express.Router();
 
@@ -291,28 +304,58 @@ router.delete("/pamphlets/:id", async (req, res) => {
 // ─────────────────────────────────────────
 router.get("/clinics", async (req, res) => {
   try {
-    const snap = await db.collection("clinics").orderBy("name").get();
-    const clinics = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const snap = await db.collection("clinicDirectory").orderBy("name").get();
+    let clinics = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // Auto-seed Firestore from JSON if collection is empty
+    if (!clinics.length) {
+      const jsonClinics = loadClinicsJSON();
+      const batch = db.batch();
+      clinics = jsonClinics.map((c) => {
+        const ref = db.collection("clinicDirectory").doc();
+        const doc = {
+          name:     c.name || "",
+          country:  c.country || "Jamaica",
+          parish:   c.parish || "",
+          address:  c.address || "",
+          phone:    Array.isArray(c.phones) ? c.phones[0] || "" : (c.phone || ""),
+          hours:    c.hours || "",
+          services: Array.isArray(c.services) ? c.services : [],
+          type:     c.type || "",
+          status:   c.status || "active",
+          region:   c.region || "",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        batch.set(ref, doc);
+        return { id: ref.id, ...doc };
+      });
+      await batch.commit();
+    }
+
     res.json({ ok: true, clinics });
   } catch (err) {
+    console.error("Admin GET /clinics error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 router.post("/clinics", async (req, res) => {
   try {
-    const { name, country, parish, address, phone, hours, services } = req.body;
+    const { name, country, parish, address, type, phone, hours, services } = req.body;
     if (!name || !country) {
       return res.status(400).json({ error: "name and country are required" });
     }
-    const doc = await db.collection("clinics").add({
+    const doc = await db.collection("clinicDirectory").add({
       name,
       country,
       parish: parish || "",
       address: address || "",
+      type: type || "",
       phone: phone || "",
       hours: hours || "",
       services: Array.isArray(services) ? services : [],
+      status: "active",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdBy: req.user.uid,
@@ -326,7 +369,7 @@ router.post("/clinics", async (req, res) => {
 router.put("/clinics/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, country, parish, address, phone, hours, services } = req.body;
+    const { name, country, parish, address, type, phone, hours, services } = req.body;
     const updates = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: req.user.uid,
@@ -335,10 +378,11 @@ router.put("/clinics/:id", async (req, res) => {
     if (country !== undefined) updates.country = country;
     if (parish !== undefined) updates.parish = parish;
     if (address !== undefined) updates.address = address;
+    if (type !== undefined) updates.type = type;
     if (phone !== undefined) updates.phone = phone;
     if (hours !== undefined) updates.hours = hours;
     if (services !== undefined) updates.services = Array.isArray(services) ? services : [];
-    await db.collection("clinics").doc(id).update(updates);
+    await db.collection("clinicDirectory").doc(id).update(updates);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -347,7 +391,7 @@ router.put("/clinics/:id", async (req, res) => {
 
 router.delete("/clinics/:id", async (req, res) => {
   try {
-    await db.collection("clinics").doc(req.params.id).delete();
+    await db.collection("clinicDirectory").doc(req.params.id).delete();
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

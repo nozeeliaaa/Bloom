@@ -379,9 +379,10 @@ function openClinicModal(clinic = null) {
   document.getElementById("clinic-modal-title").textContent = clinic ? "Edit Clinic" : "New Clinic";
   document.getElementById("clinic-id").value = clinic?.id || "";
   document.getElementById("clinic-name").value = clinic?.name || "";
-  document.getElementById("clinic-country").value = clinic?.country || "";
+  document.getElementById("clinic-country").value = clinic?.country || "Jamaica";
   document.getElementById("clinic-parish").value = clinic?.parish || "";
   document.getElementById("clinic-address").value = clinic?.address || "";
+  document.getElementById("clinic-type").value = clinic?.type || "";
   document.getElementById("clinic-phone").value = clinic?.phone || "";
   document.getElementById("clinic-hours").value = clinic?.hours || "";
   document.getElementById("clinic-services").value = Array.isArray(clinic?.services)
@@ -401,6 +402,7 @@ document.getElementById("clinic-save-btn")?.addEventListener("click", async () =
     country: document.getElementById("clinic-country").value.trim(),
     parish: document.getElementById("clinic-parish").value.trim(),
     address: document.getElementById("clinic-address").value.trim(),
+    type: document.getElementById("clinic-type").value,
     phone: document.getElementById("clinic-phone").value.trim(),
     hours: document.getElementById("clinic-hours").value.trim(),
     services: servicesRaw.split(",").map((s) => s.trim()).filter(Boolean),
