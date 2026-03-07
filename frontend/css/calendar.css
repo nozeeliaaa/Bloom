@@ -147,12 +147,24 @@
 
 /* ===== Dark Mode Overrides ===== */
 [data-theme="dark"] .calendar-cell {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text);
+}
+
+/* Weekday header labels */
+[data-theme="dark"] .calendar-header-cell {
+  color: var(--color-text-muted);
 }
 
 [data-theme="dark"] .calendar-cell.logged-period {
-  background: color-mix(in srgb, var(--period-logged) 25%, transparent);
+  background: color-mix(in srgb, var(--period-logged) 28%, transparent);
   border-color: var(--period-logged);
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .calendar-cell.predicted-period {
+  border-color: var(--period-logged);
+  color: var(--color-text);
 }
 
 [data-theme="dark"] .calendar-cell.predicted-period::after {
@@ -165,28 +177,45 @@
   );
 }
 
-[data-theme="dark"] .calendar-cell.predicted-period {
-  border-color: var(--period-logged);
+[data-theme="dark"] .calendar-cell.predicted-period .day-number {
+  color: var(--color-text);
 }
 
 [data-theme="dark"] .calendar-cell.fertile-day {
   background: color-mix(in srgb, var(--fertility) 25%, transparent);
   border-color: var(--fertility);
+  color: var(--color-text);
 }
 
 [data-theme="dark"] .calendar-cell.ovulation-day {
   border-color: var(--ovulation);
-  color: var(--ovulation);
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .calendar-cell.ovulation-day .day-number {
+  color: #7dd3fc;
 }
 
 [data-theme="dark"] .calendar-cell.ovulation-day::after {
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--ovulation) 25%, transparent),
-    color-mix(in srgb, var(--ovulation) 25%, transparent) 6px,
+    color-mix(in srgb, var(--ovulation) 30%, transparent),
+    color-mix(in srgb, var(--ovulation) 30%, transparent) 6px,
     transparent 6px,
     transparent 12px
   );
+}
+
+/* Ensure today marker stays visible in dark mode */
+[data-theme="dark"] .calendar-cell.is-today {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* Text muted dates (other month) */
+[data-theme="dark"] .calendar-cell.other-month .day-number {
+  color: var(--color-text-muted);
+  opacity: 0.5;
 }
 
 /* ===== Legend / Key ===== */

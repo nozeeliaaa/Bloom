@@ -15,6 +15,7 @@ import { getAllLogs } from "./db.js";
 import { getMode } from "./mode.js";
 import { computeCyclePhase } from "./phase.js";
 import { getUserGoal, goalLabel, goalDesc } from "./goals.js";
+import { triggerNotifications } from "./notifications.js";
 
 // Wire up finished algorithms (safe — wrapped in try/catch)
 let algoPregnancy = null;
@@ -823,3 +824,9 @@ async function loadDashboard() {
 }
 
 loadDashboard();
+
+// Fire notifications after dashboard loads (cycle data computed inside loadDashboard)
+getAllLogs().then(logs => {
+  const cycle = computeCyclePhase(logs);
+  triggerNotifications(cycle, logs);
+});
