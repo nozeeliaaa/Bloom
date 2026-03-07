@@ -7,9 +7,9 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
 
-
-<style>
+  <style>
     .auth-page {
       display: flex;
       align-items: center;
@@ -37,9 +37,7 @@
       margin-top: 1.25rem;
       font-size: 0.9rem;
     }
-    .auth-links a {
-      font-weight: 600;
-    }
+    .auth-links a { font-weight: 600; }
     .brand-link {
       display: flex;
       align-items: center;
@@ -52,14 +50,22 @@
       margin-bottom: 1.5rem;
     }
     .brand-link svg { width: 24px; height: 24px; }
+
+    .forgot-link {
+      font-size: 0.85rem;
+      text-align: right;
+      display: block;
+      margin-top: 0.25rem;
+    }
+
+    /* Reset panel (hidden by default) */
+    #reset-panel { display: none; }
   </style>
-    <link rel="stylesheet" href="/css/main.css" />
-  </head>
+</head>
 
 <body>
   <main class="auth-page">
     <div class="card auth-card">
-      <!-- IMPORTANT: don't jump to dashboard from the logo -->
       <a href="/pages/login.html" class="brand-link" aria-label="Bloom home">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
@@ -72,75 +78,134 @@
         Bloom
       </a>
 
-      <h1>Welcome Back</h1>
-      <p class="subtitle">Log in to access your synced data and advanced features.</p>
+      <!-- ── Login panel ── -->
+      <div id="login-panel">
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Log in to access your synced data and advanced features.</p>
 
-      <div id="error-msg" class="banner banner-warning hidden" role="alert"></div>
+        <div id="error-msg"   class="banner banner-warning hidden" role="alert"></div>
+        <div id="success-msg" class="banner banner-success hidden" role="status"></div>
 
-      <form id="login-form">
-        <div class="form-group">
-          <label class="form-label" for="email">Email</label>
-          <input class="form-input" type="email" id="email" name="email" required autocomplete="email"
-            placeholder="you@example.com" />
+        <!-- Unverified email notice (hidden until needed) -->
+        <div id="verify-notice" class="banner banner-warning hidden" role="alert">
+          <p id="verify-text"></p>
+          <button class="btn btn-outline btn-sm" id="btn-resend" type="button"
+            style="margin-top:0.5rem;">
+            Resend verification email
+          </button>
         </div>
 
+        <form id="login-form">
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input class="form-input" type="email" id="email" name="email" required
+              autocomplete="email" placeholder="you@example.com" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input class="form-input" type="password" id="password" name="password" required
+              autocomplete="current-password" placeholder="Your password" />
+            <a href="#" class="forgot-link" id="btn-forgot">Forgot password?</a>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="login-btn">
+            Log In
+          </button>
+        </form>
+
+        <div class="auth-links">
+          <p>Don't have an account? <a href="/pages/register.html">Create one (18+)</a></p>
+          <p style="margin-top:0.75rem;">
+            <a href="#" id="btn-anon">Continue anonymously instead</a>
+          </p>
+        </div>
+      </div>
+
+      <!-- ── Password reset panel ── -->
+      <div id="reset-panel">
+        <h1>Reset Password</h1>
+        <p class="subtitle">Enter your email and we'll send a reset link.</p>
+
+        <div id="reset-error"   class="banner banner-warning hidden" role="alert"></div>
+        <div id="reset-success" class="banner banner-success hidden" role="status"></div>
+
         <div class="form-group">
-          <label class="form-label" for="password">Password</label>
-          <input class="form-input" type="password" id="password" name="password" required
-            autocomplete="current-password" placeholder="Your password" />
+          <label class="form-label" for="reset-email">Email</label>
+          <input class="form-input" type="email" id="reset-email" placeholder="you@example.com"
+            autocomplete="email" />
         </div>
 
-        <button type="submit" class="btn btn-primary btn-block btn-lg" id="login-btn">Log In</button>
-      </form>
+        <button class="btn btn-primary btn-block" id="btn-send-reset" type="button">
+          Send Reset Link
+        </button>
 
-      <div class="auth-links">
-        <p>Don't have an account? <a href="/pages/register.html">Create one (18+)</a></p>
-        <p style="margin-top:0.75rem;">
-          <a href="#" id="btn-anon">Continue anonymously instead</a>
-        </p>
+        <div class="auth-links" style="margin-top:1rem;">
+          <a href="#" id="btn-back-login">← Back to login</a>
+        </div>
       </div>
     </div>
   </main>
 
   <script type="module">
     import { showBloomLoader, runBloomLoader } from "/js/loadingOverlay.js";
-    import { login } from '/js/auth.js';
+    import { login, sendPasswordReset, resendVerificationEmail } from '/js/auth.js';
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
 
     renderFooter();
 
-    const form = document.getElementById('login-form');
-    const errorMsg = document.getElementById('error-msg');
-    const loginBtn = document.getElementById('login-btn');
-    const anonBtn = document.getElementById('btn-anon');
+    const loginPanel   = document.getElementById('login-panel');
+    const resetPanel   = document.getElementById('reset-panel');
+    const form         = document.getElementById('login-form');
+    const errorMsg     = document.getElementById('error-msg');
+    const successMsg   = document.getElementById('success-msg');
+    const verifyNotice = document.getElementById('verify-notice');
+    const verifyText   = document.getElementById('verify-text');
+    const loginBtn     = document.getElementById('login-btn');
+
+    // Stores email+password temporarily for resend flow
+    let _unverifiedEmail = null;
+    let _unverifiedPassword = null;
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.remove('hidden');
+      successMsg.classList.add('hidden');
+      verifyNotice.classList.add('hidden');
+    }
+
+    function showSuccess(msg) {
+      successMsg.textContent = msg;
+      successMsg.classList.remove('hidden');
+      errorMsg.classList.add('hidden');
+    }
 
     const goPostAuth = async () => {
       const onboarded = localStorage.getItem('bloom_onboarded') === '1';
       const target = onboarded ? '/pages/dashboard.html' : '/pages/survey.html';
-
       showBloomLoader({ message: "Preparing Bloom", sub: "Syncing your experience…" });
       await runBloomLoader({ targetUrl: target });
-};
+    };
 
-
+    // ── Login ──
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.classList.add('hidden');
+      successMsg.classList.add('hidden');
+      verifyNotice.classList.add('hidden');
 
       if (!isFirebaseConfigured()) {
-        errorMsg.textContent = 'Firebase is not configured. Please set up Firebase or continue anonymously.';
-        errorMsg.classList.remove('hidden');
+        showError('Firebase is not configured. Please continue anonymously.');
         return;
       }
 
-      const email = document.getElementById('email').value.trim();
+      const email    = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
 
       if (!email || !password) {
-        errorMsg.textContent = 'Please fill in all fields.';
-        errorMsg.classList.remove('hidden');
+        showError('Please fill in all fields.');
         return;
       }
 
@@ -149,31 +214,123 @@
 
       try {
         await login(email, password);
-        setMode('account'); // ✅ ensure mode is correct
+        setMode('account');
         localStorage.setItem("bloom_show_mode_banner_once", "1");
-        goPostAuth();       // ✅ survey only if first time
+        goPostAuth();
 
       } catch (err) {
-        let msg = 'Login failed. Please check your credentials.';
-        if (
-          err?.code === 'auth/user-not-found' ||
-          err?.code === 'auth/wrong-password' ||
-          err?.code === 'auth/invalid-credential'
-        ) {
-          msg = 'Invalid email or password. Please try again.';
-        } else if (err?.code === 'auth/too-many-requests') {
-          msg = 'Too many attempts. Please try again later.';
+        if (err.code === 'auth/email-not-verified') {
+          // Show the resend verification notice
+          _unverifiedEmail = email;
+          _unverifiedPassword = password;
+          verifyText.textContent =
+            `Your email (${email}) hasn't been verified yet. ` +
+            `Check your inbox or resend the verification email below.`;
+          verifyNotice.classList.remove('hidden');
+          errorMsg.classList.add('hidden');
+
+        } else {
+          let msg = 'Login failed. Please check your credentials.';
+          if (err.code === 'auth/user-not-found' ||
+              err.code === 'auth/wrong-password' ||
+              err.code === 'auth/invalid-credential') {
+            msg = 'Invalid email or password. Please try again.';
+          } else if (err.code === 'auth/too-many-requests') {
+            msg = 'Too many attempts. Please try again later.';
+          }
+          showError(msg);
         }
-        errorMsg.textContent = msg;
-        errorMsg.classList.remove('hidden');
       } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = 'Log In';
       }
     });
 
-    // ✅ Continue anonymously: set mode, then route based on "first time" flag
-    anonBtn.addEventListener('click', (e) => {
+    // ── Resend verification ──
+    document.getElementById('btn-resend').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-resend');
+      if (!_unverifiedEmail || !_unverifiedPassword) {
+        showError('Please try logging in again first.');
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        await resendVerificationEmail(_unverifiedEmail, _unverifiedPassword);
+        verifyText.textContent =
+          `Verification email resent to ${_unverifiedEmail}. Please check your inbox.`;
+        btn.style.display = 'none';
+      } catch (e) {
+        showError('Could not resend. Please try again shortly.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Resend verification email';
+      }
+    });
+
+    // ── Forgot password → show reset panel ──
+    document.getElementById('btn-forgot').addEventListener('click', (e) => {
+      e.preventDefault();
+      // Pre-fill reset email from whatever was typed in login
+      const emailVal = document.getElementById('email').value.trim();
+      if (emailVal) document.getElementById('reset-email').value = emailVal;
+
+      loginPanel.style.display = 'none';
+      resetPanel.style.display = 'block';
+    });
+
+    // ── Send reset link ──
+    document.getElementById('btn-send-reset').addEventListener('click', async () => {
+      const btn        = document.getElementById('btn-send-reset');
+      const resetError = document.getElementById('reset-error');
+      const resetOk    = document.getElementById('reset-success');
+      const email      = document.getElementById('reset-email').value.trim();
+
+      resetError.classList.add('hidden');
+      resetOk.classList.add('hidden');
+
+      if (!email) {
+        resetError.textContent = 'Please enter your email address.';
+        resetError.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      try {
+        await sendPasswordReset(email);
+        resetOk.textContent =
+          `Reset link sent to ${email}. Check your inbox (and spam folder).`;
+        resetOk.classList.remove('hidden');
+        btn.style.display = 'none';
+      } catch (err) {
+        let msg = 'Could not send reset email. Please try again.';
+        if (err.code === 'auth/user-not-found') {
+          msg = 'No account found with that email.';
+        } else if (err.code === 'auth/invalid-email') {
+          msg = 'Please enter a valid email address.';
+        }
+        resetError.textContent = msg;
+        resetError.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        if (btn.style.display !== 'none') btn.textContent = 'Send Reset Link';
+      }
+    });
+
+    // ── Back to login ──
+    document.getElementById('btn-back-login').addEventListener('click', (e) => {
+      e.preventDefault();
+      resetPanel.style.display = 'none';
+      loginPanel.style.display = 'block';
+      document.getElementById('reset-error').classList.add('hidden');
+      document.getElementById('reset-success').classList.add('hidden');
+      document.getElementById('btn-send-reset').style.display = '';
+    });
+
+    // ── Anonymous ──
+    document.getElementById('btn-anon').addEventListener('click', (e) => {
       e.preventDefault();
       setMode('anon');
       goPostAuth();

@@ -8,6 +8,7 @@ import rateLimit from "express-rate-limit";
 import cycleLogRoutes from "./routes/cycleLogs.js";
 import symptomLogRoutes from "./routes/symptomLogs.js";
 import consentRoutes from "./routes/consent.js";
+import catalogRoutes from "./routes/catalog.js";
 import userRoutes from "./routes/user.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
@@ -62,6 +63,7 @@ app.use("/api/cycle", cycleLogRoutes);
 app.use("/api/symptoms", symptomLogRoutes);
 app.use("/api/consent", consentRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/catalog", catalogRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/admin", adminRoutes);
 
