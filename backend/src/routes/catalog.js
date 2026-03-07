@@ -7,7 +7,7 @@ const router = express.Router();
 
 // ─── GET /catalog/clinics ────────────────────────────────────────────────────
 // Returns clinic directory, filterable by parish and type
-router.get("/clinics", requireAuth, async (req, res) => {
+router.get("/clinics", async (req, res) => {
   try {
     const { parish, type } = req.query;
 

@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clinic Finder - Bloom</title>
+  
+  <script>
+    window.BLOOM_API_BASE = "http://localhost:4000";
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -181,6 +185,7 @@
     const JAMAICA_CENTER = [18.1096, -77.2975];
 
     let clinics = [];
+    window.debugClinics = () => clinics;
     let map, markersLayer;
     let userLocation = null; // { lat, lng }
 
@@ -428,18 +433,28 @@
     document.getElementById('btn-locate').addEventListener('click', requestUserLocation);
 
     // ----- Init -----
-    async function init() {
-      const res = await fetch('/data/clinics.json');
-      clinics = (await res.json())
-        .filter(c => c.status === 'active')
-        .map(attachCoords);
+   async function init() {
+      try {
+        const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+        const res = await fetch(`${apiBase}/catalog/clinics`);
+
+        if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+
+        const data = await res.json();
+        // Backend returns { ok: true, clinics: [...] }
+        clinics = (data.clinics || []).map(attachCoords);
+
+      } catch (e) {
+        console.warn('Backend fetch failed, falling back to local:', e);
+
+        const res = await fetch('/data/clinics.json');
+        const data = await res.json();
+        clinics = (data.clinics || data || []).map(attachCoords);
+      }
 
       initMap();
       populateFilters();
-      renderClinics();
-
-      // Optional: auto-prompt location once (comment out if you prefer button-only)
-      // requestUserLocation();
+      renderClinics();  
     }
 
     init();
