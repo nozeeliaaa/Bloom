@@ -4,9 +4,12 @@
  * - account mode: sync to backend using Firebase ID token
  *
  * Backend endpoints used:
- * - GET    /cycle-logs
- * - PUT    /cycle-logs/:dateKey
- * - DELETE /cycle-logs/:dateKey
+ * - GET    /api/logs
+ * - PUT    /api/logs/:dateKey
+ * - DELETE /api/logs/:dateKey
+ * - GET    /api/symptoms
+ * - PUT    /api/symptoms/:dateKey
+ * - DELETE /api/symptoms/:dateKey
  */
 
 import { getIdToken } from "./auth.js";
@@ -52,16 +55,80 @@ function apiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
+// Convert UI label to backend symptom code.
+// Example: "Back pain" -> "BACK_PAIN"
+function toSymptomCode(label) {
+  return String(label || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+// Convert backend code back to readable label for UI.
+// Example: "BACK_PAIN" -> "Back Pain"
+function fromSymptomCode(code) {
+  return String(code || "")
+    .trim()
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+// Merge cloud cycle logs + cloud symptom logs into one calendar-friendly object
+function mergeCloudLogs(cycleItems = [], symptomItems = []) {
+  const merged = {};
+
+  for (const entry of cycleItems) {
+    const dateKey = entry?.dateKey;
+    if (!dateKey) continue;
+
+    merged[dateKey] = {
+      ...(merged[dateKey] || {}),
+      date: dateKey,
+      flow:
+        entry.flowLevel && entry.flowLevel !== "none"
+          ? entry.flowLevel
+          : "none",
+      notes: entry.notes || "",
+    };
+  }
+
+  for (const entry of symptomItems) {
+    const dateKey = entry?.dateKey;
+    if (!dateKey) continue;
+
+    const symptoms = Array.isArray(entry.items)
+      ? entry.items.map((it) => fromSymptomCode(it?.code)).filter(Boolean)
+      : [];
+
+    const symptomSeverity = {};
+    if (Array.isArray(entry.items)) {
+      entry.items.forEach((it) => {
+        const label = fromSymptomCode(it?.code);
+        if (label) symptomSeverity[label] = Number(it?.severity ?? 3);
+      });
+    }
+
+    merged[dateKey] = {
+      ...(merged[dateKey] || {}),
+      date: dateKey,
+      symptoms,
+      symptomSeverity,
+    };
+  }
+
+  return merged;
+}
+
 // --------------------
 // Logs API (hybrid)
 // --------------------
 
-/**
- * Save a daily log for a specific dateKey (YYYY-MM-DD).
- * In account mode: attempts to sync to backend, falls back to local if needed.
- */
 export async function saveDailyLog(dateKey, log) {
-  // Always write local first (keeps UI snappy + works offline)
+  // Always write local first
   const all = readJSON(LOGS_KEY, {});
   all[dateKey] = { ...(all[dateKey] || {}), ...log, date: dateKey };
   writeJSON(LOGS_KEY, all);
@@ -72,16 +139,63 @@ export async function saveDailyLog(dateKey, log) {
     const headers = await authHeaders();
     if (!headers) return all[dateKey];
 
-    const res = await fetch(apiUrl(`/cycle-logs/${encodeURIComponent(dateKey)}`), {
+    const localEntry = all[dateKey];
+
+    // 1) Save cycle data
+    const cycleRes = await fetch(apiUrl(`/api/logs/${encodeURIComponent(dateKey)}`), {
       method: "PUT",
       headers,
-      body: JSON.stringify(all[dateKey]),
+      body: JSON.stringify({
+        flowLevel:
+          localEntry.flow && localEntry.flow !== "none"
+            ? localEntry.flow
+            : null,
+        notes: localEntry.notes || "",
+      }),
     });
 
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      console.warn("Cloud save failed:", res.status, txt);
+    if (!cycleRes.ok) {
+      const txt = await cycleRes.text().catch(() => "");
+      console.warn("Cycle cloud save failed:", cycleRes.status, txt);
       return all[dateKey];
+    }
+
+    // 2) Save symptom data separately
+    const symptomsArray = Array.isArray(localEntry.symptoms)
+      ? localEntry.symptoms
+      : [];
+
+    if (symptomsArray.length > 0) {
+      const items = symptomsArray.map((symptom) => ({
+        code: toSymptomCode(symptom),
+        severity: Number(localEntry.symptomSeverity?.[symptom] ?? 3),
+        note: "",
+      }));
+
+      const symptomRes = await fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ items }),
+      });
+
+      if (!symptomRes.ok) {
+        const txt = await symptomRes.text().catch(() => "");
+        console.warn("Symptom cloud save failed:", symptomRes.status, txt);
+      }
+    } else {
+      // If user removed all symptoms for that day, delete backend symptom entry
+      const symptomDeleteRes = await fetch(
+        apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`),
+        {
+          method: "DELETE",
+          headers,
+        }
+      );
+
+      if (!symptomDeleteRes.ok && symptomDeleteRes.status !== 404) {
+        const txt = await symptomDeleteRes.text().catch(() => "");
+        console.warn("Symptom cloud delete failed:", symptomDeleteRes.status, txt);
+      }
     }
 
     setCloudSyncedBanner();
@@ -101,10 +215,6 @@ export async function getDailyLog(dateKey) {
   return all[dateKey] || null;
 }
 
-/**
- * Get all logs.
- * In account mode: tries backend first, caches to local, falls back to local on error.
- */
 export async function getAllLogs() {
   const local = readJSON(LOGS_KEY, {});
 
@@ -114,21 +224,40 @@ export async function getAllLogs() {
     const headers = await authHeaders();
     if (!headers) return local;
 
-    const res = await fetch(apiUrl("/cycle-logs"), { headers });
+    const [cycleRes, symptomRes] = await Promise.all([
+      fetch(apiUrl("/api/logs"), { headers }),
+      fetch(apiUrl("/api/symptoms"), { headers }),
+    ]);
 
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      console.warn("Cloud fetch failed:", res.status, txt);
+    if (!cycleRes.ok) {
+      const txt = await cycleRes.text().catch(() => "");
+      console.warn("Cycle cloud fetch failed:", cycleRes.status, txt);
       return local;
     }
 
-    const data = await res.json();
+    if (!symptomRes.ok) {
+      const txt = await symptomRes.text().catch(() => "");
+      console.warn("Symptom cloud fetch failed:", symptomRes.status, txt);
+      return local;
+    }
 
-    // Backend returns { ok: true, entries: { dateKey: {...} } }
-    const logs =
-      data?.entries && typeof data.entries === "object" ? data.entries : {};
+    const cycleData = await cycleRes.json();
+    const symptomData = await symptomRes.json();
 
-    // Cache cloud logs locally
+    let cycleItems = [];
+    if (Array.isArray(cycleData?.items)) {
+      cycleItems = cycleData.items;
+    } else if (cycleData?.entries && typeof cycleData.entries === "object") {
+      cycleItems = Object.entries(cycleData.entries).map(([dateKey, entry]) => ({
+        dateKey,
+        ...entry,
+      }));
+    }
+
+    const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
+
+    const logs = mergeCloudLogs(cycleItems, symptomItems);
+
     writeJSON(LOGS_KEY, logs);
     setCloudSyncedBanner();
 
@@ -140,7 +269,6 @@ export async function getAllLogs() {
 }
 
 export async function deleteDailyLog(dateKey) {
-  // Always delete locally first
   const all = readJSON(LOGS_KEY, {});
   delete all[dateKey];
   writeJSON(LOGS_KEY, all);
@@ -151,15 +279,25 @@ export async function deleteDailyLog(dateKey) {
     const headers = await authHeaders();
     if (!headers) return;
 
-    const res = await fetch(apiUrl(`/cycle-logs/${encodeURIComponent(dateKey)}`), {
-      method: "DELETE",
-      headers,
-    });
+    const [cycleRes, symptomRes] = await Promise.all([
+      fetch(apiUrl(`/api/logs/${encodeURIComponent(dateKey)}`), {
+        method: "DELETE",
+        headers,
+      }),
+      fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
+        method: "DELETE",
+        headers,
+      }),
+    ]);
 
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      console.warn("Cloud delete failed:", res.status, txt);
-      return;
+    if (!cycleRes.ok) {
+      const txt = await cycleRes.text().catch(() => "");
+      console.warn("Cycle cloud delete failed:", cycleRes.status, txt);
+    }
+
+    if (!symptomRes.ok && symptomRes.status !== 404) {
+      const txt = await symptomRes.text().catch(() => "");
+      console.warn("Symptom cloud delete failed:", symptomRes.status, txt);
     }
 
     setCloudSyncedBanner();
@@ -186,27 +324,57 @@ export async function deleteAllLocalData() {
 }
 
 export async function clearAllLogs() {
-  // Clear locally first
   writeJSON(LOGS_KEY, {});
 
   if (!isAccountMode()) return;
 
-  // Account mode: fetch all log keys then delete each from cloud
   try {
     const headers = await authHeaders();
     if (!headers) return;
 
-    const res = await fetch(apiUrl("/api/logs"), { headers });
-    if (!res.ok) return;
+    const [cycleRes, symptomRes] = await Promise.all([
+      fetch(apiUrl("/api/logs"), { headers }),
+      fetch(apiUrl("/api/symptoms"), { headers }),
+    ]);
 
-    const data = await res.json();
-    const logs = data?.logs && typeof data.logs === "object" ? data.logs : {};
+    if (cycleRes.ok) {
+      const cycleData = await cycleRes.json();
+      const cycleItems = Array.isArray(cycleData?.items)
+        ? cycleData.items
+        : cycleData?.entries && typeof cycleData.entries === "object"
+          ? Object.entries(cycleData.entries).map(([dateKey, entry]) => ({
+              dateKey,
+              ...entry,
+            }))
+          : [];
 
-    await Promise.all(
-      Object.keys(logs).map((dateKey) =>
-        fetch(apiUrl(`/api/logs/${encodeURIComponent(dateKey)}`), { method: "DELETE", headers })
-      )
-    );
+      await Promise.all(
+        cycleItems
+          .filter((entry) => entry?.dateKey)
+          .map((entry) =>
+            fetch(apiUrl(`/api/logs/${encodeURIComponent(entry.dateKey)}`), {
+              method: "DELETE",
+              headers,
+            })
+          )
+      );
+    }
+
+    if (symptomRes.ok) {
+      const symptomData = await symptomRes.json();
+      const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
+
+      await Promise.all(
+        symptomItems
+          .filter((entry) => entry?.dateKey)
+          .map((entry) =>
+            fetch(apiUrl(`/api/symptoms/${encodeURIComponent(entry.dateKey)}`), {
+              method: "DELETE",
+              headers,
+            })
+          )
+      );
+    }
   } catch (e) {
     console.warn("Cloud clear error:", e);
   }

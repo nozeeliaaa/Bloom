@@ -1,7 +1,7 @@
 // src/routes/symptomLogs.js
 import express from "express";
 import { db } from "../firebaseAdmin.js";
-import { requireAuth, requireSensitiveAccess } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -23,7 +23,7 @@ function sanitizeText(s, max = 300) {
 // Each doc holds an items[] array — multiple symptoms per day
 
 // Create/Update symptoms for a day
-router.put("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) => {
+router.put("/:dateKey", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { dateKey } = req.params;
@@ -42,19 +42,17 @@ router.put("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) =>
       return res.status(400).json({ error: "Too many symptom items for one day (max 40)" });
     }
 
-    // Validate and clean each item
     const cleaned = [];
+
     for (let idx = 0; idx < items.length; idx++) {
       const it = items[idx];
 
-      // code is required and must be a non-empty string
       if (!it.code || typeof it.code !== "string") {
         return res.status(400).json({ error: `items[${idx}].code is required` });
       }
 
       const code = it.code.trim().toUpperCase();
 
-      // Verify code exists in symptomCatalog
       const catalogDoc = await db.collection("symptomCatalog").doc(code).get();
       if (!catalogDoc.exists) {
         return res.status(400).json({
@@ -62,17 +60,15 @@ router.put("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) =>
         });
       }
 
-      // If teen, block sensitive symptoms without consent
-      // (requireSensitiveAccess already blocks teens without consent,
-      // but we double-check at the item level for sensitive symptoms)
       const catalogData = catalogDoc.data();
+
+      // Block only sensitive symptoms for teens without consent
       if (catalogData.sensitive && req.user.ageBand === "13-17") {
         return res.status(403).json({
           error: `Symptom "${code}" requires guardian consent`,
         });
       }
 
-      // severity: required, 0-5
       const severity = Number(it.severity);
       if (!isValidSeverity(severity)) {
         return res.status(400).json({
@@ -106,13 +102,13 @@ router.put("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) =>
 
     return res.json({ ok: true, entry: payload });
   } catch (err) {
-    console.error("PUT /symptom-logs/:dateKey error:", err);
+    console.error("PUT /api/symptoms/:dateKey error:", err);
     return res.status(500).json({ error: "Failed to save symptom log" });
   }
 });
 
 // Get one day's symptom log
-router.get("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) => {
+router.get("/:dateKey", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { dateKey } = req.params;
@@ -131,13 +127,13 @@ router.get("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) =>
     if (!doc.exists) return res.json(null);
     return res.json(doc.data());
   } catch (err) {
-    console.error("GET /symptom-logs/:dateKey error:", err);
+    console.error("GET /api/symptoms/:dateKey error:", err);
     return res.status(500).json({ error: "Failed to fetch symptom log" });
   }
 });
 
 // List range
-router.get("/", requireAuth, requireSensitiveAccess, async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { start, end } = req.query;
@@ -164,13 +160,13 @@ router.get("/", requireAuth, requireSensitiveAccess, async (req, res) => {
 
     return res.json({ ok: true, items });
   } catch (err) {
-    console.error("GET /symptom-logs error:", err);
+    console.error("GET /api/symptoms error:", err);
     return res.status(500).json({ error: "Failed to fetch symptom logs" });
   }
 });
 
 // Delete one day
-router.delete("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res) => {
+router.delete("/:dateKey", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { dateKey } = req.params;
@@ -188,7 +184,7 @@ router.delete("/:dateKey", requireAuth, requireSensitiveAccess, async (req, res)
 
     return res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /symptom-logs/:dateKey error:", err);
+    console.error("DELETE /api/symptoms/:dateKey error:", err);
     return res.status(500).json({ error: "Failed to delete symptom log" });
   }
 });
