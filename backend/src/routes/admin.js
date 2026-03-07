@@ -1,12 +1,12 @@
 /**
  * admin.js — Bloom Admin API Routes
  * All endpoints require role="admin" (set via Firebase Custom Claims).
- * Use setAdminClaim(uid) from auth.js middleware to promote a user.
  */
 import express from "express";
 import admin from "firebase-admin";
 import { db, auth } from "../firebaseAdmin.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -23,41 +23,74 @@ function loadClinicsJSON() {
 
 const router = express.Router();
 
-// All admin routes require auth + admin role
 router.use(requireAuth);
 router.use(requireRole("admin"));
 
 // ─────────────────────────────────────────
-// STATS — Overview numbers for dashboard
+// STATS
 // ─────────────────────────────────────────
 router.get("/stats", async (req, res) => {
   try {
-    const [usersSnap, cycleSnap, symptomSnap] = await Promise.all([
-      db.collection("users").count().get(),
-      db.collectionGroup("entries").where("flow", "!=", "none").count().get(),
-      db.collectionGroup("entries").where("items", "!=", null).count().get(),
-    ]);
+    const usersCountPromise = db.collection("users").count().get();
+    const clinicsCountPromise = db.collection("clinicDirectory").count().get();
+    const pamphletsCountPromise = db.collection("pamphlets").count().get();
 
-    const totalUsers = usersSnap.data().count;
-    const totalCycleLogs = cycleSnap.data().count;
-    const totalSymptomLogs = symptomSnap.data().count;
-
-    // New users in last 7 days (by createdAt)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const newUsersSnap = await db
+
+    const newUsersPromise = db
       .collection("users")
       .where("createdAt", ">=", sevenDaysAgo)
       .count()
       .get();
+
+    const goalsPromise = db.collection("users").select("profile").get();
+
+    const [
+      usersSnap,
+      clinicsSnap,
+      pamphletsSnap,
+      newUsersSnap,
+      allUsers,
+    ] = await Promise.all([
+      usersCountPromise,
+      clinicsCountPromise,
+      pamphletsCountPromise,
+      newUsersPromise,
+      goalsPromise,
+    ]);
+
+    const totalUsers = usersSnap.data().count;
+    const totalClinics = clinicsSnap.data().count;
+    const totalPamphlets = pamphletsSnap.data().count;
     const newUsersThisWeek = newUsersSnap.data().count;
 
-    // Goal distribution
-    const allUsers = await db.collection("users").select("profile").get();
-    const goalCounts = {};
-    allUsers.docs.forEach((d) => {
-      const goal = d.data()?.profile?.goal || "unknown";
-      goalCounts[goal] = (goalCounts[goal] || 0) + 1;
+    let totalCycleLogs = 0;
+    let totalSymptomLogs = 0;
+
+    try {
+      const entriesSnap = await db.collectionGroup("entries").get();
+
+      entriesSnap.forEach((doc) => {
+        const data = doc.data();
+
+        if (data.flow && data.flow !== "none") {
+          totalCycleLogs++;
+        }
+
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          totalSymptomLogs++;
+        }
+      });
+    } catch (err) {
+      console.warn("Entries aggregation failed:", err.message);
+    }
+
+    const goalDistribution = {};
+    allUsers.forEach((doc) => {
+      const data = doc.data();
+      const goal = data?.profile?.goal || "unknown";
+      goalDistribution[goal] = (goalDistribution[goal] || 0) + 1;
     });
 
     res.json({
@@ -67,7 +100,9 @@ router.get("/stats", async (req, res) => {
         newUsersThisWeek,
         totalCycleLogs,
         totalSymptomLogs,
-        goalDistribution: goalCounts,
+        totalPamphlets,
+        totalClinics,
+        goalDistribution,
       },
     });
   } catch (err) {
@@ -84,10 +119,7 @@ router.get("/users", async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const pageToken = req.query.pageToken || undefined;
 
-    // Firebase Auth list (has email, createdAt, disabled, etc.)
     const listResult = await auth.listUsers(limit, pageToken);
-
-    // Batch fetch Firestore profiles for these UIDs
     const uids = listResult.users.map((u) => u.uid);
     const profileDocs = await Promise.all(
       uids.map((uid) => db.collection("users").doc(uid).get())
@@ -108,18 +140,13 @@ router.get("/users", async (req, res) => {
       profile: profileMap[u.uid] || null,
     }));
 
-    res.json({
-      ok: true,
-      users,
-      nextPageToken: listResult.pageToken || null,
-    });
+    res.json({ ok: true, users, nextPageToken: listResult.pageToken || null });
   } catch (err) {
     console.error("Admin list users error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get one user with full details
 router.get("/users/:uid", async (req, res) => {
   try {
     const { uid } = req.params;
@@ -128,11 +155,20 @@ router.get("/users/:uid", async (req, res) => {
       db.collection("users").doc(uid).get(),
     ]);
 
-    // Count their logs
     const [cycleCount, symptomCount] = await Promise.all([
       db.collection("cycleLogs").doc(uid).collection("entries").count().get(),
       db.collection("symptomLogs").doc(uid).collection("entries").count().get(),
     ]);
+
+    // Audit: admin viewed a user's detail page
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.ADMIN_VIEWED_USER,
+      entityType: "user",
+      entityId:   uid,
+      targetUid:  uid,
+    });
 
     res.json({
       ok: true,
@@ -160,8 +196,20 @@ router.get("/users/:uid", async (req, res) => {
 router.post("/users/:uid/disable", async (req, res) => {
   try {
     const { uid } = req.params;
-    if (uid === req.user.uid) return res.status(400).json({ error: "Cannot disable your own account" });
+    if (uid === req.user.uid) {
+      return res.status(400).json({ error: "Cannot disable your own account" });
+    }
     await auth.updateUser(uid, { disabled: true });
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.ACCOUNT_DISABLED,
+      entityType: "user",
+      entityId:   uid,
+      targetUid:  uid,
+    });
+
     res.json({ ok: true, message: "User disabled" });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -172,6 +220,16 @@ router.post("/users/:uid/enable", async (req, res) => {
   try {
     const { uid } = req.params;
     await auth.updateUser(uid, { disabled: false });
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.ACCOUNT_ENABLED,
+      entityType: "user",
+      entityId:   uid,
+      targetUid:  uid,
+    });
+
     res.json({ ok: true, message: "User enabled" });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -183,8 +241,21 @@ router.post("/users/:uid/promote", async (req, res) => {
     const { uid } = req.params;
     const { role } = req.body;
     const allowed = ["admin", "user"];
-    if (!allowed.includes(role)) return res.status(400).json({ error: "Invalid role" });
+    if (!allowed.includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
     await auth.setCustomUserClaims(uid, { role });
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.ROLE_CHANGED,
+      entityType: "user",
+      entityId:   uid,
+      targetUid:  uid,
+      meta:       { changedFields: ["role"], reasonCode: role },
+    });
+
     res.json({ ok: true, message: `User role set to ${role}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -192,17 +263,14 @@ router.post("/users/:uid/promote", async (req, res) => {
 });
 
 // ─────────────────────────────────────────
-// SELF-PROMOTE SETUP ROUTE (one-time only)
-// Restricted to first admin setup — blocks if any admin already exists
+// SETUP (disabled)
 // ─────────────────────────────────────────
 router.post("/setup/first-admin", async (_req, res) => {
-  // NOTE: This endpoint temporarily bypasses the admin role check
-  // It should be removed after first admin is created
   res.status(410).json({ error: "Setup route disabled. Use Firebase Console to set admin claim." });
 });
 
 // ─────────────────────────────────────────
-// RECENT ACTIVITY — Last N logs across all users
+// RECENT ACTIVITY
 // ─────────────────────────────────────────
 router.get("/activity", async (req, res) => {
   try {
@@ -216,7 +284,6 @@ router.get("/activity", async (req, res) => {
 
     const items = snap.docs.map((d) => {
       const data = d.data();
-      // Parent path: cycleLogs/{uid}/entries/{dateKey}
       const uid = d.ref.parent.parent?.id || "unknown";
       return {
         uid,
@@ -263,6 +330,16 @@ router.post("/pamphlets", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdBy: req.user.uid,
     });
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.PAMPHLET_ADDED,
+      entityType: "pamphlet",
+      entityId:   doc.id,
+      meta:       { changedFields: ["title", "category", "content"] },
+    });
+
     res.json({ ok: true, id: doc.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -277,13 +354,24 @@ router.put("/pamphlets/:id", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: req.user.uid,
     };
-    if (title !== undefined) updates.title = title;
-    if (category !== undefined) updates.category = category;
-    if (summary !== undefined) updates.summary = summary;
-    if (content !== undefined) updates.content = content;
-    if (readTime !== undefined) updates.readTime = readTime;
+    if (title     !== undefined) updates.title     = title;
+    if (category  !== undefined) updates.category  = category;
+    if (summary   !== undefined) updates.summary   = summary;
+    if (content   !== undefined) updates.content   = content;
+    if (readTime  !== undefined) updates.readTime  = readTime;
     if (sensitive !== undefined) updates.sensitive = sensitive === true;
+
     await db.collection("pamphlets").doc(id).update(updates);
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.PAMPHLET_UPDATED,
+      entityType: "pamphlet",
+      entityId:   id,
+      meta:       { changedFields: Object.keys(req.body) },
+    });
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -292,7 +380,17 @@ router.put("/pamphlets/:id", async (req, res) => {
 
 router.delete("/pamphlets/:id", async (req, res) => {
   try {
-    await db.collection("pamphlets").doc(req.params.id).delete();
+    const { id } = req.params;
+    await db.collection("pamphlets").doc(id).delete();
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.PAMPHLET_DELETED,
+      entityType: "pamphlet",
+      entityId:   id,
+    });
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -307,23 +405,22 @@ router.get("/clinics", async (req, res) => {
     const snap = await db.collection("clinicDirectory").orderBy("name").get();
     let clinics = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    // Auto-seed Firestore from JSON if collection is empty
     if (!clinics.length) {
       const jsonClinics = loadClinicsJSON();
       const batch = db.batch();
       clinics = jsonClinics.map((c) => {
         const ref = db.collection("clinicDirectory").doc();
         const doc = {
-          name:     c.name || "",
-          country:  c.country || "Jamaica",
-          parish:   c.parish || "",
-          address:  c.address || "",
-          phone:    Array.isArray(c.phones) ? c.phones[0] || "" : (c.phone || ""),
-          hours:    c.hours || "",
-          services: Array.isArray(c.services) ? c.services : [],
-          type:     c.type || "",
-          status:   c.status || "active",
-          region:   c.region || "",
+          name:      c.name || "",
+          country:   c.country || "Jamaica",
+          parish:    c.parish || "",
+          address:   c.address || "",
+          phone:     Array.isArray(c.phones) ? c.phones[0] || "" : (c.phone || ""),
+          hours:     c.hours || "",
+          services:  Array.isArray(c.services) ? c.services : [],
+          type:      c.type || "",
+          status:    c.status || "active",
+          region:    c.region || "",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
@@ -349,17 +446,27 @@ router.post("/clinics", async (req, res) => {
     const doc = await db.collection("clinicDirectory").add({
       name,
       country,
-      parish: parish || "",
-      address: address || "",
-      type: type || "",
-      phone: phone || "",
-      hours: hours || "",
-      services: Array.isArray(services) ? services : [],
-      status: "active",
+      parish:    parish    || "",
+      address:   address   || "",
+      type:      type      || "",
+      phone:     phone     || "",
+      hours:     hours     || "",
+      services:  Array.isArray(services) ? services : [],
+      status:    "active",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdBy: req.user.uid,
     });
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.CLINIC_ADDED,
+      entityType: "clinic",
+      entityId:   doc.id,
+      meta:       { changedFields: ["name", "parish", "type"] },
+    });
+
     res.json({ ok: true, id: doc.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -374,15 +481,26 @@ router.put("/clinics/:id", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: req.user.uid,
     };
-    if (name !== undefined) updates.name = name;
-    if (country !== undefined) updates.country = country;
-    if (parish !== undefined) updates.parish = parish;
-    if (address !== undefined) updates.address = address;
-    if (type !== undefined) updates.type = type;
-    if (phone !== undefined) updates.phone = phone;
-    if (hours !== undefined) updates.hours = hours;
+    if (name     !== undefined) updates.name     = name;
+    if (country  !== undefined) updates.country  = country;
+    if (parish   !== undefined) updates.parish   = parish;
+    if (address  !== undefined) updates.address  = address;
+    if (type     !== undefined) updates.type     = type;
+    if (phone    !== undefined) updates.phone    = phone;
+    if (hours    !== undefined) updates.hours    = hours;
     if (services !== undefined) updates.services = Array.isArray(services) ? services : [];
+
     await db.collection("clinicDirectory").doc(id).update(updates);
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.CLINIC_UPDATED,
+      entityType: "clinic",
+      entityId:   id,
+      meta:       { changedFields: Object.keys(req.body) },
+    });
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -391,7 +509,17 @@ router.put("/clinics/:id", async (req, res) => {
 
 router.delete("/clinics/:id", async (req, res) => {
   try {
-    await db.collection("clinicDirectory").doc(req.params.id).delete();
+    const { id } = req.params;
+    await db.collection("clinicDirectory").doc(id).delete();
+
+    await logAudit({
+      actorUid:   req.user.uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.CLINIC_DELETED,
+      entityType: "clinic",
+      entityId:   id,
+    });
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -59,7 +59,7 @@ export async function requireAuth(req, res, next) {
       uid: decoded.uid,
       email: decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role: profile.role || "user",
+      role: decoded.role || profile.role || "user",
       ageBand,           // "13-17" | "18+" | null
       yob: profile.yearOfBirth || null,
     };

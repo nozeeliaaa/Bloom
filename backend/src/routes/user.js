@@ -4,6 +4,7 @@ import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateUserProfile } from "../validators/validateUser.js";
+import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
 const router = express.Router();
 
@@ -25,19 +26,15 @@ router.post("/profile", requireAuth, async (req, res) => {
 
     // ---- Build profile object ----
     const profile = {
-      // Role: preserve existing role, never let client set it directly
       role: existingProfile?.role || "user",
-
       goal: req.body.goal ?? existingProfile?.goal ?? "track_cycle",
       mode: req.body.mode ?? existingProfile?.mode ?? "account",
-
       yearOfBirth:
         req.body.yearOfBirth === undefined
           ? existingProfile?.yearOfBirth ?? null
           : req.body.yearOfBirth === null
           ? null
           : Number(req.body.yearOfBirth),
-
       consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
       remindersEnabled: req.body.remindersEnabled ?? existingProfile?.remindersEnabled ?? false,
       reminderTime: req.body.reminderTime ?? existingProfile?.reminderTime ?? "09:00",
@@ -51,6 +48,35 @@ router.post("/profile", requireAuth, async (req, res) => {
       },
       { merge: true }
     );
+
+    // ── Audit: track which fields changed ──
+    const changedFields = Object.keys(req.body).filter(
+      (k) => k !== "role" // role changes go through admin route only
+    );
+
+    // Special case: YOB being set for the first time is a locked action
+    const yobJustSet =
+      req.body.yearOfBirth !== undefined && !existingProfile?.yearOfBirth;
+
+    if (yobJustSet) {
+      await logAudit({
+        actorUid:   uid,
+        actorRole:  req.user.role,
+        action:     AUDIT_ACTIONS.YOB_SET,
+        entityType: "user",
+        entityId:   uid,
+        meta:       { changedFields: ["yearOfBirth"] },
+      });
+    } else if (changedFields.length) {
+      await logAudit({
+        actorUid:   uid,
+        actorRole:  req.user.role,
+        action:     AUDIT_ACTIONS.PROFILE_UPDATED,
+        entityType: "user",
+        entityId:   uid,
+        meta:       { changedFields },
+      });
+    }
 
     return res.json({ ok: true, profile });
   } catch (err) {

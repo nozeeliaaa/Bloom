@@ -2,13 +2,13 @@
 import express from "express";
 import admin from "firebase-admin";
 import { db, auth } from "../firebaseAdmin.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
 import { validateConsentRequest, validateConsentUpdate } from "../validators/validateConsent.js";
+import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
 const router = express.Router();
 
 // ─── GET /consent/status ─────────────────────────────────────────────────────
-// Teen checks their own consent status
 router.get("/status", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -39,17 +39,14 @@ router.get("/status", requireAuth, async (req, res) => {
 });
 
 // ─── POST /consent/request ───────────────────────────────────────────────────
-// Teen requests guardian consent by providing guardian's email
 router.post("/request", requireAuth, async (req, res) => {
   try {
     const teenUid = req.user.uid;
 
-    // Only teens should be requesting consent
     if (req.user.ageBand !== "13-17") {
       return res.status(403).json({ error: "Only teens can request guardian consent" });
     }
 
-    // Validate body
     const validation = validateConsentRequest(req.body);
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
@@ -57,7 +54,6 @@ router.post("/request", requireAuth, async (req, res) => {
 
     const guardianEmail = validation.guardianEmail;
 
-    // Look up guardian by email in Firebase Auth
     let guardianRecord;
     try {
       guardianRecord = await auth.getUserByEmail(guardianEmail);
@@ -69,7 +65,6 @@ router.post("/request", requireAuth, async (req, res) => {
 
     const guardianUid = guardianRecord.uid;
 
-    // Prevent self-linking
     if (guardianUid === teenUid) {
       return res.status(400).json({ error: "You cannot link yourself as a guardian" });
     }
@@ -78,7 +73,6 @@ router.post("/request", requireAuth, async (req, res) => {
     const consentRef = db.collection("consents").doc(consentId);
     const existing = await consentRef.get();
 
-    // Don't create duplicate if already pending or approved
     if (existing.exists) {
       const status = existing.data().status;
       if (status === "pending" || status === "approved") {
@@ -90,28 +84,32 @@ router.post("/request", requireAuth, async (req, res) => {
 
     const now = admin.firestore.FieldValue.serverTimestamp();
 
-    // Create consent doc
     await consentRef.set({
       teenUid,
       guardianUid,
       status: "pending",
-      scope: {
-        sensitiveModules: false,
-        pregnancyMode: false,
-      },
+      scope: { sensitiveModules: false, pregnancyMode: false },
       requestedAt: now,
       statusUpdatedAt: now,
       decidedAt: null,
     });
 
-    // Create / update relationship doc
-    const relationshipRef = db.collection("relationships").doc(consentId);
-    await relationshipRef.set({
+    await db.collection("relationships").doc(consentId).set({
       teenUid,
       guardianUid,
       status: "invited",
       invitedAt: now,
     }, { merge: true });
+
+    await logAudit({
+      actorUid:   teenUid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.CONSENT_REQUESTED,
+      entityType: "consent",
+      entityId:   consentId,
+      targetUid:  guardianUid,
+      meta:       { changedFields: ["status", "scope"] },
+    });
 
     return res.json({ ok: true, message: "Consent request sent to guardian" });
   } catch (err) {
@@ -121,13 +119,11 @@ router.post("/request", requireAuth, async (req, res) => {
 });
 
 // ─── PATCH /consent/respond/:consentId ──────────────────────────────────────
-// Guardian approves or denies a consent request
 router.patch("/respond/:consentId", requireAuth, async (req, res) => {
   try {
     const guardianUid = req.user.uid;
     const { consentId } = req.params;
 
-    // Validate body
     const validation = validateConsentUpdate(req.body);
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
@@ -142,12 +138,10 @@ router.patch("/respond/:consentId", requireAuth, async (req, res) => {
 
     const data = snap.data();
 
-    // Only the linked guardian can respond
     if (data.guardianUid !== guardianUid) {
       return res.status(403).json({ error: "You are not the guardian for this consent request" });
     }
 
-    // Can only respond to pending requests
     if (data.status !== "pending") {
       return res.status(409).json({
         error: `Cannot respond to a consent request with status: ${data.status}`,
@@ -161,22 +155,28 @@ router.patch("/respond/:consentId", requireAuth, async (req, res) => {
       status: newStatus,
       statusUpdatedAt: now,
       decidedAt: now,
-      // If approved, grant scope
       ...(newStatus === "approved" && {
-        scope: {
-          sensitiveModules: true,
-          pregnancyMode: false, // pregnancy mode requires separate opt-in
-        },
+        scope: { sensitiveModules: true, pregnancyMode: false },
       }),
     });
 
-    // Update relationship status too
-    const relationshipRef = db.collection("relationships").doc(consentId);
-    await relationshipRef.set({
+    await db.collection("relationships").doc(consentId).set({
       status: newStatus === "approved" ? "active" : "revoked",
       activatedAt: newStatus === "approved" ? now : null,
-      revokedAt: newStatus === "denied" ? now : null,
+      revokedAt:   newStatus === "denied"   ? now : null,
     }, { merge: true });
+
+    await logAudit({
+      actorUid:   guardianUid,
+      actorRole:  req.user.role,
+      action:     newStatus === "approved"
+        ? AUDIT_ACTIONS.CONSENT_APPROVED
+        : AUDIT_ACTIONS.CONSENT_DENIED,
+      entityType: "consent",
+      entityId:   consentId,
+      targetUid:  data.teenUid,
+      meta:       { changedFields: ["status", "decidedAt"] },
+    });
 
     return res.json({ ok: true, status: newStatus });
   } catch (err) {
@@ -186,7 +186,6 @@ router.patch("/respond/:consentId", requireAuth, async (req, res) => {
 });
 
 // ─── GET /consent/pending ────────────────────────────────────────────────────
-// Guardian sees all pending consent requests for them
 router.get("/pending", requireAuth, async (req, res) => {
   try {
     const guardianUid = req.user.uid;
@@ -206,7 +205,6 @@ router.get("/pending", requireAuth, async (req, res) => {
 });
 
 // ─── DELETE /consent/revoke/:consentId ──────────────────────────────────────
-// Teen or guardian can revoke an active consent
 router.delete("/revoke/:consentId", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -221,22 +219,28 @@ router.delete("/revoke/:consentId", requireAuth, async (req, res) => {
 
     const data = snap.data();
 
-    // Only the teen or guardian involved can revoke
     if (data.teenUid !== uid && data.guardianUid !== uid) {
       return res.status(403).json({ error: "Not authorized to revoke this consent" });
     }
 
     const now = admin.firestore.FieldValue.serverTimestamp();
 
-    await consentRef.update({
-      status: "denied",
-      statusUpdatedAt: now,
-    });
+    await consentRef.update({ status: "denied", statusUpdatedAt: now });
 
     await db.collection("relationships").doc(consentId).set({
       status: "revoked",
       revokedAt: now,
     }, { merge: true });
+
+    await logAudit({
+      actorUid:   uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.CONSENT_REVOKED,
+      entityType: "consent",
+      entityId:   consentId,
+      targetUid:  uid === data.teenUid ? data.guardianUid : data.teenUid,
+      meta:       { changedFields: ["status"] },
+    });
 
     return res.json({ ok: true, message: "Consent revoked" });
   } catch (err) {

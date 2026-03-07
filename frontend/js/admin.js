@@ -7,7 +7,7 @@ import { renderNav, renderFooter, renderModeBanner } from "./utils.js";
 import { onAuthChange, getIdToken, isAdminCached } from "./auth.js";
 import { isAccountMode } from "./mode.js";
 
-const API = "/api/admin";
+const API = window.BLOOM_API_BASE + "/api/admin";
 
 renderNav("admin");
 renderFooter();

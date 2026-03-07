@@ -6,10 +6,12 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import userRoutes from "./src/routes/user.js";
+import preferencesRoutes from "./src/routes/preferences.js";
 import cycleLogRoutes from "./src/routes/cycleLogs.js";
 import symptomLogRoutes from "./src/routes/symptomLogs.js";
 import consentRoutes from "./src/routes/consent.js";
 import catalogRoutes from "./src/routes/catalog.js";
+import adminRoutes from "./src/routes/admin.js";
 import authRoutes from "./src/routes/auth.js";
 
 const app = express();
@@ -24,6 +26,8 @@ app.use("/user", userRoutes);
 app.use("/cycle-logs", cycleLogRoutes);
 app.use("/symptom-logs", symptomLogRoutes);
 app.use("/consent", consentRoutes);
+app.use("/preferences", preferencesRoutes);
+app.use("/admin", adminRoutes);
 app.use("/catalog", catalogRoutes);
 app.use("/auth", authRoutes);
 

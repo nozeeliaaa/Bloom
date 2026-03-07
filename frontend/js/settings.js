@@ -1,3 +1,10 @@
+/**
+ * settings.js — Preferences UI
+ * - Loads from backend (account mode) or localStorage (anon mode)
+ * - Saves to backend + localStorage in account mode
+ * - Local-only in anon mode
+ */
+
 import {
   renderNav,
   renderFooter,
@@ -7,14 +14,18 @@ import {
 } from "./utils.js";
 
 import { getTheme, setTheme } from "./theme-manager.js";
+import { isAccountMode } from "./mode.js";
+import { getIdToken } from "./auth.js";
 
 renderNav("settings");
 renderFooter();
 renderBloomieFab();
 renderModeBanner(document.getElementById("banner-area"));
 
-const KEY = "bloom_preferences";
+const LOCAL_KEY = "bloom_preferences";
+const API_BASE  = window.BLOOM_API_BASE || "";
 
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
 const els = {
   hideSensitive:  document.getElementById("pref-hide-sensitive"),
   reminders:      document.getElementById("pref-reminders"),
@@ -31,32 +42,95 @@ const els = {
   },
 };
 
-function getPrefs() {
-  try { return JSON.parse(localStorage.getItem(KEY)) || {}; }
+// ─── Local helpers ────────────────────────────────────────────────────────────
+function getLocalPrefs() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {}; }
   catch { return {}; }
 }
 
-function setPrefs(prefs) {
-  localStorage.setItem(KEY, JSON.stringify(prefs));
+function setLocalPrefs(prefs) {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(prefs));
 }
 
+// ─── Backend helpers ──────────────────────────────────────────────────────────
+async function authHeaders() {
+  const token = await getIdToken();
+  if (!token) return null;
+  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+}
+
+async function loadFromBackend() {
+  try {
+    const headers = await authHeaders();
+    if (!headers) return null;
+
+    const res = await fetch(`${API_BASE}/preferences`, { headers });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    return data?.preferences || null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveToBackend(prefs) {
+  try {
+    const headers = await authHeaders();
+    if (!headers) return false;
+
+    const payload = {
+      theme:          getTheme(),
+      hideSensitive:  prefs.hideSensitive  ?? false,
+      compact:        prefs.compact        ?? false,
+      reminders: {
+        enabled:      prefs.reminders      ?? false,
+        discreetCopy: false,
+        types: [
+          ...(prefs.periodReminder ? ["PERIOD_SOON"] : []),
+          ...(prefs.fertileAlert   ? ["FERTILE_WINDOW"] : []),
+        ],
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/preferences`, {
+      method:  "PUT",
+      headers,
+      body:    JSON.stringify(payload),
+    });
+
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
 function updateThemeButtons(current) {
   Object.entries(els.themeBtns).forEach(([key, btn]) => {
     if (btn) btn.classList.toggle("active", key === current);
   });
 }
 
-function loadUI() {
-  const prefs = getPrefs();
-  const currentTheme = getTheme();
-
-  updateThemeButtons(currentTheme);
+function applyPrefsToUI(prefs) {
+  const theme = prefs.theme || getTheme();
+  updateThemeButtons(theme);
+  setTheme(theme);
 
   if (els.hideSensitive)  els.hideSensitive.checked  = !!prefs.hideSensitive;
-  if (els.reminders)      els.reminders.checked      = !!prefs.reminders;
-  if (els.periodReminder) els.periodReminder.checked = !!prefs.periodReminder;
-  if (els.fertileAlert)   els.fertileAlert.checked   = !!prefs.fertileAlert;
   if (els.compact)        els.compact.checked        = !!prefs.compact;
+
+  // Reminders — flatten from backend shape or local shape
+  const remindersEnabled = prefs.reminders?.enabled ?? !!prefs.reminders;
+  if (els.reminders) els.reminders.checked = remindersEnabled;
+
+  const types = prefs.reminders?.types || [];
+  if (els.periodReminder) {
+    els.periodReminder.checked = types.includes("PERIOD_SOON") || !!prefs.periodReminder;
+  }
+  if (els.fertileAlert) {
+    els.fertileAlert.checked = types.includes("FERTILE_WINDOW") || !!prefs.fertileAlert;
+  }
 }
 
 function showStatus(msg) {
@@ -65,7 +139,25 @@ function showStatus(msg) {
   setTimeout(() => (els.status.textContent = ""), 2500);
 }
 
-// Theme button clicks — live preview + highlight active
+// ─── Init: load preferences ───────────────────────────────────────────────────
+async function init() {
+  let prefs = getLocalPrefs();
+
+  if (isAccountMode()) {
+    const cloudPrefs = await loadFromBackend();
+    if (cloudPrefs) {
+      // Cloud is source of truth — merge into local cache
+      prefs = { ...prefs, ...cloudPrefs };
+      setLocalPrefs(prefs);
+    }
+  }
+
+  applyPrefsToUI(prefs);
+}
+
+init();
+
+// ─── Theme button clicks ──────────────────────────────────────────────────────
 Object.entries(els.themeBtns).forEach(([key, btn]) => {
   btn?.addEventListener("click", () => {
     setTheme(key);
@@ -73,8 +165,8 @@ Object.entries(els.themeBtns).forEach(([key, btn]) => {
   });
 });
 
-// Save
-els.save?.addEventListener("click", () => {
+// ─── Save ─────────────────────────────────────────────────────────────────────
+els.save?.addEventListener("click", async () => {
   const prefs = {
     hideSensitive:  els.hideSensitive?.checked  ?? false,
     reminders:      els.reminders?.checked      ?? false,
@@ -82,17 +174,36 @@ els.save?.addEventListener("click", () => {
     fertileAlert:   els.fertileAlert?.checked   ?? false,
     compact:        els.compact?.checked        ?? false,
   };
-  setPrefs(prefs);
-  showStatus("Saved!");
-  showToast("Preferences saved.");
+
+  // Always save locally first
+  setLocalPrefs(prefs);
+
+  if (isAccountMode()) {
+    els.save.disabled = true;
+    els.save.textContent = "Saving…";
+
+    const ok = await saveToBackend(prefs);
+
+    els.save.disabled = false;
+    els.save.textContent = "Save";
+
+    if (ok) {
+      showStatus("Saved to cloud!");
+      showToast("Preferences saved.");
+    } else {
+      showStatus("Saved locally (cloud sync failed).");
+      showToast("Preferences saved locally.", "info");
+    }
+  } else {
+    showStatus("Saved!");
+    showToast("Preferences saved.");
+  }
 });
 
-// Reset
+// ─── Reset ────────────────────────────────────────────────────────────────────
 els.reset?.addEventListener("click", () => {
-  localStorage.removeItem(KEY);
-  loadUI();
+  localStorage.removeItem(LOCAL_KEY);
+  applyPrefsToUI({});
   showStatus("Reset to defaults.");
   showToast("Preferences reset.", "info");
 });
-
-loadUI();
