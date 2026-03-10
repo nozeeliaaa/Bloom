@@ -14,12 +14,13 @@ export async function requireAuth(req, res, next) {
 
   try {
     const decoded = await auth.verifyIdToken(token);
-    const userDoc = await db.collection("users").doc(decoded.uid).get();
+    const userRef = db.collection("users").doc(decoded.uid);
+    const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      // Auto-create a minimal user doc on first sign-in
-      await db.collection("users").doc(decoded.uid).set({
-        role: "user",                    // top-level role
+      // Brand new user — create full doc
+      await userRef.set({
+        role: "user",
         profile: {
           role: "user",
           yearOfBirth: null,
@@ -45,15 +46,31 @@ export async function requireAuth(req, res, next) {
       return next();
     }
 
+    // Doc exists — read it
     const data    = userDoc.data();
     const profile = data?.profile || {};
 
-    // Backfill top-level role for existing accounts missing it
-    if (!data.role) {
-      await db.collection("users").doc(decoded.uid).update({
-        role:      profile.role || "user",
+    // Backfill any missing fields for legacy accounts
+    const needsBackfill = !data.role || !data.profile;
+    if (needsBackfill) {
+      const backfill = {
+        role: data.role || profile.role || "user",
+        profile: {
+          role:             profile.role             || "user",
+          yearOfBirth:      profile.yearOfBirth      ?? null,
+          consentSensitive: profile.consentSensitive ?? false,
+          remindersEnabled: profile.remindersEnabled ?? false,
+          reminderTime:     profile.reminderTime     || "09:00",
+          mode:             profile.mode             || "account",
+          goal:             profile.goal             || "track_cycle",
+        },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      };
+      await userRef.set(backfill, { merge: true });
+
+      // Use the backfilled values going forward
+      Object.assign(data, backfill);
+      Object.assign(profile, backfill.profile);
     }
 
     const ageBand = deriveAgeBand(profile.yearOfBirth);
