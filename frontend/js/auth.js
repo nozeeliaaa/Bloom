@@ -206,7 +206,9 @@ export async function login(email, password) {
   const res = await signInWithEmailAndPassword(auth(), email, password);
 
   if (!res.user.emailVerified) {
-    const { signOut } = await import("firebase/auth");
+    const { signOut, sendEmailVerification } = await import("firebase/auth");
+    // Auto-send verification email so they don't have to click Resend
+    try { await sendEmailVerification(res.user); } catch (_) {}
     await signOut(auth());
 
     const err = new Error("Please verify your email before logging in.");

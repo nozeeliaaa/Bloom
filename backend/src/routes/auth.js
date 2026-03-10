@@ -7,7 +7,7 @@ const router = express.Router();
  * Verify Firebase ID token from frontend
  */
 router.post("/verify", async (req, res) => {
-  const { token } = req.body;
+  const { token } = req.body || {};
 
   if (!token) {
     return res.status(400).json({ error: "Missing token" });

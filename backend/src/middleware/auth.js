@@ -1,9 +1,8 @@
 // backend/src/middleware/auth.js
 import { auth, db } from "../firebaseAdmin.js";
+import admin from "firebase-admin";
 
 // ─── Main auth middleware ────────────────────────────────────────────────────
-// Verifies Firebase token, loads role + profile from Firestore,
-// and attaches enriched user object to req.user
 export async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
 
@@ -14,15 +13,13 @@ export async function requireAuth(req, res, next) {
   const token = header.split(" ")[1];
 
   try {
-    // 1) Verify the Firebase ID token
     const decoded = await auth.verifyIdToken(token);
-
-    // 2) Load the user's Firestore doc
     const userDoc = await db.collection("users").doc(decoded.uid).get();
 
     if (!userDoc.exists) {
       // Auto-create a minimal user doc on first sign-in
       await db.collection("users").doc(decoded.uid).set({
+        role: "user",                    // top-level role
         profile: {
           role: "user",
           yearOfBirth: null,
@@ -32,36 +29,42 @@ export async function requireAuth(req, res, next) {
           mode: "account",
           goal: "track_cycle",
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       req.user = {
-        uid: decoded.uid,
-        email: decoded.email || null,
+        uid:            decoded.uid,
+        email:          decoded.email || null,
         email_verified: !!decoded.email_verified,
-        role: "user",
-        ageBand: null,
-        yob: null,
+        role:           "user",
+        ageBand:        null,
+        yob:            null,
       };
 
       return next();
     }
 
-    const data = userDoc.data();
+    const data    = userDoc.data();
     const profile = data?.profile || {};
 
-    // 3) Derive ageBand from yearOfBirth
+    // Backfill top-level role for existing accounts missing it
+    if (!data.role) {
+      await db.collection("users").doc(decoded.uid).update({
+        role:      profile.role || "user",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
     const ageBand = deriveAgeBand(profile.yearOfBirth);
 
-    // 4) Attach enriched user — role comes from Firestore, not the token
     req.user = {
-      uid: decoded.uid,
-      email: decoded.email || null,
+      uid:            decoded.uid,
+      email:          decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role: decoded.role || profile.role || "user",
-      ageBand,           // "13-17" | "18+" | null
-      yob: profile.yearOfBirth || null,
+      role:           decoded.role || data.role || profile.role || "user",
+      ageBand,
+      yob:            profile.yearOfBirth || null,
     };
 
     return next();
@@ -72,7 +75,6 @@ export async function requireAuth(req, res, next) {
 }
 
 // ─── Role gate middleware ────────────────────────────────────────────────────
-// Usage: requireRole("admin") or requireRole("admin", "user")
 export function requireRole(...allowed) {
   const allowedSet = new Set(allowed);
   return (req, res, next) => {
@@ -85,21 +87,16 @@ export function requireRole(...allowed) {
 }
 
 // ─── Sensitive access gate ───────────────────────────────────────────────────
-// Blocks teens from sensitive modules unless guardian consent is approved.
-// Adults (18+) pass through automatically.
 export async function requireSensitiveAccess(req, res, next) {
   try {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
 
-    // Adults always pass
     if (req.user.ageBand === "18+") return next();
 
-    // If age is unknown, block by default
     if (!req.user.ageBand) {
       return res.status(403).json({ error: "Age verification required" });
     }
 
-    // Teen: check consents collection for approved guardian consent
     const consentSnap = await db
       .collection("consents")
       .where("teenUid", "==", req.user.uid)
@@ -127,10 +124,9 @@ export function deriveAgeBand(yob) {
   const age = currentYear - year;
   if (age >= 13 && age <= 17) return "13-17";
   if (age >= 18) return "18+";
-  return null; // under 13 — handle separately if needed
+  return null;
 }
 
-// Kept for backward compatibility with any code that imports this
 export function getAgeFromYob(yob) {
   const year = Number(yob);
   const current = new Date().getFullYear();
@@ -150,10 +146,8 @@ export function requireConsentApproved() {
       const age = getAgeFromYob(profile.yearOfBirth);
       if (age === null) return res.status(403).json({ error: "Consent required" });
 
-      // 18+ bypasses guardian consent
       if (age >= 18) return next();
 
-      // under 18 requires consent flag
       if (profile.consentSensitive === true) return next();
 
       return res.status(403).json({ error: "Consent required" });
