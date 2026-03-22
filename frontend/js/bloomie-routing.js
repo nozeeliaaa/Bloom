@@ -112,27 +112,27 @@ export function resolveOOSFollowUp(rawText, lastOOS) {
 
   switch (lastOOS) {
     case "food":
-      if (isYes || /before|pre.?period|pms/.test(t)) return "MOOD_INTRO";
+      if (isYes || /before|pre.?period|pms/.test(t)) return "MOOD_SAFETY_CHECK";
       if (isNo) return null;
       break;
     case "relationships":
     case "money":
     case "school":
       if (isYes || /late|missed|period/.test(t)) return "LATE_INTRO";
-      if (/mood|emotional|anxious|sad/.test(t)) return "MOOD_INTRO";
+      if (/mood|emotional|anxious|sad/.test(t)) return "MOOD_SAFETY_CHECK";
       break;
     case "sleep":
-      if (isYes || /mood|tired|energy/.test(t)) return "MOOD_INTRO";
+      if (isYes || /mood|tired|energy/.test(t)) return "MOOD_SAFETY_CHECK";
       if (/period|late|cycle/.test(t)) return "LATE_INTRO";
       break;
     case "mental_health_general":
-      if (isYes || /before|period|cycle/.test(t)) return "MOOD_INTRO";
+      if (isYes || /before|period|cycle/.test(t)) return "MOOD_SAFETY_CHECK";
       break;
     case "non_repro_health":
       if (isYes || /late|period|cycle|miss/.test(t)) return "LATE_INTRO";
       break;
     case "body_image":
-      if (isYes || /period|bloat|cycle/.test(t)) return "MOOD_INTRO";
+      if (isYes || /period|bloat|cycle/.test(t)) return "MOOD_SAFETY_CHECK";
       break;
     case "travel":
       if (isYes || /late|miss|period/.test(t)) return "LATE_INTRO";
@@ -228,9 +228,9 @@ export function scoreSignals(t) {
  * Callers fall back to single-best-signal logic when this returns null.
  */
 export function resolveSignals(sig, has) {
-  // Late + pregnancy signal → test pathway
+  // Late + pregnancy signal → intent-first entry
   if (has("late") && has("pregnancy")) {
-    return { next: "LATE_TEST_Q", payload: { reason: "late+pregnancy_signal" } };
+    return { next: "PREGNANCY_ENTRY", payload: { reason: "late+pregnancy_signal" } };
   }
 
   // Heavy + mood (could be hormonal / anaemia) → heavy intro but note mood

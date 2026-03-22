@@ -1,242 +1,828 @@
 /**
- * report.js — Report for Doctor
- * - Shows a preview summary
- * - Generates the SAME readable PDF (not screenshot) from cycle history
+ * report.js — Bloom Personal Cycle Report
+ *
+ * Generates a polished, structured PDF entirely client-side using
+ * jsPDF + jspdf-autotable. All data ordering and summarisation lives in
+ * pdf-report-data.js — this file is responsible only for rendering.
+ *
+ * PDF structure:
+ *   Page 1  — Cover (branding, generation date, quick-stats preview)
+ *   Page 2+ — Summary snapshot (stat grid + narrative paragraph)
+ *           — Cycle history table
+ *           — Symptom log table
+ *           — Patterns & insights
+ *           — Notable observations / alerts  (only when relevant)
+ *           — Disclaimer
  */
 
-import { renderNav, renderFooter, renderModeBanner, renderBloomieFab, formatDate, toDateKey } from "./utils.js";
-import { getAllLogs } from "./db.js";
+import {
+  renderNav,
+  renderFooter,
+  renderModeBanner,
+  renderBloomieFab,
+} from "./utils.js";
+import { getAllLogs }       from "./db.js";
 import { computeCyclePhase } from "./phase.js";
+import { jsPDF }            from "jspdf";
+import autoTable            from "jspdf-autotable";
+import {
+  buildReportData,
+  formatDateLong,
+  formatDateMed,
+} from "./pdf-report-data.js";
 
 renderNav("report");
 renderFooter();
 renderBloomieFab();
 renderModeBanner(document.getElementById("banner-area"));
 
-function isPeriodFlow(flow) {
-  return ["spotting", "light", "medium", "heavy"].includes(String(flow || "").toLowerCase());
+// ── Colour palette ────────────────────────────────────────────────────────────
+const C = {
+  primary:      [212, 116, 154],   // rose pink
+  primaryDark:  [170,  78, 118],   // deep rose
+  primaryDeep:  [140,  58,  98],   // darkest rose (cover bg)
+  primaryLight: [228, 175, 205],   // medium-light pink
+  primaryPale:  [250, 238, 245],   // near-white pink (tile bg)
+  white:        [255, 255, 255],
+  textDark:     [ 42,  24,  44],   // near-black purple-tinted
+  textMid:      [ 85,  58,  88],   // mid mauve
+  textMuted:    [138, 108, 138],   // muted mauve
+  divider:      [218, 192, 213],   // soft pink divider
+  success:      [ 68, 138,  90],   // muted green (normal range)
+  warning:      [176,  95,  35],   // amber (out of range)
+  info:         [ 78, 112, 172],   // steel blue (current cycle)
+};
+
+// ── Layout constants ──────────────────────────────────────────────────────────
+const PW     = 210;          // page width  (mm, A4)
+const PH     = 297;          // page height (mm, A4)
+const M      = 18;           // left/right margin
+const CW     = PW - M * 2;  // usable column width  (174 mm)
+const BOTTOM = 272;          // y beyond which we add a new page
+
+// ── Low-level draw helpers ────────────────────────────────────────────────────
+
+const tc = (doc, c) => doc.setTextColor(...c);
+const fc = (doc, c) => doc.setFillColor(...c);
+const dc = (doc, c) => doc.setDrawColor(...c);
+
+function hRule(doc, y, shade = C.divider) {
+  dc(doc, shade);
+  doc.setLineWidth(0.25);
+  doc.line(M, y, PW - M, y);
+  return y + 1;
 }
 
-function addDays(isoDate, delta) {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  dt.setDate(dt.getDate() + delta);
-  return toDateKey(dt);
-}
-
-function diffDays(a, b) {
-  const d1 = new Date(a + "T00:00:00");
-  const d2 = new Date(b + "T00:00:00");
-  return Math.round((d2 - d1) / 86400000);
-}
-
-function sortAsc(a, b) {
-  return String(a).localeCompare(String(b));
-}
-
-function getPeriodStartsFromLogs(logsByDate) {
-  const dates = Object.keys(logsByDate || {}).sort(sortAsc);
-  const periodDays = dates.filter(d => isPeriodFlow(logsByDate[d]?.flow));
-  const periodSet = new Set(periodDays);
-
-  const starts = [];
-  for (const d of periodDays) {
-    const prev = addDays(d, -1);
-    if (!periodSet.has(prev)) starts.push(d);
+function maybeNewPage(doc, y, needed = 40) {
+  if (y + needed > BOTTOM) {
+    doc.addPage();
+    return 24;
   }
-  return [...new Set(starts)].sort(sortAsc);
+  return y;
 }
 
-function getCycles(periodStarts) {
-  const cycles = [];
-  for (let i = 0; i < periodStarts.length - 1; i++) {
-    const start = periodStarts[i];
-    const next = periodStarts[i + 1];
-    const length = diffDays(start, next);
-    if (length > 0 && length <= 90) cycles.push({ start, next, length });
-  }
-  return cycles;
+// ── Section heading (pink left-bar + uppercase label) ────────────────────────
+
+function sectionHeading(doc, label, y) {
+  y = maybeNewPage(doc, y, 20);
+  fc(doc, C.primary);
+  doc.roundedRect(M, y - 4, 4, 13, 1.5, 1.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10.5);
+  tc(doc, C.primaryDark);
+  doc.text(label.toUpperCase(), M + 8, y + 5);
+  return y + 16;
 }
 
-function average(nums) {
-  if (!nums.length) return null;
-  return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+// ── Page footer (added in post-pass) ─────────────────────────────────────────
+
+function stampFooters(doc, firstContentPage, totalContent) {
+  for (let p = firstContentPage; p <= doc.getNumberOfPages(); p++) {
+    doc.setPage(p);
+    const contentPageNum = p - firstContentPage + 1;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    tc(doc, C.textMuted);
+    doc.text("Bloom — Personal Cycle Report", M, PH - 7);
+    doc.text(
+      `Page ${contentPageNum} of ${totalContent}`,
+      PW - M, PH - 7,
+      { align: "right" }
+    );
+  }
 }
 
-function generateCyclePDF(cycle, logsByDate) {
-  if (!window.jspdf) { alert("PDF library not loaded. Check your connection and try again."); return; }
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+// ── Cover page ────────────────────────────────────────────────────────────────
 
-  const cycleStarts = cycle.cycleStarts || [];
-  const cycleLengths = [];
-  for (let i = 1; i < cycleStarts.length; i++) {
-    cycleLengths.push(diffDays(cycleStarts[i - 1], cycleStarts[i]));
+function drawCover(doc, data) {
+  const coverH = 158;
+
+  // Background block
+  fc(doc, C.primaryDeep);
+  doc.rect(0, 0, PW, coverH, "F");
+
+  // Decorative circles (layered for depth)
+  fc(doc, C.primaryDark);
+  doc.circle(PW - 22, 36, 58, "F");
+  fc(doc, C.primary);
+  doc.circle(PW - 22, 36, 44, "F");
+  fc(doc, C.primaryDeep);
+  doc.circle(16, coverH + 4, 42, "F");
+  fc(doc, [158, 72, 112]);
+  doc.circle(16, coverH + 4, 28, "F");
+
+  // Wordmark
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(56);
+  tc(doc, C.white);
+  doc.text("bloom", PW / 2, 76, { align: "center" });
+
+  // Subtitle
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(14.5);
+  tc(doc, [245, 215, 232]);
+  doc.text("Personal Cycle Report", PW / 2, 96, { align: "center" });
+
+  // Thin rule
+  dc(doc, [255, 255, 255]);
+  doc.setLineWidth(0.35);
+  doc.line(M + 28, 106, PW - M - 28, 106);
+
+  // Generation date
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  tc(doc, [232, 195, 218]);
+  doc.text(
+    `Generated ${formatDateLong(data.generatedDate)}`,
+    PW / 2, 116, { align: "center" }
+  );
+
+  // User name (optional)
+  if (data.userName) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    tc(doc, C.white);
+    doc.text(`For ${data.userName}`, PW / 2, 130, { align: "center" });
   }
-  const avg = cycleLengths.length
-    ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
-    : null;
 
-  const pageW = 210, margin = 18, cW = pageW - margin * 2;
-  let y = 0;
+  // ── Below-cover content ──
+  const belowY = coverH + 18;
 
-  // ── Header band ──
-  doc.setFillColor(212, 116, 154);
-  doc.rect(0, 0, pageW, 20, "F");
-  doc.setFontSize(15); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
-  doc.text("Bloom — Health Report for Doctor", margin, 13);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  tc(doc, C.textMid);
+  const tagline = doc.splitTextToSize(
+    "Your personal menstrual health insights — for personal review or sharing with a healthcare provider.",
+    CW - 16
+  );
+  doc.text(tagline, PW / 2, belowY, { align: "center" });
 
-  y = 28;
-  doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(140, 110, 140);
-  doc.text(`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, margin, y);
-  y += 4;
-  doc.setDrawColor(212, 116, 154); doc.line(margin, y, pageW - margin, y);
-  y += 7;
+  // Quick-stats tiles (only if there is data to show)
+  if (data.cyclesTracked > 0) {
+    const tilesY = belowY + tagline.length * 5.2 + 12;
+    const tileW  = (CW - 8) / 3;
+    const tileH  = 28;
 
-  // ── Summary ──
-  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(184, 92, 130);
-  doc.text("CYCLE SUMMARY", margin, y); y += 6;
-  doc.setFont("helvetica", "normal"); doc.setTextColor(60, 40, 60);
-  if (avg) { doc.text(`Average cycle length: ${avg} days`, margin, y); y += 5; }
-  doc.text(`Cycles tracked: ${cycleStarts.length}`, margin, y); y += 5;
-  if (cycleStarts.length) {
-    doc.text(`Data from: ${formatDate(cycleStarts[0])}`, margin, y); y += 5;
+    const quickStats = [
+      { label: "Avg Cycle",       value: data.avgCycleLength  ? `${data.avgCycleLength} days`  : "—" },
+      { label: "Cycles Tracked",  value: String(data.cyclesTracked) },
+      { label: "Regularity",      value: data.regularity?.label ?? "—" },
+    ];
+
+    quickStats.forEach(({ label, value }, i) => {
+      const x = M + i * (tileW + 4);
+      fc(doc, C.primaryPale);
+      dc(doc, C.divider);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(x, tilesY, tileW, tileH, 3, 3, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      tc(doc, C.primaryDark);
+      doc.text(value, x + tileW / 2, tilesY + 11, { align: "center" });
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      tc(doc, C.textMuted);
+      doc.text(label.toUpperCase(), x + tileW / 2, tilesY + 20, { align: "center" });
+    });
   }
-  y += 2;
-  doc.setDrawColor(220, 200, 220); doc.line(margin, y, pageW - margin, y); y += 7;
 
-  // ── Cycle details ──
-  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(184, 92, 130);
-  doc.text("CYCLE DETAILS", margin, y); y += 7;
+  // Cover footer strip
+  fc(doc, C.primaryPale);
+  doc.rect(0, PH - 14, PW, 14, "F");
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7.5);
+  tc(doc, C.textMuted);
+  doc.text(
+    "Bloom — Educational Health Tracker  •  Not a medical document  •  For personal use only",
+    PW / 2, PH - 5.5, { align: "center" }
+  );
+}
 
-  const todayKey = toDateKey(new Date());
+// ── Summary snapshot ──────────────────────────────────────────────────────────
 
-  [...cycleStarts].reverse().forEach((start, revIdx) => {
-    const i = cycleStarts.length - 1 - revIdx;
-    const cycleLen = cycleLengths[i];
-    const isCurrent = cycleLen == null;
-    const nextStart = isCurrent ? null : cycleStarts[i + 1];
-    const cycleEndKey = nextStart ? addDays(nextStart, -1) : todayKey;
+function drawSummary(doc, data, y) {
+  y = sectionHeading(doc, "Your Cycle at a Glance", y);
 
-    if (y > 258) { doc.addPage(); y = 20; }
+  // 3 × 2 stat grid
+  const gap   = 4;
+  const tileW = (CW - gap * 2) / 3;
+  const tileH = 30;
 
-    const daysSoFar = diffDays(start, todayKey) + 1;
-    const heading = isCurrent
-      ? `Current cycle — Day ${daysSoFar} (started ${formatDate(start)})`
-      : `${cycleLen} days — ${formatDate(start)} to ${formatDate(cycleEndKey)}`;
+  const phase = data.phaseLabel
+    ?? (data.currentPhase !== "unknown" ? data.currentPhase : null);
 
-    doc.setFontSize(10.5); doc.setFont("helvetica", "bold"); doc.setTextColor(60, 40, 60);
-    doc.text(heading, margin, y); y += 5;
+  const tiles = [
+    {
+      label: "Avg Cycle Length",
+      value: data.avgCycleLength ? `${data.avgCycleLength} days` : "—",
+      sub:   data.avgCycleLength ? "per completed cycle" : "need 2+ cycles",
+    },
+    {
+      label: "Avg Period Length",
+      value: data.avgPeriodLength ? `${data.avgPeriodLength} days` : "—",
+      sub:   data.avgPeriodLength ? "days of bleeding" : "need more data",
+    },
+    {
+      label: "Cycles Tracked",
+      value: String(data.cyclesTracked || 0),
+      sub:   data.cyclesTracked === 1 ? "cycle logged" : "cycles logged",
+    },
+    {
+      label: "Last Period",
+      value: data.lastPeriodStart ? formatDateMed(data.lastPeriodStart) : "—",
+      sub:   "period start date",
+    },
+    {
+      label: "Next Period Expected",
+      value: data.nextPeriodDate ? formatDateMed(data.nextPeriodDate) : "—",
+      sub:   data.nextPeriodDate ? "estimated" : "need more data",
+    },
+    {
+      label: "Current Phase",
+      value: phase ?? "—",
+      sub: (() => {
+        if (!data.dayInCycle) return data.confidence === "low" ? "need more data" : "";
+        const base = `Day ${data.dayInCycle} of your cycle`;
+        if (data.avgCycleLength > 35) return `${base} (longer cycle pattern)`;
+        if (data.avgCycleLength < 21) return `${base} (shorter cycle pattern)`;
+        return base;
+      })(),
+    },
+  ];
 
-    if (!isCurrent && nextStart) {
-      const ov  = addDays(nextStart, -14);
-      const fws = addDays(nextStart, -19);
-      const fwe = addDays(nextStart, -13);
-      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 80, 100);
-      doc.text(`Ovulation (est.): ${formatDate(ov)}   Fertile window: ${formatDate(fws)} – ${formatDate(fwe)}`, margin + 3, y);
-      y += 5;
+  tiles.forEach(({ label, value, sub }, i) => {
+    const row = Math.floor(i / 3);
+    const col = i % 3;
+    const x   = M + col * (tileW + gap);
+    const ty  = y + row * (tileH + gap);
+
+    fc(doc, C.primaryPale);
+    dc(doc, C.divider);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(x, ty, tileW, tileH, 3, 3, "FD");
+
+    // Value
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    tc(doc, C.primaryDark);
+    doc.text(value, x + tileW / 2, ty + 12, { align: "center", maxWidth: tileW - 4 });
+
+    // Label
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    tc(doc, C.textMuted);
+    doc.text(label.toUpperCase(), x + tileW / 2, ty + 20, { align: "center" });
+
+    // Sub-note
+    if (sub) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      tc(doc, C.textMuted);
+      doc.text(sub, x + tileW / 2, ty + 26, { align: "center" });
     }
-
-    // Symptoms logged in this cycle
-    const symptoms = [];
-    let d = 0;
-    while (d <= 60) {
-      const dk = addDays(start, d);
-      if (dk > cycleEndKey) break;
-      const log = logsByDate[dk];
-      if (log?.symptoms?.length) symptoms.push(`${formatDate(dk)}: ${log.symptoms.join(", ")}`);
-      if (log?.notes) symptoms.push(`${formatDate(dk)} (note): ${log.notes}`);
-      d++;
-    }
-
-    if (symptoms.length) {
-      doc.setFontSize(9); doc.setFont("helvetica", "italic"); doc.setTextColor(120, 100, 120);
-      symptoms.forEach((s) => {
-        if (y > 268) { doc.addPage(); y = 20; }
-        const lines = doc.splitTextToSize(`  ${s}`, cW - 6);
-        doc.text(lines, margin + 4, y);
-        y += lines.length * 4.2;
-      });
-    }
-
-    y += 3;
-    doc.setDrawColor(230, 215, 230); doc.line(margin, y, pageW - margin, y); y += 5;
   });
 
-  // ── Disclaimer ──
-  if (y > 255) { doc.addPage(); y = 20; }
-  y += 2;
-  doc.setFontSize(8); doc.setFont("helvetica", "italic"); doc.setTextColor(160, 140, 160);
-  const disc = "This report is for personal reference only and is not a medical document. Always consult a qualified healthcare provider for medical advice. Bloom is an educational tool.";
-  doc.text(doc.splitTextToSize(disc, cW), margin, y);
+  y += 2 * (tileH + gap) + 10;
 
-  doc.save(`bloom-health-report-${todayKey}.pdf`);
+  // Regularity badge
+  if (data.regularity?.tier) {
+    y = maybeNewPage(doc, y, 16);
+    const { tier, inTypicalRange, badgeLabel } = data.regularity;
+    const badgeColor = tier === "loose"   ? C.warning
+                     : inTypicalRange     ? C.success
+                     : C.info;
+    // Badge width scales with text length
+    const badgeText  = (badgeLabel ?? "").toUpperCase();
+    const badgeW     = Math.max(32, badgeText.length * 2.1 + 8);
+    fc(doc, badgeColor);
+    doc.roundedRect(M, y, badgeW, 8, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    tc(doc, C.white);
+    doc.text(badgeText, M + badgeW / 2, y + 5.5, { align: "center" });
+    y += 13;
+  }
+
+  // "What This Means For You" interpretation block
+  if (data.interpretation) {
+    y = maybeNewPage(doc, y, 28);
+    hRule(doc, y);
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    tc(doc, C.primaryDark);
+    doc.text("What This Means For You", M, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    tc(doc, C.textMid);
+    const interpLines = doc.splitTextToSize(data.interpretation, CW);
+    doc.text(interpLines, M, y);
+    y += interpLines.length * 5.2 + 8;
+  }
+
+  // Factual narrative paragraph
+  y = maybeNewPage(doc, y, 20);
+  hRule(doc, y);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  tc(doc, C.textMid);
+  const narrativeLines = doc.splitTextToSize(data.narrativeSummary, CW);
+  doc.text(narrativeLines, M, y);
+  y += narrativeLines.length * 5.2 + 10;
+
+  return y;
 }
 
+// ── Cycle history table ───────────────────────────────────────────────────────
+
+function drawCycleHistory(doc, data, y) {
+  if (!data.cyclesTracked) return y;
+
+  y = maybeNewPage(doc, y, 30);
+  y = sectionHeading(doc, "Cycle History", y);
+
+  const rows = data.cyclesNewestFirst.map((c) => {
+    const started   = formatDateMed(c.start);
+    const periodLen = c.periodLength ? `${c.periodLength} days` : "—";
+    const cycleLen  = c.isCurrent
+      ? `Day ${c.daysSoFar} (ongoing)`
+      : c.cycleLength ? `${c.cycleLength} days` : "—";
+
+    let status, statusTag;
+    if (c.isCurrent) {
+      status    = "Ongoing";
+      statusTag = "info";
+    } else if (c.cycleLength < 21) {
+      status    = "Short";
+      statusTag = "warning";
+    } else if (c.cycleLength > 35) {
+      status    = "Long";
+      statusTag = "warning";
+    } else {
+      status    = "Normal";
+      statusTag = "success";
+    }
+
+    return { started, periodLen, cycleLen, status, statusTag };
+  });
+
+  autoTable(doc, {
+    startY:  y,
+    margin:  { left: M, right: M },
+    head:    [["Period Started", "Period Length", "Cycle Length", "Status"]],
+    body:    rows.map((r) => [r.started, r.periodLen, r.cycleLen, r.status]),
+    styles: {
+      fontSize:    9,
+      cellPadding: { top: 3.5, right: 6, bottom: 3.5, left: 6 },
+      textColor:   [...C.textDark],
+      lineColor:   [...C.divider],
+      lineWidth:   0.2,
+      overflow:    "linebreak",
+    },
+    headStyles: {
+      fillColor:  [...C.primary],
+      textColor:  [255, 255, 255],
+      fontStyle:  "bold",
+      fontSize:   8.5,
+    },
+    alternateRowStyles: {
+      fillColor: [...C.primaryPale],
+    },
+    columnStyles: {
+      0: { cellWidth: 36 },
+      1: { cellWidth: 30, halign: "center" },
+      2: { cellWidth: 40, halign: "center" },
+      3: { cellWidth: 28, halign: "center" },
+    },
+    didParseCell(hook) {
+      if (hook.section !== "body" || hook.column.index !== 3) return;
+      const { statusTag } = rows[hook.row.index];
+      if (statusTag === "success") {
+        hook.cell.styles.textColor  = [...C.success];
+        hook.cell.styles.fontStyle  = "bold";
+      } else if (statusTag === "warning") {
+        hook.cell.styles.textColor  = [...C.warning];
+        hook.cell.styles.fontStyle  = "bold";
+      } else if (statusTag === "info") {
+        hook.cell.styles.textColor  = [...C.info];
+        hook.cell.styles.fontStyle  = "bold";
+      }
+    },
+  });
+
+  return doc.lastAutoTable.finalY + 12;
+}
+
+// ── Symptom log table ─────────────────────────────────────────────────────────
+
+function drawSymptomLog(doc, data, y) {
+  if (!data.symptomLog.length) return y;
+
+  y = maybeNewPage(doc, y, 30);
+  y = sectionHeading(doc, "Symptom Log", y);
+
+  // Cap at 90 entries so the table doesn't dominate for heavy users
+  const display = data.symptomLog.slice(0, 90);
+
+  autoTable(doc, {
+    startY:  y,
+    margin:  { left: M, right: M },
+    head:    [["Date", "Symptoms", "Notes"]],
+    body:    display.map((entry) => [
+      formatDateMed(entry.date),
+      entry.symptoms.length ? entry.symptoms.join(", ") : "—",
+      entry.notes || "—",
+    ]),
+    styles: {
+      fontSize:    8.5,
+      cellPadding: { top: 3, right: 5, bottom: 3, left: 5 },
+      textColor:   [...C.textDark],
+      lineColor:   [...C.divider],
+      lineWidth:   0.2,
+      overflow:    "linebreak",
+    },
+    headStyles: {
+      fillColor:  [...C.primary],
+      textColor:  [255, 255, 255],
+      fontStyle:  "bold",
+      fontSize:   8.5,
+    },
+    alternateRowStyles: {
+      fillColor: [...C.primaryPale],
+    },
+    columnStyles: {
+      0: { cellWidth: 30 },
+      1: { cellWidth: 82 },
+      2: { cellWidth: CW - 112 },
+    },
+  });
+
+  return doc.lastAutoTable.finalY + 12;
+}
+
+// ── Patterns & insights ───────────────────────────────────────────────────────
+
+function drawTrends(doc, data, y) {
+  const { topSymptoms, regularity, cyclesTracked } = data;
+  if (!topSymptoms.length && cyclesTracked < 2) return y;
+
+  y = maybeNewPage(doc, y, 30);
+  y = sectionHeading(doc, "Patterns & Insights", y);
+
+  // Standout personal insight sentence
+  if (data.patternInsight) {
+    y = maybeNewPage(doc, y, 16);
+    // Light tinted box for visual emphasis
+    fc(doc, C.primaryPale);
+    dc(doc, C.divider);
+    doc.setLineWidth(0.2);
+    const insightLines = doc.splitTextToSize(data.patternInsight, CW - 14);
+    const boxH = insightLines.length * 5.2 + 10;
+    doc.roundedRect(M, y, CW, boxH, 3, 3, "FD");
+    fc(doc, C.primary);
+    doc.roundedRect(M, y, 3.5, boxH, 1, 1, "F");
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9.5);
+    tc(doc, C.primaryDark);
+    doc.text(insightLines, M + 9, y + 6);
+    y += boxH + 10;
+  }
+
+  // Most frequent symptoms list (2 columns, top 8)
+  if (topSymptoms.length) {
+    y = maybeNewPage(doc, y, 14);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    tc(doc, C.primaryDark);
+    doc.text("Most Frequent Symptoms", M, y);
+    y += 7;
+
+    const top8  = topSymptoms.slice(0, 8);
+    const colW2 = (CW - 4) / 2;
+
+    top8.forEach(([name, count], i) => {
+      const col  = i % 2;
+      const rowY = y + Math.floor(i / 2) * 8;
+      const x    = M + col * (colW2 + 4);
+
+      if (rowY + 8 > BOTTOM) return; // safety: skip if about to overflow
+
+      // Rank number
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      tc(doc, C.textMuted);
+      doc.text(`${i + 1}.`, x, rowY);
+
+      // Symptom name
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      tc(doc, C.textMid);
+      doc.text(name, x + 7, rowY);
+
+      // Count badge
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      tc(doc, C.primary);
+      doc.text(`${count}×`, x + colW2 - 4, rowY, { align: "right" });
+    });
+
+    y += Math.ceil(top8.length / 2) * 8 + 10;
+    hRule(doc, y, C.primaryPale);
+    y += 7;
+  }
+
+  // Cycle variability paragraph
+  if (cyclesTracked >= 2 && regularity?.tier) {
+    y = maybeNewPage(doc, y, 20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    tc(doc, C.primaryDark);
+    doc.text("Cycle Variability", M, y);
+    y += 6;
+
+    const { tier, inTypicalRange, range, min, max } = regularity;
+    let varText;
+    if (tier === "tight") {
+      if (inTypicalRange) {
+        varText =
+          `Your cycle lengths have been very consistent — a range of ${range ?? 0} day${range !== 1 ? "s" : ""} across your tracked cycles. ` +
+          `This level of consistency makes your period easy to predict.`;
+      } else {
+        varText =
+          `Your cycle lengths have been very consistent (varying by only ${range ?? 0} day${range !== 1 ? "s" : ""}), though they fall outside the typical 21–35 day range. ` +
+          `That consistency means your cycle is predictable on its own schedule — this is likely your personal baseline.`;
+      }
+    } else if (tier === "moderate") {
+      if (inTypicalRange) {
+        varText =
+          `Your cycle lengths have varied by about ${range} days (${min}–${max} days). ` +
+          `This level of variation is common and generally within a normal range.`;
+      } else {
+        varText =
+          `Your cycle lengths have varied by about ${range} days (${min}–${max} days) and fall outside the typical 21–35 day range. ` +
+          `Continued logging will help clarify whether this is a stable personal pattern.`;
+      }
+    } else {
+      varText =
+        `Your cycle lengths have varied notably, ranging from ${min} to ${max} days. ` +
+        `Cycle irregularity can have many causes including stress, sleep, travel, and hormonal shifts. ` +
+        `If this is a consistent pattern, it is worth discussing with a healthcare provider.`;
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    tc(doc, C.textMid);
+    const varLines = doc.splitTextToSize(varText, CW);
+    doc.text(varLines, M, y);
+    y += varLines.length * 5 + 10;
+  }
+
+  return y;
+}
+
+// ── Notable observations / alerts ────────────────────────────────────────────
+
+function drawAlerts(doc, data, y) {
+  if (!data.alerts?.length) return y;
+
+  y = maybeNewPage(doc, y, 30);
+  y = sectionHeading(doc, "Notable Observations", y);
+
+  for (const alert of data.alerts) {
+    const titleLines = doc.splitTextToSize(alert.title, CW - 18);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.8);
+    const bodyLines  = doc.splitTextToSize(alert.body,  CW - 18);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+
+    const boxH = titleLines.length * 5.2 + bodyLines.length * 4.8 + 16;
+    y = maybeNewPage(doc, y, boxH + 8);
+
+    // Alert box
+    fc(doc, [255, 249, 254]);
+    dc(doc, C.primaryLight);
+    doc.setLineWidth(0.45);
+    doc.roundedRect(M, y, CW, boxH, 3, 3, "FD");
+
+    // Left accent bar
+    fc(doc, C.primary);
+    doc.roundedRect(M, y, 3.5, boxH, 1, 1, "F");
+
+    let ty = y + 7;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    tc(doc, C.primaryDark);
+    doc.text(titleLines, M + 9, ty);
+    ty += titleLines.length * 5.2 + 3;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.8);
+    tc(doc, C.textMid);
+    doc.text(bodyLines, M + 9, ty);
+
+    y += boxH + 9;
+  }
+
+  return y;
+}
+
+// ── Next Steps ────────────────────────────────────────────────────────────────
+
+function drawNextSteps(doc, data, y) {
+  y = maybeNewPage(doc, y, 40);
+  y = sectionHeading(doc, "Next Steps", y);
+
+  const hasOutliers = data.cyclesNewestFirst.some(
+    (c) => !c.isCurrent && c.cycleLength != null && (c.cycleLength < 21 || c.cycleLength > 35)
+  );
+
+  const bullets = [
+    "Keep logging — the more cycle data you have, the more accurate your predictions and pattern insights become.",
+    "Watch for changes — if you notice consistent shifts in symptoms, flow intensity, or timing from cycle to cycle, note them so you can discuss them with a provider.",
+  ];
+
+  if (hasOutliers) {
+    bullets.push(
+      "Consider a provider conversation — some of your cycles fall outside the typical 21–35 day range. " +
+      "This is not necessarily a problem, but a healthcare provider can help you understand what is normal for your body and whether any follow-up is useful."
+    );
+  }
+
+  for (const bullet of bullets) {
+    y = maybeNewPage(doc, y, 14);
+    fc(doc, C.primary);
+    doc.circle(M + 2.5, y - 1, 1.5, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    tc(doc, C.textMid);
+    const lines = doc.splitTextToSize(bullet, CW - 10);
+    doc.text(lines, M + 7, y);
+    y += lines.length * 5 + 4;
+  }
+
+  return y + 6;
+}
+
+// ── Disclaimer ────────────────────────────────────────────────────────────────
+
+function drawDisclaimer(doc, y) {
+  y = maybeNewPage(doc, y, 24);
+  hRule(doc, y);
+  y += 6;
+  const text =
+    "This report is generated by Bloom, an educational health-tracking tool. It is intended for personal reference " +
+    "and to support conversations with healthcare professionals — it is not a diagnosis, prescription, or substitute " +
+    "for medical advice. Cycle predictions and phase estimates are based on statistical averages from your logged " +
+    "data and may not reflect your individual physiology. Always consult a qualified healthcare provider for medical guidance.";
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7.8);
+  tc(doc, C.textMuted);
+  const lines = doc.splitTextToSize(text, CW);
+  doc.text(lines, M, y);
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+function generatePDF(data) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  doc.setLineWidth(0.25);
+
+  // ── Page 1: Cover ─────────────────────────────────────────────────────────
+  drawCover(doc, data);
+
+  // ── Page 2+: Content ──────────────────────────────────────────────────────
+  doc.addPage();
+  let y = 24;
+
+  y = drawSummary(doc, data, y);
+  y = drawCycleHistory(doc, data, y);
+  y = drawSymptomLog(doc, data, y);
+  y = drawTrends(doc, data, y);
+  y = drawAlerts(doc, data, y);
+  y = drawNextSteps(doc, data, y);
+  drawDisclaimer(doc, y);
+
+  // ── Stamp footers on all content pages ────────────────────────────────────
+  const totalPages   = doc.getNumberOfPages();
+  const contentPages = totalPages - 1; // page 1 is the cover
+  stampFooters(doc, 2, contentPages);
+
+  doc.save(`bloom-cycle-report-${data.generatedDate}.pdf`);
+}
+
+// ── Page preview & button wiring ──────────────────────────────────────────────
+
 async function loadPreview() {
-  const previewEl = document.getElementById("report-preview");
+  const previewEl  = document.getElementById("report-preview");
   const logsByDate = await getAllLogs();
-  const cycle = computeCyclePhase(logsByDate);
+  const cycle      = computeCyclePhase(logsByDate);
 
-  const periodStarts = getPeriodStartsFromLogs(logsByDate);
-  const cycles = getCycles(periodStarts);
-  const avgCycleLength = average(cycles.map(c => c.length));
-  const periodDays = Object.keys(logsByDate).filter(d => isPeriodFlow(logsByDate[d]?.flow)).sort(sortAsc);
+  // No explicit user-name field in the data model; slot available for future
+  // profile work (e.g. localStorage.getItem("bloom_user_name")).
+  const userName = localStorage.getItem("bloom_user_name") ?? null;
+  const report   = buildReportData(logsByDate, cycle, userName);
 
-  if (!periodDays.length) {
+  if (!report.cyclesTracked) {
     previewEl.innerHTML = `
       <p class="text-muted">Log period days in the Calendar to generate a report.</p>
-      <a class="btn btn-outline" href="/pages/calendar.html" style="display:inline-block;margin-top:0.5rem;">Open Calendar</a>
+      <a class="btn btn-outline" href="/pages/calendar.html"
+         style="display:inline-block;margin-top:0.5rem;">Open Calendar</a>
     `;
   } else {
-    const lastStart = periodStarts.length ? periodStarts[periodStarts.length - 1] : null;
-    const nextDate = (avgCycleLength && lastStart) ? addDays(lastStart, avgCycleLength) : null;
+    const { avgCycleLength, avgPeriodLength, cyclesTracked,
+            lastPeriodStart, nextPeriodDate, regularity } = report;
 
-    const cycleRows = cycles.slice(-5).reverse().map(c => `
+    const cycleRows = report.cyclesNewestFirst.slice(0, 5).map((c) => `
       <tr>
-        <td>${formatDate(c.start)}</td>
-        <td>${formatDate(c.next)}</td>
-        <td class="${c.length < 21 || c.length > 35 ? "out-of-range" : ""}">${c.length} days</td>
+        <td>${formatDateMed(c.start)}</td>
+        <td>${c.periodLength ? `${c.periodLength}d` : "—"}</td>
+        <td class="${
+          !c.isCurrent && c.cycleLength && (c.cycleLength < 21 || c.cycleLength > 35)
+            ? "out-of-range" : ""
+        }">${c.isCurrent ? `Day ${c.daysSoFar}` : c.cycleLength ? `${c.cycleLength}d` : "—"}</td>
       </tr>`).join("");
 
+    const regularityBadge = regularity?.label && regularity.label !== "Not enough data"
+      ? `<span class="regularity-badge" style="
+           display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;
+           font-weight:700;background:var(--color-primary-light,#f0d0e0);
+           color:var(--color-primary,#d4749a);margin-bottom:0.75rem;"
+         >${regularity.label}</span>`
+      : "";
+
     previewEl.innerHTML = `
+      ${regularityBadge}
       <div class="stat-row">
         <div class="stat-tile">
           <div class="stat-tile-label">Cycles tracked</div>
-          <div class="stat-tile-value">${cycles.length}</div>
+          <div class="stat-tile-value">${cyclesTracked}</div>
         </div>
         <div class="stat-tile">
-          <div class="stat-tile-label">Avg cycle length</div>
+          <div class="stat-tile-label">Avg cycle</div>
           <div class="stat-tile-value">${avgCycleLength ? `${avgCycleLength}d` : "—"}</div>
         </div>
         <div class="stat-tile">
+          <div class="stat-tile-label">Avg period</div>
+          <div class="stat-tile-value">${avgPeriodLength ? `${avgPeriodLength}d` : "—"}</div>
+        </div>
+        <div class="stat-tile">
           <div class="stat-tile-label">Last period</div>
-          <div class="stat-tile-value" style="font-size:1rem;">${lastStart ? formatDate(lastStart) : "—"}</div>
+          <div class="stat-tile-value" style="font-size:1rem;">
+            ${lastPeriodStart ? formatDateMed(lastPeriodStart) : "—"}
+          </div>
         </div>
         <div class="stat-tile">
           <div class="stat-tile-label">Next expected</div>
-          <div class="stat-tile-value" style="font-size:1rem;">${nextDate ? formatDate(nextDate) : "—"}</div>
+          <div class="stat-tile-value" style="font-size:1rem;">
+            ${nextPeriodDate ? formatDateMed(nextPeriodDate) : "—"}
+          </div>
         </div>
       </div>
       ${cycleRows ? `
-        <p class="text-muted" style="font-size:0.85rem;margin-bottom:0.5rem;">Recent cycles (newest first):</p>
+        <p class="text-muted" style="font-size:0.85rem;margin-bottom:0.5rem;">
+          Recent cycles (newest first):
+        </p>
         <table class="cycle-table">
-          <thead><tr><th>Period Start</th><th>Next Start</th><th>Length</th></tr></thead>
+          <thead>
+            <tr><th>Period Start</th><th>Period Length</th><th>Cycle Length</th></tr>
+          </thead>
           <tbody>${cycleRows}</tbody>
         </table>` : ""}
     `;
   }
 
-  // Wire up download button
   const btn = document.getElementById("download-report");
   if (btn) {
-    btn.onclick = () => {
-      if (!periodDays.length) {
-        alert("No cycle history data yet. Log period days on the calendar first.");
+    btn.addEventListener("click", () => {
+      if (!report.cyclesTracked) {
+        alert("No cycle history yet. Log period days in the Calendar first.");
         return;
       }
-      generateCyclePDF(cycle, logsByDate);
-    };
+      generatePDF(report);
+    });
   }
 }
 

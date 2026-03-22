@@ -1,0 +1,1 @@
+- [bloomie_chatbot_refactor_2026](project_bloomie_refactor.md) — Bloomie stale button fix, conversational response format, typing indicator, topic interrupt, test suite (March 2026)

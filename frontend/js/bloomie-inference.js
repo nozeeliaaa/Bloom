@@ -286,7 +286,7 @@ function extractPregnancy(t) {
 }
 
 // ── 1f. Urgency flags ─────────────────────────────────────────────────────────
-function extractUrgency(t) {
+export function extractUrgency(t) {
   return /\b(faint|fainting|passed out|pass out|passing out|can't breathe|cant breathe|shortness of breath|soaking through|bleeding through|bleed through|bleed.*pants|soaked.*pants|blood.*pants|severe.*pain|one.sided.*pain|pain.*one.sided|sharp.*pain.*one side|bleed.*so bad|blood.*so bad|emergency|hospital|urgent|collaps\w*|can't stand|cant stand|too weak)\b/.test(t);
 }
 
@@ -296,6 +296,12 @@ function extractUrgency(t) {
 export function inferRoute(entities) {
   const { symptoms, duration, severity, timing, pregnancy, urgent } = entities;
   const sym = symptoms;
+  const raw = entities.raw || "";
+
+  // ── CRISIS / SELF-HARM: always before urgency ──────────────────────────────
+  if (/\b(hurt(?:ing)? myself|harm(?:ing)? myself|end it all|end my life|want to die|dont want to be here|cant go on|unsafe|feeling unsafe|cyan cope)\b/.test(raw)) {
+    return { next: "MOOD_SAFETY_ROUTE", payload: { inferred: true, reason: "self_harm_language" } };
+  }
 
   // ── URGENT: always highest priority ───────────────────────────────────────
   if (urgent) {
@@ -308,9 +314,9 @@ export function inferRoute(entities) {
 
   // ── MULTI-SYMPTOM COMBOS ───────────────────────────────────────────────────
 
-  // Late + pregnancy chance + no test yet → skip straight to test suggestion
+  // Late + pregnancy chance + no test yet → intent-first entry
   if (sym.late && pregnancy.chance && !pregnancy.testedYet) {
-    return { next: "LATE_TEST_SUGGEST", payload: { inferred: true, reason: "late+pregnancy_chance+no_test" } };
+    return { next: "PREGNANCY_ENTRY", payload: { inferred: true, reason: "late+pregnancy_chance+no_test" } };
   }
 
   // Late + positive test → skip to positive result node

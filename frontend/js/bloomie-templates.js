@@ -317,28 +317,98 @@ const REASON_TO_SCENARIO = {
  *
  * Returns null if no scenario could be determined (fall through to decision tree).
  */
-export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx = null) {
+// Scenarios where tone-wording adjustments must NEVER be applied (emergency/safety).
+const SAFETY_SCENARIOS = new Set(["urgent", "heavy_with_dizziness", "heavy_long"]);
+
+export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx = null, tone = null) {
   const scenario = resolveScenario(entities, inferredReason);
   if (!scenario) return null;
 
   const situation   = resolve(SITUATION[scenario], cycleCtx)  || null;
   const meaning     = resolve(MEANING[scenario],   cycleCtx)  || null;
-  const nextSteps   = NEXT_STEPS[scenario]                    || null;
-  // urgentSigns entries no longer embed the "Seek urgent help if:" prefix —
-  // it is added here once, consistently, for every scenario.
+  let   nextSteps   = NEXT_STEPS[scenario]                    || null;
   const urgentSigns = URGENT_SIGNS[scenario] || URGENT_SIGNS.default;
 
   if (!situation && !meaning) return null;
 
-  // ── Assemble lines array for say() ───────────────────────────────────────
+  const isSafetyNode = SAFETY_SCENARIOS.has(scenario);
+
+  // ── Assemble conversational lines for say() ───────────────────────────────
+  // Internal reasoning stays internal. What the user sees should feel warm,
+  // natural, and supportive — no clinical section headers.
   const lines = [];
 
-  if (situation)   lines.push(` Possible situation: ${situation}`);
-  if (meaning)     lines.push(` What this may mean: ${meaning}`);
-  if (nextSteps)   lines.push(` What to do next: ${nextSteps}`);
-  if (urgentSigns) lines.push(` Seek urgent help if: ${urgentSigns}`);
+  // ── Tone: distressed — grounding reassurance before guidance ─────────────
+  // Added before the situation line so the user feels held before receiving info.
+  // Never applied to emergency/safety nodes.
+  if (tone === "distressed" && !isSafetyNode) {
+    lines.push("You're in the right place, and we'll work through this together.");
+  }
 
-  lines.push("Remember: Bloomie provides educational information only — not a diagnosis. You know your body best 🩷");
+  // Line 1: Situation + meaning merged into one fluid opener.
+  // If both exist, join them with a space (they're complementary sentences).
+  // Tone: frustrated — prefix with a direct validating acknowledgement.
+  let combinedLine = "";
+  if (situation && meaning) {
+    combinedLine = `${situation} ${meaning}`;
+  } else if (situation) {
+    combinedLine = situation;
+  } else if (meaning) {
+    combinedLine = meaning;
+  }
+
+  if (combinedLine) {
+    if (tone === "frustrated" && !isSafetyNode) {
+      lines.push(`You deserve clear answers. ${combinedLine}`);
+    } else {
+      lines.push(combinedLine);
+    }
+  }
+
+  // Line 2: Practical next step — phrased as a natural suggestion, not a header.
+  // Tone: exhausted — trim to max 2 sentences and soften the lead-in.
+  if (nextSteps) {
+    let stepsText = nextSteps;
+
+    if (tone === "exhausted" && !isSafetyNode) {
+      // Reduce to first 2 action sentences — don't overwhelm someone who's drained
+      const sentences = stepsText.split(/\.\s+/).filter(Boolean);
+      stepsText = sentences.slice(0, 2).join(". ").trim();
+      if (!stepsText.endsWith(".")) stepsText += ".";
+      lines.push(`When you have the energy — ${stepsText}`);
+    } else {
+      const starters = [
+        "Going forward —",
+        "A helpful next step:",
+        "What might help:",
+        "Here's what to consider:",
+      ];
+      const starter = starters[Math.floor(Math.random() * starters.length)];
+      lines.push(`${starter} ${stepsText}`);
+    }
+  }
+
+  // Line 3: Safety note — phrased as a gentle heads-up, not a clinical list item.
+  // Only adds "if" if the urgentSigns text doesn't already start with one.
+  if (urgentSigns) {
+    const lower = urgentSigns.trim().toLowerCase();
+    const alreadyStartsWithIf = lower.startsWith("if ") || lower.startsWith("this combination");
+    if (alreadyStartsWithIf) {
+      lines.push(`One thing to watch for: ${urgentSigns}`);
+    } else {
+      lines.push(`One thing to watch for: if ${urgentSigns}`);
+    }
+  }
+
+  // Line 4: Short, friendly disclaimer — no "Remember:" prefix.
+  // Tone: angry — strip any exclamation marks from all lines (calm, steady tone).
+  lines.push("This is educational info, not a diagnosis — you know your body best 🩷");
+
+  if (tone === "angry" && !isSafetyNode) {
+    for (let i = 0; i < lines.length; i++) {
+      lines[i] = lines[i].replace(/!/g, ".");
+    }
+  }
 
   return {
     scenario,
@@ -383,6 +453,259 @@ function resolveScenario(entities, inferredReason) {
   if (s.spotting)                                      return "spotting_midcycle";
 
   return null;
+}
+
+
+// ─── MEDICAL SERIOUSNESS GUARD ───────────────────────────────────────────────
+//
+// Even after tone detection, messages containing heavy medical urgency signals
+// must never receive a playful casual opener. hasMedicalSeriousness() checks
+// both Patois and English forms so the guard works on mixed-language messages.
+
+/**
+ * hasMedicalSeriousness(text) → boolean
+ *
+ * Returns true if the message contains heavy bleeding, severe pain, fainting,
+ * pregnancy concern, or other urgency signals that warrant a calm opener
+ * regardless of detected tone.
+ *
+ * @param  {string} text - Raw or normalized user input
+ * @returns {boolean}
+ */
+export function hasMedicalSeriousness(text) {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  return (
+    /\b(heavy bleed|bleeding heavy|soaking through|soaked through|bleeding through|bleed through)\b/.test(t) ||
+    /\b(severe pain|pain.*severe|pain a kill|pain bad|hurt bad|belly a murder)\b/.test(t) ||
+    /\b(faint\w*|passed out|pass out|passing out|nearly faint|mi faint|mi pass out)\b/.test(t) ||
+    /\b(pregnant|pregnancy|might be pregnant|think.*pregnant|breed)\b/.test(t) ||
+    /\b(can'?t breathe|cant breathe|shortness of breath|cant stand|can'?t stand)\b/.test(t) ||
+    /\b(emergency|hospital|urgent care|bleed.*bad|a bleed bad|bleed nuff)\b/.test(t) ||
+    /\b(collaps\w*|too weak to|ectopic|miscarr)\b/.test(t)
+  );
+}
+
+// ─── TONE OPENERS ─────────────────────────────────────────────────────────────
+
+const TONE_OPENER_POOLS = {
+  distressed: [
+    "Hey, take a breath with me for a second 🩷",
+    "I hear you — and I want you to know you're not alone in this 🩷",
+    "It's okay to feel overwhelmed. Let's figure this out together 🩷",
+    "You came to the right place. Let's go through this step by step 🩷",
+    "Whatever's going on, you don't have to figure it out alone 🩷",
+    "I've got you. Let's take this one thing at a time 🩷",
+  ],
+  frustrated: [
+    "I hear you — dealing with this repeatedly is exhausting 🩷",
+    "That frustration makes complete sense. Let's see what's actually going on 🩷",
+    "You shouldn't have to keep going through this. Let's look at it properly 🩷",
+    "Okay, let's actually get to the bottom of this 🩷",
+    "Your frustration is valid — you deserve real answers, not more runaround 🩷",
+    "I get it. Let's stop going in circles and actually look at what's happening 🩷",
+  ],
+  exhausted: [
+    "I can tell you're running low right now — I'll keep this gentle 🩷",
+    "You don't have to have it together to talk to me 🩷",
+    "Even when everything feels like too much, your health still matters 🩷",
+    "Let's make this as easy as possible — I'll do the heavy lifting 🩷",
+    "You're here and that takes something, even when you're drained 🩷",
+    "Rest when you can. But let's sort this out first 🩷",
+  ],
+  angry: [
+    "Whatever's got you upset — I'm not here to make it worse 🩷",
+    "That anger is telling you something. Let's figure out what's actually going on 🩷",
+    "You don't have to be calm to talk to me. Let's just look at what's happening 🩷",
+    "I hear the frustration. Let's see if I can actually help 🩷",
+    "Valid. Let's focus on what's going on with your body right now 🩷",
+    "I'm not going anywhere. Tell me what's going on 🩷",
+  ],
+  casual: [
+    "Hey! 🩷 Let's look at this —",
+    "Okay okay, let's get into it 🩷",
+    "You came to the right place 😄 Let's see what's going on —",
+    "On it 🩷",
+    "Let's figure this out together —",
+    "Say less, I got you 🩷",
+  ],
+};
+
+/**
+ * getToneOpener(tone, ctx, text) → string
+ *
+ * Returns a contextually appropriate warm opening line for the given tone.
+ * Returns an empty string for 'neutral' so callers can safely prepend without
+ * checking — an empty string filtered by say() produces no extra bubble.
+ *
+ * Medical seriousness override: if the message contains heavy bleeding, severe
+ * pain, fainting, pregnancy concern, or urgency signals, casual openers are
+ * suppressed entirely (returns ""). Other tones use their calmest available
+ * opener — playful phrasing would feel dismissive on medically serious content.
+ *
+ * Repetition control: when ctx is provided, already-used opener strings are
+ * tracked in ctx.usedOpeners (a Set). Each call picks from unused options first.
+ * When all options in the pool have been used, the Set resets so the cycle
+ * can begin again.
+ *
+ * @param  {'distressed'|'frustrated'|'exhausted'|'angry'|'casual'|'neutral'} tone
+ * @param  {object|null} ctx  - Session context (needs ctx.usedOpeners Set), or null
+ * @param  {string|null} text - Raw user message for medical seriousness check, or null
+ * @returns {string}
+ */
+export function getToneOpener(tone, ctx = null, text = null) {
+  // Medical seriousness override — block casual opener on urgent/serious content
+  const medicallySerious = text ? hasMedicalSeriousness(text) : false;
+  if (medicallySerious && tone === "casual") return "";
+
+  const pool = TONE_OPENER_POOLS[tone];
+  if (!pool) return "";
+
+  // No context — plain random pick (backward-compatible path)
+  if (!ctx) {
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  // Ensure usedOpeners exists on ctx (defensive — should be set by createCtx)
+  if (!ctx.usedOpeners) ctx.usedOpeners = new Set();
+
+  // When medically serious, prefer the calmest opener for non-casual tones:
+  // that's the first entry in each pool (intentionally the most grounded one).
+  if (medicallySerious) {
+    const calmest = pool.find(o => !ctx.usedOpeners.has(o)) ?? pool[0];
+    ctx.usedOpeners.add(calmest);
+    return calmest;
+  }
+
+  // Repetition control — pick from unused openers; reset when pool is exhausted
+  const unused = pool.filter(o => !ctx.usedOpeners.has(o));
+  if (unused.length === 0) ctx.usedOpeners.clear();
+
+  const candidates = ctx.usedOpeners.size === 0 ? pool : pool.filter(o => !ctx.usedOpeners.has(o));
+  const selected = candidates[Math.floor(Math.random() * candidates.length)];
+  ctx.usedOpeners.add(selected);
+  return selected;
+}
+
+// ─── PHASE INSIGHTS ──────────────────────────────────────────────────────────
+
+/**
+ * Concern priority order — used by callers when multiple concerns are detected
+ * in a single message so only the highest-priority insight is shown.
+ * Exported so callers and tests can reference the same list.
+ */
+export const CONCERN_PRIORITY = ["pain", "mood", "fatigue", "bloating", "sleep", "skin", "libido"];
+
+/**
+ * softenInsight(text, phase) → string
+ *
+ * Replaces hard phase-naming openers (e.g. "In the luteal phase…") with
+ * hedged phrasing suitable for low-confidence cycle data. Returns the
+ * original string unchanged when no hard opener is detected (e.g. strings
+ * that already say "some people" or "usually").
+ *
+ * Internal — not exported.
+ */
+function softenInsight(text, phase) {
+  const SOFTENERS = {
+    luteal: [
+      [/^In the luteal phase,?\s*/i,         "If you're in your luteal phase, "],
+      [/^Fatigue in the luteal phase/i,       "If you're in your luteal phase, fatigue"],
+      [/^Luteal phase bloating/i,             "If you're in your luteal phase, bloating"],
+      [/^Cramping that starts in the late luteal phase/i, "Around the later part of the cycle, cramping"],
+      [/^Libido can dip in the luteal phase/i,"If you're in your luteal phase, libido can dip"],
+      [/^Progesterone can make/i,             "If you're in your luteal phase, progesterone can make"],
+    ],
+    menstrual: [
+      [/^During your period,?\s*/i,            "Around your period, "],
+      [/^Period cramps can happen when/i,      "Period cramps can happen when"],  // already soft
+      [/^Bloating around the start of your period/i, "Around the start of your period, bloating"],
+      [/^Around your period,\s*/i,             "Around your period, "],           // already soft
+      [/^Libido is often lower during your period/i, "Around your period phase, libido can be lower"],
+    ],
+    follicular: [
+      [/^Estrogen rises steadily through the follicular phase/i,   "If you're in your follicular phase, estrogen tends to rise"],
+      [/^Rising estrogen in the follicular phase/i,                "If you're in your follicular phase, rising estrogen"],
+      [/^Bloating is usually lower in the follicular phase/i,      "If you're in a follicular phase, bloating is often lower"],
+      [/^Sleep quality often improves in the follicular phase/i,   "If you're in your follicular phase, sleep quality can improve"],
+      [/^Pelvic discomfort in the follicular phase/i,              "Around the follicular phase, pelvic discomfort"],
+      [/^Estrogen can support skin/i,                              "Estrogen can support skin"],  // already soft
+    ],
+    ovulation: [
+      [/^Estrogen peaks at ovulation/i,     "If you're around ovulation, estrogen can peak"],
+      [/^Libido often peaks at ovulation/i, "Around ovulation, libido can peak"],
+    ],
+  };
+
+  for (const [pattern, replacement] of (SOFTENERS[phase] || [])) {
+    if (pattern.test(text)) {
+      return text.replace(pattern, replacement);
+    }
+  }
+  // String is already hedged ("some people…", "usually…", etc.) — return as-is
+  return text;
+}
+
+/**
+ * getPhaseInsight(phase, concern, lowConfidence) → string | null
+ *
+ * Returns a warm 1–2 sentence phase explanation for a given cycle phase and
+ * concern category. Returns null if no insight exists for the combination so
+ * callers can safely skip rendering without checking first.
+ *
+ * Language uses "can contribute to" framing rather than presenting hormones
+ * as the sole cause of any experience.
+ *
+ * @param {'luteal'|'menstrual'|'follicular'|'ovulation'|null} phase
+ * @param {'mood'|'fatigue'|'pain'|'bloating'|'sleep'|'libido'|'skin'} concern
+ * @param {boolean} [lowConfidence=false] - true when cycle data is sparse or >45 days old
+ * @returns {string|null}
+ */
+export function getPhaseInsight(phase, concern, lowConfidence = false) {
+  if (!phase || !concern) return null;
+
+  const insights = {
+    luteal: {
+      mood:    "In the luteal phase progesterone rises and then drops sharply — that emotional dip is one of the most common experiences in this phase and it's completely real.",
+      fatigue: "Fatigue in the luteal phase is very common — your body temperature is slightly higher, your metabolism speeds up, and progesterone can have a sedating effect. You're not being lazy.",
+      bloating:"Luteal phase bloating can happen as progesterone tends to slow digestion slightly — it usually peaks a day or two before your period and then eases once bleeding starts.",
+      sleep:   "Progesterone can make you feel sleepy but may also disrupt deep sleep quality — feeling tired even after sleeping is a common luteal phase pattern.",
+      skin:    "Progesterone in the luteal phase can increase oil production — breakouts in the week before your period can be linked to these hormonal changes, not random bad luck.",
+      pain:    "Cramping that starts in the late luteal phase can be prostaglandin-related — the same compounds that contribute to period cramps begin building before bleeding actually starts.",
+      libido:  "Libido can dip in the luteal phase as progesterone rises and energy drops — this is a common experience in this phase and not a reflection of how you feel about your relationship.",
+    },
+    menstrual: {
+      fatigue: "During your period your body is losing iron through bleeding — fatigue during this time can have a physical component. Iron-rich foods and rest genuinely help.",
+      mood:    "The drop in estrogen and progesterone at the start of your period can contribute to a low or flat mood in the first couple of days — it usually lifts as estrogen starts rising again around day 3–4.",
+      pain:    "Period cramps can happen when the uterus contracts to shed its lining — prostaglandins are the hormone-like compounds that contribute to that. Higher prostaglandin levels tend to mean more intense cramps.",
+      bloating:"Bloating around the start of your period is very common — prostaglandins that contribute to cramps can also affect your digestive system. It usually eases within a day or two.",
+      sleep:   "Sleep can be harder during your period — cramps, discomfort, and night sweats from hormonal shifts can all play a role. Rest as much as you can.",
+      libido:  "Libido is often lower during your period due to discomfort and fatigue — this is completely normal and tends to rise again in the follicular phase.",
+      skin:    "Some people notice fewer breakouts once their period starts as progesterone drops — others see continued breakouts from inflammation during menstruation.",
+    },
+    follicular: {
+      mood:    "Estrogen rises steadily through the follicular phase — most people notice their mood, energy, and motivation are better in this part of their cycle.",
+      fatigue: "The follicular phase is usually when energy levels are at their best as estrogen rises — persistent fatigue in this phase is worth paying attention to, since stress or sleep could be a factor.",
+      libido:  "Rising estrogen in the follicular phase often brings higher energy and libido — this is one of the times in the cycle when many people feel most like themselves.",
+      bloating:"Bloating is usually lower in the follicular phase as progesterone (which can slow digestion) is at its minimum — if you're bloating here, diet or stress may be playing a role.",
+      sleep:   "Sleep quality often improves in the follicular phase as estrogen rises — if sleep is still disrupted, it's worth looking at other factors like screen time or stress.",
+      pain:    "Pelvic discomfort in the follicular phase can sometimes reflect ovarian activity as follicles develop — mild, brief twinges are usually normal.",
+      skin:    "Estrogen can support skin collagen and oil balance — many people notice their skin looks clearest in the follicular phase.",
+    },
+    ovulation: {
+      mood:    "Estrogen peaks at ovulation and so does a lot of people's confidence, social energy, and general mood — if you feel good right now, that's a common experience at this point in the cycle.",
+      pain:    "Some people feel a sharp or dull one-sided pain at ovulation called mittelschmerz — it can be caused by the follicle releasing the egg and usually lasts a few hours to a day.",
+      libido:  "Libido often peaks at ovulation — estrogen and LH are both high, and this is the body's natural fertility window.",
+      fatigue: "Energy is usually at its highest around ovulation — if you're tired right now, it may be worth checking in on sleep quality or stress levels.",
+      bloating:"Some mild bloating around ovulation is common — the follicle rupture and fluid release can contribute to brief, minor distension.",
+      sleep:   "Sleep is usually stable around ovulation — if you're having trouble at this point, stress or anxiety may be the more likely driver.",
+      skin:    "Skin often looks its best around ovulation when estrogen is at its peak — a slight rise in testosterone can occasionally contribute to a pre-ovulation breakout for some people.",
+    },
+  };
+
+  const raw = insights[phase]?.[concern] ?? null;
+  if (!raw) return null;
+  return lowConfidence ? softenInsight(raw, phase) : raw;
 }
 
 

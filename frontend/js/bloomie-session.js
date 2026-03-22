@@ -31,6 +31,23 @@
  *   urgency         — true when the current thread has an urgent flag
  *   adviceGiven     — Set of string codes for advice already surfaced this session
  *                     e.g. "told_to_test", "told_to_seek_care", "told_to_monitor"
+ *   isTyping        — true while Bloomie is "thinking" (typing indicator visible)
+ *   backgroundContext — symptom snapshot seeded from a prior session that is older
+ *                     than 24 hours. Not merged into entityHistory so it cannot
+ *                     influence inferRoute or topic-switch detection. Available
+ *                     for reference by recall helpers and PDF export.
+ *                     Shape mirrors an entityHistory entry plus a `seededAt` ISO
+ *                     string. Null when no stale prior-session data exists.
+ *   flowId          — integer counter incremented each time the user sends a message.
+ *                     Buttons rendered by a previous render pass capture the flowId
+ *                     at render time; clicks are ignored when flowId has advanced,
+ *                     preventing stale buttons from yanking the user back into an
+ *                     old flow after they have already changed topics.
+ *   nodeFlowId      — flowId value at the time the current node's choices were last
+ *                     rendered. matchTypedToChoice compares this against
+ *                     (ctx.flowId - 1) — the epoch immediately before the user's
+ *                     current message — and skips the match when they differ,
+ *                     mirroring the stale-button guard used by button clicks.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -63,5 +80,14 @@ export function createCtx() {
     riskLevel:          "low",
     urgency:            false,
     adviceGiven:        new Set(),
+    isTyping:           false,
+    backgroundContext:  null,
+    flowId:             0,
+    nodeFlowId:         -1,
+    insightsGiven:      new Set(),  // keys like "luteal_mood" — prevents repeated full insights
+    cycleVariability:   null,       // range (max–min) across last 3 logged cycle lengths, null if unknown
+    currentTone:        null,       // tone resolved for the current message ('distressed'|'angry'|…|'neutral')
+    previousTone:       null,       // tone from the prior turn — used for session stability blending
+    usedOpeners:        new Set(),  // opener strings already shown — prevents repetition within a session
   };
 }

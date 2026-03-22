@@ -636,118 +636,8 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
 }
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
-
-function generateCyclePDF(cycle, logsByDate) {
-  if (!window.jspdf) { alert("PDF library not loaded. Check your connection and try again."); return; }
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-
-  const cycleStarts = cycle.cycleStarts || [];
-  const cycleLengths = [];
-  for (let i = 1; i < cycleStarts.length; i++) {
-    cycleLengths.push(diffDays(cycleStarts[i - 1], cycleStarts[i]));
-  }
-  const avg = cycleLengths.length
-    ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
-    : null;
-
-  const pageW = 210, margin = 18, cW = pageW - margin * 2;
-  let y = 0;
-
-  // ── Header band ──
-  doc.setFillColor(212, 116, 154);
-  doc.rect(0, 0, pageW, 20, "F");
-  doc.setFontSize(15); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
-  doc.text("Bloom — Cycle Report", margin, 13);
-
-  y = 28;
-  doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(140, 110, 140);
-  doc.text(`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, margin, y);
-  y += 4;
-  doc.setDrawColor(212, 116, 154); doc.line(margin, y, pageW - margin, y);
-  y += 7;
-
-  // ── Summary ──
-  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(184, 92, 130);
-  doc.text("CYCLE SUMMARY", margin, y); y += 6;
-  doc.setFont("helvetica", "normal"); doc.setTextColor(60, 40, 60);
-  if (avg) { doc.text(`Average cycle length: ${avg} days`, margin, y); y += 5; }
-  doc.text(`Cycles tracked: ${cycleStarts.length}`, margin, y); y += 5;
-  if (cycleStarts.length) {
-    doc.text(`Data from: ${formatDate(cycleStarts[0])}`, margin, y); y += 5;
-  }
-  y += 2;
-  doc.setDrawColor(220, 200, 220); doc.line(margin, y, pageW - margin, y); y += 7;
-
-  // ── Cycle details ──
-  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(184, 92, 130);
-  doc.text("CYCLE DETAILS", margin, y); y += 7;
-
-  const todayKey = toDateKey(new Date());
-
-  [...cycleStarts].reverse().forEach((start, revIdx) => {
-    const i = cycleStarts.length - 1 - revIdx;
-    const cycleLen = cycleLengths[i];
-    const isCurrent = cycleLen == null;
-    const nextStart = isCurrent ? null : cycleStarts[i + 1];
-    const cycleEndKey = nextStart ? addDaysStr(nextStart, -1) : todayKey;
-
-    if (y > 258) { doc.addPage(); y = 20; }
-
-    // Row header
-    const daysSoFar = diffDays(start, todayKey) + 1;
-    const heading = isCurrent
-      ? `Current cycle — Day ${daysSoFar} (started ${formatDate(start)})`
-      : `${cycleLen} days — ${formatDate(start)} to ${formatDate(cycleEndKey)}`;
-
-    doc.setFontSize(10.5); doc.setFont("helvetica", "bold"); doc.setTextColor(60, 40, 60);
-    doc.text(heading, margin, y); y += 5;
-
-    // Predicted dates for this cycle
-    if (!isCurrent && nextStart) {
-      const ov = addDaysStr(nextStart, -14);
-      const fws = addDaysStr(nextStart, -19);
-      const fwe = addDaysStr(nextStart, -13);
-      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 80, 100);
-      doc.text(`Ovulation (est.): ${formatDate(ov)}   Fertile window: ${formatDate(fws)} – ${formatDate(fwe)}`, margin + 3, y);
-      y += 5;
-    }
-
-    // Symptoms logged in this cycle
-    const symptoms = [];
-    let d = 0;
-    while (d <= 60) {
-      const dk = addDaysStr(start, d);
-      if (dk > cycleEndKey) break;
-      const log = logsByDate[dk];
-      if (log?.symptoms?.length) symptoms.push(`${formatDate(dk)}: ${log.symptoms.join(", ")}`);
-      if (log?.notes) symptoms.push(`${formatDate(dk)} (note): ${log.notes}`);
-      d++;
-    }
-
-    if (symptoms.length) {
-      doc.setFontSize(9); doc.setFont("helvetica", "italic"); doc.setTextColor(120, 100, 120);
-      symptoms.forEach((s) => {
-        if (y > 268) { doc.addPage(); y = 20; }
-        const lines = doc.splitTextToSize(`  ${s}`, cW - 6);
-        doc.text(lines, margin + 4, y);
-        y += lines.length * 4.2;
-      });
-    }
-
-    y += 3;
-    doc.setDrawColor(230, 215, 230); doc.line(margin, y, pageW - margin, y); y += 5;
-  });
-
-  // ── Disclaimer ──
-  if (y > 255) { doc.addPage(); y = 20; }
-  y += 2;
-  doc.setFontSize(8); doc.setFont("helvetica", "italic"); doc.setTextColor(160, 140, 160);
-  const disc = "This report is for personal reference only and is not a medical document. Always consult a qualified healthcare provider for medical advice. Bloom is an educational tool.";
-  doc.text(doc.splitTextToSize(disc, cW), margin, y);
-
-  doc.save(`bloom-cycle-report-${todayKey}.pdf`);
-}
+// Full report generation lives in report.js / pdf-report-data.js.
+// The dashboard button navigates there so all PDF logic stays in one place.
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -794,10 +684,10 @@ async function loadDashboard() {
   renderSymptomTools(goal, logsByDate);
   renderCycleHistoryAndChart(cycle, logsByDate);
 
-  // PDF export
+  // PDF export — navigate to the full report page
   const pdfBtn = document.getElementById("export-pdf");
   if (pdfBtn) {
-    pdfBtn.onclick = () => generateCyclePDF(cycle, logsByDate);
+    pdfBtn.onclick = () => { window.location.href = "/pages/report.html"; };
   }
 
   const phaseKey = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";

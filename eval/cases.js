@@ -244,16 +244,16 @@ export const cases = [
   {
     id: "RT001", input: "my period is late and i had unprotected sex",
     category: "routing",
-    expected: { route: "LATE_TEST_SUGGEST" },
+    expected: { route: "PREGNANCY_ENTRY" },
     tags: ["late", "pregnancy", "english"],
-    notes: "Late + pregnancy chance + no test → test suggestion",
+    notes: "Late + pregnancy chance + no test → PREGNANCY_ENTRY intent-first node",
   },
   {
     id: "RT002", input: "period is late and i might be pregnant",
     category: "routing",
-    expected: { route: "LATE_TEST_SUGGEST" },
+    expected: { route: "PREGNANCY_ENTRY" },
     tags: ["late", "pregnancy", "english"],
-    notes: "Direct pregnancy suspicion without test mention",
+    notes: "Direct pregnancy suspicion without test mention → PREGNANCY_ENTRY",
   },
   {
     id: "RT003", input: "my period is late and i took a test it was positive",
@@ -581,9 +581,9 @@ export const cases = [
   {
     id: "PA015", input: "me period nuh show up and me breed fi 3 days late",
     category: "routing",
-    expected: { route: "LATE_TEST_SUGGEST" },
+    expected: { route: "PREGNANCY_ENTRY" },
     tags: ["patois", "late", "duration", "pregnancy"],
-    notes: "Late + breed (pregnancy) → LATE_TEST_SUGGEST fires before short_duration check (line priority in inferRoute)",
+    notes: "Late + breed (pregnancy) → PREGNANCY_ENTRY fires before short_duration check (line priority in inferRoute)",
   },
   {
     id: "PA016", input: "flooding and feel like me ago faint",
@@ -801,9 +801,9 @@ export const cases = [
   {
     id: "EG004", input: "my period is 2 weeks late and i had sex",
     category: "edge",
-    expected: { route: "LATE_TEST_SUGGEST" },
+    expected: { route: "PREGNANCY_ENTRY" },
     tags: ["late", "pregnancy", "duration"],
-    notes: "Late + sex → pregnancy.chance fires → LATE_TEST_SUGGEST (pregnancy check at line 312 fires before duration at line 327)",
+    notes: "Late + sex → pregnancy.chance fires → PREGNANCY_ENTRY (pregnancy check at line 312 fires before duration at line 327)",
   },
   {
     id: "EG005", input: "missed my period, took a test, it says positive",
@@ -863,9 +863,9 @@ export const cases = [
   {
     id: "EG011", input: "MY PERIOD IS VERY LATE AND I HAD UNPROTECTED SEX",
     category: "edge",
-    expected: { route: "LATE_TEST_SUGGEST" },
+    expected: { route: "PREGNANCY_ENTRY" },
     tags: ["caps", "late", "pregnancy"],
-    notes: "Uppercase input — normalization must handle",
+    notes: "Uppercase input — normalization must handle; routes to PREGNANCY_ENTRY",
   },
 
   // Ellipsis / punctuation heavy
@@ -890,9 +890,9 @@ export const cases = [
   {
     id: "EG014", input: "my period is late 😭😭 i had sex last week 😰",
     category: "edge",
-    expected: { route: "LATE_TEST_SUGGEST" },
+    expected: { route: "PREGNANCY_ENTRY" },
     tags: ["emoji", "late", "pregnancy"],
-    notes: "Emojis should be stripped — core signal still fires",
+    notes: "Emojis should be stripped — core signal still fires; routes to PREGNANCY_ENTRY",
   },
 
   // Contradictory signals
@@ -1120,6 +1120,655 @@ export const cases = [
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["narrowing", "period", "sick", "ambiguous"],
     notes: "period + sick in uncertain framing — no secondary signal; NARROWING should ask clarifying question rather than OOS",
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  PREGNANCY TEST FLOW — new multi-entry route cases
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: "PT001", input: "i tested negative yesterday",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "negative", "already_tested", "english"],
+    notes: "'tested negative' phrase → routeUserText should fire TEST_NEGATIVE_INTRO",
+  },
+  {
+    id: "PT002", input: "my test came back negative but my period still hasn't come",
+    category: "routing",
+    expected: { route: "LATE_NEG_UNCLEAR", urgent: false },
+    tags: ["test_flow", "negative", "late_period", "english"],
+    notes: "Negative test + late period → inferRoute fires LATE_NEG_UNCLEAR before routeUserText runs",
+  },
+  {
+    id: "PT003", input: "i already tested and it was negative",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "negative", "already_tested", "english"],
+    notes: "'already tested' pattern → TEST_NEGATIVE_INTRO",
+  },
+  {
+    id: "PT004", input: "i took a test already but i'm not sure if it was right",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "negative", "already_tested", "english"],
+    notes: "'took a test already' phrase → TEST_NEGATIVE_INTRO",
+  },
+  {
+    id: "PT005", input: "i had unprotected sex last week",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "recent_sex", "english"],
+    notes: "'had unprotected sex' → routeUserText fires TEST_RECENT_SEX_INTRO",
+  },
+  {
+    id: "PT006", input: "we had unprotected sex recently and i'm worried",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "recent_sex", "english"],
+    notes: "'unprotected sex recently' pattern → TEST_RECENT_SEX_INTRO",
+  },
+  {
+    id: "PT007", input: "we had sex without a condom three days ago",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "recent_sex", "english"],
+    notes: "'sex without condom' → TEST_RECENT_SEX_INTRO",
+  },
+  {
+    id: "PT008", input: "i forgot the condom and now i'm scared i might be pregnant",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "recent_sex", "english"],
+    notes: "'forgot the condom' → TEST_RECENT_SEX_INTRO",
+  },
+  {
+    id: "PT009", input: "i have irregular cycles and i don't know when my period is due",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "irregular_cycle", "english"],
+    notes: "Irregular cycle mention — no route from inferRoute but routeUserText shouldn't misfire as urgent",
+  },
+  {
+    id: "PT010", input: "i have severe one-sided pain and i tested positive",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["test_flow", "urgent", "ectopic_risk", "english"],
+    notes: "Severe one-sided pain in test context — ectopic risk, must route HEAVY_URGENT",
+  },
+  {
+    id: "PT011", input: "i took a pregnancy test and it was positive but i feel faint and have bad pain on one side",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["test_flow", "urgent", "ectopic_risk", "faint", "english"],
+    notes: "Positive test + faint + one-sided pain = ectopic red flag, HEAVY_URGENT required",
+  },
+  {
+    id: "PT012", input: "i had unprotected sex yesterday and i want to test now",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["test_flow", "recent_sex", "too_early", "english"],
+    notes: "Sex yesterday — too early for any test; should eventually reach TEST_TOO_EARLY via TEST_RECENT_SEX_INTRO",
+  },
+  {
+    id: "PT013", input: "negative test two days ago, period is 10 days late, should i test again",
+    category: "routing",
+    expected: { route: "LATE_NEG_UNCLEAR", urgent: false },
+    tags: ["test_flow", "negative", "retest", "late_period", "english"],
+    notes: "Negative + late + retest intent → inferRoute fires LATE_NEG_UNCLEAR; TEST_RETEST_NOW path in assistant.js",
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  HEAVY BLEEDING FLOW — multi-entry route cases
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: "HV001", input: "i'm soaking through pads every hour for the last three hours",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["heavy", "soaking_through", "route_a", "urgent", "english"],
+    notes: "'soaking through' matches urgency phrase — must route HEAVY_URGENT directly (urgentPhrases check)",
+  },
+  {
+    id: "HV002", input: "i'm soaking my pad really fast, changing every hour",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "soaking", "route_a", "english"],
+    notes: "'soaking' (without 'through') + 'changing every hour' → HEAVY_INTRO via Route A in routeUserText",
+  },
+  {
+    id: "HV003", input: "my period won't stop and it's been 9 days now",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "duration", "route_b", "english"],
+    notes: "'won't stop' + '9 days' → HEAVY_ROUTE_B via Route B detection in routeUserText",
+  },
+  {
+    id: "HV004", input: "bleeding for 10 days straight and getting heavier",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "duration", "route_b", "10_days", "english"],
+    notes: "'10 days' matches Route B detection → HEAVY_ROUTE_B",
+  },
+  {
+    id: "HV005", input: "i'm feeling really dizzy and i'm bleeding heavily",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "dizzy", "route_c", "english"],
+    notes: "'dizzy' + 'bleeding' → Route C detection (C > A) → HEAVY_ROUTE_C",
+  },
+  {
+    id: "HV006", input: "i feel weak and my period is very heavy",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["heavy", "weak", "urgent", "english"],
+    notes: "heavy + weak → inferRoute fires HEAVY_URGENT before routeUserText; Route C path via routeUserText only if inferRoute misses",
+  },
+  {
+    id: "HV007", input: "i passed out from heavy bleeding",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["heavy", "faint", "urgent", "english"],
+    notes: "'passed out' in urgentPhrases — direct HEAVY_URGENT, bypasses all route detection",
+  },
+  {
+    id: "HV008", input: "mi period nuh stop a week now",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "patois", "route_b", "duration"],
+    notes: "Patois: 'nuh stop' normalizes, 'a week now' matches Route B → HEAVY_ROUTE_B",
+  },
+  {
+    id: "HV009", input: "pad full up and blood everywhere",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "patois", "route_a", "volume"],
+    notes: "Patois Route A patterns: 'pad full up', 'blood everywhere' → HEAVY_INTRO",
+  },
+  {
+    id: "HV010", input: "mi feel weak and a nuff blood",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "patois", "route_c", "weak"],
+    notes: "Patois: 'mi feel weak' + 'nuff blood' → Route C priority → HEAVY_ROUTE_C",
+  },
+  {
+    id: "HV011", input: "mi dizzy and mi period flooding",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["heavy", "patois", "dizzy", "urgent"],
+    notes: "Patois: after normalization dizzy + heavy → inferRoute catches as HEAVY_URGENT; Route C is routeUserText fallback",
+  },
+  {
+    id: "HV012", input: "heavy bleeding with clots and it's been going on 8 days",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "clots", "duration", "route_b", "english"],
+    notes: "heavy + clots + 8 days — inferRoute returns null; routeUserText '8 days' matches Route B → HEAVY_ROUTE_B",
+  },
+  {
+    id: "HV013", input: "i have heavy bleeding and it's not more than usual",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "route_a", "no_flags", "english"],
+    notes: "'heavy' triggers Route A → HEAVY_INTRO; user will answer no-flags → HEAVY_MONITOR expected path",
+  },
+  {
+    id: "HV014", input: "period still a go and a nuff blood",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "patois", "route_b", "duration"],
+    notes: "Patois: 'period still a go' matches Route B → HEAVY_ROUTE_B",
+  },
+  {
+    id: "HV015", input: "i fainted from the bleeding and i'm scared",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["heavy", "faint_past", "route_c", "english"],
+    notes: "'fainted' (past tense) is not caught by inferRoute urgent detection; routeUserText catches 'faint' substring → HEAVY_URGENT via urgentPhrases",
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  PREGNANCY INTENT FLOW — covers new PREGNANCY_ENTRY and sub-routes
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: "PI001", input: "pregnancy concern",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pregnancy_entry", "english"],
+    notes: "'pregnancy concern' → inferRoute returns null; routeUserText explicit pattern sends to PREGNANCY_ENTRY",
+  },
+  {
+    id: "PI002", input: "i might be pregnant and my period is late",
+    category: "routing",
+    expected: { route: "PREGNANCY_ENTRY", urgent: false },
+    tags: ["pregnancy_entry", "late", "english"],
+    notes: "sym.late + pregnancy.chance (might be pregnant) + no test → inferRoute returns PREGNANCY_ENTRY",
+  },
+  {
+    id: "PI003", input: "could i be pregnant",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pregnancy_entry", "english"],
+    notes: "'could be pregnant' sets pregnancy.chance but no late signal → inferRoute returns null; routeUserText sends to PREGNANCY_ENTRY",
+  },
+  {
+    id: "PI004", input: "i'm having a pregnancy scare",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pregnancy_entry", "english"],
+    notes: "'pregnancy scare' → inferRoute null; routeUserText explicit pattern sends to PREGNANCY_ENTRY",
+  },
+  {
+    id: "PI005", input: "i'm trying to conceive and want help",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pregnancy_entry", "ttc", "english"],
+    notes: "'trying to conceive' → inferRoute null; routeUserText sends to PREGNANCY_ENTRY (user picks TTC_INTRO from choices)",
+  },
+  {
+    id: "PI006", input: "fertility concern",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pregnancy_entry", "fertility", "english"],
+    notes: "'fertility concern' → inferRoute null; routeUserText explicit pattern sends to PREGNANCY_ENTRY",
+  },
+  {
+    id: "PI007", input: "i already took a test and it came back negative but i still feel weird",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pregnancy_entry", "tested_negative", "english"],
+    notes: "testedYet=true, result=negative, no late signal → inferRoute null; routeUserText 'already tested' pattern → TEST_NEGATIVE_INTRO",
+  },
+  {
+    id: "PI008", input: "i took a test and it was positive",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pregnancy_entry", "tested_positive", "english"],
+    notes: "testedYet=true, result=positive, no late signal → inferRoute null (needs late+positive combo); routeUserText handles via pregnancy signal",
+  },
+  {
+    id: "PI009", input: "severe one-sided pain and i'm worried i might be pregnant",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["pregnancy_entry", "ectopic_risk", "one_sided", "english"],
+    notes: "One-sided + severe + pelvic → inferRoute late+severe_pelvic ectopic rule fires HEAVY_URGENT; urgency trumps PREGNANCY_ENTRY",
+  },
+  {
+    id: "PI010", input: "i'm anxious about pregnancy and not sure what to do",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pregnancy_entry", "anxious", "english"],
+    notes: "'pregnancy' (not 'pregnant') doesn't set pregnancy.chance → inferRoute null; routeUserText sends to PREGNANCY_ENTRY → user picks PREG_CLARIFY_ROUTE",
+  },
+  {
+    id: "PI011", input: "my period is late and i think i might be pregnant",
+    category: "routing",
+    expected: { route: "PREGNANCY_ENTRY", urgent: false },
+    tags: ["pregnancy_entry", "late", "english"],
+    notes: "sym.late + pregnancy.chance (think.*pregnant) + no test → inferRoute returns PREGNANCY_ENTRY",
+  },
+  {
+    id: "PI012", input: "i tested negative and want to know if i should test again my period is 10 days late",
+    category: "routing",
+    expected: { route: "LATE_NEG_UNCLEAR", urgent: false },
+    tags: ["pregnancy_entry", "tested_negative", "late", "no_major_changes_early", "english"],
+    notes: "Tested negative + late → inferRoute fires LATE_NEG_UNCLEAR; major changes question appears AFTER negative result — correct placement",
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ELSE SECTION — discharge, body changes, not-sure routing, ELSE_INTRO
+  //
+  //  Inference layer (inferRoute) routes discharge-only to ELSE_DISCHARGE.
+  //  Node-level routing inside assistant.js then fans out to DISCHARGE_*
+  //  and ELSE_BODY_ENTRY sub-nodes — those paths are not testable here.
+  //  Cases with noRoute: true guard that inferRoute does NOT misfire urgency
+  //  or a wrong route for these inputs.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // — Discharge with odour → DISCHARGE_PROVIDER_SOON (node level) —
+  {
+    id: "EL001", input: "i have unusual discharge with a strong smell and itching",
+    category: "routing",
+    expected: { route: "ELSE_DISCHARGE", urgent: false },
+    tags: ["discharge", "smell", "else_section", "english"],
+    notes: "Discharge + smell → inferRoute returns ELSE_DISCHARGE; node-level ELSE_DISCHARGE_ENTRY routes to DISCHARGE_PROVIDER_SOON",
+  },
+  {
+    id: "EL002", input: "my discharge smells really bad and there is burning",
+    category: "routing",
+    expected: { route: "ELSE_DISCHARGE", urgent: false },
+    tags: ["discharge", "smell", "else_section", "english"],
+    notes: "Bad smell + burning → ELSE_DISCHARGE; node-level → DISCHARGE_PROVIDER_SOON via ELSE_DISCHARGE_ENTRY",
+  },
+
+  // — Discharge with fever → DISCHARGE_URGENT (node level) —
+  {
+    id: "EL003", input: "i have discharge and fever and my lower belly hurts",
+    category: "routing",
+    expected: { route: "ELSE_DISCHARGE", urgent: false },
+    tags: ["discharge", "fever", "pelvic", "else_section", "english"],
+    notes: "Discharge + fever: 'belly hurts' misses pelvic regex (requires 'belly.*hurt\\b', 'hurts' fails \\b), so sym.pelvic=false — inferRoute returns ELSE_DISCHARGE; node-level user picks 'fever or pelvic pain' → DISCHARGE_URGENT",
+  },
+
+  // — Normal increased discharge → DISCHARGE_MONITOR (node level) —
+  {
+    id: "EL004", input: "i have more discharge than usual but no smell or colour change",
+    category: "routing",
+    expected: { route: "ELSE_DISCHARGE", urgent: false },
+    tags: ["discharge", "normal", "else_section", "english"],
+    notes: "Discharge alone with no pelvic/spot → ELSE_DISCHARGE; node-level user picks 'just more than usual' → DISCHARGE_MONITOR",
+  },
+
+  // — Body changes → BODY_HORMONAL_ROUTE (node level) —
+  {
+    id: "EL005", input: "my skin keeps breaking out and my hair is thinning, could it be hormonal",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["body_changes", "hormonal", "else_section", "english"],
+    notes: "Body changes (acne, hair) have no inferRoute signal; node-level ELSE_BODY_ENTRY → BODY_HORMONAL_ROUTE",
+  },
+  {
+    id: "EL006", input: "i have been gaining weight and getting more acne, wonder if its my cycle",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["body_changes", "hormonal", "else_section", "english"],
+    notes: "Weight + acne without health signal keywords — inferRoute returns null; node-level → BODY_HORMONAL_ROUTE",
+  },
+
+  // — Sleep issues → BODY_SLEEP_ROUTE (node level) —
+  {
+    id: "EL007", input: "i have not been sleeping well for the past few weeks, maybe something hormonal",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["sleep", "body_changes", "else_section", "english"],
+    notes: "Sleep complaint without cycle-specific signal — inferRoute null; node-level ELSE_BODY_ENTRY → BODY_SLEEP_ROUTE",
+  },
+
+  // — Urgent check with severe pain → HEAVY_URGENT —
+  {
+    id: "EL008", input: "i am having severe abdominal pain and heavy bleeding and i feel faint",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["urgent", "heavy", "faint", "else_section", "english"],
+    notes: "Severe pain + heavy bleeding + faint → HEAVY_URGENT; ELSE_URGENT_CHECK 'Yes' path also routes here",
+  },
+
+  // — Not sure → ELSE_NOT_SURE_ROUTE (node level) —
+  {
+    id: "EL009", input: "something just feels off but i cannot explain what it is",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["not_sure", "vague", "else_section", "english"],
+    notes: "Vague complaint, no specific signal — inferRoute null; chat handler NARROWING intercept or ELSE_NOT_SURE_ROUTE via ELSE_INTRO",
+  },
+
+  // — Patois input landing in correct ELSE sub-route —
+  {
+    id: "EL010", input: "me discharge smell like something off, a scratch down there too",
+    category: "routing",
+    expected: { route: "ELSE_DISCHARGE", urgent: false },
+    tags: ["discharge", "smell", "patois", "else_section"],
+    notes: "Patois: discharge + smell → after normalization discharge signal fires → ELSE_DISCHARGE; node-level → DISCHARGE_PROVIDER_SOON",
+  },
+  {
+    id: "EL011", input: "mi skin break out bad and mi hair a fall out",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["body_changes", "patois", "else_section"],
+    notes: "Patois: skin + hair changes — no inferRoute signal; node-level ELSE_BODY_ENTRY → BODY_HORMONAL_ROUTE",
+  },
+
+  // — ELSE_CHANGE_TYPE handing off to existing nodes —
+  {
+    id: "EL012", input: "my cycle timing feels different this month",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["cycle_timing", "else_section", "english"],
+    notes: "Vague cycle timing without 'late'/'missed' keywords — inferRoute null; ELSE_CHANGE_TYPE 'cycle timing' choice → LATE_INTRO",
+  },
+  {
+    id: "EL013", input: "i have some spotting between periods and not sure why",
+    category: "routing",
+    expected: { route: "SPOT_MIDCYCLE_NOTE", urgent: false },
+    tags: ["spotting", "mid_cycle", "else_section", "english"],
+    notes: "Spotting + 'between periods' phrase → inferRoute returns SPOT_MIDCYCLE_NOTE; ELSE_CHANGE_TYPE 'spotting' choice routes to SPOT_INTRO from ELSE_INTRO path",
+  },
+
+  // — ELSE_TALK_THROUGH does not crash on free text input —
+  {
+    id: "EL014", input: "i dont even know how to explain it i just feel wrong lately",
+    category: "edge",
+    expected: { noRoute: true, urgent: false, gibberish: false },
+    tags: ["free_text", "else_section", "talk_through", "english"],
+    notes: "Free-text emotional input — not gibberish; no inferRoute signal; ELSE_TALK_THROUGH accepts this and waits for intent router",
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  PELVIC PAIN MULTI-ROUTE FLOW — new entry system cases
+  //
+  //  inferRoute handles: pelvic+after_sex → PELVIC_SEX_INTRO,
+  //                      pelvic+severe    → PELVIC_PERSISTENT.
+  //  Node-level routing (PELVIC_SAFETY_CHECK, PELVIC_ENTRY, route sub-nodes)
+  //  is triggered by routeUserText/buttons — these test noRoute:true from
+  //  inferRoute while guarding urgency and signal correctness.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: "PV001", input: "i have sudden severe pelvic pain and i feel dizzy",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["pelvic", "urgent", "dizziness", "english"],
+    notes: "Severe pelvic + dizzy → inferRoute heavy+dizzy rule → HEAVY_URGENT; safety check would also catch this",
+  },
+  {
+    id: "PV002", input: "i have really bad cramps during my period every month",
+    category: "routing",
+    expected: { route: "PELVIC_PERSISTENT", urgent: false },
+    tags: ["pelvic", "period_route", "severe", "english"],
+    notes: "pelvic + severe ('really bad') → inferRoute pelvic+severe → PELVIC_PERSISTENT; period route endo note fires in PELVIC_PERSISTENT say(ctx)",
+  },
+  {
+    id: "PV003", input: "mild cramping mid-cycle happens for a day then stops",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pelvic", "ovulation_route", "mild", "english"],
+    notes: "Mild + mid-cycle → inferRoute returns null (no after_sex, no severe); routeUserText sends to PELVIC_SAFETY_CHECK → PELVIC_ENTRY → PELVIC_OVULATION_ROUTE",
+  },
+  {
+    id: "PV004", input: "i get random pelvic pain sometimes and i don't know what causes it",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pelvic", "random_route", "english"],
+    notes: "Random pain → inferRoute null; routeUserText → PELVIC_SAFETY_CHECK → PELVIC_ENTRY → PELVIC_RANDOM_ROUTE",
+  },
+  {
+    id: "PV005", input: "deep cramps inside during sex every time we try",
+    category: "routing",
+    expected: { route: "PELVIC_SEX_INTRO", urgent: false },
+    tags: ["pelvic", "sex_deep_pain", "after_sex", "english"],
+    notes: "'cramps' triggers sym.pelvic; during_sex maps to after_sex timing → inferRoute PELVIC_SEX_INTRO; PELVIC_SEX_ENTRY 'deep' choice → PELVIC_SEX_DEEP_PAIN → PELVIC_PERSISTENT",
+  },
+  {
+    id: "PV006", input: "tightness and dryness during sex and i also noticed unusual discharge",
+    category: "routing",
+    expected: { route: "ELSE_DISCHARGE", urgent: false },
+    tags: ["pelvic", "sex_entry_pain", "discharge", "english"],
+    notes: "pelvic + discharge → inferRoute fires ELSE_DISCHARGE (discharge_only rule); PELVIC_SEX_ENTRY_PAIN 'dryness or discharge' choice routes to ELSE_DISCHARGE_ENTRY",
+  },
+  {
+    id: "PV007", input: "been dealing with pelvic pain for about two years",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pelvic", "pattern_chronic", "english"],
+    notes: "Chronic framing → inferRoute null; PELVIC_PATTERN 'often' choice routes to PELVIC_PERSISTENT",
+  },
+  {
+    id: "PV008", input: "this pelvic pain feels different from usual, started a few days ago",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["pelvic", "pattern_new", "english"],
+    notes: "New/different framing → inferRoute null; PELVIC_PATTERN 'new or different' choice routes to PELVIC_REVIEW_SOON",
+  },
+  {
+    id: "PV009", input: "mi belly a hurt mi bad",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["patois", "pelvic", "belly_hurt", "english"],
+    notes: "Patois 'mi belly a hurt' → inferRoute null; routeUserText explicit Patois pattern → PELVIC_SAFETY_CHECK",
+  },
+  {
+    id: "PV010", input: "cramp bad and waist a hurt",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["patois", "pelvic", "cramp_bad", "waist_hurt"],
+    notes: "Patois 'cramp bad' + 'waist a hurt' → inferRoute null; routeUserText Patois pattern → PELVIC_SAFETY_CHECK",
+  },
+  {
+    id: "PV011", input: "pain inna mi belly all the time",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["patois", "pelvic", "belly_pain"],
+    notes: "Patois 'pain inna mi belly' → inferRoute null; routeUserText Patois explicit pattern → PELVIC_SAFETY_CHECK",
+  },
+  {
+    id: "PV012", input: "i have cramps after sex and it lingers for hours",
+    category: "routing",
+    expected: { route: "PELVIC_SEX_INTRO", urgent: false },
+    tags: ["pelvic", "sex_after_pain", "lingering", "english"],
+    notes: "'cramps' triggers sym.pelvic; after_sex timing → inferRoute PELVIC_SEX_INTRO; PELVIC_SEX_ENTRY 'after sex' choice → PELVIC_SEX_AFTER_PAIN 'lingers' → PELVIC_PERSISTENT",
+  },
+  {
+    id: "PV013", input: "cramps after sex but it goes away pretty quickly",
+    category: "routing",
+    expected: { route: "PELVIC_SEX_INTRO", urgent: false },
+    tags: ["pelvic", "sex_after_pain", "quick", "english"],
+    notes: "pelvic + after_sex → inferRoute PELVIC_SEX_INTRO; PELVIC_SEX_AFTER_PAIN 'eases quickly' → PELVIC_REVIEW_SOON",
+  },
+  {
+    id: "PV014", input: "pain between mi legs and down there",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["patois", "pelvic", "between_legs"],
+    notes: "Patois 'pain between mi legs' → inferRoute null; routeUserText Patois pattern → PELVIC_SAFETY_CHECK",
+  },
+  {
+    id: "PV015", input: "sudden severe one-sided pelvic pain",
+    category: "red_flag",
+    expected: { urgent: true, route: "HEAVY_URGENT" },
+    tags: ["pelvic", "urgent", "one_sided", "ectopic_risk", "english"],
+    notes: "Severe + one-sided → extractUrgency fires (one.sided.*pain) → urgent=true → inferRoute HEAVY_URGENT; PELVIC_URGENT language also covers this",
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  MOOD — new intent-first system (safety check, routes, Patois)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: "MO001", input: "i feel like hurting myself",
+    category: "routing",
+    expected: { route: "MOOD_SAFETY_ROUTE", urgent: false },
+    tags: ["mood", "safety", "self_harm", "english"],
+    notes: "'hurt myself' → inferRoute self-harm detection → MOOD_SAFETY_ROUTE before urgency check",
+  },
+  {
+    id: "MO002", input: "i want to die i cant go on like this",
+    category: "routing",
+    expected: { route: "MOOD_SAFETY_ROUTE", urgent: false },
+    tags: ["mood", "safety", "self_harm", "english"],
+    notes: "'want to die' and 'cant go on' → self-harm detection → MOOD_SAFETY_ROUTE",
+  },
+  {
+    id: "MO003", input: "i feel completely unsafe right now",
+    category: "routing",
+    expected: { route: "MOOD_SAFETY_ROUTE", urgent: false },
+    tags: ["mood", "safety", "english"],
+    notes: "'feel unsafe' → self-harm detection → MOOD_SAFETY_ROUTE",
+  },
+  {
+    id: "MO004", input: "mi cyan cope wid how mi feel",
+    category: "routing",
+    expected: { route: "MOOD_SAFETY_ROUTE", urgent: false },
+    tags: ["patois", "mood", "safety"],
+    notes: "Patois 'mi cyan cope' — after normalizeText stays as 'mi cyan cope'; inferRoute self-harm pattern catches 'cyan cope' → MOOD_SAFETY_ROUTE",
+  },
+  {
+    id: "MO005", input: "i feel very anxious all the time",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["mood", "anxiety", "english"],
+    notes: "General anxiety without before_period — inferRoute null; routeUserText mood signal → MOOD_SAFETY_CHECK via chat flow",
+  },
+  {
+    id: "MO006", input: "i have low mood and i've been crying a lot",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["mood", "low", "english"],
+    notes: "Low mood without cycle timing — inferRoute null; mood signal routes to MOOD_SAFETY_CHECK in chat",
+  },
+  {
+    id: "MO007", input: "i'm irritable and snapping at everyone lately",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["mood", "irritable", "english"],
+    notes: "Irritability without timing — inferRoute null; routeUserText mood → MOOD_SAFETY_CHECK",
+  },
+  {
+    id: "MO008", input: "i can't sleep even when i try, for weeks now",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["mood", "fatigue", "insomnia", "english"],
+    notes: "Insomnia/fatigue without cycle context — inferRoute null; MOOD_FATIGUE_ROUTE insomnia choice applies in chat flow",
+  },
+  {
+    id: "MO009", input: "mi feel off lately",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["patois", "mood"],
+    notes: "Patois 'mi feel off' — inferRoute null; routeUserText Patois mood pattern → MOOD_SAFETY_CHECK in chat",
+  },
+  {
+    id: "MO010", input: "mi sad fi no reason",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["patois", "mood", "low"],
+    notes: "Patois 'mi sad fi no reason' — inferRoute null; routeUserText Patois pattern → MOOD_SAFETY_CHECK",
+  },
+  {
+    id: "MO011", input: "everything a get to me and mi nuh have no energy fi nothing",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["patois", "mood", "fatigue"],
+    notes: "Patois emotional exhaustion — inferRoute null; routeUserText Patois pattern → MOOD_SAFETY_CHECK",
+  },
+  {
+    id: "MO012", input: "i cant cope with being around my baby i dont want to be here",
+    category: "routing",
+    expected: { route: "MOOD_SAFETY_ROUTE", urgent: false },
+    tags: ["mood", "postpartum", "safety", "english"],
+    notes: "'dont want to be here' → self-harm detection → MOOD_SAFETY_ROUTE (postpartum-specific language shown at node level)",
+  },
+  {
+    id: "MO013", input: "i want to harm myself because of how i feel",
+    category: "routing",
+    expected: { route: "MOOD_SAFETY_ROUTE", urgent: false },
+    tags: ["mood", "safety", "self_harm", "english"],
+    notes: "'harm myself' → self-harm detection → MOOD_SAFETY_ROUTE; safety route does not continue into mood assessment",
+  },
+  {
+    id: "MO014", input: "i feel really sad and anxious before my period every month",
+    category: "routing",
+    expected: { route: "MOOD_SEVERITY", urgent: false },
+    tags: ["mood", "before_period", "english"],
+    notes: "Mood + before_period timing → inferRoute MOOD_SEVERITY (existing PMS pathway unchanged)",
+  },
+  {
+    id: "MO015", input: "mi vex all the time lately",
+    category: "routing",
+    expected: { noRoute: true, urgent: false },
+    tags: ["patois", "mood", "irritable"],
+    notes: "Patois 'mi vex all the time' → routeUserText Patois mood pattern → MOOD_SAFETY_CHECK; inferRoute null",
   },
 
 ];

@@ -629,6 +629,170 @@ export function detectPatois(rawText) {
   return PATOIS_SIGNALS.some((rx) => rx.test(t));
 }
 
+// ── Tone pattern arrays — each entry is one detectable signal ─────────────────
+// Checking arrays (not a single combined regex) lets us COUNT how many signals
+// are present per category. The priority resolver then picks the highest-priority
+// category that has at least one match, resolving overlaps cleanly.
+//
+// Patterns are tested against BOTH raw text (so Patois signals are intact) AND
+// normalizePatois() output (so mixed Patois/English messages are handled).
+// Priority: distressed > angry > exhausted > frustrated > casual > neutral
+
+const DISTRESS_PATTERNS = [
+  /\b(scared|freaking out)\b/,
+  /\b(don'?t know what to do|do not know what to do|mi nuh know wah fi do)\b/,
+  /\b(worried|stress(?:ed)? out|mi stress|a worry mi)\b/,
+  /\b(frightened|terrified|panic(?:king)?)\b/,
+  /\b(nuh know wah do|what do i do|i don'?t know anymore)\b/,
+  /\b(lost|confused and scared)\b/,
+  /\b(something(?:'s)? wrong|sumn wrong|feel(?:ing)? like something(?:'s)? wrong)\b/,
+  /\b(help me)\b/,
+  /\b(upset|mi so upset)\b/,           // upset → distressed (not angry)
+];
+
+const ANGRY_PATTERNS = [
+  /\b(vex|mi vex|so vex)\b/,
+  /\b(mad|angry|furious)\b/,
+  /\b(pissed(?: off)?)\b/,
+  /\b(frustrated bad)\b/,
+  /\b(annoyed|tick(?:ed)? off)\b/,
+  /\b(this is ridiculous|unfair|not fair|why me|nuh fair)\b/,
+  /\b(mi so mad)\b/,
+  /\b(blood\s*claat|bombo\s*claat|bomboclaat|rahtid)\b/, // Patois expletives → angry signal
+];
+
+const EXHAUSTED_PATTERNS = [
+  /\b(me cya bada|cyan bada|mi cya bada|can'?t be bothered)\b/,
+  /\b(feel(?:ing)? done out|mi feel done out)\b/,
+  /\b(drained|no energy|exhausted|too tired)\b/,
+  /\b(can'?t deal|cyan deal)\b/,
+  /\b(feel(?:ing)? like giving up|running on empty)\b/,
+  /\b(burnt? out|nuh have no energy)\b/,
+  /\b(feel(?:ing)? weak|body tired|mi body tired)\b/,
+  // "mi done" = exhausted; "mi done wid dis" = frustrated — negative lookahead separates them
+  /\bmi done(?!\s+wid)\b/,
+];
+
+const FRUSTRATED_PATTERNS = [
+  /\b(again|still happening|why does this keep)\b/,
+  /\b(every time|always|sick and tired|sick of this)\b/,
+  /\b(this keeps|nuh stop|mi tired of)\b/,
+  /\b(every single|not again|happening again|keeps happening)\b/,
+  /\b(i give up|pointless|waste of time|nothing works)\b/,
+  /\b(nutten nuh work|mi done wid dis)\b/,
+];
+
+// "mi weak" is Patois laughing slang (≈ "I'm dead"), NOT a fatigue signal.
+// It lives only in casual. Weighted matching ensures that if exhaustion phrases
+// also appear in the same message, exhausted wins by priority.
+const CASUAL_PATTERNS = [
+  /\b(lol|lmao+|omg|fr)\b/,
+  /\b(ugh+|haha+)\b/,
+  /\b(no way|wait what)\b/,
+  /\b(dead+|mi weak)\b/,
+  /\b(bruh|bro\b|sis\b|bestie)\b/,
+  /\b(ngl|tbh|idk|idc)\b/,
+  /[\u{1F602}\u{1F923}]/u,             // 😂 🤣
+];
+
+/**
+ * detectUserToneWithScores(text) → { tone, scores, confidence }
+ *
+ * Internal helper that returns the per-category match counts alongside the
+ * resolved tone. Exported so updateSessionTone() and tests can inspect scores.
+ *
+ * confidence = true when resolved tone has 2+ phrase matches, OR when a single
+ * strong distressed/angry/exhausted/frustrated signal fires (serious tones are
+ * always considered confident — a single "scared" or "vex" is unambiguous).
+ *
+ * @param  {string} text - Raw user input
+ * @returns {{ tone: string, scores: object, confidence: boolean }}
+ */
+export function detectUserToneWithScores(text) {
+  if (!text) return { tone: "neutral", scores: {}, confidence: false };
+
+  const t = text.toLowerCase();
+  // Normalize for mixed Patois/English support — checked alongside raw text
+  const tn = normalizePatois(text).toLowerCase();
+
+  // Test a pattern against both raw and normalized text
+  const hit = (rx) => rx.test(t) || rx.test(tn);
+
+  const scores = {
+    distressed:  DISTRESS_PATTERNS.filter(hit).length,
+    angry:       ANGRY_PATTERNS.filter(hit).length,
+    exhausted:   EXHAUSTED_PATTERNS.filter(hit).length,
+    frustrated:  FRUSTRATED_PATTERNS.filter(hit).length,
+    casual:      CASUAL_PATTERNS.filter(hit).length,
+  };
+
+  // Priority: distressed > angry > exhausted > frustrated > casual > neutral.
+  // A single match is enough for any serious tone — "lol I'm scared" → distressed.
+  const SERIOUS = ["distressed", "angry", "exhausted", "frustrated"];
+  for (const tone of SERIOUS) {
+    if (scores[tone] >= 1) {
+      return { tone, scores, confidence: scores[tone] >= 2 };
+    }
+  }
+
+  // Casual: keyword match OR short message length — but ONLY when no serious
+  // tones were detected anywhere in the message. Fixes: "help me" (short but
+  // distressed), short urgent messages under 40 chars staying distressed.
+  const hasShortLength = t.trim().length <= 40;
+  if (scores.casual >= 1 || hasShortLength) {
+    return { tone: "casual", scores, confidence: scores.casual >= 2 };
+  }
+
+  return { tone: "neutral", scores, confidence: false };
+}
+
+/**
+ * detectUserTone(text) → 'distressed' | 'angry' | 'exhausted' | 'frustrated' | 'casual' | 'neutral'
+ *
+ * Reads the emotional register of a single user message and returns one of six
+ * tone tokens. Bloomie uses this to prepend a contextually warm opener before
+ * its substantive response.
+ *
+ * Priority: distressed > angry > exhausted > frustrated > casual > neutral.
+ * Runs normalizePatois() internally so mixed Patois/English messages are handled.
+ * Short message length is a weak casual signal only — it never overrides a
+ * distressed, angry, exhausted, or frustrated match.
+ *
+ * @param  {string} text  - Raw user input
+ * @returns {'distressed'|'angry'|'exhausted'|'frustrated'|'casual'|'neutral'}
+ */
+export function detectUserTone(text) {
+  return detectUserToneWithScores(text).tone;
+}
+
+/**
+ * updateSessionTone(ctx, text) → string
+ *
+ * Updates ctx.currentTone and ctx.previousTone based on a new message.
+ * Applies session tone stability: if the new detection is ambiguous (neutral
+ * or low confidence), blend toward the previous tone rather than swinging
+ * abruptly. Only fully updates ctx.currentTone when detection is confident
+ * (2+ phrase matches or any single serious-tone match from this session).
+ *
+ * @param  {object} ctx  - Session context with currentTone / previousTone fields
+ * @param  {string} text - Raw user input
+ * @returns {string}       The resolved tone for this turn
+ */
+export function updateSessionTone(ctx, text) {
+  const { tone, confidence } = detectUserToneWithScores(text);
+
+  ctx.previousTone = ctx.currentTone;
+
+  if (tone === "neutral" || (!confidence && tone === "casual")) {
+    // Ambiguous turn — hold the previous tone if one exists
+    ctx.currentTone = ctx.previousTone || tone;
+  } else {
+    ctx.currentTone = tone;
+  }
+
+  return ctx.currentTone;
+}
+
 // ─── INTERNAL HELPER ─────────────────────────────────────────────────────────
 
 function escapeRegex(str) {
