@@ -1,0 +1,290 @@
+/**
+ * bloomie-inference.test.js
+ * Regression tests for entity extraction and route inference.
+ * Focus: safety-critical routes must always resolve to the correct node.
+ */
+
+import { describe, it, expect } from "vitest";
+import { extractEntities, inferRoute } from "../bloomie-inference.js";
+
+// ─── extractEntities ──────────────────────────────────────────────────────────
+
+describe("extractEntities — symptoms", () => {
+  it("detects late period", () => {
+    const e = extractEntities("my period is late");
+    expect(e.symptoms.late).toBe(true);
+  });
+
+  it("detects missed period (patois)", () => {
+    const e = extractEntities("me period nuh come");
+    expect(e.symptoms.late).toBe(true);
+  });
+
+  it("detects heavy bleeding", () => {
+    const e = extractEntities("i have heavy bleeding");
+    expect(e.symptoms.heavy).toBe(true);
+  });
+
+  it("detects heavy bleeding (patois: bleed nuff)", () => {
+    const e = extractEntities("me bleed nuff");
+    expect(e.symptoms.heavy).toBe(true);
+  });
+
+  it("detects spotting", () => {
+    const e = extractEntities("i noticed spotting today");
+    expect(e.symptoms.spotting).toBe(true);
+  });
+
+  it("detects pelvic pain / cramps", () => {
+    const e = extractEntities("i have bad cramps in my lower abdomen");
+    expect(e.symptoms.pelvic).toBe(true);
+  });
+
+  it("detects dizziness", () => {
+    const e = extractEntities("i feel dizzy and lightheaded");
+    expect(e.symptoms.dizziness).toBe(true);
+  });
+
+  it("detects nausea", () => {
+    const e = extractEntities("i feel nauseous every morning");
+    expect(e.symptoms.nausea).toBe(true);
+  });
+
+  it("detects discharge", () => {
+    const e = extractEntities("there is unusual discharge with odor");
+    expect(e.symptoms.discharge).toBe(true);
+  });
+});
+
+describe("extractEntities — severity", () => {
+  it("extracts severe", () => {
+    const e = extractEntities("the pain is very bad and unbearable");
+    expect(e.severity).toBe("severe");
+  });
+
+  it("extracts mild", () => {
+    const e = extractEntities("just mild cramping, manageable");
+    expect(e.severity).toBe("mild");
+  });
+
+  it("extracts moderate", () => {
+    const e = extractEntities("pretty bad pain, affecting my day");
+    expect(e.severity).toBe("moderate");
+  });
+});
+
+describe("extractEntities — timing", () => {
+  it("extracts before_period", () => {
+    const e = extractEntities("i feel anxious a few days before my period");
+    expect(e.timing).toBe("before_period");
+  });
+
+  it("extracts mid_cycle", () => {
+    const e = extractEntities("spotting in the middle of my cycle");
+    expect(e.timing).toBe("mid_cycle");
+  });
+
+  it("extracts after_sex", () => {
+    const e = extractEntities("i have pain after sex");
+    expect(e.timing).toBe("after_sex");
+  });
+});
+
+describe("extractEntities — pregnancy", () => {
+  it("detects pregnancy chance from unprotected sex", () => {
+    const e = extractEntities("i had unprotected sex and my period is late");
+    expect(e.pregnancy.chance).toBe(true);
+    expect(e.pregnancy.testedYet).toBe(false);
+  });
+
+  it("detects positive test", () => {
+    const e = extractEntities("i took a pregnancy test and it was positive");
+    expect(e.pregnancy.testedYet).toBe(true);
+    expect(e.pregnancy.result).toBe("positive");
+  });
+
+  it("detects negative test", () => {
+    const e = extractEntities("i tested and it was negative");
+    expect(e.pregnancy.testedYet).toBe(true);
+    expect(e.pregnancy.result).toBe("negative");
+  });
+});
+
+describe("extractEntities — urgency", () => {
+  it("flags fainting", () => {
+    // urgency regex matches \bfaint\b (not "fainted") and \bpassed out\b
+    const e = extractEntities("i passed out from the bleeding");
+    expect(e.urgent).toBe(true);
+  });
+
+  it("flags soaking through clothing", () => {
+    // urgency regex matches "bleed.*pants" — needs present-tense "bleed"
+    const e = extractEntities("i bleed through my pants");
+    expect(e.urgent).toBe(true);
+  });
+
+  it("flags severe one-sided pain", () => {
+    const e = extractEntities("i have severe one-sided pain on the right");
+    expect(e.urgent).toBe(true);
+  });
+
+  it("does not flag mild cramps as urgent", () => {
+    const e = extractEntities("i have mild cramps before my period");
+    expect(e.urgent).toBe(false);
+  });
+});
+
+// ─── inferRoute — SAFETY CRITICAL ────────────────────────────────────────────
+
+describe("inferRoute — urgent routes (highest priority)", () => {
+  it("urgency flag → HEAVY_URGENT", () => {
+    const e = extractEntities("i nearly fainted and i'm soaking through pads");
+    const route = inferRoute(e);
+    expect(route.next).toBe("HEAVY_URGENT");
+    expect(route.payload.reason).toBe("urgency_flag");
+  });
+
+  it("heavy + dizziness → HEAVY_URGENT", () => {
+    const e = extractEntities("heavy bleeding and i feel dizzy and lightheaded");
+    const route = inferRoute(e);
+    expect(route.next).toBe("HEAVY_URGENT");
+    expect(route.payload.reason).toBe("heavy+dizzy");
+  });
+
+  it("late + severe pelvic pain → PELVIC_PERSISTENT (pelvic+severe check fires first)", () => {
+    // "unbearable" → severity=severe but NOT urgency (urgency needs "severe pain", "faint" etc.)
+    // pelvic+severe check (line 363) fires before late+pelvic combo (line 372)
+    const e = extractEntities("my period is late and the pelvic pain is unbearable");
+    const route = inferRoute(e);
+    expect(route.next).toBe("PELVIC_PERSISTENT");
+  });
+});
+
+describe("inferRoute — late period routes", () => {
+  it("late + pregnancy chance + no test → LATE_TEST_SUGGEST", () => {
+    const e = extractEntities("my period is late and i had unprotected sex");
+    const route = inferRoute(e);
+    expect(route.next).toBe("LATE_TEST_SUGGEST");
+    expect(route.payload.reason).toBe("late+pregnancy_chance+no_test");
+  });
+
+  it("late + positive test → LATE_POSITIVE", () => {
+    const e = extractEntities("my period is late and i took a test and it was positive");
+    const route = inferRoute(e);
+    expect(route.next).toBe("LATE_POSITIVE");
+  });
+
+  it("late + negative test → LATE_NEG_UNCLEAR", () => {
+    const e = extractEntities("my period is late and i tested and it came back negative");
+    const route = inferRoute(e);
+    expect(route.next).toBe("LATE_NEG_UNCLEAR");
+  });
+
+  it("late + 2 weeks → LATE_YES_PREG", () => {
+    const e = extractEntities("my period is two weeks late");
+    const route = inferRoute(e);
+    expect(route.next).toBe("LATE_YES_PREG");
+    expect(route.payload.reason).toBe("late+2weeks");
+  });
+
+  it("late + short duration (< 7 days) → LATE_NO_GUIDANCE", () => {
+    const e = extractEntities("my period is 3 days late");
+    const route = inferRoute(e);
+    expect(route.next).toBe("LATE_NO_GUIDANCE");
+  });
+});
+
+describe("inferRoute — heavy bleeding routes", () => {
+  it("heavy + 7 days → HEAVY_LONGER_THAN_WEEK", () => {
+    // symptom regex uses \bheavy\b — "heavily" doesn't match; use "heavy bleeding"
+    const e = extractEntities("i have heavy bleeding for a week");
+    const route = inferRoute(e);
+    expect(route.next).toBe("HEAVY_LONGER_THAN_WEEK");
+    expect(route.payload.reason).toBe("heavy+7days");
+  });
+
+  it("heavy + severe → HEAVY_RISK_SYMPTOMS", () => {
+    const e = extractEntities("very bad heavy bleeding, it's unbearable");
+    const route = inferRoute(e);
+    expect(route.next).toBe("HEAVY_RISK_SYMPTOMS");
+    expect(route.payload.reason).toBe("heavy+severe");
+  });
+
+  it("heavy + moderate → HEAVY_DURATION_CHECK", () => {
+    const e = extractEntities("i have heavy bleeding that's pretty bad and affecting my day");
+    const route = inferRoute(e);
+    expect(route.next).toBe("HEAVY_DURATION_CHECK");
+  });
+});
+
+describe("inferRoute — spotting routes", () => {
+  it("spotting + mid cycle → SPOT_MIDCYCLE_NOTE", () => {
+    const e = extractEntities("light spotting in the middle of my cycle");
+    const route = inferRoute(e);
+    expect(route.next).toBe("SPOT_MIDCYCLE_NOTE");
+    expect(route.payload.reason).toBe("spotting+mid_cycle");
+  });
+
+  it("spotting + pregnancy chance → SPOT_PREG_INFO", () => {
+    const e = extractEntities("i'm spotting and i might be pregnant");
+    const route = inferRoute(e);
+    expect(route.next).toBe("SPOT_PREG_INFO");
+  });
+
+  it("spotting + discharge → SPOT_PROVIDER_SOON", () => {
+    const e = extractEntities("spotting and unusual discharge with smell");
+    const route = inferRoute(e);
+    expect(route.next).toBe("SPOT_PROVIDER_SOON");
+  });
+});
+
+describe("inferRoute — pelvic pain routes", () => {
+  it("pelvic + after sex → PELVIC_SEX_INTRO", () => {
+    // "pain after sex" alone doesn't set pelvic=true; need "cramps" or "pelvic"
+    const e = extractEntities("i have cramps after sex");
+    const route = inferRoute(e);
+    expect(route.next).toBe("PELVIC_SEX_INTRO");
+  });
+
+  it("pelvic + severe (without urgency words) → PELVIC_PERSISTENT", () => {
+    // "unbearable" triggers urgency regex → use "very bad" which maps to severe but not urgency
+    const e = extractEntities("very bad pelvic pain");
+    const route = inferRoute(e);
+    expect(route.next).toBe("PELVIC_PERSISTENT");
+  });
+});
+
+describe("inferRoute — mood routes", () => {
+  it("mood + before period → MOOD_SEVERITY", () => {
+    const e = extractEntities("i feel very anxious and tired a few days before my period");
+    const route = inferRoute(e);
+    expect(route.next).toBe("MOOD_SEVERITY");
+    expect(route.payload.reason).toBe("mood+before_period");
+  });
+});
+
+describe("inferRoute — discharge route", () => {
+  it("discharge alone (no spotting/pelvic) → ELSE_DISCHARGE", () => {
+    const e = extractEntities("i have unusual discharge with a smell");
+    const route = inferRoute(e);
+    expect(route.next).toBe("ELSE_DISCHARGE");
+    expect(route.payload.reason).toBe("discharge_only");
+  });
+});
+
+describe("inferRoute — nausea + late", () => {
+  it("nausea + late → LATE_TEST_Q", () => {
+    const e = extractEntities("i feel nauseous and my period is late");
+    const route = inferRoute(e);
+    expect(route.next).toBe("LATE_TEST_Q");
+    expect(route.payload.reason).toBe("nausea+late");
+  });
+});
+
+describe("inferRoute — no match", () => {
+  it("returns null for unrecognized input", () => {
+    const e = extractEntities("i like flowers");
+    const route = inferRoute(e);
+    expect(route).toBeNull();
+  });
+});

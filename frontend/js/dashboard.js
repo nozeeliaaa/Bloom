@@ -17,11 +17,9 @@ import { computeCyclePhase } from "./phase.js";
 import { getUserGoal, goalLabel, goalDesc } from "./goals.js";
 import { triggerNotifications } from "./notifications.js";
 
-// Wire up finished algorithms (safe — wrapped in try/catch)
+// algoPregnancy is loaded lazily inside loadDashboard() to avoid
+// top-level await, which is not supported in the configured build targets.
 let algoPregnancy = null;
-try {
-  algoPregnancy = await import("./algorithms/pregnancyAlgorithm.js");
-} catch (_) {}
 
 renderNav("dashboard");
 renderFooter();
@@ -754,6 +752,11 @@ function generateCyclePDF(cycle, logsByDate) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function loadDashboard() {
+  // Load algorithm module here so we never hit a top-level await
+  try {
+    algoPregnancy = await import("./algorithms/pregnancyAlgorithm.js");
+  } catch (_) {}
+
   const mode = getMode();
   const logsByDate = await getAllLogs();
   const goal = getUserGoal();

@@ -1,6 +1,10 @@
 import { normalizePatois, detectPatois } from "./bloomie-patois.js";
 import { extractEntities, inferRoute, summarizeEntities, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary } from "./bloomie-templates.js";
+import { loadBloomieMemory, saveBloomieMemory } from "./db.js";
+import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals } from "./bloomie-routing.js";
+import { createCtx } from "./bloomie-session.js";
+import { logSafetyEvent } from "./bloomie-logger.js";
 
 /* ------------------ PAGE UI ------------------ */
 export function Chat() {
@@ -35,9 +39,13 @@ export function Chat() {
   `;
 }
 
-export function mountChat(user = null, cycleData = null, symptomHistory = null) {
+export async function mountChat(user = null, cycleData = null, symptomHistory = null) {
   const box = document.getElementById("chat-box");
   if (!box) return;
+
+  // Load persistent memory from Firestore (or localStorage fallback)
+  // before mounting so Bloomie can surface recall on first message.
+  const bloomieMemory = await loadBloomieMemory();
 
   // cycleData shape (pass from Firestore / dashboard state):
   // {
@@ -54,6 +62,8 @@ export function mountChat(user = null, cycleData = null, symptomHistory = null) 
     userName: user?.nickname || user?.displayName || null,
     cycleData,
     symptomHistory,
+    bloomieMemory,
+    onSaveMemory: saveBloomieMemory,
     onOpenCareMap: () => {
       location.hash = "#/care-map";
     },
@@ -75,6 +85,8 @@ export function initBloomieChat({
   // Shape: [{ dateKey: "YYYY-MM-DD", items: [{ code, severity, note }] }, ...]
   // Pass this from dashboard when mounting so Bloomie can reference log history.
   symptomHistory = null,
+  bloomieMemory = null,
+  onSaveMemory = null,
   onOpenCareMap = () => (location.hash = "#/care-map"),
   onRequestPdf = (summaryText) => console.log("PDF requested:", summaryText),
   onLogAction = (action, data) => console.log("Log action:", action, data),
@@ -153,6 +165,21 @@ export function initBloomieChat({
   }
   function hasLmpData() {
     return !!(effectiveLmp());
+  }
+
+  // Builds the cycle context object passed to buildGuidanceResponse so
+  // templates can produce specific numbers ("you're 3 days late") rather
+  // than generic copy.  Returns null when no LMP data is available.
+  function buildCycleCtx() {
+    const lmp = effectiveLmp();
+    if (!lmp) return null;
+    const cycleLength = effectiveCycleLength();
+    const today       = new Date();
+    // dayOfCycle is 1-indexed: day 1 = first day of last period.
+    const dayOfCycle  = Math.max(1, Math.round((today - lmp) / (1000 * 60 * 60 * 24)) + 1);
+    // daysLate: how many days past the expected end of this cycle (0 if not late).
+    const daysLate    = Math.max(0, dayOfCycle - cycleLength);
+    return { lmp, cycleLength, dayOfCycle, daysLate };
   }
 
   // Reactive mode checks — always use these instead of cd.mode directly
@@ -266,6 +293,69 @@ export function initBloomieChat({
     return lines.join(" ");
   }
 
+  // ── Follow-up memory: merge entity history ───────────────────────────────
+  // Merges the current entity extraction with up to the last 2 stored sets so
+  // that symptoms mentioned in earlier messages are still visible to inferRoute.
+  // Symptoms are OR-merged (once mentioned, stays true this session).
+  // duration / severity / timing / pregnancy take the most-recent non-null value.
+  function mergeEntities(current, history) {
+    if (!history.length) return current;
+
+    const merged = {
+      symptoms:  { ...current.symptoms },
+      duration:  current.duration,
+      severity:  current.severity,
+      timing:    current.timing,
+      pregnancy: { ...current.pregnancy },
+      urgent:    current.urgent,
+      raw:       current.raw,
+    };
+
+    // Walk history newest-first so earlier messages only fill gaps
+    for (let i = history.length - 1; i >= 0; i--) {
+      const prev = history[i];
+
+      // Accumulate symptoms
+      for (const key of Object.keys(merged.symptoms)) {
+        if (prev.symptoms?.[key]) merged.symptoms[key] = true;
+      }
+
+      // Fill in missing scalar fields from prior messages
+      if (!merged.duration && prev.duration)   merged.duration = prev.duration;
+      if (!merged.severity && prev.severity)   merged.severity = prev.severity;
+      if (!merged.timing   && prev.timing)     merged.timing   = prev.timing;
+
+      // Accumulate pregnancy signals
+      if (prev.pregnancy?.chance)     merged.pregnancy.chance    = true;
+      if (prev.pregnancy?.testedYet)  merged.pregnancy.testedYet = true;
+      if (!merged.pregnancy.result && prev.pregnancy?.result)
+        merged.pregnancy.result = prev.pregnancy.result;
+
+      if (prev.urgent) merged.urgent = true;
+    }
+
+    return merged;
+  }
+
+  // Persist a compact memory snapshot after a meaningful exchange.
+  // Safe to call fire-and-forget — saves to localStorage immediately,
+  // Firestore sync happens in the background.
+  function persistMemory(entities, reason) {
+    if (!onSaveMemory) return;
+    const activeSymptoms = Object.entries(entities.symptoms)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (!activeSymptoms.length) return;
+    onSaveMemory({
+      lastSymptoms:        activeSymptoms,
+      lastIntent:          reason || null,
+      lastSeverity:        entities.severity,
+      lastDuration:        entities.duration,
+      lastPregnancyChance: entities.pregnancy?.chance || false,
+      recentTopics:        activeSymptoms.slice(0, 5),
+    });
+  }
+
   // How many days until next period
   function daysUntilNextPeriod() {
     const lmp = effectiveLmp();
@@ -286,24 +376,32 @@ export function initBloomieChat({
   }
 
   // ---------- State ----------
-  const ctx = {
-    state: "START",
-    history: [],
-    answers: [],
-    multiDraft: null,
-    locked: false,
-    timers: new Set(),
-    capture: null,
-    captureData: {},
-    greeted: false,         // true after first greeting so we don't repeat the intro
-    lastEntities: null,
-    lastInferredReason: null,
-    lastOOS: null,          // last OOS category fired, for follow-up context
-    lastIntent: null,       // last routed health intent (late/heavy/spot/mood/pelvic/pregnancy)
-    sessionMode: null,      // mode user confirmed THIS session (overrides cd.mode for session)
-    sessionData: {},        // user-entered dates/values this session (lmp, cycleLength)
-    captureReturnTo: null,  // node to go to after a capture sequence completes
-  };
+  const ctx = createCtx();
+
+  // ── Seed entity history from persistent memory ───────────────────────────
+  // If the last session was within 7 days, pre-populate entityHistory so
+  // symptoms the user mentioned then stay active in inferRoute this session.
+  if (bloomieMemory?.lastSymptoms?.length) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const sessionDate  = bloomieMemory.lastSessionDate ? new Date(bloomieMemory.lastSessionDate) : null;
+    if (sessionDate && sessionDate >= sevenDaysAgo) {
+      const seedSymptoms = Object.fromEntries(
+        Object.keys(extractEntities("").symptoms).map(k => [k, false])
+      );
+      for (const key of bloomieMemory.lastSymptoms) {
+        if (key in seedSymptoms) seedSymptoms[key] = true;
+      }
+      ctx.entityHistory = [{
+        symptoms:  seedSymptoms,
+        duration:  bloomieMemory.lastDuration  || null,
+        severity:  bloomieMemory.lastSeverity  || null,
+        timing:    null,
+        pregnancy: { chance: !!bloomieMemory.lastPregnancyChance, testedYet: false, result: null },
+        urgent:    false,
+        raw:       "",
+      }];
+    }
+  }
 
   if ($input) {
     $input.disabled = false;
@@ -406,7 +504,10 @@ export function initBloomieChat({
         if (choice.action === "OPEN_MAP")      onOpenCareMap();
         if (choice.action === "REQUEST_PDF")   onRequestPdf(buildSummaryText());
         if (choice.action?.startsWith("LOG_")) onLogAction(choice.action, choice.logData || {});
-        transition(choice.next, { choiceId: choice.id });
+        const effectiveNext = (choice.id === "done" && choice.next === "CLOSE" && ctx.adviceGiven.size > 0)
+          ? "SUMMARY"
+          : choice.next;
+        transition(effectiveNext, { choiceId: choice.id });
         return;
       }
 
@@ -418,7 +519,15 @@ export function initBloomieChat({
       // 2. Build a structured guidance response from templates
       // 3. Infer the best route based on entity combinations
       const entities = extractEntities(normalizedText);
-      console.log("[Bloomie inference]", summarizeEntities(entities));
+
+      // ── Follow-up memory: accumulate entity context ───────────────────
+      // Merge with up to the last 2 extractions so symptoms from earlier
+      // messages remain visible to inferRoute (e.g. "late period" then
+      // "I also have nausea" now routes correctly as late+nausea).
+      const mergedEntities = mergeEntities(entities, ctx.entityHistory.slice(-2));
+      ctx.entityHistory = [...ctx.entityHistory.slice(-2), entities];
+
+      console.log("[Bloomie inference]", summarizeEntities(mergedEntities));
 
       // ── P1: Inject symptom history context ───────────────────────────
       // If we have symptomHistory and this message mentions something the user
@@ -426,26 +535,43 @@ export function initBloomieChat({
       // This makes Bloomie feel aware of the user's actual body, not just the
       // current message. We only fire this when routing is also going to
       // proceed (i.e. we detected real symptoms), to avoid false positives.
-      const catalogCodes = detectedCatalogKeys(entities.symptoms);
+      const catalogCodes = detectedCatalogKeys(mergedEntities.symptoms);
       const historyContext = buildSymptomContext(catalogCodes);
       if (historyContext) {
         say([historyContext], { delayMs: 0 });
       }
 
-      const inferred  = inferRoute(entities);
-      const guidance  = buildGuidanceResponse(entities, inferred?.payload?.reason);
+      const inferred   = inferRoute(mergedEntities);
+
+      // ── Safety log: urgent_trigger ────────────────────────────────────────
+      if (inferred?.next === "HEAVY_URGENT") {
+        logSafetyEvent("urgent_trigger", {
+          input:       normalizedText,
+          route:       inferred.next,
+          reason:      inferred.payload?.reason || null,
+          symptoms:    Object.entries(mergedEntities.symptoms).filter(([,v]) => v).map(([k]) => k),
+          urgencyFlag: mergedEntities.urgent,
+          topic:       ctx.topic,
+          riskLevel:   ctx.riskLevel,
+        });
+      }
+
+      const cycleCtx   = buildCycleCtx();
+      const guidance   = buildGuidanceResponse(mergedEntities, inferred?.payload?.reason, cycleCtx);
 
       if (guidance) {
         // Store on ctx so buildSummaryText can include them in PDF export
-        ctx.lastEntities = entities;
+        ctx.lastEntities = mergedEntities;
         ctx.lastInferredReason = inferred?.payload?.reason || null;
+        ctx.lastCycleCtx = cycleCtx;
+        persistMemory(mergedEntities, ctx.lastInferredReason);
         // Show the structured template response THEN transition
         console.log("[Bloomie guidance] scenario →", guidance.scenario);
         const delay = 500 + Math.max(0, guidance.lines.length - 1) * 900 + 150;
         say(guidance.lines);
         if (inferred) {
           const tid = setTimeout(() => {
-            transition(inferred.next, { entities, ...(inferred.payload || {}) });
+            transition(inferred.next, { entities: mergedEntities, ...(inferred.payload || {}) });
           }, delay);
           ctx.timers.add(tid);
         }
@@ -454,13 +580,41 @@ export function initBloomieChat({
 
       if (inferred) {
         ctx.lastIntent = inferred.payload?.reason?.split("+")[0] || null;
+        persistMemory(mergedEntities, inferred.payload?.reason || null);
         console.log("[Bloomie inference] routed →", inferred.next, inferred.payload?.reason);
-        transition(inferred.next, { entities, ...(inferred.payload || {}) });
+        transition(inferred.next, { entities: mergedEntities, ...(inferred.payload || {}) });
         return;
       }
 
       // Fall through to existing keyword router
       const routed = routeUserText(normalizedText);
+
+      // ── Safety log: urgent_trigger (keyword router path) ──────────────────
+      if (routed?.next === "HEAVY_URGENT") {
+        logSafetyEvent("urgent_trigger", {
+          input:     normalizedText,
+          route:     "HEAVY_URGENT",
+          reason:    "keyword_router",
+          topic:     ctx.topic,
+          riskLevel: ctx.riskLevel,
+        });
+      }
+
+      // ── Safety log: oos_fallback ──────────────────────────────────────────
+      // containsHealthKeywords flags inputs that had urgency-adjacent words
+      // but still fell through to OOS — the highest-risk false-negative mode.
+      if (routed?.payload?.oos && routed.payload.oos !== "greeting") {
+        const containsHealthKeywords =
+          /\b(bleed|faint|pass out|passing out|collapse|pain|cramp|late|pregnant|spotting|dizzy|discharge)\b/
+          .test(normalizedText);
+        logSafetyEvent("oos_fallback", {
+          input:                normalizedText,
+          category:             routed.payload.oos,
+          containsHealthKeywords,
+          topic:                ctx.topic,
+          riskLevel:            ctx.riskLevel,
+        });
+      }
 
       if (routed?.payload?.oos) {
         console.log("OOS category:", routed.payload.oos);
@@ -472,6 +626,12 @@ export function initBloomieChat({
         const lines = Array.isArray(routed.reply) ? routed.reply : [routed.reply];
         const isOOS = !!routed.payload?.oos;
         if (isOOS && routed.next === "START_MENU") {
+          // Zero-confidence narrowing: if the input has health-adjacent words,
+          // ask a clarifying question with topic buttons instead of the generic OOS reply.
+          if (/\b(period|bleed|pain|cramp|discharge|pregnant|cycle|mood|tired|sick|hurt)\b/.test(normalizedText)) {
+            transition("NARROWING");
+            return;
+          }
           // OOS fallback: just show reply, leave the menu buttons in place
           say(lines);
           render();
@@ -490,6 +650,11 @@ export function initBloomieChat({
         ctx.lastIntent = routed.next;
         transition(routed.next, routed.payload || {});
       } else {
+        // Zero-confidence narrowing: same check for the hard no-match path.
+        if (/\b(period|bleed|pain|cramp|discharge|pregnant|cycle|mood|tired|sick|hurt)\b/.test(normalizedText)) {
+          transition("NARROWING");
+          return;
+        }
         say([
           "I'm here to help with periods, spotting, cramps, mood changes, or cycle concerns 🩷",
           "Try typing something like: \"late period\", \"spotting\", \"heavy bleeding\", or \"pelvic pain\".",
@@ -500,24 +665,7 @@ export function initBloomieChat({
   }
 
   // ---------------- OUT-OF-SCOPE ENGINE ----------------
-
-  function normalizeText(s) {
-    return String(s || "")
-      .toLowerCase()
-      .replace(/[^\w\s'']/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function safeEcho(s, max = 52) {
-    const t = normalizeText(s);
-    if (!t) return "";
-    return t.length > max ? t.slice(0, max).trim() + "…" : t;
-  }
-
-  function pick(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
+  // normalizeText, safeEcho, pick, looksLikeGibberish → imported from bloomie-routing.js
 
   // ── Tone toolkit ──────────────────────────────────────────────────────────
   // Use these instead of writing fresh phrasing every time.
@@ -600,25 +748,7 @@ export function initBloomieChat({
     ]),
   ];
 
-  // Common short words that are NOT gibberish
-  const SHORT_REAL_WORDS = new Set([
-    "hi","hey","yo","ok","no","yes","yep","nah","nope","yah","ya",
-    "ow","ugh","hmm","hm","lol","lmao","omg","wtf","idk","smh",
-    "ew","aw","oh","ah","oi","ouch","wow",
-  ]);
-
-  function looksLikeGibberish(t) {
-    if (!t) return true;
-    // Allow known short real words through
-    if (t.length <= 2 && SHORT_REAL_WORDS.has(t)) return false;
-    if (t.length <= 2) return true;
-    // Allow any short phrase that's in the known-word set
-    if (SHORT_REAL_WORDS.has(t)) return false;
-    const letters = (t.match(/[a-z]/g) || []).length;
-    if (letters / Math.max(1, t.length) < 0.35) return true;
-    if (/^(.)\1{5,}$/.test(t.replace(/\s/g, ""))) return true;
-    return false;
-  }
+  // looksLikeGibberish → imported from bloomie-routing.js
 
   const OOS = [
     // ── App help / how to log ─────────────────────────────────────────────
@@ -744,11 +874,17 @@ export function initBloomieChat({
               "Still here 🩷 What's going on?",
               "I'm here — what would you like help with?",
               "Hey again 🩷 Pick something below or just tell me what's up.",
+              "Still with you 🩷 What can I do for you?",
+              "I didn't go anywhere 😄 What's on your mind?",
+              "Always here 🩷 Tap a button or just tell me what you're dealing with.",
             ])
           : pick([
               "Heyy 🩷 What can I help with today? You can tap a button below or just type what's going on.",
               "Hi there 🩷 I'm here for period and cycle concerns — tap an option or just tell me what's up.",
               "Hey! 🩷 What's going on? You can type it out or pick from the options below.",
+              "Welcome 🩷 I'm Bloomie — here to help with anything cycle or reproductive health. What's on your mind?",
+              "Hey, glad you're here 🩷 Tell me what's going on or pick a topic below and we'll sort it out together.",
+              "Wah gwaan 🩷 I'm here for cycle, period, and reproductive health questions — what can I help you with today?",
             ]),
       ],
     },
@@ -877,6 +1013,10 @@ export function initBloomieChat({
         () => pick([
           "I'm here to help, not argue 🩷 Tell me what's going on with your cycle and I'll do my best.",
           "Still here for you 🩷 If something's bothering you health-wise, let me know.",
+          "I don't take it personally 🩷 If something's stressing you out — especially anything cycle-related — I'm all ears.",
+          "Not gonna argue 😌 but if your body's giving you grief, I can actually help with that.",
+          "It's okay — I know this stuff can be frustrating 🩷 What's actually going on?",
+          "No hard feelings 🩷 If you want to tell me what's really going on with your health, I'm listening.",
         ]),
       ],
     },
@@ -920,6 +1060,10 @@ export function initBloomieChat({
         () => pick([
           "Relationship stress is real — and honestly it can throw off your whole cycle 🩷 If you've noticed anything shifting (late period, mood changes, spotting), I can help with that.",
           "I'm a cycle assistant, not a relationship coach 😅 but if the stress is messing with your period, tell me what you've noticed and I'll help.",
+          "Sounds like a rough time 🩷 I can't weigh in on the relationship drama, but if the stress has your cycle acting up, that's something I can actually help with.",
+          "Emotional stress — whether it's a breakup, a situationship, or just life — can genuinely delay or shift your period 🩷 Noticed anything different lately?",
+          "Not really a love advice gyal 😄 but cycle disruption from relationship stress is real — if your period's been off, I'm here.",
+          "That sounds hard 🩷 If anything's shifted with your cycle since things got stressful, tell me what you've noticed.",
         ]),
       ],
     },
@@ -935,6 +1079,10 @@ export function initBloomieChat({
         () => pick([
           "Financial stress is no joke — and it can genuinely affect your cycle 🩷 If you've noticed changes (late period, mood shifts), I can help with those.",
           "I can't help with finances, but if money stress has your body acting up, tell me what you've been noticing.",
+          "Money stress is one of those things the body feels for real 🩷 If your cycle has been off lately, that connection is worth looking at.",
+          "Can't sort out the bills unfortunately 😅 but financial stress affecting your period or mood is genuinely something I can help with.",
+          "Broke season hits different 😩 and your hormones feel it too — if your period's been late or your mood has shifted, tell me what's going on.",
+          "I'm no financial advisor 😄 but if stress over money has your cycle acting up, that's exactly what I'm here for.",
         ]),
       ],
     },
@@ -951,6 +1099,10 @@ export function initBloomieChat({
         () => pick([
           "I can't help with food orders 😄 but if you're getting strong cravings before your period, that's actually a hormonal thing I can talk through with you 🩷",
           "Cravings are real — especially the pre-period chocolate ones 🍫 If they're cycle-related, tap **Hormones / mood changes** and let's dig in.",
+          "Not a food delivery service unfortunately 😄 but pre-period cravings? That's fully in my lane — hormones are wild.",
+          "Jerk chicken and festival not quite my area 😄 but if the cravings hit hardest around your period, that's progesterone doing its thing — I can explain.",
+          "Hungry can mean a lot of things 🩷 If it's that premenstrual 'want to eat everything' feeling, that's hormonal and worth talking about.",
+          "Can't sort out your dinner plans 😄 but if the craving situation gets intense around your period, tap **Hormones / mood changes** and let's chat.",
         ]),
       ],
     },
@@ -963,6 +1115,10 @@ export function initBloomieChat({
         () => pick([
           "I can't check the forecast, but I can help with cycle and health concerns 🩷 What's going on?",
           "Not a weather app unfortunately 😅 but if something health-related is on your mind, I'm here.",
+          "Can't predict the rain, but I can help you understand your cycle patterns 😄 What's up?",
+          "Jamaica sun or Jamaica rain — either way I can't help with the forecast 😄 But if your health is on your mind, I'm here.",
+          "Wish I could tell you, but weather's not my area 🩷 Anything cycle or health related, though — you're in the right place.",
+          "Not Accuweather 😄 but cycle and symptom support? That I can do. What's going on?",
         ]),
       ],
     },
@@ -1009,6 +1165,10 @@ export function initBloomieChat({
         () => pick([
           "I can't help with school or work stuff, but deadline stress is a known cycle disruptor 🩷 If your period's been off lately, let me know.",
           "Not a study buddy, but stress from school or work can genuinely affect your cycle — if you've noticed changes, I can help.",
+          "Exams and assignments aren't quite my area 😄 but study stress affecting your period or mood? That I can talk about.",
+          "Can't write the assignment for you 😅 but if the pressure has your cycle going haywire, tell me what you've noticed.",
+          "School stress is no joke — and it's one of the most common reasons periods go late or moods go sideways 🩷 Is anything shifting for you?",
+          "Not a tutor unfortunately 😄 but chronic stress from work or studies can genuinely disrupt your hormones — if that's happening, let's talk.",
         ]),
       ],
     },
@@ -1062,6 +1222,10 @@ export function initBloomieChat({
           "That means a lot 🩷 Is there anything else I can help with today?",
           "So glad I could help 🩷 Anything else on your mind?",
           "You're so welcome 🩷 Take care of yourself!",
+          "Aww, that warms my heart 🩷 You deserve good care — anything else I can help with?",
+          "Glad I could be helpful today 🩷 Don't hesitate to come back if anything comes up.",
+          "That genuinely means a lot 🩷 You're doing great just by paying attention to your body.",
+          "Big up to you for looking out for your health 🩷 Come back anytime.",
         ]),
       ],
     },
@@ -1071,8 +1235,14 @@ export function initBloomieChat({
       name: "confused_with_bloomie",
       patterns: [/\b(you don't understand|you're not helping|this isn't working|useless bot|not what i asked|wrong answer|bad answer)\b/],
       replies: [
-        () => "I'm sorry I didn't get that right 🩷 I'm still learning and I know I have limits.",
-        () => "Try tapping one of the buttons below — those pathways are more reliable than my text understanding right now.",
+        () => pick([
+          "I'm sorry I didn't catch that right 🩷 I'm still learning and I know I have limits — try tapping one of the buttons below.",
+          "My bad — I missed what you were getting at 🩷 The buttons below are more reliable than my text understanding right now.",
+          "I hear your frustration and I'm sorry 🩷 Try rephrasing what's going on with your body and I'll do my best.",
+          "Not always perfect, I know 😕 If you can describe it simply — like 'late period' or 'bad cramps' — I'll follow better.",
+          "Sorry I didn't get that right 🩷 Sometimes typing something short like 'my period is late' or 'I have cramps' works better than a longer message.",
+          "I'm doing my best but I know I don't always get it right 🩷 Try a button below or rephrase and I'll try again.",
+        ]),
       ],
     },
 
@@ -1140,6 +1310,10 @@ export function initBloomieChat({
         () => pick([
           "I'm not the funniest assistant out there 😅 but I'm pretty solid at cycle questions. What's going on?",
           "Ha 😄 Okay okay, I'll stay in my lane. What's going on health-wise?",
+          "Comedians out here and I'm just a cycle assistant 😄 What's actually on your mind?",
+          "I can't compete with the group chat jokes 😂 but if something health-related is going on, I've got you.",
+          "Laughter is good medicine 😄 — but if you've got an actual question about your cycle, I'm here for that too.",
+          "The bored season is real 😄 If you want something to actually think about — how's your cycle been lately?",
         ]),
       ],
     },
@@ -1160,83 +1334,6 @@ export function initBloomieChat({
     /\b(when is my due date|what is my due date|due date|edd|estimated delivery|how far along|how many weeks (am i|pregnant))\b/,
     /\b(when (should|can) i (take|do) a (pregnancy )?test|when (should|can) i test|best time to test|when to test|can i test (yet|now))\b/,
   ];
-
-  function detectOutOfScope(rawText) {
-    const t = normalizeText(rawText);
-
-    // Cycle questions must be checked FIRST — before the health override —
-    // because they contain words like "period" that would otherwise bypass OOS
-    const cycleMatch = OOS.find((cat) =>
-      ["cycle_phase_q","next_period_q","last_period_q","edd_q","test_timing_q"].includes(cat.name) &&
-      cat.patterns.some(rx => rx.test(t))
-    );
-    if (cycleMatch) return cycleMatch;
-
-    // If the text contains a clear health signal, don't treat it as OOS
-    // This prevents "me bleed thru me pants lol" routing to jokes
-    if (HEALTH_OVERRIDE_PATTERNS.some(rx => rx.test(t))) return null;
-
-    if (looksLikeGibberish(t)) {
-      return {
-        name: "gibberish",
-        replies: [
-          (raw) => `I couldn't quite understand ("${safeEcho(raw)}").`,
-          () => "Try a short phrase like: \"late period\", \"spotting\", \"heavy bleeding\", \"cramps\", or \"mood changes\".",
-        ],
-      };
-    }
-    return OOS.find((cat) => cat.patterns.some((rx) => rx.test(t))) || null;
-  }
-
-  // ---------------- OOS FOLLOW-UP RESOLVER ----------------
-  // When an OOS category fires and invites a follow-up (e.g. food → cravings before period?),
-  // this catches the user's typed reply and routes it properly instead of hitting OOS again.
-  function resolveOOSFollowUp(rawText, lastOOS) {
-    if (!lastOOS) return null;
-    const t = normalizePatois(rawText).toLowerCase().trim();
-
-    const YES = ["yes", "yeah", "yep", "yah", "ya", "definitely", "for sure", "true", "it is", "before", "its before", "yes its before", "before it", "yep before"];
-    const NO  = ["no", "nah", "nope", "not really", "no its not", "it isnt", "not before"];
-
-    const isYes = YES.some(w => t === w || t.startsWith(w));
-    const isNo  = NO.some(w => t === w || t.startsWith(w));
-
-    switch (lastOOS) {
-      case "food":
-        // "are cravings before your period?" → yes → MOOD_INTRO
-        if (isYes || /before|pre.?period|pms/.test(t)) return "MOOD_INTRO";
-        if (isNo) return null; // let normal router handle
-        break;
-      case "relationships":
-      case "money":
-      case "school":
-        // "stress messing with your cycle?" → yes → LATE_INTRO
-        if (isYes || /late|missed|period/.test(t)) return "LATE_INTRO";
-        if (/mood|emotional|anxious|sad/.test(t)) return "MOOD_INTRO";
-        break;
-      case "sleep":
-        if (isYes || /mood|tired|energy/.test(t)) return "MOOD_INTRO";
-        if (/period|late|cycle/.test(t)) return "LATE_INTRO";
-        break;
-      case "mental_health_general":
-        if (isYes || /before|period|cycle/.test(t)) return "MOOD_INTRO";
-        break;
-      case "non_repro_health":
-        if (isYes || /late|period|cycle|miss/.test(t)) return "LATE_INTRO";
-        break;
-      case "body_image":
-        if (isYes || /period|bloat|cycle/.test(t)) return "MOOD_INTRO";
-        break;
-      case "travel":
-        if (isYes || /late|miss|period/.test(t)) return "LATE_INTRO";
-        break;
-      case "contraception":
-        if (/spot|spotting/.test(t)) return "SPOT_INTRO";
-        if (/late|miss|period/.test(t)) return "LATE_INTRO";
-        break;
-    }
-    return null;
-  }
 
   // ---------------- CONTEXT-AWARE CHOICE MATCHER ----------------
   // Tries to match what the user typed to one of the current node's choices.
@@ -1350,101 +1447,53 @@ export function initBloomieChat({
     ];
     if (urgentPhrases.some((p) => t.includes(p))) return { next: "HEAVY_URGENT" };
 
-    // ── Build signal object ────────────────────────────────────────────────
-    // Each signal is boolean + optional strength (1 = weak hint, 2 = strong match)
-    const sig = {
-      late:        0,
-      heavy:       0,
-      spot:        0,
-      mood:        0,
-      pelvic:      0,
-      pregnancy:   0,
-      discharge:   0,
-      late_check:  0,   // "is my period late?" — needs cycle math
-      red_flag:    0,   // "should I see a doctor?" — severity assessment
-    };
+    // ── Condition education: PCOS ─────────────────────────────────────────
+    // Explicit name, or "irregular period" paired with acne or hair symptoms.
+    if (
+      /\bpcos\b/.test(t) ||
+      /\bpolycystic\b/.test(t) ||
+      (/irregular period/.test(t) && /\bacne\b/.test(t)) ||
+      (/irregular period/.test(t) && /\bhair\b/.test(t))
+    ) return { next: "EDUC_PCOS" };
 
-    // late / missed period
-    if (/late|missed|no period/.test(t))             sig.late      += 2;
-    if (/period.*not come|period.*didn.t/.test(t))       sig.late      += 2;
-    if (/skipped|overdue/.test(t))                       sig.late      += 1;
+    // ── Condition education: Endometriosis ────────────────────────────────
+    if (
+      /\bendometriosis\b/.test(t) ||
+      /\bendo\b/.test(t) ||
+      /pain every period/.test(t) ||
+      /period pain that doesn.t go away/.test(t)
+    ) return { next: "EDUC_ENDO" };
 
-    // heavy bleeding
-    if (/heavy|soaking|clot|bleeding/.test(t))  sig.heavy     += 2;
-    if (/flood|nuff blood|bleed bad/.test(t))        sig.heavy     += 2;
-    if (/soak through|changing.*hour/.test(t))           sig.heavy     += 2;
+    // ── Condition education: Contraception ────────────────────────────────
+    if (
+      /\bcontraception\b/.test(t) ||
+      /birth control/.test(t) ||
+      /\bcondom\b/.test(t) ||
+      /\bpill\b/.test(t) ||
+      /\biud\b/.test(t) ||
+      /\bimplant\b/.test(t) ||
+      /family planning/.test(t)
+    ) return { next: "EDUC_CONTRACEPTION" };
 
-    // spotting
-    if (/spot|spotting/.test(t))                         sig.spot      += 2;
-    if (/brown|between periods|pink discharge/.test(t)) sig.spot   += 2;
-    if (/little blood|likkle blood/.test(t))             sig.spot      += 1;
+    // ── Condition education: Perimenopause ────────────────────────────────
+    if (
+      /\bperimenopause\b/.test(t) ||
+      /peri menopause/.test(t) ||
+      (/irregular period/.test(t) && /hot flash/.test(t)) ||
+      /my period is changing/.test(t)
+    ) return { next: "EDUC_PERIMENOPAUSE" };
 
-    // mood / hormones / energy
-    if (/mood|anxious|sad|irritable/.test(t))   sig.mood      += 2;
-    if (/tired|fatigue|fatigued|exhaust/.test(t)) sig.mood    += 2;
-    if (/low energy|drain|drained|weak/.test(t)) sig.mood     += 2;
-    if (/overwhelm|emotional|cry|tearful/.test(t)) sig.mood   += 1;
+    // ── Condition education: Menopause ────────────────────────────────────
+    if (
+      /\bmenopause\b/.test(t) ||
+      /going through the change/.test(t) ||
+      /no period for months/.test(t) ||
+      /period stopped/.test(t)
+    ) return { next: "EDUC_MENOPAUSE" };
 
-    // pelvic pain / cramps
-    if (/cramp|pelvic|pain/.test(t))                sig.pelvic    += 2;
-    if (/belly.*hurt|stomach.*hurt|waist.*hurt/.test(t)) sig.pelvic += 2;
-    if (/discomfort|ache|sore/.test(t))              sig.pelvic    += 1;
-
-    // pregnancy signals
-    if (/pregnant|pregnancy|test|breed/.test(t)) sig.pregnancy += 2;
-    if (/unprotected|missed.*period/.test(t))             sig.pregnancy += 1;
-
-    // discharge
-    if (/discharge|odor|smell/.test(t))              sig.discharge += 2;
-
-    // "is my period late?" — direct lateness question needing cycle math
-    if (/is my period (late|overdue|due|coming)|has my period (come|arrived)/.test(t)) sig.late_check += 3;
-    if (/period not (come|here|arrived)|period (supposed|expected) to/.test(t)) sig.late_check += 2;
-
-    // red flag / should I see a doctor
-    if (/should i (go|see|call|visit|get)|need (medical|help|care|doctor)/.test(t)) sig.red_flag += 2;
-    if (/is this serious|how bad|how serious|worried about|when to (go|see)/.test(t)) sig.red_flag += 2;
-
-    // ── Multi-signal combination rules ────────────────────────────────────
-    // Reason over the COMBINATION of signals, not just the highest score.
-    // This is what makes it an inference engine vs a simple scorer.
-
-    const has = (key, min = 1) => sig[key] >= min;
-
-    // Late + pregnancy signal → test pathway
-    if (has("late") && has("pregnancy")) {
-      return { next: "LATE_TEST_Q", payload: { reason: "late+pregnancy_signal" } };
-    }
-
-    // Heavy + mood (could be hormonal/anaemia) → heavy intro but note mood
-    if (has("heavy", 2) && has("mood")) {
-      return { next: "HEAVY_INTRO", payload: { also: "mood", reason: "heavy+mood" } };
-    }
-
-    // Pelvic + heavy → could be serious, go to heavy risk check
-    if (has("pelvic", 2) && has("heavy", 2)) {
-      return { next: "HEAVY_RISK_SYMPTOMS", payload: { reason: "pelvic+heavy" } };
-    }
-
-    // Late + pelvic (no heavy) → late intro with pelvic note
-    if (has("late") && has("pelvic") && !has("heavy")) {
-      return { next: "LATE_INTRO", payload: { also: "pelvic", reason: "late+pelvic" } };
-    }
-
-    // Spot + discharge → provider soon
-    if (has("spot") && has("discharge")) {
-      return { next: "SPOT_PROVIDER_SOON", payload: { reason: "spot+discharge" } };
-    }
-
-    // Spot + pregnancy → preg spotting pathway
-    if (has("spot") && has("pregnancy")) {
-      return { next: "SPOT_PREG_INFO", payload: { reason: "spot+pregnancy" } };
-    }
-
-    // Discharge alone (no spotting/pelvic) → else discharge
-    if (has("discharge") && !has("spot") && !has("pelvic")) {
-      return { next: "ELSE_DISCHARGE", payload: { reason: "discharge_only" } };
-    }
+    const { sig, has } = scoreSignals(t);
+    const combo = resolveSignals(sig, has);
+    if (combo) return combo;
 
     // ── Single best-signal fallback ───────────────────────────────────────
     // If no combination rule fired, pick the strongest single signal.
@@ -1453,7 +1502,7 @@ export function initBloomieChat({
 
     if (bestScore < 2) {
       // ── Deterministic OOS handling ───────────────────────────────
-      const cat = detectOutOfScope(t);
+      const cat = detectOutOfScope(t, OOS, HEALTH_OVERRIDE_PATTERNS);
       if (cat) {
         const lines = (cat.replies || OOS_DEFAULT).map((r) =>
           typeof r === "function" ? r(t) : r
@@ -1588,6 +1637,19 @@ export function initBloomieChat({
 
   function transition(nextState, payload = {}) {
     if (!nextState) return;
+
+    // ── Safety log: escalation — "seek care" node reached ─────────────────
+    if (nextState === "HEAVY_URGENT") {
+      logSafetyEvent("escalation", {
+        fromNode:  ctx.state,
+        symptoms:  ctx.lastEntities
+          ? Object.entries(ctx.lastEntities.symptoms).filter(([,v]) => v).map(([k]) => k)
+          : [],
+        topic:     ctx.topic,
+        riskLevel: ctx.riskLevel,
+      });
+    }
+
     ctx.state = nextState;
     const node = NODES[nextState];
     if (!node) return;
@@ -1628,7 +1690,7 @@ export function initBloomieChat({
     // Include structured guidance summary if entities were extracted this session
     const structuredParts = [];
     if (ctx.lastEntities) {
-      const summary = getStructuredSummary(ctx.lastEntities, ctx.lastInferredReason);
+      const summary = getStructuredSummary(ctx.lastEntities, ctx.lastInferredReason, ctx.lastCycleCtx);
       if (summary) {
         structuredParts.push("");
         structuredParts.push("── Inferred Scenario ──");
@@ -1647,6 +1709,95 @@ export function initBloomieChat({
 
     const footer = "If symptoms worsen or you feel unsafe, seek urgent care.";
     return [header, ...items, ...structuredParts, footer].join("\n");
+  }
+
+  // ── Summary card builder ───────────────────────────────────────────────────
+  // Produces an HTML string for the SUMMARY node bubble.
+  // All content is internally generated — never interpolates raw user text
+  // into HTML without going through escapeHtml().
+  function buildSummaryCard() {
+    // ── Section 1: What I heard — detected symptoms ───────────────────────
+    const TOPIC_LABELS = {
+      late_period:      "a late or missed period",
+      heavy_bleeding:   "heavy or unusual bleeding",
+      spotting:         "spotting between periods",
+      pelvic_pain:      "pelvic pain or cramps",
+      mood_changes:     "hormonal mood changes",
+      pregnancy:        "pregnancy-related concerns",
+      discharge:        "unusual discharge",
+      ttc:              "trying to conceive",
+      postpartum:       "postpartum recovery",
+    };
+
+    const ADVICE_LABELS = {
+      told_to_test:      "Take a pregnancy test",
+      told_to_seek_care: "See a healthcare provider soon",
+      told_to_monitor:   "Keep track of your symptoms over the next few days",
+      told_to_rest:      "Rest and monitor how you feel",
+      told_to_call_911:  "Call emergency services or go to A&E immediately",
+      told_about_sti:    "Speak with a provider about STI screening",
+    };
+
+    // Detected symptoms → plain-English labels via SYMPTOM_TO_CATALOG_KEYS + CATALOG_LABELS
+    let symptomItems = "";
+    if (ctx.lastEntities?.symptoms) {
+      const codes = new Set();
+      for (const [key, fired] of Object.entries(ctx.lastEntities.symptoms)) {
+        if (fired && SYMPTOM_TO_CATALOG_KEYS[key]) {
+          SYMPTOM_TO_CATALOG_KEYS[key].forEach(c => codes.add(c));
+        }
+      }
+      const labels = [...codes].map(c => CATALOG_LABELS[c]).filter(Boolean);
+      if (labels.length) {
+        symptomItems = labels.map(l => `<li>${escapeHtml(l)}</li>`).join("");
+      }
+    }
+    const heardSection = symptomItems
+      ? `<ul class="summary-list">${symptomItems}</ul>`
+      : `<p class="summary-none">No specific symptoms were detected in our conversation.</p>`;
+
+    // ── Section 2: What this might be about ──────────────────────────────
+    const topicLabel = ctx.topic ? TOPIC_LABELS[ctx.topic] || ctx.topic.replace(/_/g, " ") : null;
+    const aboutLine = topicLabel
+      ? `This sounds like it could be related to <strong>${escapeHtml(topicLabel)}</strong>.`
+      : `We covered a few different topics in our chat.`;
+
+    // ── Section 3: What to do next ────────────────────────────────────────
+    let nextItems = "";
+    if (ctx.adviceGiven?.size) {
+      nextItems = [...ctx.adviceGiven]
+        .map(code => ADVICE_LABELS[code] || escapeHtml(code.replace(/_/g, " ")))
+        .map(label => `<li>${label}</li>`)
+        .join("");
+    }
+    const nextSection = nextItems
+      ? `<ul class="summary-list">${nextItems}</ul>`
+      : `<p class="summary-none">Keep tracking how you feel and reach out if anything changes.</p>`;
+
+    // ── Section 4: When to seek urgent care (always present) ─────────────
+    const urgentLine = "Go to emergency care right away if you experience soaking through a pad in under 2 hours, severe one-sided pain, fainting, difficulty breathing, or any symptom that feels out of the ordinary for you.";
+
+    return `
+      <div class="summary-card">
+        <div class="summary-header">Your session summary</div>
+        <p class="summary-disclaimer">This is not a diagnosis — it's a record of what we talked about 🩷</p>
+        <div class="summary-section">
+          <div class="summary-section-title">What I heard</div>
+          ${heardSection}
+        </div>
+        <div class="summary-section">
+          <div class="summary-section-title">What this might be about</div>
+          <p>${aboutLine}</p>
+        </div>
+        <div class="summary-section">
+          <div class="summary-section-title">What to do next</div>
+          ${nextSection}
+        </div>
+        <div class="summary-section summary-section--urgent">
+          <div class="summary-section-title">When to seek urgent care</div>
+          <p>${escapeHtml(urgentLine)}</p>
+        </div>
+      </div>`;
   }
 
   function escapeHtml(str) {
@@ -1685,7 +1836,7 @@ export function initBloomieChat({
           const showReactions = isBot && i === lastBotIndex;
           return `
             <div class="msg ${m.from}">
-              <div class="bubble">${escapeHtml(m.text)}</div>
+              <div class="bubble${m.meta?.html ? " bubble--html" : ""}">${m.meta?.html ? m.text : escapeHtml(m.text)}</div>
               ${showReactions ? `
                 <div class="bubble-actions" aria-label="Message reactions">
                   <button class="react-btn ${rx.up ? "on" : ""}" data-react="up" data-idx="${i}" type="button" title="Helpful">👍</button>
@@ -1772,7 +1923,11 @@ export function initBloomieChat({
           if (choice.action === "REQUEST_PDF")   onRequestPdf(buildSummaryText());
           if (choice.action?.startsWith("LOG_")) onLogAction(choice.action, choice.logData || {});
           if (typeof choice.onSelect === "function") choice.onSelect();
-          transition(choice.next, { choiceId });
+          // "I'm done for now" → SUMMARY when there's advice to show
+          const effectiveNext = (choice.id === "done" && choice.next === "CLOSE" && ctx.adviceGiven.size > 0)
+            ? "SUMMARY"
+            : choice.next;
+          transition(effectiveNext, { choiceId });
         });
       });
     }
@@ -1781,33 +1936,62 @@ export function initBloomieChat({
   }
 
   // ---------- Conversation Nodes ----------
+
+  // Returns a recall sentence if memory is recent and has symptom data, else null.
+  // e.g. "Last time we talked, you mentioned a missed period and nausea —
+  //        is that still going on, or is something new coming up?"
+  function buildRecallLine() {
+    if (!bloomieMemory?.lastSymptoms?.length) return null;
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const sessionDate  = bloomieMemory.lastSessionDate ? new Date(bloomieMemory.lastSessionDate) : null;
+    if (!sessionDate || sessionDate < sevenDaysAgo) return null;
+
+    const labels = [...new Set(
+      bloomieMemory.lastSymptoms
+        .flatMap(key => SYMPTOM_TO_CATALOG_KEYS[key] || [])
+        .map(code => CATALOG_LABELS[code])
+        .filter(Boolean)
+        .slice(0, 3)
+    )];
+    if (!labels.length) return null;
+
+    const list = labels.length === 1
+      ? labels[0]
+      : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+
+    return `Last time we talked, you mentioned **${list}** — is that still going on, or is something new coming up?`;
+  }
+
   // Mode-aware intro — Bloomie greets differently based on what she knows about the user
   function buildIntro() {
-    const base = `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
+    const base   = `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
+    const recall = buildRecallLine();
+    // Appends the recall line (if any) after the core intro messages.
+    const r = (lines) => recall ? [...lines, recall] : lines;
 
     if (userMode.isPregnancy && cd.lmp) {
       const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
-      return [
+      return r([
         base,
         `I can see you're in pregnancy tracking mode${weeksAlong > 0 ? ` — you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along` : ""} 🩷`,
         "I can help with symptoms, test timing, due dates, or anything else on your mind. What's going on?",
-      ];
+      ]);
     }
 
     if (userMode.isTTC) {
-      return [
+      return r([
         base,
         "I can see you're in trying-to-conceive mode 🩷 I can help with ovulation windows, test timing, cycle tracking, and symptoms.",
         "What can I help you with today?",
-      ];
+      ]);
     }
 
     if (userMode.isPostpartum) {
-      return [
+      return r([
         base,
         "I can see you're in postpartum mode 🩷 Your cycle may behave differently for a while — that's completely normal.",
         "What's on your mind today?",
-      ];
+      ]);
     }
 
     if (userMode.isCycleTracking && cd.lmp) {
@@ -1815,32 +1999,32 @@ export function initBloomieChat({
       const dueSoon  = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
       const overdue  = daysLeft !== null && daysLeft < 0;
       if (dueSoon) {
-        return [
+        return r([
           base,
           `I can see your period is due in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
           "If you're already feeling symptoms, I can help. What's going on?",
-        ];
+        ]);
       }
       if (overdue) {
-        return [
+        return r([
           base,
           `I can see your period may have been due a few days ago 🩷`,
           "If it hasn't come yet or something feels off, I'm here. What's going on?",
-        ];
+        ]);
       }
-      return [
+      return r([
         base,
         "I can help with period concerns, cycle questions, spotting, cramps, mood changes, and more.",
         "What can I help you with today?",
-      ];
+      ]);
     }
 
     // Default / just browsing
-    return [
+    return r([
       base,
       "I can help you understand common period-related concerns based on what you decide to share, but I can't provide diagnoses.",
       "What can I help you with today?",
-    ];
+    ]);
   }
 
   const INTRO = buildIntro();
@@ -1865,49 +2049,67 @@ export function initBloomieChat({
     // Silent menu — no intro replay, just shows the choices again
     START_MENU: {
       choices() {
-        // Pregnancy mode — swap in pregnancy-relevant buttons
-        if (userMode.isPregnancy) {
+        const base = (() => {
+          // Pregnancy mode — swap in pregnancy-relevant buttons
+          if (userMode.isPregnancy) {
+            return [
+              { id: "edd",   label: "My due date / how far along", next: "CYCLE_EDD_ANSWER", primary: true },
+              { id: "bleed", label: "Bleeding or spotting", next: "HEAVY_INTRO" },
+              { id: "pain",  label: "Pelvic pain or cramps", next: "PELVIC_INTRO" },
+              { id: "mood",  label: "Mood or energy changes", next: "MOOD_INTRO" },
+              { id: "test",  label: "Pregnancy test timing", next: "CYCLE_TEST_TIMING" },
+              { id: "else",  label: "Something else", next: "ELSE_INTRO" },
+            ];
+          }
+          // TTC mode — ovulation-first layout
+          if (userMode.isTTC) {
+            return [
+              { id: "ovul",  label: "My ovulation window", next: "TTC_INTRO", primary: true },
+              { id: "test",  label: "When should I test?", next: "CYCLE_TEST_TIMING" },
+              { id: "late",  label: "My period is late", next: "LATE_INTRO" },
+              { id: "spot",  label: "Spotting or unusual bleeding", next: "SPOT_INTRO" },
+              { id: "mood",  label: "Hormones / mood changes", next: "MOOD_INTRO" },
+              { id: "else",  label: "Something else", next: "ELSE_INTRO" },
+            ];
+          }
+          // Postpartum mode
+          if (userMode.isPostpartum) {
+            return [
+              { id: "post",  label: "Postpartum concerns", next: "POSTPARTUM_INTRO", primary: true },
+              { id: "bleed", label: "Bleeding questions", next: "HEAVY_INTRO" },
+              { id: "mood",  label: "Mood or energy changes", next: "MOOD_INTRO" },
+              { id: "late",  label: "Period hasn't returned yet", next: "LATE_INTRO" },
+              { id: "pain",  label: "Pelvic pain or cramps", next: "PELVIC_INTRO" },
+              { id: "else",  label: "Something else", next: "ELSE_INTRO" },
+            ];
+          }
+          // Default — cycle tracking or browsing
           return [
-            { id: "edd",   label: "My due date / how far along", next: "CYCLE_EDD_ANSWER", primary: true },
-            { id: "bleed", label: "Bleeding or spotting", next: "HEAVY_INTRO" },
-            { id: "pain",  label: "Pelvic pain or cramps", next: "PELVIC_INTRO" },
-            { id: "mood",  label: "Mood or energy changes", next: "MOOD_INTRO" },
-            { id: "test",  label: "Pregnancy test timing", next: "CYCLE_TEST_TIMING" },
-            { id: "else",  label: "Something else", next: "ELSE_INTRO" },
-          ];
-        }
-        // TTC mode — ovulation-first layout
-        if (userMode.isTTC) {
-          return [
-            { id: "ovul",  label: "My ovulation window", next: "TTC_INTRO", primary: true },
-            { id: "test",  label: "When should I test?", next: "CYCLE_TEST_TIMING" },
-            { id: "late",  label: "My period is late", next: "LATE_INTRO" },
-            { id: "spot",  label: "Spotting or unusual bleeding", next: "SPOT_INTRO" },
+            { id: "heavy", label: "Heavy or unusual bleeding", next: "HEAVY_INTRO" },
+            { id: "late",  label: "Late or missed period", next: "LATE_INTRO" },
+            { id: "spot",  label: "Spotting in between periods", next: "SPOT_INTRO" },
             { id: "mood",  label: "Hormones / mood changes", next: "MOOD_INTRO" },
+            { id: "pelvic",label: "Pelvic pain or cramps", next: "PELVIC_INTRO" },
             { id: "else",  label: "Something else", next: "ELSE_INTRO" },
           ];
-        }
-        // Postpartum mode
-        if (userMode.isPostpartum) {
-          return [
-            { id: "post",  label: "Postpartum concerns", next: "POSTPARTUM_INTRO", primary: true },
-            { id: "bleed", label: "Bleeding questions", next: "HEAVY_INTRO" },
-            { id: "mood",  label: "Mood or energy changes", next: "MOOD_INTRO" },
-            { id: "late",  label: "Period hasn't returned yet", next: "LATE_INTRO" },
-            { id: "pain",  label: "Pelvic pain or cramps", next: "PELVIC_INTRO" },
-            { id: "else",  label: "Something else", next: "ELSE_INTRO" },
-          ];
-        }
-        // Default — cycle tracking or browsing
-        return [
-          { id: "heavy", label: "Heavy or unusual bleeding", next: "HEAVY_INTRO" },
-          { id: "late",  label: "Late or missed period", next: "LATE_INTRO" },
-          { id: "spot",  label: "Spotting in between periods", next: "SPOT_INTRO" },
-          { id: "mood",  label: "Hormones / mood changes", next: "MOOD_INTRO" },
-          { id: "pelvic",label: "Pelvic pain or cramps", next: "PELVIC_INTRO" },
-          { id: "else",  label: "Something else", next: "ELSE_INTRO" },
-        ];
+        })();
+        return [...base, { id: "summary", label: "Get summary", next: "SUMMARY" }];
       },
+    },
+
+    // ── Zero-confidence narrowing ──────────────────────────────────────────
+    // Reached when the input contains health-adjacent words but neither
+    // inferRoute nor the keyword router could resolve a specific topic.
+    // Presents topic buttons instead of a generic OOS reply.
+    NARROWING: {
+      say: "I want to make sure I help you with the right thing 🩷 Are you asking about bleeding, pain, your cycle timing, mood changes, or something else?",
+      choices: [
+        { id: "heavy", label: "Bleeding",       next: "HEAVY_INTRO" },
+        { id: "pain",  label: "Pain or cramps", next: "PELVIC_INTRO" },
+        { id: "cycle", label: "Cycle timing",   next: "LATE_INTRO" },
+        { id: "mood",  label: "Mood changes",   next: "MOOD_INTRO" },
+        { id: "else",  label: "Something else", next: "ELSE_INTRO" },
+      ],
     },
 
     /* ---------------- HEAVY OR UNUSUAL BLEEDING ---------------- */
@@ -4090,6 +4292,87 @@ export function initBloomieChat({
     CLOSE: {
       say: [CLOSE],
       choices: [{ id: "menu", label: "Back to main options", next: "START_MENU", primary: true }],
+    },
+
+    /* ---------------- SESSION SUMMARY ---------------- */
+    SUMMARY: {
+      onEnter() {
+        pushMsg("bot", buildSummaryCard(), { html: true });
+      },
+      choices: [
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu", label: "Back to main menu", next: "START_MENU" },
+      ],
+    },
+
+    /* ---------------- EDUCATION: PERIMENOPAUSE ---------------- */
+    EDUC_PERIMENOPAUSE: {
+      say: [
+        "Perimenopause is the transition phase leading up to menopause — and it can actually start earlier than most people expect, sometimes in the mid-30s but more commonly in the 40s 🩷 It's your body's way of gradually shifting away from its regular reproductive cycle.",
+        "The symptom list is long, and it's different for everyone: irregular or unpredictable periods, hot flashes, night sweats, mood changes, brain fog, trouble sleeping, vaginal dryness, and changes in energy or libido are all common. You might notice just a few of these, or several at once.",
+        "Here's the part that catches people off guard — perimenopause isn't a brief phase. It can last anywhere from a few years to over a decade, and symptoms can come and go unpredictably. Tracking your cycle and symptoms over time is genuinely useful context for any provider.",
+        "If your symptoms are affecting your daily life, or you're not sure whether what you're experiencing is perimenopausal, it's worth talking to a provider — there are real options for managing symptoms, from lifestyle changes to hormonal and non-hormonal treatments 🩷",
+      ],
+      choices: [
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu", label: "Back to main menu", next: "START_MENU" },
+      ],
+    },
+
+    /* ---------------- EDUCATION: MENOPAUSE ---------------- */
+    EDUC_MENOPAUSE: {
+      say: [
+        "Menopause is defined as 12 consecutive months without a period — that 12-month mark is the official transition point 🩷 The average age is around 51, but it's completely normal to reach it earlier or later.",
+        "It's important to name this clearly: menopause is a natural life transition, not an illness. That said, the hormonal shifts involved are real, and so are the symptoms — you don't have to just push through them.",
+        "After menopause, some symptoms from the perimenopause years continue: hot flashes, sleep disruption, mood changes, vaginal dryness, joint discomfort, and changes in bone density are all things providers take seriously and can help with.",
+        "Support options range from lifestyle approaches (movement, sleep hygiene, nutrition) to menopausal hormone therapy (MHT/HRT), non-hormonal medications, and talking therapies — the right fit depends on your health history and your preferences. A provider or menopause specialist can walk you through what's available 🩷",
+      ],
+      choices: [
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu", label: "Back to main menu", next: "START_MENU" },
+      ],
+    },
+
+    /* ---------------- EDUCATION: CONTRACEPTION ---------------- */
+    EDUC_CONTRACEPTION: {
+      say: [
+        "Contraception is something Bloomie can give you a general overview of — but I want to be upfront: I can't recommend a specific method for you, because what works best really depends on your health history, your cycle, and your own goals 🩷",
+        "That said, here's a quick lay of the land: barrier methods (like condoms or diaphragms) work in the moment and don't affect your hormones. Hormonal methods (the pill, patch, ring, shot) use synthetic hormones to prevent pregnancy and can also help with cycle symptoms. Long-acting options (IUDs — hormonal or copper — and implants) are set-and-forget for years at a time.",
+        "Each category has real trade-offs — side effects, how easy they are to use, how quickly fertility returns — and a provider or pharmacist can walk you through what fits your situation, your body, and your life.",
+        "If you don't have a regular provider, a sexual health clinic or a pharmacist are both great first steps 🩷",
+      ],
+      choices: [
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu", label: "Back to main menu", next: "START_MENU" },
+      ],
+    },
+
+    /* ---------------- EDUCATION: PCOS ---------------- */
+    EDUC_PCOS: {
+      say: [
+        "PCOS — polycystic ovary syndrome — is one of the most common hormonal conditions people with periods deal with, and it's way more manageable than it sounds 🩷",
+        "It basically means your hormones are running a little out of balance, which can cause things like irregular or skipped periods, acne that flares around your cycle, extra hair growth (chin, chest, belly), weight changes, or difficulty conceiving.",
+        "The frustrating part is that PCOS looks different for everyone — some people have most of those symptoms, some have just one or two. That's why getting an actual diagnosis (usually an ultrasound plus a blood panel) matters so much.",
+        "If your periods are consistently irregular, or you've been noticing acne or hair changes alongside cycle issues, it's worth bringing up with a provider — not because it's an emergency, but because the right support makes a real difference 🩷",
+      ],
+      choices: [
+        { id: "map",  label: "Find care near me",   next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu", label: "Back to main menu",   next: "START_MENU" },
+      ],
+    },
+
+    /* ---------------- EDUCATION: ENDOMETRIOSIS ---------------- */
+    EDUC_ENDO: {
+      say: [
+        "Endometriosis (often called endo) is a condition where tissue similar to your uterine lining grows in places it shouldn't — like on your ovaries or fallopian tubes — and that tissue still responds to your hormones each cycle 🩷",
+        "That's why endo pain tends to show up around your period and can be really intense — cramping that doesn't respond well to regular pain relief, pain during sex, heavy bleeding, or a deep aching in your pelvis or lower back.",
+        "One thing worth knowing: endo symptoms are often dismissed or written off as \"bad periods\" for years. If your period pain is significantly affecting your day-to-day life — if you're missing work, school, or things you love — that's not something you should have to just push through.",
+        "Endo is diagnosed through a procedure called a laparoscopy, but a provider can also start with an ultrasound and a thorough conversation about your symptoms. You deserve to be taken seriously 🩷",
+      ],
+      choices: [
+        { id: "map",  label: "Find care near me",   next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu", label: "Back to main menu",   next: "START_MENU" },
+      ],
     },
   };
 

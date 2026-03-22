@@ -287,7 +287,7 @@ function extractPregnancy(t) {
 
 // ── 1f. Urgency flags ─────────────────────────────────────────────────────────
 function extractUrgency(t) {
-  return /\b(faint|fainting|passed out|can't breathe|cant breathe|shortness of breath|soaking through|bleeding through|bleed through|bleed.*pants|soaked.*pants|blood.*pants|severe.*pain|one.sided.*pain|sharp.*pain.*one side|emergency|hospital|urgent|collaps|can't stand|cant stand|too weak)\b/.test(t);
+  return /\b(faint|fainting|passed out|pass out|passing out|can't breathe|cant breathe|shortness of breath|soaking through|bleeding through|bleed through|bleed.*pants|soaked.*pants|blood.*pants|severe.*pain|one.sided.*pain|pain.*one.sided|sharp.*pain.*one side|bleed.*so bad|blood.*so bad|emergency|hospital|urgent|collaps\w*|can't stand|cant stand|too weak)\b/.test(t);
 }
 
 

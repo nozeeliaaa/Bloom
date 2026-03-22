@@ -307,26 +307,51 @@ const WORD_MAP = [
 
 // ─── 3. FUZZY MATCHING (Levenshtein distance) ─────────────────────────────────
 //
-// This is Stage 3 of the preprocessing pipeline.
+// This is Stage 3 of the preprocessing pipeline. It has two sub-stages:
 //
-// PURPOSE: Handle regional spelling variation, dropped letters, transpositions,
-// and elongation that exact matching cannot catch. A user from rural St. Thomas
-// writing "cyann" instead of "cyaan", or "bellly" instead of "belly", or
-// "bleedin" instead of "bleeding" — all should still resolve correctly.
+// 3a. PATOIS FUZZY — matches near-miss Patois tokens against WORD_MAP entries.
+//     Catches regional spelling variation, dropped letters, transpositions.
 //
-// THRESHOLD:
-//   - Words ≤ 5 characters: distance ≤ 1 (close match only — short words are
-//     more collision-prone, so we're conservative)
-//   - Words > 5 characters: distance ≤ 2 (allows one transposition + one drop,
-//     or two single-character changes)
+// 3b. MEDICAL FUZZY — matches near-miss English tokens against MEDICAL_TERMS.
+//     Catches common misspellings of health vocabulary ("pregnacy", "ovultaion",
+//     "endometrisos") so the scoring engine sees the canonical form.
+//
+// THRESHOLD (applies to both sub-stages):
+//   - Token length < 8 characters: distance ≤ 1 (conservative — short words
+//     are more collision-prone)
+//   - Token length ≥ 8 characters: distance ≤ 2 (allows one transposition +
+//     one drop, or two single-character changes)
 //
 // SAFETY: Only applied to tokens that did NOT match in Stage 1 or 2.
 // Minimum token length: 3 characters (prevents "a" matching "i" etc.)
-// Minimum match length: token length ≥ 60% of dictionary word length
+// Proportion guard: token length ≥ 70% of dictionary word length
 // (prevents short tokens matching long words).
 
-// Extract just the Patois keys we want to fuzzy-match against
+// ── 3a. Patois fuzzy targets — extracted from WORD_MAP ────────────────────────
 const FUZZY_TARGETS = WORD_MAP.map(([patois, english]) => ({ patois, english }));
+
+// ── 3b. Medical terms dictionary — canonical health/reproductive vocabulary ────
+// Used by fuzzyCorrect() to normalise near-miss spellings of medical words.
+const MEDICAL_TERMS = [
+  "spotting", "bleeding", "pregnant", "pregnancy", "period", "periods",
+  "discharge", "cramps", "cramping", "ovulation", "ovulating", "nausea",
+  "dizziness", "dizzy", "irregular", "endometriosis", "contraception",
+  "implantation", "miscarriage", "menstrual", "menstruation", "cycle",
+  "hormones", "hormonal", "progesterone", "estrogen", "testosterone",
+  "cervical", "cervix", "uterus", "uterine", "fibroids", "fibroid",
+  "fallopian", "pelvic", "bloating", "bloated", "fatigue", "exhausted",
+  "insomnia", "anxiety", "depression", "irritable", "irritability",
+  "breastfeeding", "postpartum", "perimenopause", "menopause", "menopausal",
+  "trimester", "placenta", "ultrasound", "gynecologist", "gynecology",
+  "obstetrician", "contraceptive", "iud", "implant", "injection", "condom",
+  "abstinence", "fertile", "fertility", "infertility", "conception",
+  "intercourse", "libido", "vaginal", "vagina", "vulva", "clitoris", "hymen",
+  "labia", "endometrium", "polycystic", "pcos", "adenomyosis", "ectopic",
+  "miscarry", "stillbirth", "abortion", "spotty", "clotting", "clots",
+  "faint", "fainting", "collapse", "hemorrhage", "infection", "bacterial",
+  "vaginosis", "thrush", "yeast", "sti", "std", "chlamydia", "gonorrhea",
+  "syphilis", "herpes",
+];
 
 /**
  * levenshtein(a, b) → Number
@@ -373,35 +398,36 @@ const ENGLISH_EXCLUSION_SET = new Set([
   "come","home","dome","some","Rome","foam","roam","loam",
 ]);
 
+
 /**
- * fuzzyWordLookup(token) → String | null
+ * fuzzyCorrect(token) → String | null
  *
- * Returns the English equivalent if a near-miss Patois word is found,
- * or null if no match is confident enough.
+ * Checks token against the MEDICAL_TERMS list and returns the canonical
+ * spelling if a close enough match is found, or null otherwise.
+ *
+ * Threshold: distance ≤ 1 for tokens < 8 chars, distance ≤ 2 for tokens ≥ 8.
+ * This prevents short medical codes ("iud", "std") from over-correcting to
+ * unrelated terms while still catching long-word misspellings ("pregnacy").
+ *
+ * Exported so it can be tested directly in __tests__/bloomie-patois.test.js.
  */
-function fuzzyWordLookup(token) {
-  if (token.length < 3) return null;   // too short to match safely
+export function fuzzyCorrect(token) {
+  if (!token || token.length < 3) return null;
 
-  // Never fuzz-map plain English words — they don't need remapping
-  if (ENGLISH_EXCLUSION_SET.has(token)) return null;
-
-  const threshold = token.length <= 5 ? 1 : 2;
+  const threshold = token.length < 8 ? 1 : 2;
 
   let bestMatch = null;
   let bestDist = Infinity;
 
-  for (const { patois, english } of FUZZY_TARGETS) {
-    // Length guard: skip if lengths are too different
-    if (Math.abs(token.length - patois.length) > threshold) continue;
-    // Strict proportion guard: token must be ≥ 70% the length of the target
-    // (prevents "bell" matching "belly")
-    if (token.length < patois.length * 0.70) continue;
-    if (patois.length < token.length * 0.70) continue;
+  for (const term of MEDICAL_TERMS) {
+    if (Math.abs(token.length - term.length) > threshold) continue;
+    if (token.length < term.length * 0.70) continue;
+    if (term.length < token.length * 0.70) continue;
 
-    const dist = levenshtein(token, patois);
+    const dist = levenshtein(token, term);
     if (dist <= threshold && dist < bestDist) {
       bestDist = dist;
-      bestMatch = english;
+      bestMatch = term;
     }
   }
 
@@ -411,19 +437,48 @@ function fuzzyWordLookup(token) {
 /**
  * applyFuzzyMatching(text, alreadyMatchedTokens) → String
  *
- * Tokenizes the text, applies fuzzyWordLookup to tokens that were NOT
- * already resolved by exact phrase/word matching, and reconstructs the string.
+ * Tokenizes the text and for each unresolved token finds the best match
+ * across BOTH the Patois dictionary (3a) and the medical terms list (3b),
+ * picking the candidate with the lowest Levenshtein distance. This prevents
+ * a Patois near-miss from shadowing a closer medical-term correction.
  */
 function applyFuzzyMatching(text, alreadyMatchedSet) {
   const tokens = text.split(/\s+/);
   const result = tokens.map((token) => {
-    // Skip tokens already resolved by exact matching
     if (alreadyMatchedSet.has(token)) return token;
-    // Skip tokens that look like plain English (all-ASCII, common suffixes)
-    // We only fuzz-match tokens ≥ 3 chars
     if (token.length < 3) return token;
-    const fuzzy = fuzzyWordLookup(token);
-    return fuzzy !== null ? fuzzy : token;
+
+    const threshold = token.length < 8 ? 1 : 2;
+    let bestResult = null;
+    let bestDist = Infinity;
+
+    // 3a. Patois targets (skip plain English words)
+    if (!ENGLISH_EXCLUSION_SET.has(token)) {
+      for (const { patois, english } of FUZZY_TARGETS) {
+        if (Math.abs(token.length - patois.length) > threshold) continue;
+        if (token.length < patois.length * 0.70) continue;
+        if (patois.length < token.length * 0.70) continue;
+        const dist = levenshtein(token, patois);
+        if (dist <= threshold && dist < bestDist) {
+          bestDist = dist;
+          bestResult = english;
+        }
+      }
+    }
+
+    // 3b. Medical terms — wins over Patois if it scores strictly better
+    for (const term of MEDICAL_TERMS) {
+      if (Math.abs(token.length - term.length) > threshold) continue;
+      if (token.length < term.length * 0.70) continue;
+      if (term.length < token.length * 0.70) continue;
+      const dist = levenshtein(token, term);
+      if (dist <= threshold && dist < bestDist) {
+        bestDist = dist;
+        bestResult = term;
+      }
+    }
+
+    return bestResult !== null ? bestResult : token;
   });
   return result.join(" ");
 }

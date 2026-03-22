@@ -8,7 +8,14 @@
  * - Fetches Firestore user role (admin/user) and stores in localStorage
  */
 
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut,
+} from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseDB } from "./firebase.js";
 import { setMode } from "./mode.js";
@@ -183,7 +190,6 @@ export async function register(email, password) {
     throw err;
   }
 
-  const { createUserWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth");
   const res = await createUserWithEmailAndPassword(auth(), email, password);
 
   await sendEmailVerification(res.user);
@@ -202,11 +208,9 @@ export async function register(email, password) {
  * Throws err.code = "auth/email-not-verified" so UI can offer resend.
  */
 export async function login(email, password) {
-  const { signInWithEmailAndPassword } = await import("firebase/auth");
   const res = await signInWithEmailAndPassword(auth(), email, password);
 
   if (!res.user.emailVerified) {
-    const { signOut, sendEmailVerification } = await import("firebase/auth");
     // Auto-send verification email so they don't have to click Resend
     try { await sendEmailVerification(res.user); } catch (_) {}
     await signOut(auth());
@@ -230,7 +234,6 @@ export async function sendPasswordReset(email) {
   if (!email?.trim()) {
     throw new Error("Please enter your email address.");
   }
-  const { sendPasswordResetEmail } = await import("firebase/auth");
   await sendPasswordResetEmail(auth(), email.trim());
 }
 
@@ -243,8 +246,6 @@ export async function sendPasswordReset(email) {
  * then signs back out. Used when a user hasn't verified yet.
  */
 export async function resendVerificationEmail(email, password) {
-  const { signInWithEmailAndPassword, sendEmailVerification, signOut } = await import("firebase/auth");
-
   // Sign in temporarily (unverified users can sign in, just can't use the app)
   const res = await signInWithEmailAndPassword(auth(), email, password);
   await sendEmailVerification(res.user);
@@ -256,7 +257,6 @@ export async function resendVerificationEmail(email, password) {
 // ─────────────────────────────────────────
 
 export async function logout() {
-  const { signOut } = await import("firebase/auth");
   clearCachedRole();
   await signOut(auth());
 }

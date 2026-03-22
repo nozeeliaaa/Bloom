@@ -7,230 +7,206 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
 
-  <!-- ✅ Vite (root=frontend) paths -->
-
-
-<style>
-    .chat-wrapper {
-      max-width: 700px;
+  <style>
+    .bloomie-shell {
+      max-width: 900px;
       margin: 0 auto;
+      padding: 0 0 2rem;
+    }
+
+    .bloomie-card {
       display: flex;
       flex-direction: column;
-      min-height: calc(100vh - 280px);
+      min-height: calc(100vh - 260px);
     }
-    .chat-messages {
+
+    .chat-box {
       flex: 1;
+      overflow-y: auto;
+      padding: 1rem 0;
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      padding-bottom: 1rem;
+      min-height: 420px;
     }
-    .chat-input-area {
+
+    .msg {
+      display: flex;
+    }
+
+    .msg.bot { justify-content: flex-start; }
+    .msg.user { justify-content: flex-end; }
+
+    .bubble {
+      max-width: 80%;
+      padding: 0.75rem 1rem;
+      border-radius: 16px;
+      background: var(--color-bg-soft);
+      font-size: 0.95rem;
+      line-height: 1.45;
+      border: 1px solid var(--color-border);
+    }
+
+    .msg.user .bubble {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+
+    .chat-form {
       display: flex;
       gap: 0.5rem;
-      padding: 1rem 0;
       border-top: 1px solid var(--color-border);
-      position: sticky;
-      bottom: 0;
-      background: var(--color-bg);
+      padding-top: 0.9rem;
+      margin-top: 0.25rem;
     }
-    .chat-input-area input {
+
+    .chat-input {
       flex: 1;
+      padding: 0.75rem 0.9rem;
+      border-radius: 10px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      font: inherit;
     }
-    .chat-disclaimer {
+
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .choices {
+      margin-top: 0.75rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .reply {
+      border-radius: 999px;
+      padding: 0.45rem 0.95rem;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      cursor: pointer;
+      font-weight: 700;
+      font-family: inherit;
+    }
+
+    .reply:hover { transform: translateY(-1px); }
+
+    .reply--primary {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+
+    .tiny-note {
       font-size: 0.78rem;
-      color: var(--color-text-muted);
       text-align: center;
-      padding-top: 0.5rem;
-      font-style: italic;
+      color: var(--color-text-muted);
+      margin-top: 0.9rem;
+    }
+
+    @media (max-width: 640px) {
+      .bubble { max-width: 90%; }
+      .bloomie-card { min-height: calc(100vh - 220px); }
     }
   </style>
-    <link rel="stylesheet" href="/css/main.css" />
-  </head>
+</head>
 
 <body>
   <main>
     <div id="banner-area"></div>
 
-    <div class="page-header">
-      <h1>Bloomie</h1>
-      <p>Your guided health education assistant</p>
-    </div>
-
-    <div class="chat-wrapper">
-      <div class="chat-messages" id="chat-messages">
-        <!-- Welcome message from Bloomie -->
-        <div class="chat-bubble bot">
-          Hi there! I'm <strong>Bloomie</strong>, your health education companion. I can provide general information about menstrual health, symptoms, and wellness. How can I help you today?
-        </div>
-        <div class="chat-actions" id="quick-actions">
-          <button class="chat-action-btn" data-q="What does a normal period look like?">Normal periods</button>
-          <button class="chat-action-btn" data-q="What are common PMS symptoms?">PMS symptoms</button>
-          <button class="chat-action-btn" data-q="When should I see a doctor about my period?">When to see a doctor</button>
-          <button class="chat-action-btn" data-q="What is PCOS?">About PCOS</button>
-          <button class="chat-action-btn" data-q="Tell me about perimenopause symptoms">Perimenopause</button>
-          <button class="chat-action-btn" data-q="How can I reduce period cramps?">Reduce cramps</button>
-        </div>
+    <div class="bloomie-shell">
+      <div class="page-header">
+        <h1>Bloomie</h1>
+        <p class="text-muted">Ask a question, describe a symptom, or use the quick replies 🩷</p>
       </div>
 
-      <div class="chat-input-area">
-        <input type="text" class="form-input" id="chat-input"
-               placeholder="Type your question..." aria-label="Ask Bloomie a question">
-        <button class="btn btn-primary" id="send-btn" aria-label="Send message">Send</button>
-      </div>
+      <section class="card bloomie-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Chat Assistant</div>
+            <div class="card-subtitle">
+              Educational support for cycle, symptom, and reproductive health questions
+            </div>
+          </div>
+        </div>
 
-      <p class="chat-disclaimer">
-        Bloomie provides educational information only. This is not medical advice.
-        Always consult a healthcare provider for medical concerns.
-      </p>
+        <div class="card-body">
+          <div class="chat-box" id="chat-box" aria-live="polite"></div>
+
+          <form class="chat-form" id="chat-form">
+            <input
+              class="chat-input"
+              id="chat-input"
+              type="text"
+              placeholder="Type here or use the buttons…"
+              autocomplete="off"
+              maxlength="240"
+            />
+          </form>
+
+          <p class="tiny-note">
+            Bloomie provides educational information only. This is not medical advice.
+            Always consult a healthcare provider.
+          </p>
+        </div>
+      </section>
     </div>
   </main>
 
   <script type="module">
-    /**
-     * Bloomie Assistant (rule-based, client-side)
-     */
-
-    /* ✅ Updated imports for your new layout */
     import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
-    import { saveAssistantSession, getAssistantSession } from '/js/db.js';
+    import { getAllLogs } from '/js/db.js';
+    import { computeCyclePhase } from '/js/phase.js';
+    import { getUserGoal } from '/js/goals.js';
+    import { onAuthChange } from '/js/auth.js';
+    import { mountChat } from '/js/assistant.js';
 
     renderNav('assistant');
     renderFooter();
     renderModeBanner(document.getElementById('banner-area'));
 
-    const messagesEl = document.getElementById('chat-messages');
-    const inputEl = document.getElementById('chat-input');
-    const sendBtn = document.getElementById('send-btn');
+    async function init(user) {
+      const logsByDate = await getAllLogs();
+      const cycle = computeCyclePhase(logsByDate);
+      const goal = getUserGoal();
 
-    const RESPONSES = {
-      normal: {
-        keywords: ['normal', 'typical', 'average', 'regular'],
-        response: `A "normal" menstrual cycle typically ranges from <strong>21 to 35 days</strong>, with bleeding lasting 3-7 days. Flow can vary from light to heavy. However, everyone's body is different, and what's normal for you may differ from someone else.<br><br>If you're concerned about changes in your cycle, tracking with Bloom's calendar can help identify patterns over time. If significant changes occur suddenly, it may be worth discussing with a healthcare provider.`
-      },
-      pms: {
-        keywords: ['pms', 'premenstrual', 'before period', 'mood swing', 'bloat'],
-        response: `<strong>Premenstrual Syndrome (PMS)</strong> refers to symptoms that appear 1-2 weeks before your period. Common symptoms include:<br><ul><li>Mood swings, irritability, or anxiety</li><li>Bloating and water retention</li><li>Breast tenderness</li><li>Fatigue and trouble sleeping</li><li>Food cravings</li><li>Headaches</li></ul><br>Most PMS symptoms are manageable with lifestyle changes like regular exercise, balanced nutrition, and adequate sleep. If symptoms severely affect your daily life, speak with a healthcare provider about management options.`
-      },
-      doctor: {
-        keywords: ['doctor', 'see a doctor', 'medical', 'help', 'worry', 'concerned', 'when to see', 'provider', 'urgent'],
-        response: `Consider seeing a healthcare provider if you experience:<br><ul><li>Extremely heavy bleeding (soaking through a pad/tampon every hour)</li><li>Periods lasting longer than 7 days consistently</li><li>Severe pain that disrupts daily activities</li><li>No period for 3+ months (if not pregnant)</li><li>Bleeding between periods regularly</li><li>Sudden major changes in your cycle pattern</li></ul><br>Keeping a log of your symptoms using Bloom can help your provider better understand your situation. Check the <a href="/pages/clinics.html">Clinics</a> page for Jamaican healthcare facilities near you.`
-      },
-      pcos: {
-        keywords: ['pcos', 'polycystic', 'ovary syndrome', 'cyst'],
-        response: `<strong>Polycystic Ovary Syndrome (PCOS)</strong> is a common hormonal condition affecting about 1 in 10 women of reproductive age. Signs may include:<br><ul><li>Irregular or missed periods</li><li>Excess hair growth on face or body</li><li>Acne or oily skin</li><li>Weight changes</li><li>Difficulty getting pregnant</li></ul><br>PCOS is manageable with proper medical support. If you suspect you may have PCOS, please consult with a healthcare professional for proper diagnosis and treatment. Read more in our <a href="/pages/pamphlets.html">Pamphlets</a> section.`
-      },
-      perimenopause: {
-        keywords: ['perimenopause', 'menopause', 'hot flash', 'night sweat', 'transition'],
-        response: `<strong>Perimenopause</strong> is the transition period before menopause, often starting in your 40s. Common symptoms include:<br><ul><li>Irregular periods (shorter, longer, heavier, lighter)</li><li>Hot flashes and night sweats</li><li>Sleep disturbances</li><li>Mood changes</li><li>Brain fog</li><li>Joint pain</li></ul><br>These symptoms are caused by fluctuating hormone levels. Staying active, eating well, and maintaining good sleep habits can help. If symptoms significantly affect your quality of life, discuss management options with your healthcare provider.`
-      },
-      cramps: {
-        keywords: ['cramp', 'pain', 'hurt', 'ache', 'relief', 'reduce'],
-        response: `Period cramps (dysmenorrhea) are caused by uterine contractions. Here are some ways to find relief:<br><ul><li><strong>Heat:</strong> A warm compress or hot water bottle on your lower abdomen</li><li><strong>Movement:</strong> Gentle exercise like walking or stretching</li><li><strong>Hydration:</strong> Drinking plenty of water can reduce bloating</li><li><strong>Nutrition:</strong> Anti-inflammatory foods, reduce caffeine and salt</li><li><strong>Rest:</strong> Prioritize sleep and relaxation</li><li><strong>Over-the-counter relief:</strong> Ibuprofen or acetaminophen as directed</li></ul><br>If cramps are severe enough to interfere with daily activities, it's worth discussing with a healthcare provider, as it could indicate conditions like endometriosis.`
-      },
-      endometriosis: {
-        keywords: ['endometriosis', 'endo', 'tissue', 'lining grow'],
-        response: `<strong>Endometriosis</strong> is a condition where tissue similar to the uterine lining grows outside the uterus. It affects roughly 10% of reproductive-age women. Symptoms include:<br><ul><li>Painful periods that may worsen over time</li><li>Pain during or after intercourse</li><li>Heavy bleeding between periods</li><li>Fatigue, especially during periods</li><li>Digestive issues during menstruation</li></ul><br>Endometriosis can take years to diagnose. If you experience severe menstrual pain, consider speaking with a healthcare provider. Detailed symptom logs from Bloom can help your provider understand your situation.`
-      },
-      fertility: {
-        keywords: ['fertility', 'pregnant', 'conceive', 'ovulation', 'ovulate', 'fertile'],
-        response: `Understanding your fertile window can be helpful whether you're trying to conceive or simply learning about your body. Key points:<br><ul><li><strong>Ovulation</strong> typically occurs around day 14 of a 28-day cycle</li><li>The <strong>fertile window</strong> is about 5 days before and 1 day after ovulation</li><li>Signs of ovulation may include changes in cervical mucus, mild cramping, or slight temperature rise</li><li>Cycle tracking can help identify your pattern over time</li></ul><br><em>Note: Fertility awareness is not a reliable birth control method without careful, consistent tracking and education. For birth control options, check our <a href="/pages/pamphlets.html">Pamphlets</a> section.</em>`
-      },
-      greeting: {
-        keywords: ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening'],
-        response: `Hello! I'm Bloomie, here to help you learn about reproductive health. You can ask me about periods, symptoms, when to see a doctor, and more. What would you like to know?`
-      },
-      thanks: {
-        keywords: ['thank', 'thanks', 'appreciate'],
-        response: `You're welcome! Remember, I'm here to provide educational information. If you have specific health concerns, please consult a qualified healthcare provider. Is there anything else you'd like to know?`
-      }
-    };
+      const lastLmp = cycle.cycleStarts?.length
+        ? cycle.cycleStarts[cycle.cycleStarts.length - 1]
+        : null;
 
-    const FALLBACK = `That's a great question! While I may not have a specific answer prepared for that topic, here are some suggestions:<br><ul><li>Check our <a href="/pages/pamphlets.html">Educational Pamphlets</a> for detailed health articles</li><li>Visit the <a href="/pages/clinics.html">Clinics</a> page to find a healthcare provider near you</li><li>Try asking about specific topics like <em>cramps</em>, <em>PCOS</em>, <em>perimenopause</em>, or <em>when to see a doctor</em></li></ul><br><em>Remember: I provide educational information only. For personal medical advice, always consult a healthcare professional.</em>`;
+      const cycleData = {
+        lmp: lastLmp,
+        cycleLength: cycle.avgCycleLength || null,
+        nextPeriodDate: cycle.nextPeriodDate || null,
+        isTrackingPregnancy: goal === 'pregnancy',
+        mode: goal === 'pregnancy' ? 'pregnancy_tracking'
+            : goal === 'ttc'      ? 'trying_to_conceive'
+            : lastLmp             ? 'cycle_tracking'
+            :                       null,
+      };
 
-    function getResponse(input) {
-      const lower = input.toLowerCase();
-      let bestMatch = null;
-      let bestScore = 0;
+      const symptomHistory = Object.entries(logsByDate)
+        .filter(([, entry]) => entry.symptoms?.length)
+        .map(([dateKey, entry]) => ({
+          dateKey,
+          items: (entry.symptoms || []).map(sym => ({
+            code: sym,
+            severity: entry.symptomSeverity?.[sym] ?? 3,
+            note: null,
+          })),
+        }));
 
-      for (const [, topic] of Object.entries(RESPONSES)) {
-        let score = 0;
-        for (const kw of topic.keywords) {
-          if (lower.includes(kw)) score++;
-        }
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = topic;
-        }
-      }
-      return bestScore > 0 ? bestMatch.response : FALLBACK;
+      await mountChat(user, cycleData, symptomHistory.length ? symptomHistory : null);
     }
 
-    function addMessage(text, sender = 'bot') {
-      const bubble = document.createElement('div');
-      bubble.className = `chat-bubble ${sender}`;
-      if (sender === 'bot') bubble.innerHTML = text;
-      else bubble.textContent = text;
-
-      messagesEl.appendChild(bubble);
-      bubble.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-
-    function handleSend() {
-      const input = inputEl.value.trim();
-      if (!input) return;
-
-      const quickActions = document.getElementById('quick-actions');
-      if (quickActions) quickActions.style.display = 'none';
-
-      addMessage(input, 'user');
-      inputEl.value = '';
-
-      setTimeout(() => {
-        const response = getResponse(input);
-        addMessage(response, 'bot');
-
-        const messages = [];
-        messagesEl.querySelectorAll('.chat-bubble').forEach(b => {
-          messages.push({
-            sender: b.classList.contains('user') ? 'user' : 'bot',
-            text: b.innerHTML
-          });
-        });
-        saveAssistantSession(messages);
-      }, 400);
-    }
-
-    sendBtn.addEventListener('click', handleSend);
-
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    });
-
-    document.querySelectorAll('.chat-action-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        inputEl.value = btn.dataset.q;
-        handleSend();
-      });
-    });
-
-    const prevSession = getAssistantSession();
-    if (prevSession.length > 0) {
-      messagesEl.innerHTML = '';
-      const quickActions = document.getElementById('quick-actions');
-      if (quickActions) quickActions.remove();
-
-      prevSession.forEach(msg => {
-        const bubble = document.createElement('div');
-        bubble.className = `chat-bubble ${msg.sender}`;
-        bubble.innerHTML = msg.text;
-        messagesEl.appendChild(bubble);
-      });
-    }
+    onAuthChange(user => { init(user); });
   </script>
 </body>
 </html>

@@ -1,0 +1,228 @@
+/**
+ * admin-safety.js
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Safety log review page for Bloom admins.
+ *
+ * Queries the `bloomieSafetyLogs` Firestore collection for documents where
+ * reviewed === false, ordered by ts descending, limited to 50.
+ *
+ * Access control: redirects anyone who is not authenticated + admin to the
+ * dashboard — same gate pattern as admin.js.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+import { renderNav, renderFooter, renderModeBanner } from "./utils.js";
+import { onAuthChange, isAdminCached } from "./auth.js";
+import { isAccountMode } from "./mode.js";
+import { getFirebaseDB } from "./firebase.js";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
+
+renderNav("admin");
+renderFooter();
+renderModeBanner(document.getElementById("banner-area"));
+
+// ─── Auth gate ────────────────────────────────────────────────────────────────
+// Mirrors the exact pattern in admin.js: wait 300 ms for role cache to settle,
+// then redirect anyone who isn't a confirmed admin.
+onAuthChange(async (user) => {
+  if (!isAccountMode() || !user) {
+    window.location.href = "/pages/dashboard.html";
+    return;
+  }
+
+  await new Promise((r) => setTimeout(r, 300));
+  if (!isAdminCached()) {
+    window.location.href = "/pages/dashboard.html";
+    return;
+  }
+
+  const subtitleEl = document.getElementById("admin-subtitle");
+  if (subtitleEl) subtitleEl.textContent = `Signed in as ${user.email}`;
+
+  await loadLogs();
+
+  document.getElementById("refresh-btn")?.addEventListener("click", loadLogs);
+  document.getElementById("type-filter")?.addEventListener("change", () => {
+    renderTable(getFilteredDocs());
+  });
+});
+
+// ─── State ────────────────────────────────────────────────────────────────────
+/** All fetched (unreviewed) documents for the current load. */
+let allDocs = [];
+
+// ─── Data loading ─────────────────────────────────────────────────────────────
+async function loadLogs() {
+  const errorEl   = document.getElementById("safety-error");
+  const loadingEl = document.getElementById("safety-loading");
+  const tableEl   = document.getElementById("safety-table");
+  const emptyEl   = document.getElementById("safety-empty");
+
+  // Reset state
+  errorEl.style.display   = "none";
+  loadingEl.style.display = "block";
+  tableEl.style.display   = "none";
+  emptyEl.style.display   = "none";
+
+  const db = getFirebaseDB();
+  if (!db) {
+    loadingEl.style.display = "none";
+    showError("Firebase is not configured — cannot load safety logs.");
+    return;
+  }
+
+  try {
+    const q = query(
+      collection(db, "bloomieSafetyLogs"),
+      where("reviewed", "==", false),
+      orderBy("ts", "desc"),
+      limit(50),
+    );
+    const snap = await getDocs(q);
+    allDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    loadingEl.style.display = "none";
+    showError(`Failed to load safety logs: ${err.message}`);
+    return;
+  }
+
+  loadingEl.style.display = "none";
+  renderTable(getFilteredDocs());
+}
+
+// ─── Filtering ────────────────────────────────────────────────────────────────
+function getFilteredDocs() {
+  const type = document.getElementById("type-filter")?.value ?? "";
+  return type ? allDocs.filter((d) => d.type === type) : allDocs;
+}
+
+// ─── Rendering ────────────────────────────────────────────────────────────────
+function renderTable(docs) {
+  const tableEl  = document.getElementById("safety-table");
+  const emptyEl  = document.getElementById("safety-empty");
+  const tbody    = document.getElementById("safety-tbody");
+  const countEl  = document.getElementById("count-label");
+
+  if (!docs.length) {
+    tableEl.style.display = "none";
+    emptyEl.style.display = "block";
+    countEl.textContent   = "0 results";
+    return;
+  }
+
+  countEl.textContent   = `${docs.length} result${docs.length !== 1 ? "s" : ""}`;
+  emptyEl.style.display = "none";
+  tableEl.style.display = "table";
+
+  tbody.innerHTML = docs.map((d) => {
+    const ts        = formatTs(d.ts);
+    const typeBadge = typeBadgeClass(d.type);
+    const riskBadge = riskBadgeClass(d.riskLevel);
+
+    // Route column: urgent_trigger/oos_fallback → d.route; escalation → d.fromNode
+    const routeText = d.route || d.fromNode || "—";
+
+    return `
+      <tr data-id="${esc(d.id)}">
+        <td class="col-ts">${esc(ts)}</td>
+        <td>
+          <span class="admin-badge ${esc(typeBadge)}">${esc(d.type || "—")}</span>
+        </td>
+        <td class="col-input" title="${esc(d.input || "")}">${esc(truncate(d.input, 90))}</td>
+        <td class="col-route"><code>${esc(routeText)}</code></td>
+        <td>${esc(d.topic || "—")}</td>
+        <td>
+          ${d.riskLevel
+            ? `<span class="admin-badge ${esc(riskBadge)}">${esc(d.riskLevel)}</span>`
+            : `<span class="text-muted">—</span>`}
+        </td>
+        <td style="white-space:nowrap;">
+          <button
+            class="btn btn-sm mark-btn"
+            data-id="${esc(d.id)}"
+            type="button"
+          >Mark reviewed</button>
+        </td>
+      </tr>`;
+  }).join("");
+
+  // Attach mark-reviewed handlers after innerHTML is set
+  tbody.querySelectorAll(".mark-btn").forEach((btn) => {
+    btn.addEventListener("click", () => markReviewed(btn));
+  });
+}
+
+async function markReviewed(btn) {
+  const id = btn.dataset.id;
+  const row = btn.closest("tr");
+
+  btn.disabled    = true;
+  btn.textContent = "Saving…";
+
+  const db = getFirebaseDB();
+  try {
+    await updateDoc(doc(db, "bloomieSafetyLogs", id), { reviewed: true });
+    // Animate the row out, then remove from state and re-render
+    if (row) row.classList.add("row-reviewed");
+    allDocs = allDocs.filter((d) => d.id !== id);
+    setTimeout(() => renderTable(getFilteredDocs()), 400);
+  } catch (err) {
+    btn.disabled    = false;
+    btn.textContent = "Mark reviewed";
+    showError(`Failed to update document ${id}: ${err.message}`);
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function showError(msg) {
+  const el = document.getElementById("safety-error");
+  if (!el) return;
+  el.textContent   = msg;
+  el.style.display = "block";
+}
+
+/** Safely escape a value for HTML output. */
+function esc(val) {
+  return String(val ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function truncate(str, max) {
+  if (!str) return "—";
+  return str.length > max ? str.slice(0, max) + "…" : str;
+}
+
+/** Format a Firestore Timestamp or ISO string for display. */
+function formatTs(ts) {
+  if (!ts) return "—";
+  const d = ts?.toDate ? ts.toDate() : new Date(ts);
+  if (Number.isNaN(d.getTime())) return String(ts);
+  return d.toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function typeBadgeClass(type) {
+  if (type === "urgent_trigger") return "admin-badge--danger";
+  if (type === "escalation")     return "admin-badge--warning";
+  return "admin-badge--neutral";
+}
+
+function riskBadgeClass(level) {
+  if (level === "high")     return "admin-badge--danger";
+  if (level === "moderate") return "admin-badge--warning";
+  return "admin-badge--neutral";
+}

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Safety Review — Bloom Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <style>
+    .safety-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem 3rem;
+    }
+
+    /* ── Filter bar ── */
+    .safety-filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .safety-filter-bar label {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+    }
+
+    .safety-filter-select {
+      padding: 0.45rem 0.85rem;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: var(--color-bg);
+      font: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .safety-filter-select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.04);
+    }
+
+    .safety-count {
+      margin-left: auto;
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    /* ── Table ── */
+    .safety-table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .safety-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    .safety-table th {
+      text-align: left;
+      padding: 0.65rem 0.85rem;
+      border-bottom: 2px solid var(--color-border);
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+    }
+
+    .safety-table td {
+      padding: 0.7rem 0.85rem;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: top;
+    }
+
+    .safety-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .safety-table tbody tr:hover td {
+      background: var(--color-bg-soft);
+    }
+
+    .col-ts {
+      white-space: nowrap;
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+    }
+
+    .col-input {
+      max-width: 280px;
+      word-break: break-word;
+      color: var(--color-text);
+    }
+
+    .col-route code {
+      font-family: "Courier New", monospace;
+      font-size: 0.82rem;
+      background: var(--color-bg-soft);
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      padding: 0.1em 0.4em;
+      white-space: nowrap;
+    }
+
+    /* ── States ── */
+    .safety-loading,
+    .safety-empty {
+      padding: 2.5rem 1rem;
+      text-align: center;
+      color: var(--color-text-muted);
+      font-size: 0.95rem;
+    }
+
+    .safety-empty-icon {
+      font-size: 2rem;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── Reviewed row ── */
+    .row-reviewed td {
+      opacity: 0.45;
+    }
+
+    @media (max-width: 768px) {
+      .col-input {
+        max-width: 160px;
+      }
+
+      .safety-filter-bar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .safety-count {
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <div id="banner-area"></div>
+
+    <div class="safety-shell">
+
+      <div class="page-header admin-page-header">
+        <div>
+          <h1>Safety Log Review</h1>
+          <p id="admin-subtitle" class="text-muted">Loading…</p>
+        </div>
+        <div class="admin-header-actions">
+          <button class="btn btn-sm" id="refresh-btn" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <!-- Filter row -->
+      <div class="safety-filter-bar">
+        <label for="type-filter">Filter by event type:</label>
+        <select class="safety-filter-select" id="type-filter">
+          <option value="">All types</option>
+          <option value="urgent_trigger">urgent_trigger</option>
+          <option value="oos_fallback">oos_fallback</option>
+          <option value="escalation">escalation</option>
+        </select>
+        <span class="safety-count" id="count-label"></span>
+      </div>
+
+      <!-- Main card -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Unreviewed safety events</div>
+            <div class="card-subtitle">
+              Showing up to 50 most recent — mark each as reviewed once actioned
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body" style="padding: 0;">
+          <p id="safety-error" class="admin-error" style="display:none; padding: 1rem 1.25rem;"></p>
+
+          <div class="safety-loading" id="safety-loading">Loading safety logs…</div>
+
+          <div class="safety-table-wrap">
+            <table class="safety-table" id="safety-table" style="display:none;">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Event type</th>
+                  <th>Input text</th>
+                  <th>Route fired</th>
+                  <th>Topic</th>
+                  <th>Risk level</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="safety-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="safety-empty" id="safety-empty" style="display:none;">
+            <span class="safety-empty-icon">✅</span>
+            No unreviewed safety events — you're all caught up.
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /.safety-shell -->
+  </main>
+
+  <script type="module" src="/js/admin-safety.js"></script>
+</body>
+</html>

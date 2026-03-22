@@ -18,6 +18,7 @@ import { MODE_BANNER_ONCE_KEY } from "./utils.js";
 
 const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
+const MEMORY_KEY = "bloom_bloomie_memory";
 
 // Set in firebaseConfig.js: window.BLOOM_API_BASE = "http://localhost:4000";
 const API_BASE = window.BLOOM_API_BASE || "";
@@ -318,9 +319,51 @@ export async function getAssistantSession() {
   return readJSON(ASSIST_KEY, null);
 }
 
+// --------------------
+// Bloomie persistent memory
+// --------------------
+
+// Load the last session snapshot. Tries Firestore first (account mode),
+// falls back to localStorage for anon/offline.
+export async function loadBloomieMemory() {
+  const local = readJSON(MEMORY_KEY, null);
+  if (!isAccountMode()) return local;
+  try {
+    const headers = await authHeaders();
+    if (!headers) return local;
+    const res = await fetch(apiUrl("/api/bloomie-memory"), { headers });
+    if (!res.ok) return local;
+    const data = await res.json();
+    if (data) writeJSON(MEMORY_KEY, data);
+    return data;
+  } catch {
+    return local;
+  }
+}
+
+// Save a compact memory snapshot. Always writes to localStorage,
+// and syncs to Firestore in account mode.
+export async function saveBloomieMemory(memoryData) {
+  if (!memoryData) return;
+  writeJSON(MEMORY_KEY, memoryData);
+  if (!isAccountMode()) return;
+  try {
+    const headers = await authHeaders();
+    if (!headers) return;
+    await fetch(apiUrl("/api/bloomie-memory"), {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(memoryData),
+    });
+  } catch (e) {
+    console.warn("[Bloomie] memory cloud save failed:", e);
+  }
+}
+
 export async function deleteAllLocalData() {
   localStorage.removeItem(LOGS_KEY);
   localStorage.removeItem(ASSIST_KEY);
+  localStorage.removeItem(MEMORY_KEY);
 }
 
 export async function clearAllLogs() {

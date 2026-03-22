@@ -33,35 +33,81 @@
 // Each section is a separate string so they can be mixed and matched.
 // Keys map to scenario identifiers returned by inferRoute().
 
+// ── Template resolution helper ────────────────────────────────────────────────
+// Entries can be plain strings OR (cycleCtx) => string functions.
+// When they are functions, cycleCtx is passed in — if null/missing the function
+// falls back to generic copy internally.
+function resolve(template, cx) {
+  if (!template) return null;
+  return typeof template === "function" ? template(cx) : template;
+}
+
 const SITUATION = {
-  late_period:
-    "Your period appears to be late or hasn't arrived yet.",
+  late_period: (cx) => {
+    if (cx?.daysLate > 0) {
+      return `Your period is currently **${cx.daysLate} day${cx.daysLate === 1 ? "" : "s"} late** — your tracked cycle averages **${cx.cycleLength} days** and you're on day **${cx.dayOfCycle}**.`;
+    }
+    if (cx?.dayOfCycle && cx?.cycleLength && cx.dayOfCycle >= cx.cycleLength - 2) {
+      return `You're on day **${cx.dayOfCycle}** of your **${cx.cycleLength}-day cycle** — your period is due now or may be a little late.`;
+    }
+    return "Your period appears to be late or hasn't arrived yet.";
+  },
   late_with_pain:
     "Your period is late and you also mentioned pain or discomfort.",
-  late_with_pregnancy_chance:
-    "Your period is late and there may be a chance of pregnancy.",
-  late_long_duration:
-    "Your period is significantly overdue — more than a week or two.",
+  late_with_pregnancy_chance: (cx) => {
+    if (cx?.daysLate > 0) {
+      return `Your period is **${cx.daysLate} day${cx.daysLate === 1 ? "" : "s"} late** based on your **${cx.cycleLength}-day cycle** — and there may be a chance of pregnancy.`;
+    }
+    return "Your period is late and there may be a chance of pregnancy.";
+  },
+  late_long_duration: (cx) => {
+    if (cx?.daysLate >= 7) {
+      return `Your period is **${cx.daysLate} days late** — significantly past your typical **${cx.cycleLength}-day cycle**.`;
+    }
+    return "Your period is significantly overdue — more than a week or two.";
+  },
   heavy_bleeding:
     "You're experiencing heavier bleeding than usual.",
   heavy_with_dizziness:
     "You're experiencing heavy bleeding along with dizziness or weakness.",
   heavy_long:
     "Your heavy bleeding has been going on for more than 7 days.",
-  spotting_midcycle:
-    "You're noticing light spotting around the middle of your cycle.",
+  spotting_midcycle: (cx) => {
+    if (cx?.dayOfCycle && cx?.cycleLength) {
+      const ovDay = Math.round(cx.cycleLength / 2);
+      return `You're on day **${cx.dayOfCycle}** of a **${cx.cycleLength}-day cycle** — ovulation typically falls around day ${ovDay - 1}–${ovDay + 1}, which lines up with midcycle spotting.`;
+    }
+    return "You're noticing light spotting around the middle of your cycle.";
+  },
   spotting_with_symptoms:
     "You're spotting and also experiencing other symptoms.",
   spotting_pregnancy:
     "You're spotting and there's a possibility of pregnancy.",
-  pelvic_mild:
-    "You're experiencing pelvic pain or cramps that feel manageable.",
+  pelvic_mild: (cx) => {
+    if (cx?.dayOfCycle) {
+      if (cx.dayOfCycle <= 5) {
+        return `You're on day **${cx.dayOfCycle}** of your cycle — pelvic pain and cramps in the first few days of a period are very common.`;
+      }
+      const ovDay = cx.cycleLength ? Math.round(cx.cycleLength / 2) : 14;
+      if (Math.abs(cx.dayOfCycle - ovDay) <= 2) {
+        return `You're on day **${cx.dayOfCycle}** — close to your typical ovulation window. Some people feel mild cramping during ovulation (mittelschmerz).`;
+      }
+    }
+    return "You're experiencing pelvic pain or cramps that feel manageable.";
+  },
   pelvic_severe:
     "You're experiencing severe or persistent pelvic pain.",
   pelvic_sex:
     "You're experiencing pain during or after sex.",
-  mood_before_period:
-    "You're noticing mood changes, fatigue, or emotional shifts — especially before your period.",
+  mood_before_period: (cx) => {
+    if (cx?.dayOfCycle && cx?.cycleLength) {
+      const daysUntil = cx.cycleLength - cx.dayOfCycle;
+      if (daysUntil >= 0 && daysUntil <= 10) {
+        return `You're on day **${cx.dayOfCycle}** of your **${cx.cycleLength}-day cycle** — about **${daysUntil} day${daysUntil === 1 ? "" : "s"}** before your next expected period. The luteal phase is when PMS symptoms tend to be strongest.`;
+      }
+    }
+    return "You're noticing mood changes, fatigue, or emotional shifts — especially before your period.";
+  },
   mood_general:
     "You're experiencing mood changes, low energy, or emotional heaviness.",
   pregnancy_concern:
@@ -71,34 +117,62 @@ const SITUATION = {
 };
 
 const MEANING = {
-  late_period:
-    "A late period can happen for many reasons — stress, changes in routine, illness, travel, or natural hormonal shifts. It doesn't always mean something is wrong.",
+  late_period: (cx) => {
+    if (cx?.daysLate > 0) {
+      return `Based on your tracked cycle of **${cx.cycleLength} days**, you're about **${cx.daysLate} day${cx.daysLate === 1 ? "" : "s"} past your expected window**. A late period can happen for many reasons — stress, changes in routine, illness, or natural hormonal shifts.`;
+    }
+    return "A late period can happen for many reasons — stress, changes in routine, illness, travel, or natural hormonal shifts. It doesn't always mean something is wrong.";
+  },
   late_with_pain:
     "A late period combined with pelvic pain can sometimes point to hormonal shifts, but in some cases it may need closer attention — especially if the pain is severe or one-sided.",
-  late_with_pregnancy_chance:
-    "When a period is late and pregnancy is possible, a pregnancy test is the clearest first step. Tests are most accurate from the day your period was expected.",
-  late_long_duration:
-    "When a period is more than one to two weeks late, it's worth exploring the cause — this can include stress, significant weight changes, hormonal imbalance, or possible pregnancy.",
+  late_with_pregnancy_chance: (cx) => {
+    if (cx?.daysLate > 0) {
+      return `You're **${cx.daysLate} day${cx.daysLate === 1 ? "" : "s"} past** your expected period based on a **${cx.cycleLength}-day cycle**. When a period is late and pregnancy is possible, a test is the clearest first step — tests are most accurate from the day your period was expected.`;
+    }
+    return "When a period is late and pregnancy is possible, a pregnancy test is the clearest first step. Tests are most accurate from the day your period was expected.";
+  },
+  late_long_duration: (cx) => {
+    if (cx?.daysLate >= 7) {
+      return `You're **${cx.daysLate} days past** your expected period window of **${cx.cycleLength} days**. When a period is this late, it's worth exploring the cause — this can include stress, significant weight changes, hormonal imbalance, or possible pregnancy.`;
+    }
+    return "When a period is more than one to two weeks late, it's worth exploring the cause — this can include stress, significant weight changes, hormonal imbalance, or possible pregnancy.";
+  },
   heavy_bleeding:
     "Some people naturally have heavier flow, especially early in a period. However, flow that soaks through products quickly or lasts longer than 7 days can sometimes signal an underlying cause worth checking.",
   heavy_with_dizziness:
     "Heavy bleeding combined with dizziness or weakness can be a sign that your body needs support — this combination can sometimes lead to low iron or other concerns.",
   heavy_long:
     "Bleeding that goes on for more than a week can mean the uterus is having trouble completing the cycle, or that hormones are out of balance.",
-  spotting_midcycle:
-    "Light spotting in the middle of the cycle is often related to ovulation — a small hormone dip can cause brief, light bleeding. This is common and usually harmless.",
+  spotting_midcycle: (cx) => {
+    if (cx?.dayOfCycle && cx?.cycleLength) {
+      const ovDay = Math.round(cx.cycleLength / 2);
+      return `Light spotting around day ${ovDay - 1}–${ovDay + 1} of a ${cx.cycleLength}-day cycle is often an ovulation sign — a small hormone dip can cause brief, light bleeding. You're on day **${cx.dayOfCycle}**, so this timing fits.`;
+    }
+    return "Light spotting in the middle of the cycle is often related to ovulation — a small hormone dip can cause brief, light bleeding. This is common and usually harmless.";
+  },
   spotting_with_symptoms:
     "Spotting alongside other symptoms like pain, unusual discharge, or fever can sometimes mean irritation, infection, or a hormonal change worth checking.",
   spotting_pregnancy:
     "Light spotting can sometimes occur in early pregnancy. A test can help clarify what's happening.",
-  pelvic_mild:
-    "Mild pelvic pain around your period is very common and often related to the uterus contracting. Comfort measures usually help.",
+  pelvic_mild: (cx) => {
+    if (cx?.dayOfCycle && cx.dayOfCycle <= 5) {
+      return `On day **${cx.dayOfCycle}** of your cycle, pelvic pain is most commonly caused by the uterus contracting to shed its lining — this is prostaglandin-driven and very normal. Comfort measures usually help.`;
+    }
+    return "Mild pelvic pain around your period is very common and often related to the uterus contracting. Comfort measures usually help.";
+  },
   pelvic_severe:
     "Persistent or severe pelvic pain that doesn't respond to rest or relief deserves medical attention. This doesn't automatically mean something serious — but pain shouldn't be dismissed.",
   pelvic_sex:
     "Pain during or after sex can be related to muscle tension, dryness, hormonal shifts, or other causes. It's more common than people talk about and is something a healthcare provider can help with.",
-  mood_before_period:
-    "Mood shifts, fatigue, and emotional heaviness before a period are real hormonal responses — not a sign of weakness. They're often linked to PMS or PMDD and can be supported.",
+  mood_before_period: (cx) => {
+    if (cx?.dayOfCycle && cx?.cycleLength) {
+      const daysUntil = cx.cycleLength - cx.dayOfCycle;
+      if (daysUntil >= 0 && daysUntil <= 10) {
+        return `Mood shifts, fatigue, and emotional heaviness in the **${daysUntil > 0 ? `${daysUntil} days` : "final days"}** before a period are real hormonal responses — not a sign of weakness. They're driven by the progesterone drop in the late luteal phase and are often linked to PMS or PMDD.`;
+      }
+    }
+    return "Mood shifts, fatigue, and emotional heaviness before a period are real hormonal responses — not a sign of weakness. They're often linked to PMS or PMDD and can be supported.";
+  },
   mood_general:
     "Persistent low energy, mood shifts, or emotional difficulty — even outside of your period — can sometimes be connected to hormonal patterns or other factors worth tracking.",
   pregnancy_concern:
@@ -243,15 +317,15 @@ const REASON_TO_SCENARIO = {
  *
  * Returns null if no scenario could be determined (fall through to decision tree).
  */
-export function buildGuidanceResponse(entities, inferredReason = null) {
+export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx = null) {
   const scenario = resolveScenario(entities, inferredReason);
   if (!scenario) return null;
 
-  const situation   = SITUATION[scenario]    || null;
-  const meaning     = MEANING[scenario]      || null;
-  const nextSteps   = NEXT_STEPS[scenario]   || null;
-  // FIX #10: urgentSigns entries no longer embed the "Seek urgent help if:"
-  // prefix — it is added here once, consistently, for every scenario.
+  const situation   = resolve(SITUATION[scenario], cycleCtx)  || null;
+  const meaning     = resolve(MEANING[scenario],   cycleCtx)  || null;
+  const nextSteps   = NEXT_STEPS[scenario]                    || null;
+  // urgentSigns entries no longer embed the "Seek urgent help if:" prefix —
+  // it is added here once, consistently, for every scenario.
   const urgentSigns = URGENT_SIGNS[scenario] || URGENT_SIGNS.default;
 
   if (!situation && !meaning) return null;
@@ -318,8 +392,8 @@ function resolveScenario(entities, inferredReason) {
  * getStructuredSummary(entities, inferredReason) → object | null
  * Useful for building the PDF export / provider summary.
  */
-export function getStructuredSummary(entities, inferredReason) {
-  const response = buildGuidanceResponse(entities, inferredReason);
+export function getStructuredSummary(entities, inferredReason, cycleCtx = null) {
+  const response = buildGuidanceResponse(entities, inferredReason, cycleCtx);
   if (!response) return null;
   return {
     scenario:   response.scenario,

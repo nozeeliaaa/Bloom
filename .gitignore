@@ -42,3 +42,4 @@ firebase-debug.log
 # Coverage / Testing
 # =========================
 coverage/
+dist
