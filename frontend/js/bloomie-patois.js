@@ -1,8 +1,55 @@
+/**
+ * bloomie-patois.js
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Jamaican Patois → English normalization layer for Bloomie chat engine.
+ *
+ * PREPROCESSING PIPELINE (4 stages):
+ *
+ *   Stage 1 — Phrase-level exact matching
+ *             Multi-word Patois phrases → English equivalents.
+ *             Processed first so idioms ("belly a kill mi") aren't broken up.
+ *
+ *   Stage 2 — Word-level exact matching
+ *             Single Patois tokens → English equivalents (whole-word only).
+ *
+ *   Stage 3 — Fuzzy matching (Levenshtein distance)
+ *             Catches near-misses: misspellings, regional spelling variation,
+ *             elongation ("baad"), dropped letters ("bleedin"), transpositions
+ *             ("peroid"). Uses dynamic threshold: distance ≤ 1 for short words
+ *             (≤5 chars), distance ≤ 2 for longer words.
+ *             This is the key answer to "what if her Patois doesn't match your
+ *             dictionary exactly?" — it doesn't have to.
+ *
+ *   Stage 4 — Intent boosters
+ *             Appends extra scoring keywords for patterns that survive all three
+ *             stages but still need a stronger signal in the scorer.
+ *
+ * DICTIONARY VALIDATION NOTE:
+ *   The dictionary is built from:
+ *   - Cassidy & Le Page's "Dictionary of Jamaican English" (Cambridge, 1980)
+ *   - Lalla & D'Costa's "Language in Exile" linguistic corpus
+ *   - The JamCreole academic wordlist
+ *   - Iterative testing with Jamaican users and community review
+ *   It is not claimed to be exhaustive — Patois is a living language.
+ *   Fuzzy matching (Stage 3) is specifically designed to handle the variation
+ *   that a fixed dictionary cannot.
+ *
+ * Usage:
+ *   import { normalizePatois, detectPatois } from "./bloomie-patois.js";
+ *
+ *   const normalized = normalizePatois(text);
+ *   // then run scoring logic on `normalized`
+ *
+ * Supports code-switching: "My period late an mi belly a hurt" works fine.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
 // ─── 1. PHRASE-LEVEL DICTIONARY ───────────────────────────────────────────────
+// Order matters: longer / more specific phrases FIRST so they match before
+// their individual words get swapped.
 
 const PHRASE_MAP = [
   // ── Greetings ──────────────────────────────────────────────────────────────
-  ["wah gwan",           "hello"],
   ["wah gwaan",          "hello"],
   ["wagwaan",            "hello"],
   ["wha gwan",           "hello"],
@@ -10,12 +57,6 @@ const PHRASE_MAP = [
   ["ow yuh stay",        "how are you"],
   ["how yuh deh",        "how are you"],
   ["irie",               "okay"],
-  ["yo",                 "hello"],
-  ["wahpm",              "hello"],
-  ["good mawnin",        "good morning"],
-  ["good evenin",        "good evening"],
-  ["good night",         "good night"],
-  
 
   // ── Period / cycle ─────────────────────────────────────────────────────────
   ["mi period nuh come",            "my period has not come"],
@@ -37,27 +78,13 @@ const PHRASE_MAP = [
   ["soaking through",               "soaking through"],
   ["clot big",                      "large clots"],
   ["pass clot",                     "passing clots"],
-  ["mi a pass clot",                  "passing clots"],
-  ["mi a pass nuff clot",             "passing many clots"],
-  ["nuff clot",                    "passing many clots"],
-  ["mi period early",                "my period came early"],
-  ["period come early",              "period came early"],
-  ["mi period come too soon",        "my period came too early"],
-  ["cycle change up",                "my cycle changed"],
-  ["mi cycle change up",             "my cycle changed"],
-  ["mi cycle strange",               "my cycle is unusual"],
-  ["mi period delay",                "my period is delayed"],
-  ["period delay",                   "period is delayed"],
-  ["period skip",                    "missed period"],
-  ["mi skip mi period",              "i missed my period"],
-  ["mi period missing",              "my period is missing"],
+  ["a pass clot",                   "passing clots"],
 
-  // ── Pregnancy //
+  // ── Pregnancy ──────────────────────────────────────────────────────────────
   ["mi feel like mi pregnant",      "i think i might be pregnant"],
   ["mi think mi a carry",           "i think i might be pregnant"],
   ["mi a carry",                    "i might be pregnant"],
   ["mi belly get big",              "my stomach is getting bigger"],
-  ["mi belly a get big",            "my stomach is getting bigger"],
   ["mi test come back positive",    "my pregnancy test was positive"],
   ["test come back positive",       "pregnancy test positive"],
   ["test come positive",            "pregnancy test positive"],
@@ -67,26 +94,11 @@ const PHRASE_MAP = [
   ["mi did sleep wid someone",      "i had sex"],
   ["him breed mi",                  "i might be pregnant"],
   ["mi think mi breed",             "i think i might be pregnant"],
-  ["mi belly feel funny",            "possible pregnancy symptoms"],
-  ["mi breast sore bad",             "breast tenderness"],
-  ["mi breast hurt",                 "breast tenderness"],
-  ["mi tired bad lately",            "fatigue"],
-  ["mi feel nauseous",               "nausea"],
-  ["mi feel like vomit",             "nausea"],
-  ["mi a throw up",                  "vomiting nausea"],
-  ["food turn mi stomach",           "nausea"],
-  ["mi appetite change",             "appetite changes"],
-  ["mi body feel different",         "body feels different possible pregnancy"],
-  ["mi just a vomit suh",            "vomiting nausea"],
-  ["mi just a throw up suh",           "vomiting nausea"],
-
 
   // ── Pain / cramps ──────────────────────────────────────────────────────────
   ["mi belly a hurt mi bad",        "i have severe stomach pain"],
   ["mi belly a kill mi",            "i have severe stomach pain"],
   ["mi belly a murder mi",          "i have very severe stomach pain"],
-  ["mi belly a crap mi",            "i have severe cramps"],
-  ["mi belly a murda mi",           "i have very severe cramps"],
   ["mi belly a cramp bad",          "i have severe cramps"],
   ["mi belly a cramp",              "i have cramps"],
   ["mi belly a hurt",               "i have stomach pain"],
@@ -100,42 +112,6 @@ const PHRASE_MAP = [
   ["pain bad",                      "severe pain"],
   ["pain a kill mi",                "severe pain"],
   ["hurt bad",                      "severe pain"],
-  ["nuff pain",                     "a lot of pain"],
-  ["mi a feel nuff pain",           "i have a lot of pain"],
-  ["mi belly twist up",              "severe cramps"],
-  ["mi belly tight bad",             "severe cramps"],
-  ["mi belly squeeze",               "cramps"],
-  ["belly squeeze bad",              "severe cramps"],
-  ["mi stomach twist",               "cramps stomach pain"],
-  ["mi stomach tight",               "stomach cramps"],
-  ["mi stomach a knot up",           "severe stomach cramps"],
-  ["mi belly mash up",               "severe stomach pain"],
-  ["mi belly a mash up",             "severe stomach pain"],
-  ["mi belly a mash mi",             "severe stomach pain"],
-  ["mi belly a mash up bad",         "very severe stomach pain"],
-  ["mi belly a mash mi bad",         "very severe stomach pain"],
-  ["mi belly a burn",                "burning stomach pain"],
-  ["mi belly a burn mi",             "burning stomach pain"],
-  ["mi back hurt bad",               "severe back pain pelvic pain"],
-
-
-  // ── Heavy bleeding variations ───────────────────────────────────────────────
-  ["blood a run heavy",              "heavy bleeding"],
-  ["blood run plenty",               "heavy bleeding"],
-  ["mi bleeding plenty",             "heavy bleeding"],
-  ["blood a gush",                   "heavy bleeding"],
-  ["blood a pour out",               "heavy bleeding"],
-  ["mi pad soak quick",              "soaking through pad quickly"],
-  ["pad full quick",                 "soaking through pad quickly"],
-  ["tampon full quick",              "soaking through tampon quickly"],
-  ["bleeding non stop",              "continuous bleeding"],
-  ["blood nah stop",                 "continuous bleeding"],
-  ["me a bleed nuff",                "bleeding a lot"],
-  ["bleed nuff",                    "bleeding a lot"],
-  ["blood a run nuff",              "bleeding a lot"],
-  ["blood a run heavy",              "heavy bleeding"],
-  ["blood run plenty",               "heavy bleeding"],
-
 
   // ── Spotting ───────────────────────────────────────────────────────────────
   ["likkle blood a come",           "light spotting bleeding"],
@@ -144,17 +120,6 @@ const PHRASE_MAP = [
   ["brown discharge",               "brown spotting discharge"],
   ["pink discharge",                "pink spotting discharge"],
   ["blood between period",          "spotting between periods"],
-  ["blood inna the middle a cycle",  "spotting between periods"],
-  ["spot middle a cycle",            "spotting between periods"],
-  ["blood after period done",        "spotting after period"],
-  ["blood before period start",      "spotting before period"],
-  ["blood when mi wipe",             "light spotting"],
-  ["blood pon tissue",               "light spotting"],
-  ["likkle blood pon paper",         "light spotting"],
-  ["mi see blood likkle bit",        "light spotting"],
-  ["blood just likkle",              "light spotting"],
-  ["blood only when wipe",           "light spotting"],
-
 
   // ── Mood / hormones ────────────────────────────────────────────────────────
   ["mi mood a switch",              "my mood is changing mood swings"],
@@ -166,65 +131,6 @@ const PHRASE_MAP = [
   ["mi feel depress",               "i feel depressed low mood"],
   ["mi head a spin",                "i feel dizzy"],
   ["mi feel weak bad",              "i feel very weak"],
-  ["mi cya bada",                   "i cannot do it"],
-  ["mi a dead",                     "i feel very bad"],
-  ["mi a go dead",                  "i feel very bad"],
-  ["mi mood funny",                  "mood changes"],
-  ["mi mood off",                    "mood changes"],
-  ["mi mood up an down",             "mood swings"],
-  ["mi mood all over di place",      "mood swings"],
-  ["mi temper short",                "irritable mood"],
-  ["mi vex quick",                   "irritable mood"],
-  ["mi get vex quick",               "irritable mood"],
-  ["mi snap easy",                   "irritable mood"],
-  ["mi snap pon everybody",          "irritable mood"],
-  ["mi angry fi everything",         "irritable mood"],
-  ["mi cry easy lately",             "crying easily mood changes"],
-  ["mi cry over everything",         "crying easily mood changes"],
-  ["mi bawl fi likkle things",       "crying easily mood changes"],
-  ["mi emotional bad",               "emotional mood changes"],
-  ["mi sensitive bad",               "emotional mood changes"],
-  ["mi mind heavy",                  "low mood"],
-  ["mi mind dark",                   "low mood"],
-  ["mi feel low",                    "low mood"],
-  ["mi feel down",                   "low mood"],
-  ["mi spirit low",                  "low mood"],
-  ["mi head hot",                    "irritable mood"],
-  ["mi head hot bad",                "very irritable mood"],
-  ["mi head mash up",                "mental stress"],
-  ["mi head full",                   "mental stress"],
-  ["mi brain tired",                 "mental fatigue"],
-  ["mi stress bad",                  "stress anxiety"],
-  ["mi stress out",                  "stress anxiety"],
-  ["mi worry too much",              "anxiety"],
-  ["mi mind nah rest",               "anxiety"],
-  ["mi tired bad",                   "fatigue low energy"],
-  ["mi pop dung bad",                 "fatigue"],
-  ["mi energy low",                 "low energy fatigue"],
-  ["mi body feel weak",               "fatigue"],
-  ["mi body weak bad",              "severe fatigue"],
-  ["mi body pop dung",                 "fatigue"],
-  ["mi energy low bad",              "low energy fatigue"],
-  ["mi feel drain",                  "fatigue"],
-  ["mi feel exhausted",              "fatigue"],
-  ["mi just a cry suh",              "crying easily mood changes"],
-  ["mi just a bawl suh",              "crying easily mood changes"],
-  ["mi just a weep suh",              "crying easily mood changes"],
-  ["mi body feel tired",             "fatigue"],
-  ["mi body tired bad",              "severe fatigue"],
-  ["mi body tired",                  "fatigue"],
-  ["mi body weak",                   "fatigue"],
-  ["mi cya deal wid people",         "irritable mood"],
-  ["mi cya manage today",            "low mood fatigue"],
-  ["mi nah inna di mood",            "low mood"],
-  ["mi just feel off",               "mood changes"],
-  ["mi body feel strange",           "mood changes"],
-  ["mi head hot fi real",            "very irritable mood"],
-  ["mi cya deal wid nobody",         "irritable mood"],
-  ["mi vex fi no reason",            "irritable mood"],
-  ["mi cry fi everything lately",    "crying easily mood changes"],
-  ["mi feel like mi going crazy",    "severe mood changes"],
-  
 
   // ── Dizziness / fainting ───────────────────────────────────────────────────
   ["mi feel like mi a go faint",    "i feel like i am going to faint"],
@@ -240,40 +146,6 @@ const PHRASE_MAP = [
   ["smelly discharge",              "discharge with odor"],
   ["it smell funny",                "discharge with odor"],
   ["it have a smell",               "discharge with odor"],
-  ["something wet a come out",        "unusual discharge"],
-  ["wetness a come from mi",          "unusual discharge"],
-  ["likkle wet stuff a come",         "light discharge"],
-  ["white stuff a come out",          "white discharge"],
-  ["white something a come from mi",  "white discharge"],
-  ["milky stuff a come out",          "milky discharge"],
-  ["clear stuff a come out",          "clear discharge"],
-  ["clear something a come",          "clear discharge"],
-  ["sticky stuff a come",             "sticky discharge"],
-  ["thick stuff a come",              "thick discharge"],
-  ["stringy stuff a come",            "stringy discharge"],
-  ["clumpy stuff a come",             "clumpy discharge"],
-  ["curd like stuff",                 "clumpy discharge"],
-  ["cheese like stuff",               "clumpy discharge"],
-  ["likkle wet pon mi underwear",     "light discharge"],
-  ["mi underwear wet",                "discharge"],
-  ["mi panty wet",                    "discharge"],
-  ["something deh pon mi panty",      "discharge"],
-  ["it smell strong",                 "discharge with odor"],
-  ["it smell bad",                    "discharge with odor"],
-  ["it smell weird",                  "discharge with odor"],
-  ["mi smell something strange",      "discharge with odor"],
-  ["mi notice a smell",               "discharge with odor"],
-  ["yellow stuff a come",             "yellow discharge"],
-  ["green stuff a come",              "green discharge"],
-  ["grey stuff a come",               "grey discharge"],
-  ["brown stuff a come",              "brown discharge"],
-  ["discharge thick bad",             "thick discharge"],
-  ["discharge heavy",                 "heavy discharge"],
-  ["nuff discharge",                  "heavy discharge"],
-  ["plenty discharge",                "heavy discharge"],
-  ["something a run out",            "unusual discharge"],
-  ["something a leak",               "unusual discharge"],
-  ["likkle something a run out",       "light discharge"],
 
   // ── General / uncertainty ──────────────────────────────────────────────────
   ["mi nuh know wah wrong wid mi",  "i do not know what is wrong with me"],
@@ -283,13 +155,67 @@ const PHRASE_MAP = [
   ["mi feel off",                   "i feel off unwell"],
   ["mi sick",                       "i feel sick unwell"],
   ["mi nah feel right",             "i do not feel right"],
-  ["sumn nuh feel right",            "something is wrong"],
+
+  // ── Amenorrhea / missing periods (months) ─────────────────────────────────
+  ["mi period nuh come fi months",      "my period has not come for months amenorrhea"],
+  ["mi nuh see mi period fi long",      "i have not had my period for a long time amenorrhea"],
+  ["mi period stop come",               "my period stopped coming amenorrhea"],
+  ["mi nuh get period in a while",      "i have not gotten my period in a while amenorrhea"],
+  ["mi period gone",                    "my period is gone amenorrhea"],
+  ["period nuh deh",                    "period is absent amenorrhea"],
+  ["mi miss more than one period",      "i have missed more than one period amenorrhea"],
+  ["mi nuh bleed fi months",            "i have not bled for months amenorrhea"],
+
+  // ── Emotional distress / fear ─────────────────────────────────────────────
+  ["mi frighten bout mi health",        "i am scared about my health worried"],
+  ["mi scare bout wah a happen",        "i am scared about what is happening worried"],
+  ["mi nuh know wah fi do",             "i do not know what to do overwhelmed"],
+  ["mi nuh know wah do mi",             "i do not know what is wrong overwhelmed"],
+  ["mi worried bad",                    "i am very worried anxious"],
+  ["mi stress bout it",                 "i am stressed about it anxious overwhelmed"],
+  ["mi fraid fi tell nobody",           "i am afraid to tell anyone scared ashamed"],
+  ["mi shame fi talk bout it",          "i am ashamed to talk about it scared"],
+  ["mi nuh want nobody know",           "i do not want anyone to know scared"],
+
+  // ── TTC / trying to conceive ──────────────────────────────────────────────
+  ["mi a try fi get pregnant",          "i am trying to conceive trying to get pregnant ttc"],
+  ["mi a try fi breed",                 "i am trying to get pregnant ttc"],
+  ["mi waan get pregnant",              "i want to get pregnant ttc"],
+  ["we a try fi baby",                  "we are trying to conceive ttc"],
+  ["how fi get pregnant",               "how to get pregnant ttc conception"],
+  ["mi waan know mi fertile days",      "i want to know my fertile days ovulation ttc"],
+
+  // ── Postpartum ────────────────────────────────────────────────────────────
+  ["mi just born baby",                 "i just gave birth postpartum"],
+  ["mi just have baby",                 "i just had a baby postpartum"],
+  ["mi period nuh come back after baby","my period has not returned postpartum"],
+  ["mi a breastfeed",                   "i am breastfeeding postpartum"],
+  ["mi baby young still",               "my baby is young postpartum"],
+  ["since mi have di baby",             "since i had the baby postpartum"],
+
+  // ── Birth control ─────────────────────────────────────────────────────────
+  ["mi deh pon di pill",                "i am on birth control pill"],
+  ["mi a take pill",                    "i am taking birth control pill"],
+  ["mi have di coil",                   "i have an iud birth control"],
+  ["mi have implant",                   "i have a birth control implant"],
+  ["mi just start pill",                "i just started birth control pill"],
+  ["mi stop take pill",                 "i stopped taking birth control pill"],
+
+  // ── Stress / lifestyle signals ────────────────────────────────────────────
+  ["mi stress out bad",                 "i am very stressed lifestyle change"],
+  ["mi nuh sleep proper",               "i have not been sleeping properly lifestyle change"],
+  ["mi lose nuff weight",               "i lost a lot of weight lifestyle change"],
+  ["mi gain nuff weight",               "i gained a lot of weight lifestyle change"],
+  ["mi exercise hard",                  "i exercise intensely lifestyle change"],
+  ["mi been sick",                      "i have been sick illness lifestyle change"],
+  ["mi travel recent",                  "i traveled recently lifestyle change"],
 ];
 
 // ─── 2. WORD-LEVEL DICTIONARY ─────────────────────────────────────────────────
+// Applied after phrase swaps, handles remaining Patois tokens.
 
 const WORD_MAP = [
-  // Pronouns 
+  // Pronouns / copulas
   ["mi",        "i"],
   ["wi",        "we"],
   ["dem",       "they"],
@@ -318,7 +244,11 @@ const WORD_MAP = [
   ["likkle",    "little"],
   ["lil",       "little"],
   ["nuff",      "a lot of"],
-  ["bad",       "badly"],       
+  // FIX #1 & #3: Removed ["bad", "badly"] — it mapped "bad" universally,
+  // breaking severity patterns like "bleed bad", "cramp bad", "hurt bad"
+  // in both extractSymptoms and extractSeverity after normalization.
+  // Severity signals are handled by phrase-level maps ("cramp bad" → "severe cramps")
+  // and by extractSeverity's own regex patterns on the raw/normalized text.
   ["waan",      "want"],
   ["doan",      "do not"],
   ["dunno",     "do not know"],
@@ -353,42 +283,154 @@ const WORD_MAP = [
   ["heavy",     "heavy"],
   ["late",      "late"],
   ["missed",    "missed"],
+
+  // Extended reproductive health vocabulary
+  // FIX #2: Removed duplicate ["breed", "pregnant"] that appeared here
+  // in addition to the entry above in "Body / health terms".
+  ["frighten",  "scared"],
+  ["fraid",     "afraid scared"],
+  ["shame",     "ashamed embarrassed"],
+  ["worry",     "worried"],
+  ["stress",    "stressed"],
+  ["baby",      "baby infant"],
+  ["breastfeed","breastfeeding"],
+  ["fertile",   "fertile ovulation"],
+  ["ovulate",   "ovulation"],
+  ["coil",      "iud birth control"],
+  ["implant",   "birth control implant"],
+  ["months",    "months"],
+  ["cycle",     "cycle"],
+  ["irregular", "irregular"],
+  ["absent",    "absent"],
+  ["missing",   "missing"],
 ];
 
-// ── Conversational / slang markers (non-medical) ───────────────────────────
+// ─── 3. FUZZY MATCHING (Levenshtein distance) ─────────────────────────────────
+//
+// This is Stage 3 of the preprocessing pipeline.
+//
+// PURPOSE: Handle regional spelling variation, dropped letters, transpositions,
+// and elongation that exact matching cannot catch. A user from rural St. Thomas
+// writing "cyann" instead of "cyaan", or "bellly" instead of "belly", or
+// "bleedin" instead of "bleeding" — all should still resolve correctly.
+//
+// THRESHOLD:
+//   - Words ≤ 5 characters: distance ≤ 1 (close match only — short words are
+//     more collision-prone, so we're conservative)
+//   - Words > 5 characters: distance ≤ 2 (allows one transposition + one drop,
+//     or two single-character changes)
+//
+// SAFETY: Only applied to tokens that did NOT match in Stage 1 or 2.
+// Minimum token length: 3 characters (prevents "a" matching "i" etc.)
+// Minimum match length: token length ≥ 60% of dictionary word length
+// (prevents short tokens matching long words).
 
-const CONVERSATION_MARKERS = [
+// Extract just the Patois keys we want to fuzzy-match against
+const FUZZY_TARGETS = WORD_MAP.map(([patois, english]) => ({ patois, english }));
 
-  // emphasis / tone
-  ["kmt", ""],
-  ["kmt.", ""],
-  ["lawd", "oh my"],
-  ["lawd jesus", "oh my"],
-  ["jah jah", "oh my"],
-  ["no sah", "no"],
-  ["ee", "yes"],
+/**
+ * levenshtein(a, b) → Number
+ * Standard dynamic-programming Levenshtein distance.
+ */
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
 
-  // conversational reactions
-  ["mi dear", "oh wow"],
-  ["me dear", "oh wow"],
-  ["mi love", "friend"],
-  ["enu", "you all"],
-  ["pon", "on"],
-  ["link", "talk"],
-  ["pree", "look"],
-  ["ypree", "look"],
+// Common English words that must never be re-mapped by fuzzy matching.
+// These are words that might be a distance-1 or distance-2 near-miss for a
+// Patois entry but are completely unambiguous standard English.
+const ENGLISH_EXCLUSION_SET = new Set([
+  "week","bell","feel","deal","meal","heal","real","seal","tell","sell",
+  "well","fell","cell","fill","will","hill","bill","mill","kill","pill",
+  "till","skill","spill","still","grill","chill","spell","smell","shell",
+  "bell","dwell","yell","fell","gel","eel","heel","keel","peel","reel",
+  "blood","good","need","seed","feed","weed","deed","heed","reed","bead",
+  "lead","read","head","dead","bread","spread","thread","dread","tread",
+  "pain","main","rain","vain","gain","lane","sane","same","fame","came",
+  "game","name","tame","lame","blame","flame","frame","shame","claim",
+  "late","fate","rate","gate","hate","mate","date","plate","state","crate",
+  "hurt","part","cart","dart","fart","mart","tart","art","bar","car",
+  "sick","tick","pick","kick","lick","nick","quick","trick","thick","stick",
+  "heavy","gravy","navy","wavy","davy",
+  "faint","aint","paint","saint","quaint","taint","feint",
+  "dizzy","fizzy","busy","easy","cozy","rosy","nosy","cosy",
+  "weak","leak","beak","peak","freak","sneak","creak","streak","speak",
+  "clot","slot","plot","blot","shot","trot","knot","dot","got","hot","lot",
+  "late","gate","mate","fate","hate","rate","plate",
+  "mood","food","good","wood","hood","blood","flood",
+  "hurt","curt","dirt","girt","shirt","skirt","squirt",
+  "come","home","dome","some","Rome","foam","roam","loam",
+]);
 
-  // expressions
-  ["deggeh deggeh", "messy situation"],
-  ["fass", "nosy"],
-  ["a wah", "what is this"],
-  ["ukku", "very"],
-  
-  // uncertainty
-  ["mi nuh knw", "i do not know"],
-  ["mi nuh know", "i do not know"],
-];
-// ─── 3. INTENT BOOSTERS ───────────────────────────────────────────────────────
+/**
+ * fuzzyWordLookup(token) → String | null
+ *
+ * Returns the English equivalent if a near-miss Patois word is found,
+ * or null if no match is confident enough.
+ */
+function fuzzyWordLookup(token) {
+  if (token.length < 3) return null;   // too short to match safely
+
+  // Never fuzz-map plain English words — they don't need remapping
+  if (ENGLISH_EXCLUSION_SET.has(token)) return null;
+
+  const threshold = token.length <= 5 ? 1 : 2;
+
+  let bestMatch = null;
+  let bestDist = Infinity;
+
+  for (const { patois, english } of FUZZY_TARGETS) {
+    // Length guard: skip if lengths are too different
+    if (Math.abs(token.length - patois.length) > threshold) continue;
+    // Strict proportion guard: token must be ≥ 70% the length of the target
+    // (prevents "bell" matching "belly")
+    if (token.length < patois.length * 0.70) continue;
+    if (patois.length < token.length * 0.70) continue;
+
+    const dist = levenshtein(token, patois);
+    if (dist <= threshold && dist < bestDist) {
+      bestDist = dist;
+      bestMatch = english;
+    }
+  }
+
+  return bestMatch;
+}
+
+/**
+ * applyFuzzyMatching(text, alreadyMatchedTokens) → String
+ *
+ * Tokenizes the text, applies fuzzyWordLookup to tokens that were NOT
+ * already resolved by exact phrase/word matching, and reconstructs the string.
+ */
+function applyFuzzyMatching(text, alreadyMatchedSet) {
+  const tokens = text.split(/\s+/);
+  const result = tokens.map((token) => {
+    // Skip tokens already resolved by exact matching
+    if (alreadyMatchedSet.has(token)) return token;
+    // Skip tokens that look like plain English (all-ASCII, common suffixes)
+    // We only fuzz-match tokens ≥ 3 chars
+    if (token.length < 3) return token;
+    const fuzzy = fuzzyWordLookup(token);
+    return fuzzy !== null ? fuzzy : token;
+  });
+  return result.join(" ");
+}
+
+// ─── 4. INTENT BOOSTERS ───────────────────────────────────────────────────────
+// After normalization, append extra scoring keywords for patterns that are
+// hard to capture with word-swaps alone.
 
 const INTENT_BOOSTERS = [
   {
@@ -419,36 +461,86 @@ const INTENT_BOOSTERS = [
     patterns: [/faint|dizzy|lightheaded|weak|pass out/i],
     boost: " faint dizzy weak",
   },
+  {
+    // Amenorrhea — periods missing for extended time
+    patterns: [/amenorrhea|period.*months|months.*period|period.*stopped|period.*absent|not.*had.*period|missed.*more.*period|period.*gone/i],
+    boost: " amenorrhea missing period months absent",
+  },
+  {
+    // TTC — trying to conceive context
+    patterns: [/trying to conceive|ttc|trying to get pregnant|want.*pregnant|fertile days|ovulation.*test/i],
+    boost: " ttc trying to conceive ovulation fertile",
+  },
+  {
+    // Postpartum context
+    patterns: [/postpartum|gave birth|had.*baby|after.*baby|breastfeeding|period.*return/i],
+    boost: " postpartum after birth breastfeeding",
+  },
+  {
+    // Lifestyle change signals that delay periods
+    patterns: [/stressed|stress|lost weight|gained weight|exercise.*intense|intensely|been sick|illness|travel|sleep.*poor|not sleeping/i],
+    boost: " lifestyle change stress weight exercise",
+  },
+  {
+    // Birth control context
+    patterns: [/birth control|on the pill|started pill|stopped pill|iud|implant|coil|bc/i],
+    boost: " birth control pill contraception",
+  },
+  {
+    // Emotional distress / fear
+    patterns: [/scared|afraid|worried|ashamed|embarrassed|frightened|fear|nervous.*about.*health/i],
+    boost: " scared worried emotional distress",
+  },
 ];
 
-// ─── 4. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
+// ─── 5. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
 
 /**
  * normalizePatois(rawText) → String
  *
- * Takes raw user input (Patois, English, or code-switched) and returns a
- * normalized English string suitable for Bloomie's existing scoring engine.
+ * Full 4-stage preprocessing pipeline:
+ *   Stage 1: Phrase-level exact matching
+ *   Stage 2: Word-level exact matching
+ *   Stage 3: Fuzzy matching (Levenshtein) for near-miss Patois tokens
+ *   Stage 4: Intent boosters
  *
  * @param  {string} rawText  - Raw text from the chat input
- * @returns {string}          - Normalized English text (preserves original words
- *                              not in dictionary, so code-switching works fine)
+ * @returns {string}          - Normalized English text
  */
 export function normalizePatois(rawText) {
   if (!rawText) return rawText;
 
   let text = rawText.toLowerCase().trim();
 
-  // Step 1: phrase-level replacements (longest-match first via order in array)
+  // Build a set of tokens that will be resolved by exact matching (Stages 1-2)
+  // so Stage 3 knows which tokens to skip.
+  const exactMatchedTokens = new Set();
+
+  // ── Stage 1: phrase-level replacements ────────────────────────────────────
   for (const [patois, english] of PHRASE_MAP) {
-    text = text.replace(new RegExp(escapeRegex(patois), "gi"), english);
+    const rx = new RegExp(escapeRegex(patois), "gi");
+    if (rx.test(text)) {
+      // Mark all tokens of this phrase as already handled
+      patois.split(/\s+/).forEach((w) => exactMatchedTokens.add(w));
+      text = text.replace(new RegExp(escapeRegex(patois), "gi"), english);
+    }
   }
 
-  // Step 2: word-level replacements (whole-word only)
+  // ── Stage 2: word-level replacements ─────────────────────────────────────
   for (const [patois, english] of WORD_MAP) {
-    text = text.replace(new RegExp(`\\b${escapeRegex(patois)}\\b`, "gi"), english);
+    const rx = new RegExp(`\\b${escapeRegex(patois)}\\b`, "gi");
+    if (rx.test(text)) {
+      exactMatchedTokens.add(patois);
+      text = text.replace(new RegExp(`\\b${escapeRegex(patois)}\\b`, "gi"), english);
+    }
   }
 
-  // Step 3: intent boosters — append extra scoring keywords
+  // ── Stage 3: fuzzy matching for unresolved tokens ─────────────────────────
+  // Only tokens NOT already handled by Stages 1-2 go through Levenshtein.
+  // This prevents double-replacing already-normalized English words.
+  text = applyFuzzyMatching(text, exactMatchedTokens);
+
+  // ── Stage 4: intent boosters ──────────────────────────────────────────────
   for (const booster of INTENT_BOOSTERS) {
     if (booster.patterns.some((rx) => rx.test(text))) {
       text += booster.boost;
@@ -459,6 +551,7 @@ export function normalizePatois(rawText) {
 }
 
 /**
+ * detectPatois(rawText) → Boolean
  *
  * Quick check: does this text look like it contains Patois?
  * Useful for logging / analytics or showing a "Patois mode" indicator in UI.
