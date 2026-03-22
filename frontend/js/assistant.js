@@ -47,17 +47,6 @@ export async function mountChat(user = null, cycleData = null, symptomHistory = 
   // before mounting so Bloomie can surface recall on first message.
   const bloomieMemory = await loadBloomieMemory();
 
-  // cycleData shape (pass from Firestore / dashboard state):
-  // {
-  //   lmp:                 Date | string | null,  ← last menstrual period
-  //   cycleLength:         number | null,          ← average cycle length in days
-  //   nextPeriodDate:      Date | string | null,   ← predicted next period
-  //   isTrackingPregnancy: boolean,                ← user switched to pregnancy mode
-  //   edd:                 Date | string | null,   ← estimated due date (if pregnancy mode)
-  // }
-  //
-  // symptomHistory shape (pass from Firestore symptomLogs):
-  // [{ dateKey: "YYYY-MM-DD", items: [{ code, severity, note }] }, ...]
   initBloomieChat({
     userName: user?.nickname || user?.displayName || null,
     cycleData,
@@ -98,8 +87,6 @@ export function initBloomieChat({
   if (!$box) throw new Error(`Missing #${chatBoxId}`);
 
   // ---------- Nickname helper ----------
-  // greet(full) → "Hey Kia 🩷"  |  greet() → "Hey 🩷"
-  // greet(full, "Thanks for talking") → "Thanks for talking, Kia 🩷"
   function greet(useName = true, prefix = null) {
     const name = userName && userName.trim() ? userName.trim() : null;
     if (prefix) {
@@ -109,7 +96,6 @@ export function initBloomieChat({
   }
 
   // ---------- Cycle data helpers ----------
-  // Normalise whatever date format comes from Firestore into a JS Date or null
   function toDate(val) {
     if (!val) return null;
     if (val?.toDate) return val.toDate();           // Firestore Timestamp
@@ -118,12 +104,6 @@ export function initBloomieChat({
   }
 
   // ── User state — derived from Firestore cycleData ────────────────────────
-  // mode:
-  //   "cycle_tracking"      → logging periods, using predictions
-  //   "trying_to_conceive"  → TTC mode enabled on dashboard
-  //   "pregnancy_tracking"  → confirmed pregnancy, tracking weeks/EDD
-  //   "postpartum"          → post-birth mode
-  //   "just_browsing"       → no logs, no mode set
   const cd = {
     lmp:                 toDate(cycleData?.lmp),
     cycleLength:         Number(cycleData?.cycleLength) || 28,
@@ -146,10 +126,6 @@ export function initBloomieChat({
   };
 
   // Shorthand mode checks used throughout nodes
-  // effectiveMode: returns ctx.sessionMode if the user confirmed a mode THIS session,
-  // otherwise falls back to the Firestore-derived cd.mode.
-  // This means Bloomie can update its understanding mid-conversation without
-  // waiting for a dashboard reload.
   function effectiveMode() {
     return ctx?.sessionMode || cd.mode;
   }
@@ -175,9 +151,7 @@ export function initBloomieChat({
     if (!lmp) return null;
     const cycleLength = effectiveCycleLength();
     const today       = new Date();
-    // dayOfCycle is 1-indexed: day 1 = first day of last period.
     const dayOfCycle  = Math.max(1, Math.round((today - lmp) / (1000 * 60 * 60 * 24)) + 1);
-    // daysLate: how many days past the expected end of this cycle (0 if not late).
     const daysLate    = Math.max(0, dayOfCycle - cycleLength);
     return { lmp, cycleLength, dayOfCycle, daysLate };
   }
@@ -225,15 +199,6 @@ export function initBloomieChat({
   }
 
   // buildSymptomContext(catalogCodes) → string | null
-  //
-  // Given the catalog codes detected in the current message, scans
-  // symptomHistory to find recurring patterns tied to the user's cycle.
-  //
-  // Returns a single Bloomie-ready sentence when a pattern is found, e.g.:
-  //   "📊 Looking at your logs, cramps tend to show up around day 22–25 of
-  //    your cycle — you've logged this 4 times. That's a real pattern."
-  //
-  // Returns null when: no history, no matching entries, or < 2 matching days.
   function buildSymptomContext(catalogCodes) {
     if (!symptomHistory || !symptomHistory.length || !catalogCodes.length) return null;
     const lmp   = effectiveLmp();
@@ -294,10 +259,6 @@ export function initBloomieChat({
   }
 
   // ── Follow-up memory: merge entity history ───────────────────────────────
-  // Merges the current entity extraction with up to the last 2 stored sets so
-  // that symptoms mentioned in earlier messages are still visible to inferRoute.
-  // Symptoms are OR-merged (once mentioned, stays true this session).
-  // duration / severity / timing / pregnancy take the most-recent non-null value.
   function mergeEntities(current, history) {
     if (!history.length) return current;
 
@@ -474,8 +435,6 @@ export function initBloomieChat({
       }
 
       // ── "I tested today" reactive detection ──────────────────────────────
-      // Catches: "i tested today", "took a test today", "i just tested"
-      // Auto-calculates retest window without needing the full TEST flow
       const testedToday = /(i tested|took a test|did a test|just tested|tested this morning|tested today|pregnancy test today)/.test(
         normalizePatois(text).toLowerCase()
       );
@@ -493,10 +452,6 @@ export function initBloomieChat({
       }
 
       // ── Context-aware choice matching ────────────────────────────────────
-      // Before running the full router, check if the user's typed text
-      // matches one of the CURRENT node's active choices.
-      // This means "no me really feel tired" answers the Yes/No question
-      // instead of re-routing to MOOD_INTRO again.
       const contextMatch = matchTypedToChoice(text);
       if (contextMatch) {
         const choice = contextMatch;
@@ -529,9 +484,9 @@ export function initBloomieChat({
 
       console.log("[Bloomie inference]", summarizeEntities(mergedEntities));
 
-      // ── P1: Inject symptom history context ───────────────────────────
+      // ── Inject symptom history context ───────────────────────────
       // If we have symptomHistory and this message mentions something the user
-      // has repeatedly logged before, surface that pattern BEFORE routing.
+      // has repeatedly logged before, surface that pattern BEFOREEEEE routing.
       // This makes Bloomie feel aware of the user's actual body, not just the
       // current message. We only fire this when routing is also going to
       // proceed (i.e. we detected real symptoms), to avoid false positives.
@@ -601,8 +556,6 @@ export function initBloomieChat({
       }
 
       // ── Safety log: oos_fallback ──────────────────────────────────────────
-      // containsHealthKeywords flags inputs that had urgency-adjacent words
-      // but still fell through to OOS — the highest-risk false-negative mode.
       if (routed?.payload?.oos && routed.payload.oos !== "greeting") {
         const containsHealthKeywords =
           /\b(bleed|faint|pass out|passing out|collapse|pain|cramp|late|pregnant|spotting|dizzy|discharge)\b/
