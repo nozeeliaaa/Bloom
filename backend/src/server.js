@@ -14,6 +14,7 @@ import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import bloomieMemoryRoutes    from "./routes/bloomieMemory.js";
 import bloomieSafetyLogRoutes from "./routes/bloomieSafetyLog.js";
+import feedbackRoutes         from "./routes/feedback.js";
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/bloomie-memory",    bloomieMemoryRoutes);
 app.use("/api/bloomie-safety-log", bloomieSafetyLogRoutes);
+app.use("/api/feedback",           feedbackRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ ok: true, message: "Backend is running 🚀" });
