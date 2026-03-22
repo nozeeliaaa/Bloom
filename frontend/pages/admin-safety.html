@@ -135,6 +135,27 @@
       opacity: 0.45;
     }
 
+    /* ── Feedback section ── */
+    .feedback-section {
+      margin-top: 2.5rem;
+    }
+
+    .feedback-turn {
+      display: block;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: var(--color-text-muted);
+    }
+
+    .feedback-turn--user {
+      color: var(--color-primary, #b04e8a);
+    }
+
+    .col-slice {
+      max-width: 240px;
+      word-break: break-word;
+    }
+
     @media (max-width: 768px) {
       .col-input {
         max-width: 160px;
@@ -216,6 +237,46 @@
           <div class="safety-empty" id="safety-empty" style="display:none;">
             <span class="safety-empty-icon">✅</span>
             No unreviewed safety events — you're all caught up.
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Feedback Review section ── -->
+      <section class="card feedback-section">
+        <div class="card-header">
+          <div>
+            <div class="card-title">👎 Feedback Review</div>
+            <div class="card-subtitle">
+              Thumbs-down reactions from users — up to 50 most recent, read-only
+              <span class="safety-count" id="feedback-count-label" style="margin-left:1rem;"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body" style="padding: 0;">
+          <p id="feedback-error" class="admin-error" style="display:none; padding: 1rem 1.25rem;"></p>
+
+          <div class="safety-loading" id="feedback-loading">Loading feedback…</div>
+
+          <div class="safety-table-wrap">
+            <table class="safety-table" id="feedback-table" style="display:none;">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Node ID</th>
+                  <th>Flow name</th>
+                  <th>Message text</th>
+                  <th>Comment</th>
+                  <th>Conversation slice</th>
+                </tr>
+              </thead>
+              <tbody id="feedback-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="safety-empty" id="feedback-empty" style="display:none;">
+            <span class="safety-empty-icon">👍</span>
+            No thumbs-down feedback yet.
           </div>
         </div>
       </section>
