@@ -26,6 +26,9 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
+// ─── Feedback state ───────────────────────────────────────────────────────────
+let allFeedbackDocs = [];
+
 renderNav("admin");
 renderFooter();
 renderModeBanner(document.getElementById("banner-area"));
@@ -48,9 +51,12 @@ onAuthChange(async (user) => {
   const subtitleEl = document.getElementById("admin-subtitle");
   if (subtitleEl) subtitleEl.textContent = `Signed in as ${user.email}`;
 
-  await loadLogs();
+  await Promise.all([loadLogs(), loadFeedback()]);
 
-  document.getElementById("refresh-btn")?.addEventListener("click", loadLogs);
+  document.getElementById("refresh-btn")?.addEventListener("click", () => {
+    loadLogs();
+    loadFeedback();
+  });
   document.getElementById("type-filter")?.addEventListener("change", () => {
     renderTable(getFilteredDocs());
   });
@@ -225,4 +231,92 @@ function riskBadgeClass(level) {
   if (level === "high")     return "admin-badge--danger";
   if (level === "moderate") return "admin-badge--warning";
   return "admin-badge--neutral";
+}
+
+// ─── Feedback Review ──────────────────────────────────────────────────────────
+
+async function loadFeedback() {
+  const errorEl   = document.getElementById("feedback-error");
+  const loadingEl = document.getElementById("feedback-loading");
+  const tableEl   = document.getElementById("feedback-table");
+  const emptyEl   = document.getElementById("feedback-empty");
+
+  if (!errorEl) return; // section not present in DOM
+
+  errorEl.style.display   = "none";
+  loadingEl.style.display = "block";
+  tableEl.style.display   = "none";
+  emptyEl.style.display   = "none";
+
+  const db = getFirebaseDB();
+  if (!db) {
+    loadingEl.style.display = "none";
+    errorEl.textContent   = "Firebase is not configured — cannot load feedback.";
+    errorEl.style.display = "block";
+    return;
+  }
+
+  try {
+    const q = query(
+      collection(db, "bloomieFeedback"),
+      where("feedbackType", "==", "thumbs_down"),
+      orderBy("createdAt", "desc"),
+      limit(50),
+    );
+    const snap = await getDocs(q);
+    allFeedbackDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    loadingEl.style.display = "none";
+    errorEl.textContent   = `Failed to load feedback: ${err.message}`;
+    errorEl.style.display = "block";
+    return;
+  }
+
+  loadingEl.style.display = "none";
+  renderFeedbackTable(allFeedbackDocs);
+}
+
+function renderFeedbackTable(docs) {
+  const tableEl  = document.getElementById("feedback-table");
+  const emptyEl  = document.getElementById("feedback-empty");
+  const tbody    = document.getElementById("feedback-tbody");
+  const countEl  = document.getElementById("feedback-count-label");
+
+  if (!tableEl) return;
+
+  if (!docs.length) {
+    tableEl.style.display = "none";
+    emptyEl.style.display = "block";
+    if (countEl) countEl.textContent = "0 results";
+    return;
+  }
+
+  if (countEl) countEl.textContent = `${docs.length} result${docs.length !== 1 ? "s" : ""}`;
+  emptyEl.style.display = "none";
+  tableEl.style.display = "table";
+
+  tbody.innerHTML = docs.map((d) => {
+    const ts      = formatTs(d.createdAt);
+    const nodeId  = esc(d.nodeId  || "—");
+    const flow    = esc(d.flowName || "—");
+    const msgText = esc(truncate(d.messageText, 120));
+    const comment = esc(d.comment || "—");
+
+    // Render conversation slice as compact turn list
+    const slice = Array.isArray(d.conversationSlice)
+      ? d.conversationSlice
+          .map((m) => `<span class="feedback-turn feedback-turn--${esc(m.from)}">${esc(m.from)}: ${esc(truncate(m.text, 80))}</span>`)
+          .join("")
+      : "—";
+
+    return `
+      <tr>
+        <td class="col-ts">${esc(ts)}</td>
+        <td><code>${nodeId}</code></td>
+        <td>${flow}</td>
+        <td class="col-input" title="${esc(d.messageText || "")}">${msgText}</td>
+        <td>${comment}</td>
+        <td class="col-slice">${slice}</td>
+      </tr>`;
+  }).join("");
 }
