@@ -1,5 +1,37 @@
+/**
+ * bloomie-templates.js
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Guidance Response Layer for Bloomie.
+ *
+ * Instead of freeform text, every guidance response is assembled from
+ * structured templates based on the inferred scenario. This makes responses:
+ *   - consistent across sessions
+ *   - safe (no hallucinated advice)
+ *   - easy to review and audit
+ *   - academically defensible
+ *
+ * Pipeline position:
+ *   extractEntities()  →  inferRoute()  →  buildGuidanceResponse()  →  say()
+ *
+ * Usage in chat.js:
+ *   import { buildGuidanceResponse } from "./bloomie-templates.js";
+ *
+ *   const entities  = extractEntities(normalizedText);
+ *   const inferred  = inferRoute(entities);
+ *   const guidance  = buildGuidanceResponse(entities, inferred?.payload?.reason);
+ *
+ *   if (guidance) {
+ *     say(guidance.lines);
+ *     // then transition as normal
+ *   }
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
 
 // ─── TEMPLATE PARTS ──────────────────────────────────────────────────────────
+// Each section is a separate string so they can be mixed and matched.
+// Keys map to scenario identifiers returned by inferRoute().
 
 const SITUATION = {
   late_period:
@@ -112,31 +144,54 @@ const NEXT_STEPS = {
     "Please seek medical care as soon as possible — a clinic, urgent care, or emergency service. You can use the care map to find nearby options.",
 };
 
+// FIX #10: Standardized URGENT_SIGNS so ALL entries are plain descriptive
+// text — no "Seek urgent help if:" prefix embedded inside the strings.
+// The prefix is now added once in buildGuidanceResponse, making the output
+// consistent for every scenario. Previously "heavy_with_dizziness" started
+// with "This combination warrants..." causing the assembled line to read
+// "Seek urgent help if: This combination warrants urgent care..." which was
+// grammatically broken.
 const URGENT_SIGNS = {
   late_period:
-    "Seek urgent help if: the pain becomes severe, you feel faint, you have heavy bleeding, or you have severe one-sided pelvic pain.",
+    "pain becomes severe, you feel faint, you have heavy bleeding, or you develop severe one-sided pelvic pain.",
   late_with_pain:
-    "Seek urgent help if: the pain becomes severe or one-sided, you feel faint or dizzy, or bleeding starts and is heavy.",
+    "the pain becomes severe or one-sided, you feel faint or dizzy, or bleeding starts and is heavy.",
   late_with_pregnancy_chance:
-    "Seek urgent help if: you develop severe one-sided pain, heavy bleeding, or feel faint — these can be signs of an ectopic pregnancy.",
+    "you develop severe one-sided pain, heavy bleeding, or feel faint — these can be signs of an ectopic pregnancy.",
   heavy_bleeding:
-    "Seek urgent help if: you're soaking through a pad or tampon in under 2 hours for 2+ hours in a row, you feel faint, dizzy, or short of breath.",
+    "you're soaking through a pad or tampon in under 2 hours for 2+ hours in a row, or you feel faint, dizzy, or short of breath.",
   heavy_with_dizziness:
-    "This combination warrants urgent care. Please go to a clinic or emergency service if symptoms are not improving.",
+    "symptoms are not improving — this combination warrants urgent care. Go to a clinic or emergency service.",
+  heavy_long:
+    "you develop dizziness, weakness, or shortness of breath alongside the prolonged bleeding.",
+  spotting_midcycle:
+    "the spotting becomes heavier, lasts more than a few days, or comes with pain, fever, or unusual discharge.",
   spotting_with_symptoms:
-    "Seek urgent help if: spotting becomes heavy bleeding, you develop fever, severe pain, or foul-smelling discharge.",
+    "spotting becomes heavy bleeding, you develop fever, severe pain, or foul-smelling discharge.",
+  spotting_pregnancy:
+    "you have severe pain, heavy bleeding, or dizziness alongside the spotting.",
+  pelvic_mild:
+    "pain suddenly worsens, becomes one-sided, or comes with fever, heavy bleeding, or faintness.",
   pelvic_severe:
-    "Seek urgent help if: pain is sudden and severe, especially one-sided — this can sometimes signal an ectopic pregnancy or other urgent condition.",
+    "pain is sudden and severe, especially one-sided — this can sometimes signal an ectopic pregnancy or other urgent condition.",
+  pelvic_sex:
+    "pain is severe, worsening, or accompanied by bleeding, fever, or dizziness.",
+  mood_before_period:
+    "you are feeling unsafe or having thoughts of harming yourself — please reach out to emergency services (119 in Jamaica) or a trusted person.",
   mood_general:
-    "If you're feeling unsafe or having thoughts of harming yourself, please reach out to emergency services (119 in Jamaica) or a trusted person right away.",
+    "you're feeling unsafe or having thoughts of harming yourself. Please reach out to emergency services (119 in Jamaica) or a trusted person right away.",
+  pregnancy_concern:
+    "you develop severe one-sided pain, heavy bleeding, or feel faint — seek emergency care immediately.",
   urgent:
-    "Please seek care now. Go to the nearest emergency department or call emergency services (119 in Jamaica).",
+    "symptoms are present — please seek care now. Go to the nearest emergency department or call emergency services (119 in Jamaica).",
   default:
-    "If symptoms worsen, you feel faint, develop fever, or have severe pain — please seek medical care promptly.",
+    "symptoms worsen, you feel faint, develop fever, or have severe pain — please seek medical care promptly.",
 };
 
 
 // ─── SCENARIO MAP ─────────────────────────────────────────────────────────────
+// Maps inference reasons (from inferRoute payload) to template keys.
+// Falls back to entity-based scenario detection if no reason is provided.
 
 const REASON_TO_SCENARIO = {
   "urgency_flag":                  "urgent",
@@ -171,13 +226,32 @@ const REASON_TO_SCENARIO = {
 
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 
+/**
+ * buildGuidanceResponse(entities, inferredReason) → GuidanceResponse | null
+ *
+ * Assembles a structured guidance response from templates based on
+ * the inferred scenario.
+ *
+ * Returns:
+ * {
+ *   scenario:  string,          // which scenario was matched
+ *   lines:     string[],        // array ready to pass straight into say()
+ *   structured: {               // full structured object (for PDF / logging)
+ *     situation, meaning, nextSteps, urgentSigns
+ *   }
+ * }
+ *
+ * Returns null if no scenario could be determined (fall through to decision tree).
+ */
 export function buildGuidanceResponse(entities, inferredReason = null) {
   const scenario = resolveScenario(entities, inferredReason);
   if (!scenario) return null;
 
-  const situation   = SITUATION[scenario]   || null;
-  const meaning     = MEANING[scenario]     || null;
-  const nextSteps   = NEXT_STEPS[scenario]  || null;
+  const situation   = SITUATION[scenario]    || null;
+  const meaning     = MEANING[scenario]      || null;
+  const nextSteps   = NEXT_STEPS[scenario]   || null;
+  // FIX #10: urgentSigns entries no longer embed the "Seek urgent help if:"
+  // prefix — it is added here once, consistently, for every scenario.
   const urgentSigns = URGENT_SIGNS[scenario] || URGENT_SIGNS.default;
 
   if (!situation && !meaning) return null;
@@ -185,10 +259,10 @@ export function buildGuidanceResponse(entities, inferredReason = null) {
   // ── Assemble lines array for say() ───────────────────────────────────────
   const lines = [];
 
-  if (situation)  lines.push(`📋 Possible situation: ${situation}`);
-  if (meaning)    lines.push(`💡 What this may mean: ${meaning}`);
-  if (nextSteps)  lines.push(`✅ What to do next: ${nextSteps}`);
-  if (urgentSigns) lines.push(`⚠️ Seek urgent help if: ${urgentSigns.replace("Seek urgent help if: ", "")}`);
+  if (situation)   lines.push(` Possible situation: ${situation}`);
+  if (meaning)     lines.push(` What this may mean: ${meaning}`);
+  if (nextSteps)   lines.push(` What to do next: ${nextSteps}`);
+  if (urgentSigns) lines.push(` Seek urgent help if: ${urgentSigns}`);
 
   lines.push("Remember: Bloomie provides educational information only — not a diagnosis. You know your body best 🩷");
 
@@ -199,11 +273,20 @@ export function buildGuidanceResponse(entities, inferredReason = null) {
   };
 }
 
+/**
+ * resolveScenario(entities, inferredReason) → string | null
+ *
+ * Determines which scenario key to use, in priority order:
+ * 1. Explicit reason from inferRoute() payload
+ * 2. Entity-based scenario detection (fallback)
+ */
 function resolveScenario(entities, inferredReason) {
+  // Priority 1: use the reason string from inferRoute
   if (inferredReason && REASON_TO_SCENARIO[inferredReason]) {
     return REASON_TO_SCENARIO[inferredReason];
   }
 
+  // Priority 2: derive from entities directly
   if (!entities) return null;
   const { symptoms, severity, timing, pregnancy, urgent } = entities;
   const s = symptoms || {};
@@ -228,6 +311,13 @@ function resolveScenario(entities, inferredReason) {
   return null;
 }
 
+
+// ─── UTILITY: get just the structured object for PDF export ──────────────────
+
+/**
+ * getStructuredSummary(entities, inferredReason) → object | null
+ * Useful for building the PDF export / provider summary.
+ */
 export function getStructuredSummary(entities, inferredReason) {
   const response = buildGuidanceResponse(entities, inferredReason);
   if (!response) return null;
