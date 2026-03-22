@@ -19,17 +19,6 @@ import { isAccountMode } from "./mode.js";
 
 const API_BASE = window.BLOOM_API_BASE || "";
 
-/**
- * logSafetyEvent(type, payload)
- *
- * type    — "urgent_trigger" | "oos_fallback" | "escalation"
- * payload — event-specific data (see shapes below)
- *
- * Payload shapes:
- *   urgent_trigger:  { input, route, reason, symptoms, urgencyFlag }
- *   oos_fallback:    { input, category }
- *   escalation:      { fromNode, symptoms }
- */
 export function logSafetyEvent(type, payload = {}) {
   // Skip logging for anonymous users — no account, no record
   if (!isAccountMode()) return;
@@ -57,8 +46,6 @@ async function _send(type, payload) {
   });
 }
 
-// Strip anything that could carry unexpected PII beyond what we want.
-// input is truncated to 300 chars — enough for review, not a full transcript.
 function sanitize(payload) {
   const out = {};
   if (typeof payload.input    === "string") out.input    = payload.input.slice(0, 300);
