@@ -5,6 +5,7 @@ import { loadBloomieMemory, saveBloomieMemory } from "./db.js";
 import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals } from "./bloomie-routing.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent } from "./bloomie-logger.js";
+import { getIdToken, getUser } from "./auth.js";
 
 /* ------------------ PAGE UI ------------------ */
 export function Chat() {
@@ -85,6 +86,9 @@ export function initBloomieChat({
   const $form = document.getElementById(formId);
 
   if (!$box) throw new Error(`Missing #${chatBoxId}`);
+
+  // Stable random ID for this chat session — sent with every feedback event
+  const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
   // ── Inject typing indicator CSS once per page load ───────────────────────
   if (!document.getElementById("bloomie-typing-css")) {
@@ -2245,14 +2249,50 @@ export function initBloomieChat({
     return escapeHtml(str).replaceAll('"', "&quot;");
   }
 
-  function toggleReaction(msgIndex, type) {
+  // ── Feedback submission ──────────────────────────────────────────────────
+  // Fire-and-forget: never throws, never blocks the UI.
+  async function _sendFeedback(feedbackType, messageText) {
+    try {
+      const token = await getIdToken();   // null if not signed in
+      const uid   = getUser()?.uid ?? null;
+
+      const conversationSlice = ctx.history
+        .slice(-3)
+        .map((m) => ({ from: m.from, text: String(m.text ?? "").slice(0, 200) }));
+
+      const body = {
+        sessionId,
+        userId:            uid || "anonymous",
+        nodeId:            ctx.state ?? null,
+        flowName:          ctx.topic  ?? null,
+        messageText:       String(messageText ?? "").slice(0, 500),
+        feedbackType,
+        conversationSlice,
+      };
+
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const API_BASE = window.BLOOM_API_BASE || "";
+      await fetch(`${API_BASE}/api/feedback`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+    } catch (_) {
+      // Silently swallow — feedback must never break the chat flow
+    }
+  }
+
+  function handleReaction(msgIndex, feedbackType) {
     const m = ctx.history[msgIndex];
     if (!m || m.from !== "bot") return;
     m.meta = m.meta || {};
-    m.meta.reactions = m.meta.reactions || { up: false, down: false };
-    if (type === "up") { m.meta.reactions.up = !m.meta.reactions.up; if (m.meta.reactions.up) m.meta.reactions.down = false; }
-    else if (type === "down") { m.meta.reactions.down = !m.meta.reactions.down; if (m.meta.reactions.down) m.meta.reactions.up = false; }
+    // Prevent double-submission on the same message
+    if (m.meta.feedbackSubmitted) return;
+    m.meta.feedbackSubmitted = feedbackType;
     render();
+    _sendFeedback(feedbackType, m.text).catch(() => {});
   }
 
   function render() {
@@ -2267,16 +2307,18 @@ export function initBloomieChat({
       <div class="chat-thread">
         ${ctx.history.map((m, i) => {
           const isBot = m.from === "bot";
-          const rx = m?.meta?.reactions || { up: false, down: false };
           const showReactions = isBot && i === lastBotIndex && !ctx.isTyping;
           return `
             <div class="msg ${m.from}">
               <div class="bubble${m.meta?.html ? " bubble--html" : ""}">${m.meta?.html ? m.text : escapeHtml(m.text).replaceAll("\n", "<br>")}</div>
-              ${showReactions ? `
-                <div class="bubble-actions" aria-label="Message reactions">
-                  <button class="react-btn ${rx.up ? "on" : ""}" data-react="up" data-idx="${i}" type="button" title="Helpful">👍</button>
-                  <button class="react-btn ${rx.down ? "on" : ""}" data-react="down" data-idx="${i}" type="button" title="Not helpful">👎</button>
-                </div>` : ""}
+              ${showReactions ? (
+                m.meta?.feedbackSubmitted
+                  ? `<div class="bubble-actions bubble-actions--thanks" aria-live="polite">Thanks for the feedback 🩷</div>`
+                  : `<div class="bubble-actions" aria-label="Message reactions">
+                  <button class="react-btn" data-react="thumbs_up" data-idx="${i}" type="button" title="Helpful">👍</button>
+                  <button class="react-btn" data-react="thumbs_down" data-idx="${i}" type="button" title="Not helpful">👎</button>
+                </div>`
+              ) : ""}
             </div>`;
         }).join("")}
         ${ctx.isTyping ? `
@@ -2292,7 +2334,7 @@ export function initBloomieChat({
     $box.querySelectorAll("[data-react][data-idx]").forEach((btn) => {
       btn.addEventListener("click", () => {
         if (ctx.locked) return;
-        toggleReaction(Number(btn.getAttribute("data-idx")), btn.getAttribute("data-react"));
+        handleReaction(Number(btn.getAttribute("data-idx")), btn.getAttribute("data-react"));
       });
     });
 
