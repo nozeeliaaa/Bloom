@@ -1,5 +1,5 @@
 import { normalizePatois, detectPatois } from "./bloomie-patois.js";
-import { extractEntities, inferRoute, summarizeEntities } from "./bloomie-inference.js";
+import { extractEntities, inferRoute, summarizeEntities, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary } from "./bloomie-templates.js";
 
 /* ------------------ PAGE UI ------------------ */
@@ -35,7 +35,7 @@ export function Chat() {
   `;
 }
 
-export function mountChat(user = null, cycleData = null) {
+export function mountChat(user = null, cycleData = null, symptomHistory = null) {
   const box = document.getElementById("chat-box");
   if (!box) return;
 
@@ -47,9 +47,13 @@ export function mountChat(user = null, cycleData = null) {
   //   isTrackingPregnancy: boolean,                ← user switched to pregnancy mode
   //   edd:                 Date | string | null,   ← estimated due date (if pregnancy mode)
   // }
+  //
+  // symptomHistory shape (pass from Firestore symptomLogs):
+  // [{ dateKey: "YYYY-MM-DD", items: [{ code, severity, note }] }, ...]
   initBloomieChat({
     userName: user?.nickname || user?.displayName || null,
     cycleData,
+    symptomHistory,
     onOpenCareMap: () => {
       location.hash = "#/care-map";
     },
@@ -67,6 +71,10 @@ export function initBloomieChat({
   formId = "chat-form",
   userName = null,
   cycleData = null,
+  // Array of symptom log entries from Firestore (last ~30–60 days).
+  // Shape: [{ dateKey: "YYYY-MM-DD", items: [{ code, severity, note }] }, ...]
+  // Pass this from dashboard when mounting so Bloomie can reference log history.
+  symptomHistory = null,
   onOpenCareMap = () => (location.hash = "#/care-map"),
   onRequestPdf = (summaryText) => console.log("PDF requested:", summaryText),
   onLogAction = (action, data) => console.log("Log action:", action, data),
@@ -175,6 +183,87 @@ export function initBloomieChat({
     if (dayOfCycle <= 15) return { phase: "ovulation",   days: dayOfCycle, label: "your ovulation window — days 13–15" };
     if (dayOfCycle <= 28) return { phase: "luteal",      days: dayOfCycle, label: "the luteal phase (days 16–28) — this is when PMS symptoms can show up" };
     return null;
+  }
+
+  // ── P1: Symptom history context ───────────────────────────────────────────
+  // Converts a entities.symptoms object into the set of catalog codes that fired.
+  function detectedCatalogKeys(symptoms) {
+    const codes = new Set();
+    for (const [key, fired] of Object.entries(symptoms)) {
+      if (fired && SYMPTOM_TO_CATALOG_KEYS[key]) {
+        SYMPTOM_TO_CATALOG_KEYS[key].forEach(c => codes.add(c));
+      }
+    }
+    return [...codes];
+  }
+
+  // buildSymptomContext(catalogCodes) → string | null
+  //
+  // Given the catalog codes detected in the current message, scans
+  // symptomHistory to find recurring patterns tied to the user's cycle.
+  //
+  // Returns a single Bloomie-ready sentence when a pattern is found, e.g.:
+  //   "📊 Looking at your logs, cramps tend to show up around day 22–25 of
+  //    your cycle — you've logged this 4 times. That's a real pattern."
+  //
+  // Returns null when: no history, no matching entries, or < 2 matching days.
+  function buildSymptomContext(catalogCodes) {
+    if (!symptomHistory || !symptomHistory.length || !catalogCodes.length) return null;
+    const lmp   = effectiveLmp();
+    const phase = getCurrentPhase();
+    const cycleLen = effectiveCycleLength();
+    const todayCycleDay = phase?.days ?? null;
+
+    const insights = [];
+
+    for (const code of catalogCodes) {
+      // Find log entries that contain this catalog code
+      const matchingEntries = symptomHistory.filter(entry =>
+        Array.isArray(entry.items) && entry.items.some(item => item.code === code)
+      );
+      if (matchingEntries.length < 2) continue;  // need at least 2 to call it a pattern
+
+      // Map each entry to a cycle day (relative to lmp)
+      const cycleDays = matchingEntries
+        .map(entry => {
+          if (!lmp) return null;
+          const entryDate = new Date(entry.dateKey);
+          if (isNaN(entryDate.getTime())) return null;
+          const raw = Math.round((entryDate - lmp) / (1000 * 60 * 60 * 24));
+          // Fold back into current cycle using modulo; ignore negatives
+          const cd = ((raw % cycleLen) + cycleLen) % cycleLen;
+          return cd;
+        })
+        .filter(d => d !== null);
+
+      if (cycleDays.length < 2) continue;
+
+      const label = CATALOG_LABELS[code] || code.replace(/_/g, " ").toLowerCase();
+      const count = cycleDays.length;
+      const minDay = Math.min(...cycleDays);
+      const maxDay = Math.max(...cycleDays);
+      const dayRange = minDay === maxDay ? `day ${minDay}` : `days ${minDay}–${maxDay}`;
+
+      // Only surface the pattern if today is within that window (±2 days)
+      if (todayCycleDay !== null) {
+        const inWindow = cycleDays.some(d => Math.abs(d - todayCycleDay) <= 2);
+        if (!inWindow) continue;
+      }
+
+      insights.push({ label, count, dayRange, todayCycleDay });
+    }
+
+    if (!insights.length) return null;
+
+    // Build one cohesive sentence per pattern (max 2 to avoid wall of text)
+    const lines = insights.slice(0, 2).map(({ label, count, dayRange, todayCycleDay }) => {
+      const dayNote = todayCycleDay !== null
+        ? ` — and you're on day ${todayCycleDay} right now, which lines up`
+        : "";
+      return `📊 Your logs show **${label}** tends to appear around ${dayRange} of your cycle (logged ${count} time${count > 1 ? "s" : ""}${dayNote}).`;
+    });
+
+    return lines.join(" ");
   }
 
   // How many days until next period
@@ -330,6 +419,18 @@ export function initBloomieChat({
       // 3. Infer the best route based on entity combinations
       const entities = extractEntities(normalizedText);
       console.log("[Bloomie inference]", summarizeEntities(entities));
+
+      // ── P1: Inject symptom history context ───────────────────────────
+      // If we have symptomHistory and this message mentions something the user
+      // has repeatedly logged before, surface that pattern BEFORE routing.
+      // This makes Bloomie feel aware of the user's actual body, not just the
+      // current message. We only fire this when routing is also going to
+      // proceed (i.e. we detected real symptoms), to avoid false positives.
+      const catalogCodes = detectedCatalogKeys(entities.symptoms);
+      const historyContext = buildSymptomContext(catalogCodes);
+      if (historyContext) {
+        say([historyContext], { delayMs: 0 });
+      }
 
       const inferred  = inferRoute(entities);
       const guidance  = buildGuidanceResponse(entities, inferred?.payload?.reason);
