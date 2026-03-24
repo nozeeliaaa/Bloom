@@ -114,6 +114,16 @@ const SITUATION = {
     "You have a concern related to possible pregnancy.",
   urgent:
     "You've described symptoms that may need prompt medical attention.",
+  perimenopause_concern: () => {
+    const openers = [
+      "It takes courage to name what might be happening 🩷 Perimenopause is a real transition and you deserve real support.",
+      "What you're describing can sometimes be part of a hormonal transition — and it's worth taking seriously.",
+      "These symptoms are real, and they can be part of a significant hormonal shift many people go through.",
+    ];
+    return openers[Math.floor(Math.random() * openers.length)];
+  },
+  menopause_info:
+    "Reaching menopause — 12 consecutive months without a period — is a significant transition, not an illness.",
 };
 
 const MEANING = {
@@ -175,6 +185,10 @@ const MEANING = {
   },
   mood_general:
     "Persistent low energy, mood shifts, or emotional difficulty — even outside of your period — can sometimes be connected to hormonal patterns or other factors worth tracking.",
+  perimenopause_concern:
+    "Perimenopause is the transition leading up to menopause — your hormones are shifting, and that shift causes real, sometimes confusing symptoms. This can begin in the mid-30s and typically spans several years.",
+  menopause_info:
+    "The hormonal changes that come with menopause are real — estrogen levels drop, and that affects many systems in the body. Symptoms like hot flashes, sleep disruption, and vaginal changes are well-documented and treatable.",
   pregnancy_concern:
     "Pregnancy concerns are best addressed with clear information and a test when the timing is right.",
   urgent:
@@ -212,6 +226,10 @@ const NEXT_STEPS = {
     "Track your mood alongside your cycle days to confirm the pattern. Small lifestyle supports — sleep, hydration, light movement — can help. If it's severe or interfering with daily life, speak with a provider.",
   mood_general:
     "Track your mood and energy patterns over a few weeks. If low mood or exhaustion is persistent, it may be worth talking to a healthcare provider or counselor.",
+  perimenopause_concern:
+    "Track your symptoms — cycle dates, symptom types, intensity, and timing. This pattern data is invaluable when talking to a provider. If symptoms are affecting your daily life significantly, that's the signal to seek support.",
+  menopause_info:
+    "Discuss bone health, cardiovascular changes, and ongoing symptoms with a provider. Lifestyle support (movement, sleep, nutrition) and medical options are both worth exploring — there are real options, not just 'pushing through it'.",
   pregnancy_concern:
     "A pregnancy test is the clearest first step. Test timing matters — the day after a missed period or later gives the most accurate result.",
   urgent:
@@ -254,6 +272,10 @@ const URGENT_SIGNS = {
     "you are feeling unsafe or having thoughts of harming yourself — please reach out to emergency services (119 in Jamaica) or a trusted person.",
   mood_general:
     "you're feeling unsafe or having thoughts of harming yourself. Please reach out to emergency services (119 in Jamaica) or a trusted person right away.",
+  perimenopause_concern:
+    "bleeding becomes very heavy, you develop severe pelvic pain, or symptoms suddenly worsen — seek care promptly. Also see a provider if periods have been absent for 12 months (menopause marker) or if you are under 40 and experiencing these changes (early menopause should be evaluated).",
+  menopause_info:
+    "you develop heavy or irregular bleeding after periods have stopped, or have bone pain, chest pain, or severe mood changes — these warrant prompt medical evaluation.",
   pregnancy_concern:
     "you develop severe one-sided pain, heavy bleeding, or feel faint — seek emergency care immediately.",
   urgent:
@@ -295,6 +317,9 @@ const REASON_TO_SCENARIO = {
   "nausea+late":                   "late_with_pregnancy_chance",
   "mood+before_period":            "mood_before_period",
   "late+pregnancy_chance":         "late_with_pregnancy_chance",
+  "peri_mention":                  "perimenopause_concern",
+  "menopause_mention":             "menopause_info",
+  "peri_symptom_cluster":          "perimenopause_concern",
 };
 
 
@@ -448,6 +473,14 @@ function resolveScenario(entities, inferredReason) {
   if (s.pelvic && (severity === "mild" || !severity))  return "pelvic_mild";
   if (s.mood && timing === "before_period")            return "mood_before_period";
   if (s.mood)                                          return "mood_general";
+
+  // Menopause / perimenopause detection
+  if (s.menopause_mention)                             return "menopause_info";
+  if (s.peri_mention)                                  return "perimenopause_concern";
+  if (s.hot_flashes && s.night_sweats)                 return "perimenopause_concern";
+  const periCluster = [s.hot_flashes, s.night_sweats, s.insomnia, s.vaginal_dryness, s.mood_rage, s.memory_issues, s.irregular].filter(Boolean).length;
+  if (periCluster >= 3)                                return "perimenopause_concern";
+
   if (s.late)                                          return "late_period";
   if (s.heavy)                                         return "heavy_bleeding";
   if (s.spotting)                                      return "spotting_midcycle";

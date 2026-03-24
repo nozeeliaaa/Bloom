@@ -4,8 +4,8 @@
  * of the exported fuzzyCorrect function.
  */
 
-import { describe, it, expect } from "vitest";
-import { fuzzyCorrect, normalizePatois, detectPatois, detectUserTone, detectUserToneWithScores, updateSessionTone } from "../bloomie-patois.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import { fuzzyCorrect, normalizePatois, detectPatois, detectUserTone, detectUserToneWithScores, updateSessionTone, _resetFuzzyCache, _getFuzzyCacheHits } from "../bloomie-patois.js";
 import { createCtx } from "../bloomie-session.js";
 
 // ─── fuzzyCorrect ─────────────────────────────────────────────────────────────
@@ -28,10 +28,9 @@ describe("fuzzyCorrect — threshold=1 for tokens < 8 chars", () => {
     expect(fuzzyCorrect("nausia")).toBe("nausea");    // 6 chars, dist 1
   });
 
-  it("does NOT correct transpositions in short terms (standard Levenshtein, dist=2 > threshold=1)", () => {
-    // "peroid" is a transposition of "period" but costs 2 ops in standard Levenshtein —
-    // threshold for 6-char tokens is 1, so no correction is made.
-    expect(fuzzyCorrect("peroid")).toBeNull();
+  it("corrects transpositions in short terms via phonetic table (Damerau-Levenshtein)", () => {
+    // "peroid" is in PHONETIC_VARIANTS — caught before Levenshtein runs.
+    expect(fuzzyCorrect("peroid")).toBe("period");
   });
 
   it("does NOT correct when distance exceeds 1 for short terms", () => {
@@ -75,6 +74,8 @@ describe("fuzzyCorrect — null cases", () => {
 });
 
 // ─── normalizePatois — medical misspelling correction end-to-end ──────────────
+// normalizePatois() calls fuzzyCorrect() internally (Stage 3), so the full
+// pipeline result is available from a single normalizePatois() call.
 
 describe("normalizePatois — medical term fuzzy correction end-to-end", () => {
   it("corrects a misspelled medical term in plain English input", () => {
@@ -83,14 +84,12 @@ describe("normalizePatois — medical term fuzzy correction end-to-end", () => {
   });
 
   it("corrects a misspelled long medical term not in the Patois dictionary", () => {
-    // "ovultaion" (dist=2 from "ovulation") — not in WORD_MAP so only caught by medical fuzzy
+    // "ovultaion" (dist=1, DL transposition from "ovulation")
     const result = normalizePatois("my ovultaion was late this month");
     expect(result).toMatch(/ovulation/);
   });
 
-  it("prefers the closer medical match over a more distant Patois near-miss", () => {
-    // "pregnacy" is dist=1 from "pregnancy" and dist=2 from the Patois entry "pregnant".
-    // The combined scorer should pick "pregnancy".
+  it("corrects pregnacy to pregnancy", () => {
     const result = normalizePatois("i think i might have a pregnacy");
     expect(result).toMatch(/pregnancy/);
   });
@@ -330,6 +329,50 @@ describe("detectUserToneWithScores — returns scores alongside tone", () => {
   });
 });
 
+// ─── normalizePatois — new conversational Patois phrases ─────────────────────
+
+describe("normalizePatois — frustration, agreement, and conversational phrases", () => {
+  it("normalizes 'u nuh understand' → 'you don't understand'", () => {
+    expect(normalizePatois("u nuh understand")).toMatch(/you don't understand/i);
+  });
+
+  it("normalizes 'dat nuh right' → 'that's not right'", () => {
+    expect(normalizePatois("dat nuh right")).toMatch(/that's not right/i);
+  });
+
+  it("normalizes 'u useless' → 'you're useless'", () => {
+    expect(normalizePatois("u useless")).toMatch(/you're useless/i);
+  });
+
+  it("normalizes 'mi agree' → 'i agree'", () => {
+    expect(normalizePatois("mi agree")).toMatch(/i agree/i);
+  });
+
+  it("normalizes 'start ova' → 'start over'", () => {
+    expect(normalizePatois("start ova")).toMatch(/start over/i);
+  });
+
+  it("normalizes 'wah gwaan' → 'what's going on'", () => {
+    expect(normalizePatois("wah gwaan")).toMatch(/what's going on/i);
+  });
+
+  it("normalizes 'help mi' → 'help me'", () => {
+    expect(normalizePatois("help mi")).toMatch(/help me/i);
+  });
+
+  it("normalizes 'mi vex' → 'i'm angry'", () => {
+    expect(normalizePatois("mi vex")).toMatch(/i'm angry/i);
+  });
+
+  it("normalizes 'mi cyan cope' → 'i can't cope'", () => {
+    expect(normalizePatois("mi cyan cope")).toMatch(/i can't cope/i);
+  });
+
+  it("normalizes 'nuh mind' → 'never mind'", () => {
+    expect(normalizePatois("nuh mind")).toMatch(/never mind/i);
+  });
+});
+
 describe("updateSessionTone — session tone stability", () => {
   it("sets currentTone on first message", () => {
     const ctx = createCtx();
@@ -351,5 +394,101 @@ describe("updateSessionTone — session tone stability", () => {
     // A neutral follow-up should not wipe the distressed context
     updateSessionTone(ctx, "my period is 5 days late");
     expect(ctx.currentTone).toBe("distressed");
+  });
+});
+
+// ─── NEW: fuzzyCorrect — phonetic variants ────────────────────────────────────
+
+describe("fuzzyCorrect — phonetic variants (panadol)", () => {
+  it("panandol → panadol", () => expect(fuzzyCorrect("panandol")).toBe("panadol"));
+  it("panadoll → panadol", () => expect(fuzzyCorrect("panadoll")).toBe("panadol"));
+  it("panaodl  → panadol", () => expect(fuzzyCorrect("panaodl")).toBe("panadol"));
+  it("pnadol   → panadol", () => expect(fuzzyCorrect("pnadol")).toBe("panadol"));
+});
+
+describe("fuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)", () => {
+  it("pregnat  → pregnant",  () => expect(fuzzyCorrect("pregnat")).toBe("pregnant"));
+  it("pregnacy → pregnancy", () => expect(fuzzyCorrect("pregnacy")).toBe("pregnancy"));
+  it("spotian  → spotting",  () => expect(fuzzyCorrect("spotian")).toBe("spotting"));
+  it("bleding  → bleeding",  () => expect(fuzzyCorrect("bleding")).toBe("bleeding"));
+  it("disscharge → discharge", () => expect(fuzzyCorrect("disscharge")).toBe("discharge"));
+  it("ibupropen → ibuprofen", () => expect(fuzzyCorrect("ibupropen")).toBe("ibuprofen"));
+  it("menstral → menstrual",  () => expect(fuzzyCorrect("menstral")).toBe("menstrual"));
+  it("endometrosis → endometriosis", () => expect(fuzzyCorrect("endometrosis")).toBe("endometriosis"));
+  it("menapose → menopause",  () => expect(fuzzyCorrect("menapose")).toBe("menopause"));
+});
+
+// ─── NEW: fuzzyCorrect — Levenshtein catches ──────────────────────────────────
+
+describe("fuzzyCorrect — Levenshtein catches (not in phonetic table)", () => {
+  it("spottng  → spotting  (deletion)",      () => expect(fuzzyCorrect("spottng")).toBe("spotting"));
+  it("bleedin  → bleeding  (deletion)",      () => expect(fuzzyCorrect("bleedin")).toBe("bleeding"));
+  it("craming  → cramping  (phonetic/dl)",   () => expect(fuzzyCorrect("craming")).toBe("cramping"));
+  it("nausous  → nauseous  (substitution)",  () => expect(fuzzyCorrect("nausous")).toBe("nauseous"));
+  it("dizy     → dizzy     (deletion)",      () => expect(fuzzyCorrect("dizy")).toBe("dizzy"));
+  it("ibprofen → ibuprofen (deletion)",      () => expect(fuzzyCorrect("ibprofen")).toBe("ibuprofen"));
+  it("perod    → period    (deletion)",      () => expect(fuzzyCorrect("perod")).toBe("period"));
+  it("ovultaion → ovulation (transposition)", () => expect(fuzzyCorrect("ovultaion")).toBe("ovulation"));
+});
+
+// ─── NEW: fuzzyCorrect — protected Patois tokens ─────────────────────────────
+
+describe("fuzzyCorrect — protected tokens must NOT be corrected", () => {
+  it("mi  → null (protected)",  () => expect(fuzzyCorrect("mi")).toBeNull());
+  it("nuh → null (protected)",  () => expect(fuzzyCorrect("nuh")).toBeNull());
+  it("fi  → null (too short)",  () => expect(fuzzyCorrect("fi")).toBeNull());
+  it("bad → null (protected)",  () => expect(fuzzyCorrect("bad")).toBeNull());
+});
+
+// ─── NEW: fuzzyCorrect — short words not fuzzily corrected ───────────────────
+
+describe("fuzzyCorrect — short words must NOT be fuzzily corrected", () => {
+  it("pad → null (not corrected to 'pain')", () => expect(fuzzyCorrect("pad")).toBeNull());
+  it("pms → null (too short for fuzzy)",     () => expect(fuzzyCorrect("pms")).toBeNull());
+});
+
+// ─── NEW: full sentence correction (via normalizePatois which calls fuzzyCorrect) ──
+
+describe("full sentence correction through normalizePatois pipeline", () => {
+  it("corrects 'bleding' in a mixed Patois/English sentence", () => {
+    expect(normalizePatois("mi belly a hurt and i have bleding")).toMatch(/bleeding/);
+  });
+
+  it("corrects 'panandol' and 'craming' in a Patois sentence", () => {
+    const result = normalizePatois("me need panandol fi di craming");
+    expect(result).toMatch(/panadol/);
+    expect(result).toMatch(/cramping/);
+  });
+
+  it("corrects 'pregnent' and 'spotian' in a plain English sentence", () => {
+    const result = normalizePatois("i think im pregnent and spotian");
+    expect(result).toMatch(/pregnant/);
+    expect(result).toMatch(/spotting/);
+  });
+});
+
+// ─── NEW: fuzzyCorrect — correction cache ────────────────────────────────────
+
+describe("fuzzyCorrect — correction cache", () => {
+  beforeEach(() => _resetFuzzyCache());
+
+  it("returns same result on second call (cached)", () => {
+    const first  = fuzzyCorrect("bleding");
+    const second = fuzzyCorrect("bleding");
+    expect(first).toBe("bleeding");
+    expect(second).toBe("bleeding");
+  });
+
+  it("increments cache hit counter on second call", () => {
+    fuzzyCorrect("panandol");           // miss — populates cache
+    fuzzyCorrect("panandol");           // hit
+    expect(_getFuzzyCacheHits()).toBe(1);
+  });
+
+  it("third call also hits cache", () => {
+    fuzzyCorrect("menstral");
+    fuzzyCorrect("menstral");
+    fuzzyCorrect("menstral");
+    expect(_getFuzzyCacheHits()).toBe(2);
   });
 });

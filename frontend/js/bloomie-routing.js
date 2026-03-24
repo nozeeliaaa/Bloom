@@ -51,6 +51,14 @@ export function looksLikeGibberish(t) {
   const letters = (t.match(/[a-z]/g) || []).length;
   if (letters / Math.max(1, t.length) < 0.35) return true;
   if (/^(.)\1{5,}$/.test(t.replace(/\s/g, ""))) return true;
+  // Detect keyboard smash: unique characters have very few vowels (catches
+  // "asdfjkl" but NOT "helpppppp" — repeated chars don't dilute the unique set)
+  const words = t.trim().split(/\s+/);
+  if (words.length === 1 && t.length >= 6) {
+    const uniqueChars = [...new Set(t.replace(/\s/g, "").split(""))];
+    const uniqueVowels = uniqueChars.filter(c => "aeiou".includes(c)).length;
+    if (uniqueVowels / uniqueChars.length < 0.15) return true;
+  }
   return false;
 }
 
@@ -175,6 +183,8 @@ export function scoreSignals(t) {
   if (/late|missed|no period/.test(t))                           sig.late      += 2;
   if (/period.*not come|period.*didn.t/.test(t))                 sig.late      += 2;
   if (/skipped|overdue/.test(t))                                 sig.late      += 1;
+  if (/period.*late|late.*period/.test(t))                       sig.late      += 2;
+  if (/\d+\s*weeks?\s*late|\bvery late\b/.test(t))               sig.late      += 2;
 
   // heavy bleeding
   if (/heavy|soaking|clot|bleeding/.test(t))                     sig.heavy     += 2;
@@ -185,12 +195,14 @@ export function scoreSignals(t) {
   if (/spot|spotting/.test(t))                                   sig.spot      += 2;
   if (/brown|between periods|pink discharge/.test(t))            sig.spot      += 2;
   if (/little blood|likkle blood/.test(t))                       sig.spot      += 1;
+  if (/\bspotting\b/.test(t))                                    sig.spot      += 2;
 
   // mood / hormones / energy
   if (/mood|anxious|sad|irritable/.test(t))                      sig.mood      += 2;
   if (/tired|fatigue|fatigued|exhaust/.test(t))                  sig.mood      += 2;
   if (/low energy|drain|drained|weak/.test(t))                   sig.mood      += 2;
   if (/overwhelm|emotional|cry|tearful/.test(t))                 sig.mood      += 1;
+  if (/depressed|depression|hopeless|numb/.test(t))              sig.mood      += 2;
 
   // pelvic pain / cramps
   if (/cramp|pelvic|pain/.test(t))                               sig.pelvic    += 2;
@@ -264,4 +276,142 @@ export function resolveSignals(sig, has) {
   }
 
   return null;
+}
+
+
+// ─── 5. ROUTE CONFIDENCE SCORING ─────────────────────────────────────────────
+
+/**
+ * INTENT_LABELS — human-readable label for each signal key
+ */
+const INTENT_LABELS = {
+  late:       "late period",
+  heavy:      "heavy bleeding",
+  spot:       "spotting",
+  mood:       "mood or energy concerns",
+  pelvic:     "pelvic pain or cramps",
+  pregnancy:  "pregnancy",
+  discharge:  "discharge",
+  late_check: "late period",
+  red_flag:   "urgent care concern",
+};
+
+/**
+ * computeRouteConfidence(sig, entities) -> ConfidenceResult
+ *
+ * Pure function. Takes the raw score map from scoreSignals() and the entity
+ * snapshot from extractEntities(), and returns a confidence tier with enough
+ * context for the chat engine to decide whether to route directly, ask a
+ * soft confirmation, or fall back to NARROWING.
+ *
+ * Tiers:
+ *   "high"   -- route directly, no clarifying question
+ *   "medium" -- prepend soft confirmation before routing
+ *   "low"    -- do not route directly; surface NARROWING with top candidates
+ *
+ * Rules (evaluated in order):
+ *   1. urgency flag always HIGH (safety overrides everything)
+ *   2. top score < 4 AND no urgency -> LOW
+ *   3. 3+ signals all within 2 points of each other -> LOW (genuine ambiguity)
+ *   4. top >= 4 AND second score within 2 of top -> MEDIUM (two competing signals)
+ *   5. top >= 7 AND both pelvic AND late are present -> MEDIUM (entity ambiguity)
+ *   6. top >= 7 AND second < top / 2 -> HIGH (clear dominant winner)
+ *   7. top >= 4, no close competitor -> HIGH (single dominant, no real competition)
+ */
+export function computeRouteConfidence(sig, entities) {
+  // Rule 1 -- urgency always HIGH
+  if (entities && entities.urgent) {
+    return {
+      tier: "high",
+      score: 10,
+      primaryIntent: "urgent_care",
+      competingIntents: [],
+      confidenceNote: null,
+    };
+  }
+
+  // Build sorted list of signals with a positive score
+  const scored = Object.entries(sig)
+    .filter(function(pair) { return pair[1] > 0; })
+    .sort(function(a, b) { return b[1] - a[1]; });
+
+  if (scored.length === 0) {
+    return {
+      tier: "low",
+      score: 0,
+      primaryIntent: null,
+      competingIntents: [],
+      confidenceNote: null,
+    };
+  }
+
+  const topScore    = scored[0][1];
+  const topKey      = scored[0][0];
+  const secondScore = scored[1] ? scored[1][1] : 0;
+
+  // Merge late_check into "late" intent
+  function keyToIntent(k) { return k === "late_check" ? "late" : k; }
+  const primaryIntent = keyToIntent(topKey);
+
+  // Competing intents: different from primary, deduplicated
+  const seen = {};
+  const competingIntents = scored.slice(1)
+    .map(function(pair) { return keyToIntent(pair[0]); })
+    .filter(function(i) {
+      if (i === primaryIntent || seen[i]) return false;
+      seen[i] = true;
+      return true;
+    });
+
+  // Build the confidenceNote for MEDIUM tier
+  function medNote(intent) {
+    const label = INTENT_LABELS[intent] || intent.replace(/_/g, " ");
+    return "It sounds like this might be about " + label + " -- is that right?";
+  }
+
+  // Special: late period + confirmed positive test → unambiguous positive result
+  if (entities?.symptoms?.late && entities?.pregnancy?.result === "positive") {
+    return { tier: "high", score: topScore, primaryIntent: "late", competingIntents: [], confidenceNote: null };
+  }
+
+  // Rule 2 -- low score
+  if (topScore < 3) {
+    return { tier: "low", score: topScore, primaryIntent, competingIntents, confidenceNote: null };
+  }
+
+  // Rule 3 -- 3+ signals within 2 points of each other
+  const closeSignals = scored.filter(function(pair) { return topScore - pair[1] <= 2; });
+  if (closeSignals.length >= 3) {
+    return { tier: "low", score: topScore, primaryIntent, competingIntents, confidenceNote: null };
+  }
+
+  // Rule 4 -- two competing signals
+  if (secondScore >= topScore - 2) {
+    return {
+      tier: "medium",
+      score: topScore,
+      primaryIntent,
+      competingIntents,
+      confidenceNote: medNote(primaryIntent),
+    };
+  }
+
+  // Rule 5 -- moderate+ score but pelvic AND late both present (competing entities)
+  if (topScore >= 4 && (sig.pelvic || 0) > 0 && (sig.late || 0) > 0) {
+    return {
+      tier: "medium",
+      score: topScore,
+      primaryIntent,
+      competingIntents,
+      confidenceNote: medNote(primaryIntent),
+    };
+  }
+
+  // Rule 6 -- clear dominant winner at high score
+  if (topScore >= 7 && secondScore < topScore / 2) {
+    return { tier: "high", score: topScore, primaryIntent, competingIntents, confidenceNote: null };
+  }
+
+  // Rule 7 -- dominant signal, no close competitor
+  return { tier: "high", score: topScore, primaryIntent, competingIntents, confidenceNote: null };
 }

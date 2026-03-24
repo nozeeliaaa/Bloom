@@ -1,135 +1,24 @@
 /**
  * bloom-cycle-engine.js
- * ─────────────────────────────────────────────────────────────
- * Bloom Cycle Signals Engine
- *
- * Purpose:
- *   Generate explainable, rule-based reproductive health signals
- *   from cycle logs, prediction outputs, and user tracking patterns.
- *
- * Design goals:
- *   - single source of truth for cycle-related fallback signals
- *   - dashboard-friendly and Bloomie-friendly
- *   - easy to tune without changing calling code
- *   - safe, conservative, and honest for irregular users
- *
- * Notes:
- *   - this engine is NOT a diagnostic tool
- *   - it is a rule-based inference layer for educational product support
  */
+
+import {
+  toDate, startOfDay, diffDays, diffDaysAbs, clamp,
+  mean, median, stdDev, lastN, slopeOfSeries,
+  makeSignal as _makeSignal,
+} from "./bloom-utils.js";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Convert Date|number|string to Date safely */
-function toDate(value) {
-  if (value instanceof Date) return new Date(value.getTime());
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) {
-    throw new Error(`Invalid date input: ${value}`);
-  }
-  return d;
-}
-
-/** Normalize date to local midnight */
-function startOfDay(d) {
-  const x = toDate(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-/** Whole-day difference: (b - a) in days */
-function diffDays(a, b) {
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.floor((startOfDay(b).getTime() - startOfDay(a).getTime()) / msPerDay);
-}
-
-/** Absolute whole-day difference */
-function diffDaysAbs(a, b) {
-  return Math.abs(diffDays(a, b));
-}
-
-/** Clamp numeric value */
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-/** Mean of array */
-function mean(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) return 0;
-  return arr.reduce((sum, x) => sum + x, 0) / arr.length;
-}
-
-/** Median of array */
-function median(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) return 0;
-  const sorted = [...arr].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
-
-/** Standard deviation of array */
-function stdDev(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) return 0;
-  const m = mean(arr);
-  const variance = arr.reduce((sum, x) => sum + Math.pow(x - m, 2), 0) / arr.length;
-  return Math.sqrt(variance);
-}
-
-/** Safe recent slice */
-function lastN(arr, n) {
-  if (!Array.isArray(arr)) return [];
-  return arr.slice(Math.max(0, arr.length - n));
-}
-
-/** Simple linear slope over equally spaced points */
-function slopeOfSeries(values) {
-  if (!Array.isArray(values) || values.length < 2) return 0;
-
-  const n = values.length;
-  const xs = Array.from({ length: n }, (_, i) => i);
-  const xMean = mean(xs);
-  const yMean = mean(values);
-
-  let numerator = 0;
-  let denominator = 0;
-
-  for (let i = 0; i < n; i += 1) {
-    numerator += (xs[i] - xMean) * (values[i] - yMean);
-    denominator += Math.pow(xs[i] - xMean, 2);
-  }
-
-  return denominator === 0 ? 0 : numerator / denominator;
-}
+/** Wrap makeSignal with cycle-engine default category */
+const makeSignal = (p) => _makeSignal({ category: "cycle", ...p });
 
 /** Return most recent average if enough values */
 function averageRecent(values, n) {
   const recent = lastN(values, n);
   return recent.length ? mean(recent) : 0;
-}
-
-/** Build consistent signal object */
-function makeSignal({
-  code,
-  level,
-  show,
-  message = "",
-  debug = {},
-  title = "",
-  category = "cycle",
-}) {
-  return {
-    code,
-    level,
-    show,
-    title,
-    message,
-    category,
-    debug,
-  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -178,6 +67,7 @@ export function detectPeriodStatusSignal({
     extendedAbsenceDays = 90,
     irregularStdDevThreshold = 6,
     irregularRangeThreshold = 9,
+    stressDelay = false,
   } = settings;
 
   if (!lastPeriodStart) {
@@ -257,15 +147,18 @@ export function detectPeriodStatusSignal({
       level: irregular ? "low" : "medium",
       show: true,
       title: "Period may be late",
-      message: irregular
-        ? "Bloom noticed your period may be running late, though your recent cycles also look more variable than usual."
-        : "Bloom noticed your period may be running late based on your expected cycle window.",
+      message: stressDelay
+        ? "Periods can sometimes be delayed by stress, travel, or illness — this may be one of those cycles."
+        : irregular
+          ? "Bloom noticed your period may be running late, though your recent cycles also look more variable than usual."
+          : "Bloom noticed your period may be running late based on your expected cycle window.",
       debug: {
         daysPastWindowEnd,
         daysSinceLastPeriod,
         predictedWindowStartISO: windowStart ? windowStart.toISOString() : null,
         predictedWindowEndISO: windowEnd.toISOString(),
         irregular,
+        stressDelay,
         cycleStdDev: Number(sd.toFixed(2)),
         cycleRange: range,
       },
@@ -316,14 +209,30 @@ export function detectPeriodStatusSignal({
 }
 
 /**
- * Detect statistical instability in recent cycle lengths
+ * Detect statistical instability in recent cycle lengths.
+ *
+ * Accepts optional context flags:
+ *   isPostpartum          — suppress IRREGULAR_CYCLE for first 3 post-birth cycles
+ *   postpartumCycleCount  — cycles logged since birth
+ *   recentlyStoppedBC     — suppress for first 3 cycles after stopping hormonal BC
+ *   recentlyStoppedBCCycleCount — cycles since stopping BC
+ *   userAge               — teen users (< 18) get relaxed thresholds
  */
 export function detectIrregularCycleSignal({
   cycleLengths = [],
   minCycles = 4,
   stdDevThreshold = 5,
   rangeThreshold = 8,
+  isPostpartum = false,
+  postpartumCycleCount = 0,
+  recentlyStoppedBC = false,
+  recentlyStoppedBCCycleCount = 0,
+  userAge = null,
 } = {}) {
+  // Teen users — relax thresholds (cycles 21–45 days are normal variation)
+  const effectiveStdDevThreshold = (userAge !== null && userAge < 18) ? 8  : stdDevThreshold;
+  const effectiveRangeThreshold  = (userAge !== null && userAge < 18) ? 15 : rangeThreshold;
+
   if (!Array.isArray(cycleLengths) || cycleLengths.length < minCycles) {
     return makeSignal({
       code: "IRREGULAR_CYCLE",
@@ -333,31 +242,67 @@ export function detectIrregularCycleSignal({
     });
   }
 
-  const recent = lastN(cycleLengths, 6);
-  const min = Math.min(...recent);
-  const max = Math.max(...recent);
-  const range = max - min;
-  const sd = stdDev(recent);
-  const avg = mean(recent);
+  // Postpartum: first 3 cycles are expected to be irregular — show a gentle note instead
+  if (isPostpartum && postpartumCycleCount < 3) {
+    return makeSignal({
+      code: "IRREGULAR_CYCLE",
+      level: "low",
+      show: true,
+      title: "Postpartum cycle adjustment",
+      message:
+        "Postpartum cycles are often irregular as your body adjusts. Bloom will start building your pattern after a few more logged cycles 🩷",
+      debug: { reason: "postpartum suppression", postpartumCycleCount },
+    });
+  }
 
-  const show = range >= rangeThreshold || sd >= stdDevThreshold;
+  // Recently stopped BC: first 3 settling cycles — suppress irregular signal
+  if (recentlyStoppedBC && recentlyStoppedBCCycleCount < 3) {
+    return makeSignal({
+      code: "IRREGULAR_CYCLE",
+      level: "low",
+      show: true,
+      title: "Post-birth-control adjustment",
+      message:
+        "Cycles often take 2–3 months to settle after stopping hormonal birth control. Bloom will build your pattern as things regulate 🩷",
+      debug: { reason: "recentlyStoppedBC suppression", recentlyStoppedBCCycleCount },
+    });
+  }
+
+  const recent = lastN(cycleLengths, 6);
+  const minVal = Math.min(...recent);
+  const maxVal = Math.max(...recent);
+  const range  = maxVal - minVal;
+  const sd     = stdDev(recent);
+  const avg    = mean(recent);
+
+  const show    = range >= effectiveRangeThreshold || sd >= effectiveStdDevThreshold;
+  const isWild  = range >= 20 || sd >= 10;
+
+  const message = isWild
+    ? "Your recent cycles have varied quite a bit in length. Predictions will be less precise, but Bloom will give you a window rather than a single date."
+    : show
+      ? "Bloom noticed more variation than usual in your recent cycle lengths."
+      : "";
 
   return makeSignal({
     code: "IRREGULAR_CYCLE",
     level: "medium",
     show,
     title: "Cycle variability detected",
-    message: show
-      ? "Bloom noticed more variation than usual in your recent cycle lengths."
-      : "",
+    message,
     debug: {
       recentCycles: recent,
       mean: Number(avg.toFixed(2)),
       median: Number(median(recent).toFixed(2)),
       stdDev: Number(sd.toFixed(2)),
       range,
-      stdDevThreshold,
-      rangeThreshold,
+      stdDevThreshold: effectiveStdDevThreshold,
+      rangeThreshold: effectiveRangeThreshold,
+      isWild,
+      predictionRange: isWild ? Math.ceil(sd) : null,
+      isPostpartum,
+      recentlyStoppedBC,
+      userAge,
     },
   });
 }
@@ -754,4 +699,217 @@ export function buildTrackChangesPlan({ today = new Date() } = {}) {
       { dayOffset: 28, text: "Track Changes check-in complete. You can continue or export a summary for yourself." },
     ],
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Data quality: deduplication and suspicious entries                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Deduplicate a list of period start dates.
+ * Any two dates within dedupDays of each other are treated as the same
+ * period — the earlier date is kept and the later one is discarded.
+ *
+ * @param  {(Date|string|number)[]} dates
+ * @param  {number} dedupDays  — threshold (default 3)
+ * @returns {Date[]}
+ */
+export function deduplicatePeriods(dates = [], dedupDays = 3) {
+  const sorted = [...dates]
+    .map((d) => toDate(d))
+    .filter(Boolean)
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  const result = [];
+  for (const d of sorted) {
+    const prev = result[result.length - 1];
+    if (!prev || diffDaysAbs(prev, d) > dedupDays) {
+      result.push(d);
+    }
+    // else: within dedupDays → skip (keep the earlier entry already in result)
+  }
+  return result;
+}
+
+/**
+ * Flag period start dates that are suspiciously close together
+ * (within windowDays, default 10) but not close enough to be obvious duplicates.
+ *
+ * @param  {(Date|string|number)[]} dates
+ * @param  {number} windowDays — threshold (default 10)
+ * @returns {{ suspicious: boolean, pairs: Array<{date1: Date, date2: Date, gapDays: number}> }}
+ */
+export function detectSuspiciousEntries(dates = [], windowDays = 10) {
+  const sorted = [...dates]
+    .map((d) => toDate(d))
+    .filter(Boolean)
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  const pairs = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = diffDaysAbs(sorted[i - 1], sorted[i]);
+    if (gap > 0 && gap <= windowDays) {
+      pairs.push({ date1: sorted[i - 1], date2: sorted[i], gapDays: gap });
+    }
+  }
+  return { suspicious: pairs.length > 0, pairs };
+}
+
+/* ------------------------------------------------------------------ */
+/* Robust average cycle length                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Compute average cycle length with:
+ *   — sparse data guard (0 or 1 cycles → return default 28)
+ *   — 90-day gap detection (exclude pre-gap cycles and the gap cycle itself)
+ *   — outlier exclusion (> 2 standard deviations from the remaining mean)
+ *
+ * @param  {number[]} cycleLengths
+ * @param  {Object}   opts
+ * @param  {number}   opts.defaultLength    — returned when data is insufficient (default 28)
+ * @param  {number}   opts.gapThresholdDays — gap that triggers pre-gap exclusion (default 90)
+ * @returns {{
+ *   average: number,
+ *   usedDefault: boolean,
+ *   excluded: number[],
+ *   preGapExcluded: number,
+ *   reason: string
+ * }}
+ */
+export function computeRobustAverageCycleLength(cycleLengths = [], {
+  defaultLength = 28,
+  gapThresholdDays = 90,
+} = {}) {
+  if (!Array.isArray(cycleLengths) || cycleLengths.length === 0) {
+    return { average: defaultLength, usedDefault: true, excluded: [], preGapExcluded: 0, reason: "no data" };
+  }
+  if (cycleLengths.length === 1) {
+    return { average: defaultLength, usedDefault: true, excluded: [], preGapExcluded: 0, reason: "only 1 cycle" };
+  }
+
+  // Find the last large gap and exclude everything up to and including that cycle
+  let working = [...cycleLengths];
+  let preGapExcluded = 0;
+
+  let lastLargeGapIdx = -1;
+  for (let i = cycleLengths.length - 1; i >= 0; i--) {
+    if (cycleLengths[i] >= gapThresholdDays) {
+      lastLargeGapIdx = i;
+      break;
+    }
+  }
+  if (lastLargeGapIdx >= 0) {
+    working = cycleLengths.slice(lastLargeGapIdx + 1);
+    preGapExcluded = lastLargeGapIdx + 1;
+  }
+
+  if (working.length === 0) {
+    return { average: defaultLength, usedDefault: true, excluded: [], preGapExcluded, reason: "all cycles pre-gap" };
+  }
+  if (working.length === 1) {
+    return { average: defaultLength, usedDefault: true, excluded: [], preGapExcluded, reason: "only 1 cycle after gap" };
+  }
+
+  // Exclude outliers more than 2 SD from the mean
+  const m  = mean(working);
+  const sd = stdDev(working);
+  const excluded = [];
+  const included = working.filter((l) => {
+    if (sd > 0 && Math.abs(l - m) > 2 * sd) {
+      excluded.push(l);
+      return false;
+    }
+    return true;
+  });
+
+  if (included.length === 0) {
+    return { average: Math.round(m), usedDefault: false, excluded, preGapExcluded, reason: "all outliers" };
+  }
+
+  return {
+    average: Math.round(mean(included)),
+    usedDefault: false,
+    excluded,
+    preGapExcluded,
+    reason: excluded.length > 0
+      ? `excluded ${excluded.length} outlier(s): [${excluded.join(", ")}]`
+      : "normal",
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Dense / weird data signals                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Signal when symptom history is rich but no cycle data has been logged.
+ *
+ * @param {Object} params
+ * @param {number}  params.symptomEntryCount — total logged symptom entries
+ * @param {boolean} params.hasCycleData      — true if any period dates are logged
+ * @param {number}  params.minEntries        — threshold before signal fires (default 30)
+ * @returns {CycleSignal}
+ */
+export function detectSymptomWithoutCycleData({
+  symptomEntryCount = 0,
+  hasCycleData = false,
+  minEntries = 30,
+} = {}) {
+  const show = !hasCycleData && symptomEntryCount >= minEntries;
+  return makeSignal({
+    code: "SYMPTOM_WITHOUT_CYCLE_DATA",
+    level: "low",
+    show,
+    title: "Add period dates to unlock insights",
+    message: show
+      ? "You've been logging symptoms — great 🩷 Adding your period start dates will help Bloom connect your symptoms to your cycle and give you much better insights."
+      : "",
+    debug: { symptomEntryCount, hasCycleData, minEntries },
+  });
+}
+
+/**
+ * Flag a period entry whose logged bleeding duration exceeds 10 days.
+ * Long-duration entries are noted but excluded from average period-length
+ * calculations to avoid skewing predictions.
+ *
+ * @param  {Array<{durationDays: number}>} periodEntries
+ * @returns {CycleSignal}
+ */
+export function detectLongBleedingEntry(periodEntries = []) {
+  const long = periodEntries.filter((e) => e && e.durationDays > 10);
+  const show = long.length > 0;
+  return makeSignal({
+    code: "LONG_BLEEDING_ENTRY",
+    level: "medium",
+    show,
+    title: "Extended bleeding flagged",
+    message: show
+      ? "You logged bleeding for more than 10 days — this has been noted but won't affect your average period length. If this is ongoing, it's worth mentioning to a provider 🩷"
+      : "",
+    debug: { longEntries: long },
+  });
+}
+
+/**
+ * Flag when two period start dates are within 10 days (too close to be a
+ * separate cycle, too far apart to be a simple duplicate).
+ * The earlier date is kept; the later one should be reviewed.
+ *
+ * @param  {(Date|string|number)[]} dates
+ * @returns {CycleSignal}
+ */
+export function detectSuspiciousEntrySignal(dates = []) {
+  const { suspicious, pairs } = detectSuspiciousEntries(dates, 10);
+  return makeSignal({
+    code: "SUSPICIOUS_ENTRY",
+    level: "low",
+    show: suspicious,
+    title: "Unusual period entries",
+    message: suspicious
+      ? "It looks like two period start dates were logged close together. Bloom will use the earlier one — you can update your calendar if needed."
+      : "",
+    debug: { pairs: pairs.map((p) => ({ gapDays: p.gapDays })) },
+  });
 }

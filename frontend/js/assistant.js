@@ -1,11 +1,13 @@
-import { normalizePatois, detectPatois, detectUserTone } from "./bloomie-patois.js";
-import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
+import { normalizePatois, detectPatois, detectUserTone, fuzzyCorrect, collapseRepeatedLetters, expandShorthand } from "./bloomie-patois.js";
+import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory } from "./db.js";
-import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals } from "./bloomie-routing.js";
+import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence } from "./bloomie-routing.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent } from "./bloomie-logger.js";
 import { getIdToken, getUser } from "./auth.js";
+import { generateIntegratedSignals, getBloomieSymptomContext } from "./algorithms/bloom-symptom-engine.js";
+import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhaseConfidence } from "./algorithms/bloom-date-utils.js";
 
 /* ------------------ PAGE UI ------------------ */
 export function Chat() {
@@ -497,11 +499,87 @@ export function initBloomieChat({
     }
   }
 
+  // ── Pre-compute symptom signals from historical log data ──────────────────
+  // Runs once on mount when symptomHistory is available. The result is stored
+  // on ctx.symptomSignals and checked during message processing for safety
+  // escalation, bloomieInsight prepending, and PDF export enrichment.
+  if (Array.isArray(symptomHistory) && symptomHistory.length > 0) {
+    const phaseInfo    = getCurrentPhase();
+    const cycleLengths = Array.isArray(cycleData?.previousCycleLengths)
+      ? cycleData.previousCycleLengths
+      : Array.isArray(cycleData?.cycleLengths) ? cycleData.cycleLengths : [];
+    const mountToday = new Date();
+    const todayKey   = mountToday.toISOString().slice(0, 10);
+    const todayEntry = symptomHistory.find(e => e.dateKey === todayKey)
+      ?? symptomHistory[symptomHistory.length - 1];
+    const loggedSymptoms = (todayEntry?.items ?? []).map(item => ({
+      ...item, dateKey: todayEntry.dateKey,
+    }));
+
+    // Build expectedNextPeriodWindow from cd.nextPeriodDate when available
+    const nextPd = cd.nextPeriodDate;
+    const expectedNextPeriodWindow = nextPd
+      ? {
+          start: new Date(nextPd.getTime() - 2 * 24 * 60 * 60 * 1000),
+          end:   new Date(nextPd.getTime() + 2 * 24 * 60 * 60 * 1000),
+        }
+      : null;
+
+    ctx.integratedSignals = generateIntegratedSignals({
+      // Cycle engine params
+      expectedNextPeriodWindow,
+      today:             mountToday,
+      lastPeriodStart:   cd.lmp,
+      cycleLengths,
+      // Symptom engine params
+      loggedSymptoms,
+      phase:             phaseInfo?.phase ?? null,
+      dayOfCycle:        phaseInfo?.days  ?? null,
+      cycleCount:        Number(cycleData?.cycleCount) || 0,
+      symptomHistory,
+      missedPeriod:      false,
+      pregnancyRelevant: cd.isTTC || cd.pregnancyConfirmed,
+    });
+    // Keep backward-compatible reference
+    ctx.symptomSignals = ctx.integratedSignals.symptomSignals;
+  }
+
   if ($input) {
     $input.disabled = false;
     $input.placeholder = "Type here or use the buttons…";
     $input.setAttribute("maxlength", "240");
   }
+
+  // ── Input quality analyzer — runs before normalization or routing ────────────
+  function analyzeInputQuality(text) {
+    const trimmed = text.trim();
+    const isEmpty = !trimmed;
+    const isEmojiOnly = !isEmpty && /^[\p{Emoji}\s]+$/u.test(trimmed) && !/[a-zA-Z0-9]/.test(trimmed);
+    const isPunctuationOnly = !isEmpty && /^[!?.,;:\-_\s…]+$/.test(trimmed);
+    const letters = trimmed.replace(/[^a-z]/gi, "").toLowerCase();
+    const vowels = letters.replace(/[^aeiou]/g, "");
+    const isKeyboardSmash = !isEmpty && !isEmojiOnly && !isPunctuationOnly && letters.length >= 4 && (
+      vowels.length === 0 ||
+      (letters.length > 0 && vowels.length / letters.length < 0.10) ||
+      (letters.length >= 5 && new Set(letters.split("")).size <= 3)
+    );
+    const isRepeatedLetters = /(.)\1{3,}/.test(trimmed);
+    const SHORT_KNOWN = new Set(["ok","hi","yo","no","ow","ah","oh","ugh","hmm","idk"]);
+    const isTooShort = trimmed.length <= 1 && !SHORT_KNOWN.has(trimmed.toLowerCase());
+    const normalizedCore = trimmed.replace(/(.)\1{3,}/g, "$1").trim();
+    return { isEmpty, isEmojiOnly, isPunctuationOnly, isKeyboardSmash, isRepeatedLetters, isTooShort, normalizedCore };
+  }
+
+  // Emoji → health intent mapper
+  const EMOJI_INTENT_MAP = [
+    { emoji: /🩸/, next: "HEAVY_INTRO" },
+    { emoji: /😢|😭/, next: "MOOD_SAFETY_CHECK" },
+    { emoji: /😰|😟|😨/, next: "MOOD_SAFETY_CHECK" },
+    { emoji: /🤢|🤮/, next: null },
+    { emoji: /💊/, next: null },
+    { emoji: /❓/, next: "START_MENU" },
+    { emoji: /😤|😠/, next: null },
+  ];
 
   if ($form && $input) {
     $form.addEventListener("submit", (e) => {
@@ -509,34 +587,198 @@ export function initBloomieChat({
       if (ctx.locked) return;
 
       const text = ($input.value || "").trim();
-      if (!text) return;
-
       $input.value = "";
+
+      // ── Input quality check — runs BEFORE normalization or routing ────────
+      const inputQuality = analyzeInputQuality(text);
+
+      if (inputQuality.isEmpty) {
+        say("I'm here whenever you're ready 🩷 What's going on?");
+        render();
+        return;
+      }
+
+      if (inputQuality.isPunctuationOnly) {
+        say("Take your time 🩷 What's on your mind?");
+        render();
+        return;
+      }
+
+      if (inputQuality.isKeyboardSmash) {
+        say("That one didn't quite come through 🩷 Try typing what's going on — even a few words like \"my period is late\" or \"I have cramps\" works.");
+        render();
+        return;
+      }
+
+      if (inputQuality.isEmojiOnly) {
+        let emojiHandled = false;
+        for (const mapping of EMOJI_INTENT_MAP) {
+          if (mapping.emoji.test(text)) {
+            pushMsg("user", text);
+            if (mapping.next === "START_MENU") {
+              transition("START_MENU");
+            } else if (mapping.next) {
+              transition(mapping.next);
+            } else {
+              say("I see you 🩷 Tell me what's going on in words and I'll do my best to help.");
+              render();
+            }
+            emojiHandled = true;
+            break;
+          }
+        }
+        if (!emojiHandled) {
+          say("I see you 🩷 Tell me what's going on in words and I'll do my best to help.");
+          render();
+        }
+        return;
+      }
+
 
       // ── If we are capturing a date input, parse it here ──────────────────
       if (ctx.capture?.kind) {
-        // Try ISO date, or natural formats like "March 1", "1/3/2026", "01-03-26"
-        let parsed = new Date(text);
-        // Fallback: try rearranging DD/MM/YYYY (common Jamaican format)
-        if (Number.isNaN(parsed.getTime())) {
-          const dmyMatch = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
-          if (dmyMatch) {
-            let [, d, m, y] = dmyMatch;
-            if (y.length === 2) y = "20" + y;
-            parsed = new Date(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
+        const captureKind = ctx.capture.kind;
+        const today = new Date();
+
+        // ── Universal steps that always run on every user message ─────────
+        // Safety re-check: urgent language in any message — even date capture —
+        // must always be caught and escalated immediately.
+        {
+          const captureUrgent = extractUrgency(normalizePatois(text).toLowerCase());
+          if (captureUrgent) {
+            pushMsg("user", text);
+            ctx.urgency = true;
+            logSafetyEvent("urgent_trigger", {
+              input:  text,
+              route:  "HEAVY_URGENT",
+              reason: "urgent_during_date_capture",
+              topic:  ctx.topic,
+            });
+            ctx.capture = null;
+            ctx.captureReturnTo = null;
+            transition("HEAVY_URGENT");
+            return;
           }
         }
-        if (Number.isNaN(parsed.getTime())) {
+        // Tone detection — update every turn so openers stay current.
+        ctx.currentTone = detectUserTone(normalizePatois(text));
+        // Loop detection — track inputs even in capture mode.
+        ctx.recentInputs = ctx.recentInputs || [];
+        ctx.recentInputs.push(text);
+        if (ctx.recentInputs.length > 5) ctx.recentInputs.shift();
+
+        // ── Date capture loop detection: same invalid entry 3+ times ──────
+        ctx._invalidDateAttempts = ctx._invalidDateAttempts || {};
+        const _attemptKey = captureKind + "::" + text.trim().toLowerCase();
+        ctx._invalidDateAttempts[captureKind] = ctx._invalidDateAttempts[captureKind] || {};
+        ctx._invalidDateAttempts[captureKind][_attemptKey] = (ctx._invalidDateAttempts[captureKind][_attemptKey] || 0) + 1;
+        const _sameAttemptCount = ctx._invalidDateAttempts[captureKind][_attemptKey];
+        if (_sameAttemptCount >= 3) {
           pushMsg("user", text);
-          say("Hm, I couldn't read that date 🩷 Try typing it like: 2026-02-08, or 08/02/2026");
+          say("No worries 🩷 We can skip the date for now. I can still help with everything else — the cycle timing will just be approximate.");
+          ctx._invalidDateAttempts[captureKind] = {};
+          const _skipNext = ctx.captureReturnTo || ctx.capture.next;
+          ctx.captureReturnTo = null;
+          ctx.capture = null;
+          transition(_skipNext || "START_MENU");
           return;
         }
 
-        // ── Test-flow date validation ─────────────────────────────────────────
-        const captureKind = ctx.capture.kind;
-        const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+        // ── Step 1: Try natural language / relative date expressions ──────
+        // Also handles Patois via prior normalizePatois pass in the session,
+        // and directly handles "mi forget", "i forgot", etc.
+        const naturalResult = parseNaturalDate(normalizePatois(text), today);
+
+        if (naturalResult?.forgotten) {
+          pushMsg("user", text);
+          say("That's okay 🩷 I can still help — I just won't be able to give you personalised cycle timing until you log a period date. Everything else still works.");
+          ctx.captureReturnTo = null;
+          ctx.capture = null;
+          transition(ctx.capture?.next || "START_MENU");
+          return;
+        }
+
+        // ── Step 2: Resolve a Date from natural result or structured input ─
+        let parsed = null;
+        let isApproximate = false;
+
+        if (naturalResult?.date) {
+          parsed = naturalResult.date;
+          isApproximate = naturalResult.approximate ?? false;
+          if (isApproximate) {
+            // Confirm approximate date with the user before committing
+            pushMsg("user", text);
+            const approxStr = parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+            say(`I'll use **${approxStr}** as an estimate — does that sound about right?`, {
+              choices: [
+                { id: "approx_yes", label: "Yes, that's right", next: "__APPROX_CONFIRM__" },
+                { id: "approx_no",  label: "No, let me re-enter", next: "__APPROX_RETRY__" },
+              ],
+            });
+            // Store pending data and wait for confirmation
+            ctx._pendingApproxDate = { iso: parsed.toISOString(), kind: captureKind, next: ctx.captureReturnTo || ctx.capture.next };
+            return;
+          }
+        } else {
+          // ── Step 3: Structured date formats (ISO, DD/MM/YYYY, natural month) ──
+          parsed = new Date(text);
+          if (Number.isNaN(parsed.getTime())) {
+            const dmyMatch = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+            if (dmyMatch) {
+              let [, d, m, y] = dmyMatch;
+              if (y.length === 2) y = "20" + y;
+              // Calendar guard before constructing the Date
+              const calCheck = validateCalendarDate(parseInt(y, 10), parseInt(m, 10), parseInt(d, 10));
+              if (!calCheck.valid) {
+                pushMsg("user", text);
+                say(calCheck.message);
+                return;
+              }
+              parsed = new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
+            }
+          }
+
+          // Guard against impossible dates that JS silently rolls over (e.g. Feb 30 → Mar 2)
+          if (!Number.isNaN(parsed?.getTime())) {
+            const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (isoMatch) {
+              const calCheck = validateCalendarDate(
+                parseInt(isoMatch[1], 10),
+                parseInt(isoMatch[2], 10),
+                parseInt(isoMatch[3], 10)
+              );
+              if (!calCheck.valid) {
+                pushMsg("user", text);
+                say(calCheck.message);
+                return;
+              }
+            }
+          }
+
+          if (!parsed || Number.isNaN(parsed.getTime())) {
+            pushMsg("user", text);
+            say("Hm, I couldn't read that date 🩷 Try typing it like: 2026-02-08, or 08/02/2026 — or just say something like \"last week\" or \"early March\".");
+            return;
+          }
+        }
+
+        // ── Step 4: Logical validation ─────────────────────────────────────
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
         const oneYearAgo = addDays(todayStart, -365);
         const ninetyDaysAhead = addDays(todayStart, 90);
+
+        if (captureKind === "lmpDate") {
+          const v = validateCycleDate({ date: parsed, kind: "lmpDate", today });
+          if (!v.valid) {
+            pushMsg("user", text);
+            say(v.message);
+            return;
+          }
+          if (v.staleData) {
+            // Proceed but show a nudge — do not block
+            say(v.message);
+          }
+        }
 
         if (captureKind === "sexDate") {
           if (parsed > todayStart) {
@@ -564,17 +806,25 @@ export function initBloomieChat({
           }
         }
 
+        // ── Step 5: Commit the date ────────────────────────────────────────
         pushMsg("user", text);
         ctx.captureData = ctx.captureData || {};
-        ctx.captureData[ctx.capture.kind] = parsed.toISOString();
+        ctx.captureData[captureKind] = parsed.toISOString();
+        if (isApproximate) ctx.captureData[captureKind + "_isApproximate"] = true;
+
+        // Derive phaseConfidence for downstream symptom engine
+        if (isApproximate) {
+          ctx.sessionData = ctx.sessionData || {};
+          ctx.sessionData.phaseConfidence = computePhaseConfidence({ approximate: true });
+        }
 
         // If capturing LMP — save to sessionData so all cycle helpers use it
-        if (ctx.capture.kind === "lmpDate") {
+        if (captureKind === "lmpDate") {
           ctx.sessionData = ctx.sessionData || {};
           ctx.sessionData.lmp = parsed.toISOString();
-          console.log("[Bloomie] session LMP set →", parsed.toDateString());
+          console.log("[Bloomie] session LMP set →", parsed.toDateString(), isApproximate ? "(approximate)" : "");
         }
-        if (ctx.capture.kind === "cycleLengthDate") {
+        if (captureKind === "cycleLengthDate") {
           ctx.sessionData = ctx.sessionData || {};
           const days = parseInt(text, 10);
           if (!isNaN(days) && days >= 21 && days <= 45) {
@@ -595,10 +845,99 @@ export function initBloomieChat({
       advanceFlow();
       pushMsg("user", text);
 
+      // ── Loop detection — track recent inputs ─────────────────────────────
+      ctx.recentInputs = ctx.recentInputs || [];
+      ctx.recentInputs.push(text);
+      if (ctx.recentInputs.length > 5) ctx.recentInputs.shift();
+
+      // Exact repeat detection: same message sent 3+ times in last 5
+      const _last4 = ctx.recentInputs.slice(0, -1).slice(-4);
+      const _exactCount = _last4.filter(m => m === text).length;
+      if (_exactCount >= 2) {
+        say("I heard you the first time 🩷 I want to help — let me try a different approach.");
+        transition("ELSE_NOT_SURE_ROUTE");
+        return;
+      }
+
+      // "idk" loop — 3+ times total in recent inputs
+      const _idkPattern = /^\s*(idk|i don'?t know|not sure|nuh sure|mi nuh know)\s*$/i;
+      const _idkCount = ctx.recentInputs.filter(m => _idkPattern.test(m)).length;
+      if (_idkCount >= 3) {
+        say("That's okay — not knowing is okay 🩷 Sometimes it helps to just pick the closest thing. What feels most like what's going on?");
+        transition("ELSE_NOT_SURE_ROUTE");
+        return;
+      }
+
+      // ── Pending route confirmation (MEDIUM confidence tier) ─────────────────
+      // If Bloomie asked a soft confirmation question last turn, check whether
+      // the user confirmed or corrected. Confirmed -> proceed to pending route.
+      // Corrected -> clear pending and re-run full pipeline with correction.
+      if (ctx.pendingRoute) {
+        const confirmText = text.toLowerCase().trim();
+        const YES_CONFIRM = ["yes", "yeah", "yep", "yah", "ya", "correct", "dat right", "that's right", "right", "sure", "ok", "okay", "exactly", "true", "yes that's it"];
+        const isConfirm = YES_CONFIRM.some(w => confirmText === w || confirmText.startsWith(w + " ") || confirmText.startsWith(w + ","));
+        const NO_CORRECT = ["no", "nah", "nope", "not really", "that's not", "thats not", "not that", "different"];
+        const isCorrection = NO_CORRECT.some(w => confirmText === w || confirmText.startsWith(w + " ") || confirmText.startsWith(w + ","));
+        if (isConfirm) {
+          const route = ctx.pendingRoute;
+          ctx.pendingRoute = null;
+          transition(route.next, route.payload || {});
+          return;
+        } else if (isCorrection) {
+          // User corrected -- clear pending, fall through to full routing pipeline
+          ctx.pendingRoute = null;
+          // (effectiveInput will be set below from 'text')
+        } else {
+          // Ambiguous response -- treat as correction / new message, clear pending
+          ctx.pendingRoute = null;
+        }
+      }
+
+      // ── Resolve pending clarifying context ───────────────────────────────
+      // If Bloomie asked a clarifying question last turn, combine the original
+      // message with this answer and re-route on the combined context.
+      let effectiveInput = text;
+      let hasPendingContext = false;
+      {
+        const pending = ctx.pendingAmbiguityContext || ctx.pendingContradictionContext || ctx.pendingContextProbe;
+        if (pending?.originalText) {
+          effectiveInput = pending.originalText + " " + text;
+          hasPendingContext = true;
+        }
+        ctx.pendingAmbiguityContext = null;
+        ctx.pendingContradictionContext = null;
+        ctx.pendingContextProbe = null;
+      }
+
+      // ── PERSISTENT SAFETY RE-CHECK: urgency on every message ─────────────
+      // Runs BEFORE OOS routing, matchTypedToChoice, and inferRoute so a red
+      // flag at any point in the conversation is never silently missed.
+      // Checks both raw and Patois-normalized forms so phrases like
+      // "mi cyan breathe" (→ "i can't breathe") are always caught.
+      {
+        const _safetyRaw  = effectiveInput.toLowerCase();
+        const _safetyNorm = normalizePatois(_safetyRaw);
+        const urgentNow   = extractUrgency(_safetyRaw) || extractUrgency(_safetyNorm);
+        if (urgentNow) {
+          ctx.urgency = true;
+          logSafetyEvent("urgent_trigger", {
+            input:     effectiveInput,
+            route:     "HEAVY_URGENT",
+            reason:    "persistent_recheck",
+            topic:     ctx.topic,
+            riskLevel: ctx.riskLevel,
+          });
+          transition("HEAVY_URGENT");
+          return;
+        }
+      }
+
       // ── OOS follow-up context ────────────────────────────────────────────
-      const oosFollowUp = resolveOOSFollowUp(text, ctx.lastOOS);
+      // Pass normalizePatois(text) so Patois follow-up phrases resolve correctly.
+      const oosFollowUp = resolveOOSFollowUp(normalizePatois(text), ctx.lastOOS);
       if (oosFollowUp) {
         ctx.lastOOS = null;
+        ctx.currentTone = detectUserTone(text);
         transition(oosFollowUp);
         return;
       }
@@ -622,8 +961,13 @@ export function initBloomieChat({
       }
 
       // ── Context-aware choice matching ────────────────────────────────────
-      const contextMatch = matchTypedToChoice(text);
+      // Skip when a clarifying question was pending — the user is answering
+      // Bloomie's question, not selecting from the previous menu.
+      const contextMatch = hasPendingContext ? null : matchTypedToChoice(text);
       if (contextMatch) {
+        // Tone detection runs even when a typed choice is matched so ctx.currentTone
+        // stays current and toneOpeners apply correctly on the next node.
+        ctx.currentTone = detectUserTone(text);
         const choice = contextMatch;
         if (NODES[ctx.state]?.question) recordAnswer(NODES[ctx.state].question, choice.label);
         if (choice.action === "OPEN_MAP")      onOpenCareMap();
@@ -636,17 +980,160 @@ export function initBloomieChat({
         return;
       }
 
-      // Normalize patois before routing
-      const normalizedText = normalizePatois(text);
+      // ── Full input processing pipeline (steps 3–7) ───────────────────────
+      // Step 3: Patois → English phrase/word normalization
+      const _patoisNorm = normalizePatois(text);
+      // Step 4: Medical spell correction — phonetic variants then Levenshtein token correction
+      const _fuzzyText  = fuzzyCorrect(_patoisNorm) ?? _patoisNorm;
+      // Step 5: Collapse repeated characters ("helpppppp" → "help")
+      const _collapsed  = collapseRepeatedLetters(_fuzzyText);
+      // Step 6: Expand health/time shorthand ("ewcm", "bfp", "2wks", etc.)
+      const normalizedText = expandShorthand(_collapsed);
 
-      // Detect emotional tone from raw input (before normalization strips signals)
-      ctx.currentTone = detectUserTone(text);
+      // Step 12: Detect emotional tone from the normalized text
+      ctx.currentTone = detectUserTone(normalizedText);
 
       // ── Inference layer ──────────────────────────────────────────────
-      // 1. Extract entities (symptoms, duration, severity, timing, pregnancy, urgency)
-      // 2. Build a structured guidance response from templates
-      // 3. Infer the best route based on entity combinations
+      // Step 7: Extract entities (symptoms, duration, severity, timing, pregnancy, urgency)
       const entities = extractEntities(normalizedText);
+
+      // ── Cumulative risk flag accumulation ─────────────────────────────────
+      // Add flags as symptoms appear; check dangerous combinations every turn.
+      // This catches escalating patterns across multiple messages (e.g. heavy
+      // bleeding in message 1, dizziness in message 5).
+      {
+        const sym = entities.symptoms;
+        if (sym.heavy || sym.large_clots)          ctx.cumulativeRiskFlags.add("heavy_bleeding");
+        if (sym.dizziness)                          ctx.cumulativeRiskFlags.add("dizziness");
+        if (sym.late)                               ctx.cumulativeRiskFlags.add("late_period");
+        if (entities.pregnancy?.result === "positive") ctx.cumulativeRiskFlags.add("positive_test");
+        if (sym.pelvic)                             ctx.cumulativeRiskFlags.add("pelvic_pain");
+        if (sym.spotting)                           ctx.cumulativeRiskFlags.add("bleeding");
+        if (sym.night_sweats)                       ctx.cumulativeRiskFlags.add("night_sweats");
+        if (sym.cold_flashes)                       ctx.cumulativeRiskFlags.add("chills");
+        // one_sided_pain: detect from raw urgency text
+        if (/one.sided|one side/.test(normalizedText)) ctx.cumulativeRiskFlags.add("one_sided_pain");
+
+        const f = ctx.cumulativeRiskFlags;
+        const cumulativeUrgent =
+          (f.has("heavy_bleeding") && f.has("dizziness")) ||
+          (f.has("late_period")    && f.has("one_sided_pain")) ||
+          (f.has("positive_test")  && (f.has("pelvic_pain") || f.has("bleeding"))) ||
+          (f.has("night_sweats")   && f.has("chills") && f.has("pelvic_pain"));
+
+        if (cumulativeUrgent && !entities.urgent) {
+          const reason = f.has("heavy_bleeding") && f.has("dizziness")          ? "cumulative: heavy_bleeding+dizziness"
+                       : f.has("late_period")    && f.has("one_sided_pain")      ? "cumulative: late_period+one_sided_pain"
+                       : f.has("positive_test")  && f.has("pelvic_pain")         ? "cumulative: positive_test+pelvic_pain"
+                       : f.has("positive_test")  && f.has("bleeding")            ? "cumulative: positive_test+bleeding"
+                       : "cumulative: fever_proxy+pelvic_pain";
+          ctx.urgency = true;
+          logSafetyEvent("urgent_trigger", {
+            input:     normalizedText,
+            route:     "HEAVY_URGENT",
+            reason,
+            topic:     ctx.topic,
+            riskLevel: ctx.riskLevel,
+          });
+          transition("HEAVY_URGENT", { entities });
+          return;
+        }
+      }
+
+      // ── Downplaying detection ─────────────────────────────────────────────
+      // When the user minimises symptoms but mentions something urgency-adjacent,
+      // add a cumulative flag and inject a gentle probe BEFORE routing.
+      {
+        const isDownplaying = detectDownplaying(normalizedText);
+        const urgencyAdjacent = /\b(bleed|bleeding|faint|fainting|pain|dizzy|dizziness|weak|weakness|cramp)\b/.test(normalizedText);
+        if (isDownplaying && urgencyAdjacent) {
+          ctx.cumulativeRiskFlags.add("downplaying_detected");
+          const symptomMentioned =
+            /\bfaint/.test(normalizedText) ? "fainting" :
+            /\bbleed/.test(normalizedText) ? "bleeding" :
+            /\bdizzy|dizziness/.test(normalizedText) ? "dizziness" :
+            /\bpain/.test(normalizedText) ? "pain" : "the symptom you mentioned";
+          say([
+            `I hear you — and I don't want to alarm you. But when ${symptomMentioned} is involved, I want to make sure I'm giving you the right picture. Can you tell me a little more about ${symptomMentioned}?`,
+          ], { keepLocked: false });
+          // Continue routing below — do not return here. Safety checks still run.
+        }
+      }
+
+      // ── Contradiction detection ───────────────────────────────────────────
+      {
+        const contradictionQ = detectContradiction(normalizedText, entities);
+        if (contradictionQ && !entities.urgent) {
+          ctx.pendingContradictionContext = { originalText: effectiveInput };
+          say([contradictionQ]);
+          render();
+          return;
+        }
+      }
+
+      // ── Ambiguity detection ───────────────────────────────────────────────
+      {
+        const ambiguityQ = detectAmbiguousInput(normalizedText, entities);
+        if (ambiguityQ && !entities.urgent && !ctx.pendingContradictionContext) {
+          ctx.pendingAmbiguityContext = { originalText: effectiveInput };
+          say([ambiguityQ]);
+          render();
+          return;
+        }
+      }
+
+      // ── Missing context probe ─────────────────────────────────────────────
+      {
+        const contextProbeQ = detectMissingContext(entities, normalizedText);
+        if (contextProbeQ && !entities.urgent && !ctx.pendingContradictionContext && !ctx.pendingAmbiguityContext) {
+          ctx.pendingContextProbe = { originalText: effectiveInput };
+          say([contextProbeQ]);
+          render();
+          return;
+        }
+      }
+
+      // ── Overload detection: too many issues at once ──────────────────────
+      if (!entities.urgent && detectOverload(entities, effectiveInput)) {
+        const sym = entities.symptoms;
+        const TOPIC_LABELS = {
+          bleeding: "heavy bleeding", late_period: "a late period",
+          pain: "pain or cramps", mood: "mood or emotional concerns",
+          spotting: "spotting", discharge: "discharge",
+          nausea: "nausea", pregnancy: "a pregnancy concern",
+        };
+        const detectedTopics = [];
+        if (sym.heavy || sym.large_clots)                           detectedTopics.push("bleeding");
+        if (sym.late)                                               detectedTopics.push("late_period");
+        if (sym.pelvic || sym.ovulation_pain)                       detectedTopics.push("pain");
+        if (sym.mood || sym.anxiety || sym.depression)              detectedTopics.push("mood");
+        if (sym.spotting)                                           detectedTopics.push("spotting");
+        if ((sym.discharge || sym.unusual_discharge || sym.discharge_eggwhite) && !detectedTopics.includes("spotting")) detectedTopics.push("discharge");
+        if (sym.nausea)                                             detectedTopics.push("nausea");
+        if (entities.pregnancy?.chance || entities.pregnancy?.result) detectedTopics.push("pregnancy");
+        if (detectedTopics.length >= 3) {
+          const labelList = detectedTopics.map(k => TOPIC_LABELS[k] || k).join(", ");
+          ctx.pendingConcerns = [...detectedTopics.slice(1)];
+          say([
+            "You've shared a lot and I want to make sure I help with all of it 🩷",
+            `I noticed you mentioned: ${labelList}.`,
+            "Which one is bothering you most right now? Let's start there.",
+          ], {
+            choices: detectedTopics.map(topic => ({
+              id: `overload_${topic}`,
+              label: TOPIC_LABELS[topic] || topic,
+              next: topic === "bleeding" ? "HEAVY_INTRO"
+                  : topic === "late_period" ? "LATE_INTRO"
+                  : topic === "pain" ? "PELVIC_INTRO"
+                  : topic === "mood" ? "MOOD_SAFETY_CHECK"
+                  : topic === "spotting" ? "SPOT_INTRO"
+                  : topic === "discharge" ? "ELSE_DISCHARGE_ENTRY"
+                  : "PREGNANCY_ENTRY",
+            })),
+          });
+          return;
+        }
+      }
 
       // ── Topic interrupt: clear stale entity history on topic switch ───────
       // When the user shifts to a meaningfully different concern (e.g. from
@@ -689,6 +1176,73 @@ export function initBloomieChat({
 
       console.log("[Bloomie inference]", summarizeEntities(mergedEntities));
 
+      // ── Conversation intelligence: update profile on every exchange ──────────
+      {
+        const prof = ctx.conversationProfile;
+
+        // Increment session depth for typed messages (hasPendingContext = clarifying reply)
+        prof.sessionDepth++;
+
+        // Accumulate session symptoms across the entire conversation
+        const sym = mergedEntities.symptoms;
+        for (const [key, val] of Object.entries(sym)) {
+          if (val === true) ctx.sessionSymptoms.add(key);
+        }
+
+        // Update verbosity based on engagement level
+        if (prof.sessionDepth >= 5) {
+          prof.userEngagementLevel = "high";
+          ctx.verbosity = "detailed";
+        } else if (prof.sessionDepth <= 2 && prof.sessionDepth === (ctx.recentInputs.filter(m => m).length)) {
+          // low depth: check if user has only used buttons so far
+          ctx.verbosity = "concise";
+        } else {
+          ctx.verbosity = "normal";
+        }
+
+        // Detect return to a topic that was already resolved
+        const symptomTopicMap = {
+          late: "late", heavy: "heavy", spotting: "spot", pelvic: "pelvic",
+          mood: "mood", discharge: "discharge", nausea: "pregnancy",
+        };
+        for (const [symKey, topicCode] of Object.entries(symptomTopicMap)) {
+          if (sym[symKey] && prof.concernsResolved.includes(topicCode)) {
+            prof.returnedTopic = topicCode;
+            break;
+          }
+        }
+      }
+
+      // ── Return-to-resolved-topic detection ─────────────────────────────────
+      // If the user mentions a topic already resolved this session, offer
+      // follow-up options instead of re-starting the full flow from scratch.
+      if (ctx.conversationProfile.returnedTopic && !mergedEntities.urgent) {
+        const rt = ctx.conversationProfile.returnedTopic;
+        const TOPIC_LABELS = {
+          late: "late or missed period", heavy: "heavy bleeding", spot: "spotting",
+          mood: "mood or energy changes", pelvic: "pelvic pain or cramps",
+          pregnancy: "pregnancy concerns", discharge: "discharge",
+        };
+        const TOPIC_TO_NODE = {
+          late: "LATE_INTRO", heavy: "HEAVY_INTRO", spot: "SPOT_INTRO",
+          mood: "MOOD_SAFETY_CHECK", pelvic: "PELVIC_INTRO",
+          pregnancy: "PREGNANCY_ENTRY", discharge: "ELSE_DISCHARGE",
+        };
+        const rtLabel = TOPIC_LABELS[rt] || rt;
+        ctx.conversationProfile.returnedTopic = null;
+        say([
+          "We talked about " + rtLabel + " earlier 💗 Is there something new, or did you want to revisit something specific?",
+        ], {
+          choices: [
+            { id: "new_rt",     label: "Something new",          next: TOPIC_TO_NODE[rt] || "START_MENU" },
+            { id: "followup_rt",label: "A follow-up question",   next: TOPIC_TO_NODE[rt] || "START_MENU" },
+            { id: "restart_rt", label: "Start over on this topic",next: TOPIC_TO_NODE[rt] || "START_MENU" },
+          ],
+        });
+        return;
+      }
+
+
       // ── Inject symptom history context ───────────────────────────
       // If we have symptomHistory and this message mentions something the user
       // has repeatedly logged before, surface that pattern BEFOREEEEE routing.
@@ -705,6 +1259,59 @@ export function initBloomieChat({
         // stale button click resumes the wrong branch before the real transition.
         say([historyContext], { delayMs: 0, keepLocked: true });
       }
+
+      // ── Symptom engine: safety escalation override ────────────────────────
+      // If the pre-computed symptom signals contain a SEEK_URGENT_CARE signal,
+      // route directly to HEAVY_URGENT before any text-based inference runs.
+      if (ctx.integratedSignals?.symptomSignals?.length) {
+        const sCtx = getBloomieSymptomContext(ctx.integratedSignals.symptomSignals);
+        if (sCtx.safetyEscalationNeeded) {
+          logSafetyEvent("symptom_engine_escalation", {
+            input:     normalizedText,
+            route:     "HEAVY_URGENT",
+            reason:    "symptom_engine_seek_urgent_care",
+            topic:     ctx.topic,
+            riskLevel: ctx.riskLevel,
+          });
+          transition("HEAVY_URGENT", { entities: mergedEntities });
+          return;
+        }
+      }
+
+      // ── Medication pre-check ───────────────────────────────────────────────
+      // Runs BEFORE inferRoute so explicit medication requests are caught even
+      // when the text also scores health signals (e.g. "cramp a kill mi wah tek").
+      {
+        const medCat = OOS.find(cat =>
+          cat.name === "medication_dosage" &&
+          cat.patterns.some(rx => rx.test(normalizedText))
+        );
+        if (medCat) {
+          const medLines = (medCat.replies || OOS_DEFAULT)
+            .map(r => typeof r === "function" ? r(normalizedText) : r)
+            .filter(Boolean);
+          ctx.lastOOS = medCat.name;
+          const delay = estimateSayTime(medLines);
+          say(medLines, { keepLocked: true });
+          const tid = setTimeout(() => {
+            transition(medCat.forceNext || "START_MENU", {});
+          }, delay);
+          ctx.timers.add(tid);
+          return;
+        }
+      }
+
+      // ── Pipeline debug logging ────────────────────────────────────────────
+      debugPipeline(
+        text,          // raw
+        _patoisNorm,   // after normalizePatois (step 3)
+        _fuzzyText,    // after fuzzyCorrect (step 4)
+        normalizedText,// after collapseRepeatedLetters + expandShorthand (steps 5–6)
+        mergedEntities,
+        ctx.currentTone,
+        mergedEntities.urgent,
+        null // route resolved below
+      );
 
       const inferred   = inferRoute(mergedEntities);
 
@@ -735,9 +1342,12 @@ export function initBloomieChat({
         // guidance bubble and the transition firing, so old node buttons
         // cannot be clicked during that gap.
         console.log("[Bloomie guidance] scenario →", guidance.scenario);
-        // Prepend a tone-aware opener unless the route is an emergency node —
+        // Prepend a tone-aware opener unless the route is an emergency / safety node —
         // those must stay grounded and consistent regardless of user tone.
-        const EMERGENCY_NODES = new Set(["HEAVY_URGENT", "CRISIS_SUPPORT", "SAFETY_SUPPORT"]);
+        const EMERGENCY_NODES = new Set([
+          "HEAVY_URGENT", "CRISIS_SUPPORT", "SAFETY_SUPPORT",
+          "MOOD_SAFETY_ROUTE", "PELVIC_URGENT", "SPOT_URGENT", "DISCHARGE_URGENT",
+        ]);
         const guidanceOpener =
           ctx.currentTone && ctx.currentTone !== "neutral" && !EMERGENCY_NODES.has(inferred?.next)
             ? getToneOpener(ctx.currentTone)
@@ -767,6 +1377,12 @@ export function initBloomieChat({
       // Fall through to existing keyword router
       const routed = routeUserText(normalizedText);
 
+      // ── Compute route confidence (pure signal scoring) ──────────────────────
+      {
+        const { sig: routeSig } = scoreSignals(normalizedText);
+        ctx.routeConfidence = computeRouteConfidence(routeSig, mergedEntities);
+      }
+
       // ── Safety log: urgent_trigger (keyword router path) ──────────────────
       if (routed?.next === "HEAVY_URGENT") {
         logSafetyEvent("urgent_trigger", {
@@ -778,7 +1394,7 @@ export function initBloomieChat({
         });
       }
 
-      // ── Safety log: oos_fallback ──────────────────────────────────────────
+      // ── Safety log: oos_fallback ────────────────────────────────────────────
       if (routed?.payload?.oos && routed.payload.oos !== "greeting") {
         const containsHealthKeywords =
           /\b(bleed|faint|pass out|passing out|collapse|pain|cramp|late|pregnant|spotting|dizzy|discharge)\b/
@@ -801,10 +1417,26 @@ export function initBloomieChat({
         // clearTimers() inside transition() does not nuke the reply bubbles.
         const lines = Array.isArray(routed.reply) ? routed.reply : [routed.reply];
         const isOOS = !!routed.payload?.oos;
+        if (isOOS) ctx.oosStreakCount = (ctx.oosStreakCount || 0) + 1;
+        else ctx.oosStreakCount = 0;
+
+        // ── Conversational repair: 2+ OOS after meaningful session depth ──────────
+        if (isOOS && ctx.oosStreakCount >= 2 && ctx.conversationProfile.sessionDepth >= 3) {
+          say([
+            "I’ve been having trouble understanding what you need, and that’s on me 💗",
+            "Let me try differently. Can you pick the closest thing from below?",
+          ]);
+          ctx.oosStreakCount = 0;
+          ctx.narrowingCandidates = null;
+          transition("NARROWING");
+          return;
+        }
+
         if (isOOS && routed.next === "START_MENU") {
           // Zero-confidence narrowing: if the input has health-adjacent words,
           // ask a clarifying question with topic buttons instead of the generic OOS reply.
           if (/\b(period|bleed|pain|cramp|discharge|pregnant|cycle|mood|tired|sick|hurt)\b/.test(normalizedText)) {
+            ctx.narrowingCandidates = null; // generic OOS -- no candidates
             transition("NARROWING");
             return;
           }
@@ -813,7 +1445,10 @@ export function initBloomieChat({
           render();
         } else {
           // Prepend tone opener for non-emergency, non-OOS routed replies.
-          const EMERGENCY_NODES = new Set(["HEAVY_URGENT", "CRISIS_SUPPORT", "SAFETY_SUPPORT"]);
+          const EMERGENCY_NODES = new Set([
+            "HEAVY_URGENT", "CRISIS_SUPPORT", "SAFETY_SUPPORT",
+            "MOOD_SAFETY_ROUTE", "PELVIC_URGENT", "SPOT_URGENT", "DISCHARGE_URGENT",
+          ]);
           const routerOpener =
             ctx.currentTone && ctx.currentTone !== "neutral" && !isOOS && !EMERGENCY_NODES.has(routed.next)
               ? getToneOpener(ctx.currentTone)
@@ -834,16 +1469,51 @@ export function initBloomieChat({
         say(routed.reply);
         render();
       } else if (routed?.next) {
-        ctx.lastIntent = routed.next;
-        transition(routed.next, routed.payload || {});
+        // ── Confidence-tiered routing ──────────────────────────────────────────────
+        // HEAVY_URGENT is always immediate regardless of computed confidence.
+        if (routed.next === "HEAVY_URGENT") {
+          ctx.lastIntent = routed.next;
+          transition(routed.next, routed.payload || {});
+          return;
+        }
+        const conf = ctx.routeConfidence;
+        if (conf && conf.tier === "low") {
+          // LOW: surface NARROWING with top scored candidate buttons
+          const INTENT_TO_CANDIDATE = {
+            late:        { id: "cycle",  label: "Late or irregular cycle",  next: "LATE_INTRO" },
+            heavy:       { id: "heavy",  label: "Bleeding or flow",         next: "HEAVY_INTRO" },
+            spot:        { id: "spot",   label: "Spotting",                 next: "SPOT_INTRO" },
+            mood:        { id: "mood",   label: "Mood or energy changes",   next: "MOOD_INTRO" },
+            pelvic:      { id: "pain",   label: "Pain or cramps",           next: "PELVIC_INTRO" },
+            pregnancy:   { id: "preg",   label: "Pregnancy concerns",       next: "PREGNANCY_ENTRY" },
+            discharge:   { id: "dis",    label: "Discharge",                next: "ELSE_DISCHARGE" },
+            urgent_care: { id: "urgent", label: "Urgent concern",           next: "HEAVY_URGENT" },
+          };
+          const candidateIntents = [conf.primaryIntent, ...conf.competingIntents]
+            .filter(Boolean).slice(0, 3);
+          const candidates = candidateIntents
+            .map(i => INTENT_TO_CANDIDATE[i]).filter(Boolean);
+          ctx.narrowingCandidates = candidates.length ? candidates : null;
+          transition("NARROWING");
+        } else if (conf && conf.tier === "medium") {
+          // MEDIUM: ask soft confirmation, store pending route for next turn
+          ctx.pendingRoute = { next: routed.next, payload: routed.payload || {} };
+          say([conf.confidenceNote]);
+          render();
+        } else {
+          // HIGH (or no confidence data): route directly
+          ctx.lastIntent = routed.next;
+          transition(routed.next, routed.payload || {});
+        }
       } else {
         // Zero-confidence narrowing: same check for the hard no-match path.
         if (/\b(period|bleed|pain|cramp|discharge|pregnant|cycle|mood|tired|sick|hurt)\b/.test(normalizedText)) {
+          ctx.narrowingCandidates = null;
           transition("NARROWING");
           return;
         }
         say([
-          "I'm here to help with periods, spotting, cramps, mood changes, or cycle concerns 🩷",
+          "I'm here to help with periods, spotting, cramps, mood changes, or cycle concerns 💗",
           "Try typing something like: \"late period\", \"spotting\", \"heavy bleeding\", or \"pelvic pain\".",
         ]);
         render();
@@ -1115,21 +1785,88 @@ export function initBloomieChat({
     {
       name: "medication_dosage",
       patterns: [
-        /\b(how much|what dose|dosage|mg|milligram|how many (pills?|tablets?))(.*)(ibuprofen|paracetamol|panadol|naproxen|aspirin|metformin|provera|norethisterone|tranexamic|mefenamic|bc pill|contraceptive pill)\b/,
-        /\b(ibuprofen|paracetamol|panadol|naproxen|tranexamic|mefenamic|norethisterone|progesterone|estrogen|metformin|provera)\b.{0,40}\b(dose|dosage|how much|how many|take|mg|tablet|pill)\b/,
-        /\b(can i take|is it safe to take|should i take|take.*for (cramps?|pain|period|bleeding))\b/,
-        /\b(medication|medicine|prescription|prescribed|drug|tablet|capsule|overdose)\b.{0,40}\b(period|cramps?|bleeding|cycle|pain|pms)\b/,
-        /\b(tek (panadol|ibuprofen|painkiller|paracetamol|naproxen)|pain.?killer fi cramps?|wah (me|mi) can tek|can mi tek|safe fi tek)\b/,
+        // ── Brand names — Jamaican market + common (standalone is enough) ────
+        /\b(panadol|panadeine|ibuprofen|advil|brufen|nurofen|tylenol|buscopan|ponstan|naproxen|aleve|aspirin|disprin|codeine|co-codamol|diclofenac|voltaren|tramadol|tranexamic|norethisterone|provera|metformin|clomid|clomiphene|primolut|duphaston|mefenamic)\b/i,
+        // ── Generic pain relief phrases ──────────────────────────────────────
+        /\b(pain relief|painkiller|pain killer|pain medication|pain medicine|pain tablet|pain pill|cramp relief|period pain relief|cramp medicine|menstrual relief)\b/i,
+        // ── "Something / anything for the pain / cramps" ────────────────────
+        /\b(something for (the )?(pain|cramps?|belly|stomach|period)|anything for (the )?(pain|cramps?|period))\b/i,
+        /\b(help with (the )?(pain|cramps?)|stop the pain|ease the pain|reduce the pain|manage the pain)\b/i,
+        // ── What helps / what to do for pain (post-Patois normalization) ────
+        /\b(what (can|is good|works) (for|with) (the )?(pain|cramps?|period)|what to do for (the )?(pain|cramps?))\b/i,
+        /\b(how to (stop|ease|manage|reduce) (the )?(pain|cramps?)|what can help)\b/i,
+        // ── "Killing me" pain-relief intent ─────────────────────────────────
+        /\bkilling me\b.{0,50}\b(help|take|get|something|anything|relief)\b/i,
+        /\b(cramps? are killing me|cramps? killing me|stomach is killing me|is killing me)\b/i,
+        // ── Dosage / safety questions ────────────────────────────────────────
+        /\b(safe to take|okay to take|alright to take|is it safe|can i take|should i take|when to take|take with food|take on empty stomach)\b/i,
+        /\b(how (much|many|often) (can i|should i|to)? ?(take|panadol|ibuprofen|aspirin|buscopan|ponstan|naproxen|tablets?|pills?))\b/i,
+        /\b(overdose|too many tablets|too many pills|take two|take three|how often|every how long|can i take more)\b/i,
+        // ── Existing patterns kept + expanded ────────────────────────────────
+        /\b(how much|what dose|dosage|mg|milligram|how many (pills?|tablets?))(.*)(ibuprofen|paracetamol|panadol|naproxen|aspirin|metformin|provera|norethisterone|tranexamic|mefenamic|bc pill|contraceptive pill)\b/i,
+        /\b(ibuprofen|paracetamol|panadol|naproxen|tranexamic|mefenamic|norethisterone|progesterone|estrogen|metformin|provera)\b.{0,40}\b(dose|dosage|how much|how many|take|mg|tablet|pill)\b/i,
+        /\b(medication|medicine|prescription|prescribed|drug|tablet|capsule|overdose)\b.{0,40}\b(period|cramps?|bleeding|cycle|pain|pms)\b/i,
+        // ── Post-normalization Patois patterns ───────────────────────────────
+        /\b(i want (a|some|to (take|get|buy))|i need (a|some|to get)|want to (take|get|buy)|need to get|i am taking)\b.{0,40}\b(panadol|ibuprofen|painkiller|pain relief|advil|buscopan|ponstan|aspirin|tramadol|naproxen|voltaren)\b/i,
+        /\b(take|taking)\b.{0,25}\b(panadol|ibuprofen|painkiller|advil|buscopan|ponstan|aspirin|tramadol|naproxen|voltaren|norethisterone|provera|metformin|clomid|duphaston)\b/i,
+        /\b(want to take|want a|want some|i want|i need)\b.{0,30}\b(panadol|ibuprofen|painkiller|buscopan|ponstan|advil|aspirin|naproxen)\b/i,
+        // ── Residual Patois (pre-normalization chat path) ────────────────────
+        /\b(tek (panadol|ibuprofen|painkiller|paracetamol|naproxen|buscopan|ponstan|aspirin|tramadol|voltaren)|pain.?killer fi cramps?|wah (me|mi) can tek|can mi tek|safe fi tek|wah tek|mi wah tek|me wah tek)\b/i,
+        /\b(wah (a|some) (panadol|ibuprofen|painkiller|buscopan|ponstan)|anyting fi (cramp|pain|period)|something fi di (pain|belly|cramp))\b/i,
       ],
       replies: [
         (t) => {
-          if (/panadol/i.test(t)) return "Panadol is one of the most common things people reach for with cramps 🩷 I just can't advise on the right dose for your specific situation — that part I need to leave to a pharmacist or provider.";
-          if (/ibuprofen/i.test(t)) return "Ibuprofen can be really helpful for period pain 🩷 Getting the dose right for you personally is something a pharmacist can sort out quickly — no referral needed.";
-          if (/paracetamol/i.test(t)) return "Paracetamol is a gentle option a lot of people use for cramps 🩷 A pharmacist can confirm the right amount for your situation.";
-          if (/naproxen/i.test(t)) return "Naproxen is actually one of the options that works well for period pain 🩷 Dosage is something I need to leave to a pharmacist or your provider though.";
-          return "That's a common thing to wonder about 🩷 Medication dosage is something I genuinely can't advise on — what's right depends on your full health picture.";
+          // ── Medication-specific warm openers ───────────────────────────────
+          if (/panadol/i.test(t)) return pick([
+            "Panadol is one of the most common things people reach for for period pain 🩷",
+            "A lot of people reach for Panadol when cramps hit — you're not alone in that 🩷",
+            "Panadol fi di pain is real and valid — cramps bad enough to need relief deserve to be taken seriously 🩷",
+            "Yeah, Panadol is probably the most reached-for thing for period pain in Jamaica 🩷",
+          ]);
+          if (/ibuprofen/i.test(t)) return pick([
+            "Ibuprofen is actually one of the better options for period pain since it targets inflammation too 🩷",
+            "Ibuprofen can really help with cramps — it works differently from Panadol and often more effectively 🩷",
+            "Cramps bad enough to want ibuprofen are real and valid 🩷",
+            "Ibuprofen fi period pain — that's a solid instinct 🩷",
+          ]);
+          if (/buscopan/i.test(t)) return pick([
+            "Buscopan is often used for spasm-type cramps — makes sense that you're asking about it 🩷",
+            "Buscopan fi di cramp pain — that's something a lot of people find helpful 🩷",
+            "Cramps bad enough to want Buscopan are real and deserve proper care 🩷",
+          ]);
+          if (/ponstan|mefenamic/i.test(t)) return pick([
+            "Ponstan (mefenamic acid) is one of the strongest options for period pain — your instinct is solid 🩷",
+            "Mefenamic acid is specifically designed for period pain, so you're on the right track 🩷",
+            "Ponstan fi period pain — that's actually one of the more targeted options out there 🩷",
+          ]);
+          if (/naproxen|aleve/i.test(t)) return pick([
+            "Naproxen is one of the options that works well for period pain 🩷",
+            "Naproxen / Aleve is a solid choice for cramps — you're thinking about it right 🩷",
+          ]);
+          if (/aspirin|disprin/i.test(t)) return pick([
+            "Aspirin / Disprin is something a lot of people reach for — good that you're thinking about it carefully 🩷",
+          ]);
+          if (/tramadol|codeine|co-codamol/i.test(t)) return pick([
+            "Tramadol and codeine are stronger pain medications that really do need a provider's involvement 🩷",
+          ]);
+          // ── Pain-focused openers (no specific brand detected) ──────────────
+          if (/killing me|kill mi|murder mi|cannot manage|too bad|bad bad/i.test(t)) return pick([
+            "Cramps bad enough to feel like they're killing you are real and valid — you deserve actual relief 🩷",
+            "Pain that bad shouldn't just be pushed through 🩷",
+            "When the pain gets that intense, it absolutely makes sense to want something for it 🩷",
+            "Mi know that feeling — when di cramp a kill you, you need real help, not just toughing it out 🩷",
+          ]);
+          // ── Generic openers ───────────────────────────────────────────────
+          return pick([
+            "That's a really common thing to wonder about 🩷 Pain relief for period cramps is something a lot of people navigate.",
+            "Cramps bad enough to need pain relief are real and valid 🩷",
+            "Wanting something for the pain is completely understandable 🩷",
+            "Period pain that needs medication is legitimate — you shouldn't have to just push through 🩷",
+            "Mi hear you — when di pain bad, you need something fi help 🩷",
+          ]);
         },
-        () => "What I can do is help you describe your symptoms so you know exactly what to tell a pharmacist or doctor when you go.",
+        () => "I can't tell you how much to take or whether a specific medication is right for your situation — that really needs a pharmacist or provider who knows your full health picture.",
+        () => "A pharmacist is actually the fastest option here — you can walk in, describe your symptoms, and they can advise on the spot. No appointment needed.",
       ],
       forceNext: "MEDICATION_REDIRECT",
     },
@@ -1700,6 +2437,76 @@ export function initBloomieChat({
     return null;
   }
 
+  // ── Overload detector ─────────────────────────────────────────────────────────
+  // Returns true when user has shared too many distinct concerns simultaneously.
+  function detectOverload(entities, text) {
+    const sym = entities.symptoms;
+    const activeTopics = [
+      sym.heavy || sym.large_clots,
+      sym.late,
+      sym.pelvic || sym.ovulation_pain,
+      sym.mood || sym.anxiety || sym.depression,
+      sym.spotting,
+      sym.discharge || sym.unusual_discharge || sym.discharge_eggwhite,
+      sym.nausea,
+      entities.pregnancy?.chance || entities.pregnancy?.result,
+    ].filter(Boolean).length;
+    const symptomCount = Object.values(sym).filter(Boolean).length;
+    return symptomCount >= 3 || String(text).length > 200 || activeTopics >= 3;
+  }
+
+  // ── Pipeline debug utility ────────────────────────────────────────────────
+  // Activated only when localStorage.getItem("bloomie_debug") === "true".
+  // Logs each stage of the processing pipeline for inspection.
+  function debugPipeline(rawInput, normalizedInput, fuzzyInput, expandedInput, entities, tone, urgency, route) {
+    if (typeof localStorage === "undefined") return;
+    if (localStorage.getItem("bloomie_debug") !== "true") return;
+    console.log(`[Bloomie Pipeline] Raw: ${rawInput}`);
+    console.log(`[Bloomie Pipeline] After normalizePatois: ${normalizedInput}`);
+    console.log(`[Bloomie Pipeline] After fuzzyCorrect: ${fuzzyInput}`);
+    console.log(`[Bloomie Pipeline] After expandShorthand: ${expandedInput}`);
+    console.log(`[Bloomie Pipeline] Entities: ${JSON.stringify(entities)}`);
+    console.log(`[Bloomie Pipeline] Tone: ${tone}`);
+    console.log(`[Bloomie Pipeline] Urgency: ${urgency}`);
+    console.log(`[Bloomie Pipeline] Route: ${route}`);
+  }
+
+  // ── Advice deduplication helpers ───────────────────────────────────────────────────
+  // canGiveAdvice(code, maxTimes) returns true if advice hasn't exceeded the cap.
+  // Registers the advice in ctx.adviceGiven when it returns true.
+  function canGiveAdvice(code, maxTimes = 1) {
+    const count = [...ctx.adviceGiven].filter(k => k === code || k.startsWith(code + "_")).length;
+    if (count >= maxTimes) return false;
+    // Use a versioned key so we can count occurrences: code_1, code_2 ...
+    const versionedKey = count === 0 ? code : code + "_" + (count + 1);
+    ctx.adviceGiven.add(versionedKey);
+    return true;
+  }
+
+  // filterDedup(lines) removes any line containing repeated advice phrases.
+  // Call this when constructing say() arrays in wrap/guide nodes.
+  function filterDedup(lines) {
+    const PROVIDER_PHRASES = [
+      /see (a |your )?(healthcare )?provider/i,
+      /visit (a |the )?(clinic|doctor|hospital)/i,
+      /medical attention/i,
+      /professional (advice|help|care)/i,
+    ];
+    let providerCount = [...ctx.adviceGiven].filter(k => k.startsWith("told_to_seek_care")).length;
+    const TEST_PHRASES = [/pregnancy test/i, /take a test/i, /retest/i];
+    const LOG_PHRASES = [/track(ing)? your cycle/i, /log(ging)? your period/i, /keep a log/i];
+    return lines.filter(line => {
+      if (typeof line !== "string") return true;
+      if (PROVIDER_PHRASES.some(rx => rx.test(line))) {
+        if (providerCount >= 2) return false;
+        providerCount++;
+      }
+      if (TEST_PHRASES.some(rx => rx.test(line)) && ctx.adviceGiven.has("told_to_test")) return false;
+      if (LOG_PHRASES.some(rx => rx.test(line)) && ctx.adviceGiven.has("logging_nudge")) return false;
+      return true;
+    });
+  }
+
   // ---------------- ROUTER (Phase 2 — inference object) ----------------
   // Instead of scores.late += 2, we build a signal object and reason
   // over combinations before falling back to a single best-intent pick.
@@ -1760,6 +2567,42 @@ export function initBloomieChat({
       /forgot (the )?condom/.test(t)
     ) return { next: "TEST_RECENT_SEX_INTRO" };
 
+    // ── Session summary request ───────────────────────────────────────────────
+    // Catches "what did you say", "remind me", Patois "wah we talk bout", etc.
+    if (
+      /\b(what did (you|bloomie) say|remind me|what have we (covered|talked|discussed)|what did we talk|what was that again|give me a summary|what have you told me)\b/i.test(t) ||
+      /\b(summary)\b/i.test(t) ||
+      /\b(wah we (talk|cover|discuss)|wah yu say|wah you say|wah we talk bout)\b/i.test(t)
+    ) return { next: "CONVERSATION_SUMMARY" };
+
+    // ── Single-word / ultra-short routing ─────────────────────────────────────
+    // Ensures common single-word inputs route immediately rather than falling to OOS.
+    if (/^\s*(idk|i don'?t know|not sure)\s*$/i.test(t))                           return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/^\s*help\s*$/i.test(t))                                                   return { next: "START_MENU" };
+    if (/^\s*period\s*$/i.test(t))                                                 return { next: "PERIOD_TRIAGE" };
+    if (/^\s*late\s*$/i.test(t))                                                   return { next: "LATE_INTRO" };
+    if (/^\s*(pain|ache|aching)\s*$/i.test(t))                                     return { next: "PELVIC_INTRO" };
+    if (/^\s*(cramps?|cramping)\s*$/i.test(t))                                     return { next: "PELVIC_INTRO" };
+    if (/^\s*(bleeding|blood|bleed)\s*$/i.test(t))                                 return { next: "HEAVY_INTRO" };
+    if (/^\s*(spotting|spots?)\s*$/i.test(t))                                      return { next: "SPOT_INTRO" };
+    if (/^\s*(pregnant|pregnancy)\s*$/i.test(t))                                   return { next: "PREGNANCY_ENTRY" };
+    if (/^\s*(discharge)\s*$/i.test(t))                                            return { next: "ELSE_DISCHARGE_ENTRY" };
+    if (/^\s*(mood|moods)\s*$/i.test(t))                                           return { next: "MOOD_SAFETY_CHECK" };
+    if (/^\s*(nausea|nauseous|queasy)\s*$/i.test(t))                               return { next: "PREGNANCY_ENTRY" };
+    if (/^\s*(dizzy|dizziness)\s*$/i.test(t))                                      return { next: "PELVIC_INTRO" };
+    if (/^\s*(tired|fatigue|exhausted)\s*$/i.test(t))                              return { next: "MOOD_SAFETY_CHECK" };
+    if (/^\s*(test|testing)\s*$/i.test(t))                                         return { next: "TEST_INTRO" };
+    if (/^\s*(endo|endometriosis)\s*$/i.test(t))                                   return { next: "EDUC_ENDO" };
+    if (/^\s*pcos\s*$/i.test(t))                                                   return { next: "EDUC_PCOS" };
+    if (/^\s*menopause\s*$/i.test(t))                                              return { next: "MENOPAUSE_INFO_NODE" };
+    if (/^\s*(panadol|ibuprofen|buscopan|ponstan|naproxen)\s*$/i.test(t))          return { next: "MEDICATION_REDIRECT" };
+
+    // Vague/indirect → not sure route
+    if (/\b(something feels off|feel off|not feeling right|sumn wrong|something wrong with me)\b/.test(t)) return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/^is this normal\??\s*$/i.test(t))                                         return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(something is coming out|sumn a come out)\b/.test(t))                   return { next: "ELSE_DISCHARGE_ENTRY" };
+    if (/\b(i don.t feel like myself|mi nuh feel like miself)\b/.test(t))          return { next: "MOOD_SAFETY_CHECK" };
+
     // ── Condition education: PCOS ─────────────────────────────────────────
     // Explicit name, or "irregular period" paired with acne or hair symptoms.
     if (
@@ -1788,21 +2631,26 @@ export function initBloomieChat({
       /family planning/.test(t)
     ) return { next: "EDUC_CONTRACEPTION" };
 
-    // ── Condition education: Perimenopause ────────────────────────────────
+    // ── Perimenopause ─────────────────────────────────────────────────────
     if (
       /\bperimenopause\b/.test(t) ||
-      /peri menopause/.test(t) ||
+      /peri.?menopause/.test(t) ||
+      /going through the change/.test(t) ||
+      /change of life/.test(t) ||
+      /\bpremenopause\b/.test(t) ||
+      /mi (think mi |a )?go through the change/.test(t) ||
       (/irregular period/.test(t) && /hot flash/.test(t)) ||
       /my period is changing/.test(t)
-    ) return { next: "EDUC_PERIMENOPAUSE" };
+    ) return { next: "PERIMENOPAUSE_INTRO" };
 
-    // ── Condition education: Menopause ────────────────────────────────────
+    // ── Menopause ─────────────────────────────────────────────────────────
     if (
       /\bmenopause\b/.test(t) ||
-      /going through the change/.test(t) ||
+      /\bmenopausal\b/.test(t) ||
       /no period for months/.test(t) ||
-      /period stopped/.test(t)
-    ) return { next: "EDUC_MENOPAUSE" };
+      /period (stopped|done|finish)/.test(t) ||
+      /mi period stop/.test(t)
+    ) return { next: "MENOPAUSE_INFO_NODE" };
 
     // ── Pregnancy concern: intent-first entry ─────────────────────────────
     if (
@@ -2090,6 +2938,56 @@ export function initBloomieChat({
     }
 
     ctx.state = nextState;
+
+    // ── Conversation profile: track topics and resolve concerns ──────────────
+    {
+      const prof = ctx.conversationProfile;
+      const TOPIC_NODE_MAP = {
+        LATE_INTRO: "late", LATE_PERIOD_CHECK: "late", TEST_INTRO: "late",
+        HEAVY_INTRO: "heavy", HEAVY_ROUTE_B: "heavy", HEAVY_ROUTE_C: "heavy",
+        SPOT_INTRO: "spot", SPOT_PREG_INFO: "spot",
+        MOOD_SAFETY_CHECK: "mood", MOOD_INTRO: "mood",
+        PELVIC_INTRO: "pelvic", PELVIC_SAFETY_CHECK: "pelvic",
+        PREGNANCY_ENTRY: "pregnancy",
+        ELSE_DISCHARGE: "discharge", ELSE_DISCHARGE_ENTRY: "discharge",
+      };
+      // Track topic entered
+      const topicCode = TOPIC_NODE_MAP[nextState];
+      if (topicCode && !prof.topicsDiscussed.includes(topicCode)) {
+        prof.topicsDiscussed.push(topicCode);
+      }
+      // Mark topic as resolved when a wrap/close-adjacent node is entered
+      const RESOLVED_NODES = new Set([
+        "SUMMARY", "CLOSE", "MOOD_GUIDE", "HEAVY_GUIDE", "LATE_GUIDE",
+        "SPOT_GUIDE", "PELVIC_GUIDE", "PREG_GUIDE",
+      ]);
+      if (RESOLVED_NODES.has(nextState) && topicCode) {
+        if (!prof.concernsResolved.includes(topicCode)) {
+          prof.concernsResolved.push(topicCode);
+        }
+      }
+      // Surface unresolved concerns before CLOSE
+      if (nextState === "CLOSE" && prof.concernsUnresolved.length > 0) {
+        const TOPIC_LABELS = {
+          late: "late or missed period", heavy: "heavy bleeding", spot: "spotting",
+          mood: "mood or energy changes", pelvic: "pelvic pain or cramps",
+          pregnancy: "pregnancy concerns", discharge: "discharge",
+        };
+        const firstUnresolved = prof.concernsUnresolved[0];
+        const label = TOPIC_LABELS[firstUnresolved] || firstUnresolved;
+        say([
+          "Before you go — you also mentioned " + label + " earlier. Do you want to quickly look at that too? 💗",
+        ], {
+          choices: [
+            { id: "yes_unresolved", label: "Yes, let’s look at that", next: "START_MENU" },
+            { id: "no_done", label: "No, I’m done", next: "CLOSE" },
+          ],
+        });
+        prof.concernsUnresolved.shift();
+        return;
+      }
+    }
+
     const node = NODES[nextState];
     if (!node) return;
     // Fire onEnter hook — used by session mode setters and gate nodes
@@ -2143,6 +3041,21 @@ export function initBloomieChat({
           structuredParts.push(`Duration mentioned: ${summary.extractedEntities.duration}`);
         if (summary.extractedEntities?.severity)
           structuredParts.push(`Severity: ${summary.extractedEntities.severity}`);
+      }
+    }
+
+    // Include symptom engine patterns and guidance if signals were generated
+    if (ctx.integratedSignals?.symptomSignals?.length) {
+      const sCtx = getBloomieSymptomContext(ctx.integratedSignals.symptomSignals);
+      if (sCtx.patternDetected) {
+        structuredParts.push(`Detected symptom pattern: ${sCtx.patternDetected}`);
+      }
+      if (sCtx.guidanceLines?.length) {
+        structuredParts.push("Symptom guidance:");
+        sCtx.guidanceLines.forEach(l => structuredParts.push(`  • ${l}`));
+      }
+      if (sCtx.hasUrgentSignal) {
+        structuredParts.push("⚠ One or more urgent symptom signals were detected this session.");
       }
     }
 
@@ -2618,7 +3531,7 @@ export function initBloomieChat({
       question: "Hormones / skin concern type",
       choices: [
         { id: "pcos",  label: "Acne, irregular cycles, or hair changes", next: "EDUC_PCOS",           primary: true },
-        { id: "hfsh",  label: "Hot flashes or night sweats",             next: "EDUC_PERIMENOPAUSE" },
+        { id: "hfsh",  label: "Hot flashes or night sweats",             next: "PERIMENOPAUSE_INTRO" },
         { id: "bloat", label: "Bloating or unexplained body changes",    next: "ELSE_BODY_CHANGES" },
         { id: "tired", label: "Fatigue, brain fog, or mood swings",      next: "MOOD_INTRO" },
         { id: "hair",  label: "Hair thinning or shedding",               next: "EDUC_PCOS" },
@@ -2629,16 +3542,68 @@ export function initBloomieChat({
     // Reached when the input contains health-adjacent words but neither
     // inferRoute nor the keyword router could resolve a specific topic.
     // Presents topic buttons instead of a generic OOS reply.
-    NARROWING: {
-      say: "I want to make sure I help you with the right thing 🩷 Which area is closest to what you're dealing with?",
+    // ── Session summary node ───────────────────────────────────────────────────
+    CONVERSATION_SUMMARY: {
+      say(ctx) {
+        const prof = ctx.conversationProfile || {};
+        const TOPIC_LABELS = {
+          late: "late or missed period", heavy: "heavy bleeding", spot: "spotting",
+          mood: "mood or energy changes", pelvic: "pelvic pain or cramps",
+          pregnancy: "pregnancy concerns", discharge: "discharge",
+        };
+        const ADVICE_LABELS = {
+          told_to_test:      "pregnancy test timing",
+          told_to_seek_care: "seeing a healthcare provider",
+          told_to_monitor:   "monitoring your symptoms",
+          logging_nudge:     "cycle tracking tips",
+          phase_nudge:       "cycle phase information",
+        };
+        const lines = ["💗 Here’s what we’ve covered today:"];
+        const topics = (prof.topicsDiscussed || []);
+        if (topics.length) {
+          lines.push("Topics: " + topics.map(t => TOPIC_LABELS[t] || t).join(", ") + ".");
+        }
+        const advice = ctx.adviceGiven ? [...ctx.adviceGiven] : [];
+        if (advice.length) {
+          lines.push("We discussed: " + advice.map(k => ADVICE_LABELS[k] || k).join(", ") + ".");
+        }
+        const unresolved = prof.concernsUnresolved || [];
+        if (unresolved.length) {
+          lines.push(
+            "You also mentioned " + unresolved.map(t => TOPIC_LABELS[t] || t).join(" and ") +
+            " — we can look at that if you’d like 💗"
+          );
+        }
+        if (lines.length === 1) {
+          lines.push("We’re just getting started 💗 What would you like to talk about?");
+        }
+        return lines;
+      },
       choices: [
-        { id: "heavy",  label: "Bleeding or flow",         next: "HEAVY_INTRO" },
-        { id: "pain",   label: "Pain or cramps",           next: "PELVIC_INTRO" },
-        { id: "cycle",  label: "Late or irregular cycle",  next: "LATE_INTRO" },
-        { id: "mood",   label: "Mood or energy changes",   next: "MOOD_INTRO" },
-        { id: "dis",    label: "Discharge",                next: "ELSE_DISCHARGE" },
-        { id: "else",   label: "Something else",           next: "ELSE_INTRO" },
+        { id: "continue", label: "Continue the conversation", next: "START_MENU" },
+        { id: "done",     label: "I’m done for now",         next: "CLOSE" },
       ],
+    },
+
+    NARROWING: {
+      say: "I want to make sure I help you with the right thing 💗 Which area is closest to what you're dealing with?",
+      choices(ctx) {
+        // When LOW confidence routing set narrowingCandidates, show those specific
+        // topic buttons instead of the generic 6. Always append "Something else".
+        if (ctx.narrowingCandidates && ctx.narrowingCandidates.length) {
+          const seen = new Set(ctx.narrowingCandidates.map(c => c.id));
+          const extra = seen.has("else") ? [] : [{ id: "else", label: "Something else", next: "ELSE_INTRO" }];
+          return [...ctx.narrowingCandidates, ...extra];
+        }
+        return [
+          { id: "heavy",  label: "Bleeding or flow",         next: "HEAVY_INTRO" },
+          { id: "pain",   label: "Pain or cramps",           next: "PELVIC_INTRO" },
+          { id: "cycle",  label: "Late or irregular cycle",  next: "LATE_INTRO" },
+          { id: "mood",   label: "Mood or energy changes",   next: "MOOD_INTRO" },
+          { id: "dis",    label: "Discharge",                next: "ELSE_DISCHARGE" },
+          { id: "else",   label: "Something else",           next: "ELSE_INTRO" },
+        ];
+      },
     },
 
     /* ---------------- HEAVY OR UNUSUAL BLEEDING ---------------- */
@@ -4541,7 +5506,7 @@ export function initBloomieChat({
         { id: "hair",  label: "Hair thinning or shedding",        next: "ELSE_NOT_SURE" },
         { id: "sleep", label: "Sleep problems",                   next: "MOOD_INTRO" },
         { id: "wt",    label: "Weight changes",                   next: "ELSE_NOT_SURE" },
-        { id: "hfsh",  label: "Hot flashes or night sweats",      next: "EDUC_PERIMENOPAUSE" },
+        { id: "hfsh",  label: "Hot flashes or night sweats",      next: "PERIMENOPAUSE_INTRO" },
         { id: "back",  label: "Back to main options",             next: "ELSE_INTRO" },
       ],
     },
@@ -4778,7 +5743,7 @@ export function initBloomieChat({
         { id: "hair",  label: "Hair thinning or increased facial hair", next: "BODY_HORMONAL_ROUTE" },
         { id: "wt",    label: "Weight changes",                       next: "BODY_HORMONAL_ROUTE" },
         { id: "sleep", label: "Sleep issues or insomnia",             next: "BODY_SLEEP_ROUTE" },
-        { id: "hfsh",  label: "Hot flashes or night sweats",          next: "EDUC_PERIMENOPAUSE" },
+        { id: "hfsh",  label: "Hot flashes or night sweats",          next: "PERIMENOPAUSE_INTRO" },
         { id: "mix",   label: "Not sure or a mix of these",           next: "BODY_HORMONAL_ROUTE" },
       ],
     },
@@ -4807,7 +5772,7 @@ export function initBloomieChat({
       ],
       choices: [
         { id: "mood",  label: "My mood is also affected",     next: "MOOD_INTRO",           primary: true },
-        { id: "peri",  label: "Learn about perimenopause",    next: "EDUC_PERIMENOPAUSE" },
+        { id: "peri",  label: "Learn about perimenopause",    next: "PERIMENOPAUSE_INTRO" },
         { id: "menu",  label: "Back to main menu",            next: "START_MENU" },
       ],
     },
@@ -5540,10 +6505,10 @@ export function initBloomieChat({
     // Medication redirect — warm caring redirect, never a hard refusal
     MEDICATION_REDIRECT: {
       say: [
-        "Dosage and medication safety genuinely depends on your full health picture — weight, other medications, any underlying conditions — and getting it wrong can cause real harm 🩷",
-        "That's not me brushing you off, it's just that a pharmacist has the full picture and can actually help you properly.",
-        "The good news: a pharmacist in Jamaica can advise you on the spot, for free, without a referral or appointment.",
-        "I can help you describe what you're feeling so you go in knowing exactly what to say.",
+        "Dosage and medication safety depends on your full health picture — weight, other medications, any underlying conditions — and getting it wrong can cause real harm, so I can't advise on specifics 🩷",
+        "That's not me brushing you off. A pharmacist genuinely has the full picture to help you properly, and in Jamaica you can walk in without a referral or appointment.",
+        "If the pain is severe or not responding to anything, that's worth getting properly checked 🩷",
+        "I can help you describe what you're feeling so you know exactly what to tell a pharmacist or provider when you go.",
       ],
       choices: [
         { id: "symptoms", label: "Help me describe my symptoms", next: "START_MENU", primary: true },
@@ -5911,17 +6876,182 @@ export function initBloomieChat({
       ],
     },
 
-    /* ---------------- EDUCATION: PERIMENOPAUSE ---------------- */
-    EDUC_PERIMENOPAUSE: {
+    /* ---------------- PERIMENOPAUSE PATHWAY ---------------- */
+    PERIMENOPAUSE_INTRO: {
       say: [
-        "Perimenopause is the transition phase leading up to menopause and it can actually start earlier than most people expect, sometimes in the mid-30s but more commonly in the 40s 🩷 It's your body's way of gradually shifting away from its regular reproductive cycle.",
-        "The symptom list is long, and it's different for everyone: irregular or unpredictable periods, hot flashes, night sweats, mood changes, brain fog, trouble sleeping, vaginal dryness, and changes in energy or libido are all common. You might notice just a few of these, or several at once.",
-        "Here's the part that catches people off guard, perimenopause isn't a brief phase. It can last anywhere from a few years to over a decade, and symptoms can come and go unpredictably. Tracking your cycle and symptoms over time is genuinely useful context for any provider.",
-        "If your symptoms are affecting your daily life, or you're not sure whether what you're experiencing is perimenopausal, it's worth talking to a provider, there are real options for managing symptoms, from lifestyle changes to hormonal and non-hormonal treatments 🩷",
+        pick([
+          "Perimenopause is one of the most under-discussed transitions in women's health — and you're right to want to understand it 🩷",
+          "The fact that you're paying attention to these changes already puts you ahead 🩷",
+          "Perimenopause can start earlier than most people expect — sometimes in the mid-30s — and it deserves real conversation 🩷",
+        ]),
+        "It's the transition period leading up to menopause — your hormones are shifting, and that shift can cause real, sometimes confusing symptoms.",
+        "What's been going on for you?",
+      ],
+      choices: [
+        { id: "vaso",    label: "Hot flashes or night sweats",          next: "PERI_VASOMOTOR_ROUTE" },
+        { id: "cycle",   label: "Irregular or changing periods",         next: "PERI_CYCLE_ROUTE" },
+        { id: "mood",    label: "Mood changes or brain fog",             next: "PERI_MOOD_ROUTE" },
+        { id: "sleep",   label: "Sleep problems",                        next: "PERI_SLEEP_ROUTE" },
+        { id: "vaginal", label: "Vaginal dryness or pain during sex",    next: "PERI_VAGINAL_ROUTE" },
+        { id: "mixed",   label: "A mix of several things",               next: "PERI_MIXED_ROUTE" },
+        { id: "unsure",  label: "I'm not sure if this is perimenopause", next: "PERI_UNSURE_ROUTE" },
+      ],
+    },
+
+    PERI_VASOMOTOR_ROUTE: {
+      say: [
+        "Hot flashes and night sweats are some of the most well-known perimenopause symptoms 🩷",
+        "They happen because estrogen fluctuations affect your body's temperature regulation — your brain gets a false signal that you're overheating.",
+        "How often are they happening, and are they affecting your sleep or daily life?",
+      ],
+      choices: [
+        { id: "manage",  label: "A few times a week, manageable",      next: "PERI_MONITOR_WRAP" },
+        { id: "daily",   label: "Daily or disrupting sleep",           next: "PERI_PROVIDER_SOON", primary: true },
+        { id: "sweat",   label: "Happening with heavy sweating at night", next: "PERI_PROVIDER_SOON" },
+        { id: "unsure",  label: "Not sure yet",                        next: "PERI_MONITOR_WRAP" },
+      ],
+    },
+
+    PERI_CYCLE_ROUTE: {
+      say: [
+        "Irregular periods are often one of the first signs of perimenopause 🩷",
+        "Cycles can get shorter, longer, heavier, lighter, or just unpredictable — because estrogen and progesterone are no longer following their usual rhythm.",
+        "Has the change been gradual, or did it seem to shift suddenly?",
+      ],
+      choices: [
+        { id: "gradual",  label: "Gradual change over time",        next: "PERI_MONITOR_WRAP" },
+        { id: "sudden",   label: "Sudden change",                   next: "PERI_PROVIDER_SOON" },
+        { id: "heavy",    label: "Periods getting very heavy",      next: "HEAVY_INTRO" },
+        { id: "stopped",  label: "Periods stopping for months",     next: "PERI_ABSENCE_CHECK" },
+      ],
+    },
+
+    PERI_ABSENCE_CHECK: {
+      say: [
+        "If your periods have stopped for 12 months in a row, that's the clinical definition of menopause 🩷",
+        "Before that point, pregnancy is still possible — so if there's any chance of pregnancy, a test would help clarify things.",
+        "Has it been less than 12 months, or more?",
+      ],
+      choices: [
+        { id: "less",   label: "Less than 12 months",  next: "PERI_MONITOR_WRAP" },
+        { id: "more",   label: "12 months or more",    next: "MENOPAUSE_INFO_NODE", primary: true },
+        { id: "unsure", label: "Not sure",              next: "PERI_MONITOR_WRAP" },
+      ],
+    },
+
+    PERI_MOOD_ROUTE: {
+      say: [
+        "Mood changes, brain fog, and emotional intensity during perimenopause are real — not imagined, not dramatic 🩷",
+        "Estrogen affects serotonin and other brain chemicals, so as levels fluctuate, mood stability can too.",
+        "Is it more like anxiety and irritability, or more like low mood and exhaustion?",
+      ],
+      choices: [
+        { id: "anxiety", label: "Anxiety or irritability",    next: "MOOD_ANXIETY_ROUTE" },
+        { id: "low",     label: "Low mood or exhaustion",     next: "MOOD_LOW_ROUTE" },
+        { id: "fog",     label: "Brain fog and memory",       next: "PERI_COGNITIVE_NOTE", primary: true },
+        { id: "mix",     label: "A mix",                      next: "MOOD_MIXED_ROUTE" },
+      ],
+    },
+
+    PERI_COGNITIVE_NOTE: {
+      say: [
+        "Brain fog and memory changes during perimenopause are incredibly common — and incredibly frustrating 🩷",
+        "Estrogen plays a role in cognitive function, so when it fluctuates, concentration and recall can be affected.",
+        "This usually improves as hormones stabilise, but if it's significantly affecting your daily life, it's worth mentioning to a provider.",
+      ],
+      choices: [
+        { id: "map",  label: "Find care near me",   next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu", label: "Back to main menu",   next: "START_MENU" },
+      ],
+    },
+
+    PERI_SLEEP_ROUTE: {
+      say: [
+        "Sleep disruption is one of the most exhausting parts of perimenopause 🩷",
+        "It can come from night sweats waking you up, or from progesterone changes that affect sleep quality directly — sometimes both.",
+        "Are you waking up from heat and sweating, or is it more that you just can't stay asleep?",
+      ],
+      choices: [
+        { id: "heat",    label: "Waking from heat or sweating", next: "PERI_VASOMOTOR_ROUTE" },
+        { id: "sleep",   label: "Can't stay asleep generally",  next: "BODY_SLEEP_ROUTE" },
+        { id: "both",    label: "Both",                         next: "PERI_PROVIDER_SOON", primary: true },
+      ],
+    },
+
+    PERI_VAGINAL_ROUTE: {
+      say: [
+        "Vaginal dryness and discomfort during sex are common in perimenopause and menopause — and they're very treatable 🩷",
+        "As estrogen drops, vaginal tissue can become thinner and less lubricated. This is called genitourinary syndrome of menopause and it does not have to be something you just live with.",
+        "There are options — from over-the-counter lubricants and moisturisers to treatments a provider can discuss with you.",
+      ],
+      choices: [
+        { id: "map",    label: "Find care near me",              next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "contra", label: "Learn about contraception options", next: "EDUC_CONTRACEPTION" },
+        { id: "menu",   label: "Back to main menu",              next: "START_MENU" },
+      ],
+    },
+
+    PERI_MIXED_ROUTE: {
+      say: [
+        "A mix of symptoms is actually very typical for perimenopause — it's rarely just one thing 🩷",
+        "The most helpful thing you can do right now is track what you're experiencing — when symptoms happen, how intense they are, and whether they're getting worse.",
+        "That information is gold when you talk to a provider.",
+      ],
+      choices: [
+        { id: "cont", label: "What should I do next?", next: "PERI_PROVIDER_SOON", primary: true },
+      ],
+    },
+
+    PERI_UNSURE_ROUTE: {
+      say: [
+        "That uncertainty is really common — perimenopause can start earlier than most people expect and the symptoms overlap with a lot of other things 🩷",
+        "Some things that can help you figure it out: tracking your cycle changes, noting which symptoms cluster together, and thinking about your age and family history.",
+        "You don't need a definitive answer to start paying attention.",
+      ],
+      choices: [
+        { id: "more",  label: "Tell me more about the symptoms",  next: "PERIMENOPAUSE_INTRO" },
+        { id: "cycle", label: "I think my periods are changing",  next: "PERI_CYCLE_ROUTE" },
+        { id: "care",  label: "I want to talk to a provider",     next: "PERI_PROVIDER_SOON", primary: true },
+        { id: "menu",  label: "Back to main menu",                next: "START_MENU" },
+      ],
+    },
+
+    PERI_MONITOR_WRAP: {
+      say: [
+        "Based on what you've shared, this sounds like it may be part of the perimenopause transition 🩷",
+        "The most useful thing right now is consistent tracking — cycle dates, symptom types, intensity, and duration. Patterns over time tell a much clearer story than any single day.",
+        "If symptoms become more intense, start affecting your daily life significantly, or you have very heavy bleeding, that's when to move from tracking to seeking care.",
+      ],
+      choices: [
+        { id: "log",  label: "Log a symptom",     next: "START_MENU", action: "LOG_SYMPTOM" },
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP" },
+        { id: "menu", label: "Back to main menu", next: "START_MENU" },
+      ],
+    },
+
+    PERI_PROVIDER_SOON: {
+      say: [
+        "What you're describing is worth discussing with a healthcare provider — not because it's an emergency, but because you deserve proper support for this transition 🩷",
+        "A provider can confirm whether this is perimenopause, rule out other causes, and talk through options that might help.",
+        "In Jamaica, a gynaecologist or your GP is a good starting point. The care map can help you find someone nearby.",
       ],
       choices: [
         { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: "Back to main menu", next: "START_MENU" },
+      ],
+    },
+
+    MENOPAUSE_INFO_NODE: {
+      say: [
+        "Twelve months without a period is the clinical marker for menopause — your body has completed that transition 🩷",
+        "What comes after is called postmenopause. Some symptoms like hot flashes and sleep disruption may continue for a while, but for many people they ease over time.",
+        "Vaginal dryness, bone health, and cardiovascular changes are things worth discussing with a provider now that you're postmenopausal — not to alarm you, but because this is a new chapter your body deserves support for.",
+      ],
+      choices: [
+        { id: "vaginal", label: "Vaginal dryness or discomfort", next: "PERI_VAGINAL_ROUTE" },
+        { id: "mood",    label: "Mood or sleep changes",         next: "PERI_MOOD_ROUTE" },
+        { id: "map",     label: "Find care near me",             next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu",    label: "Back to main menu",             next: "START_MENU" },
       ],
     },
 

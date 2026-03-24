@@ -22,10 +22,12 @@
  */
 
 import { cases }          from "./cases.js";
-import { extractEntities, inferRoute } from "../frontend/js/bloomie-inference.js";
+import { extractEntities, inferRoute, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext, checkCumulativeRisk } from "../frontend/js/bloomie-inference.js";
 import { buildGuidanceResponse }       from "../frontend/js/bloomie-templates.js";
-import { normalizeText, looksLikeGibberish, scoreSignals, resolveSignals }
+import { normalizeText, looksLikeGibberish, scoreSignals, resolveSignals, computeRouteConfidence }
                                        from "../frontend/js/bloomie-routing.js";
+import { normalizePatois, fuzzyCorrect, collapseRepeatedLetters, expandShorthand }
+                                       from "../frontend/js/bloomie-patois.js";
 
 // ─── CLI flags ────────────────────────────────────────────────────────────────
 
@@ -38,8 +40,18 @@ const CAT_FILTER   = args.includes("--category") ? args[args.indexOf("--category
 
 // ─── Pipeline runner ──────────────────────────────────────────────────────────
 
+// Full pipeline normalization (mirrors assistant.js steps 3–6):
+//   normalizePatois → fuzzyCorrect → collapseRepeatedLetters → expandShorthand → normalizeText
+function pipelineNormalize(rawInput) {
+  const p1 = normalizePatois(rawInput);
+  const p2 = fuzzyCorrect(p1) ?? p1;
+  const p3 = collapseRepeatedLetters(p2);
+  const p4 = expandShorthand(p3);
+  return normalizeText(p4);
+}
+
 function runPipeline(rawInput) {
-  const normalized = normalizeText(rawInput);
+  const normalized = pipelineNormalize(rawInput);
   const entities   = extractEntities(normalized);
   const route      = inferRoute(entities);
   const guidance   = route
@@ -48,6 +60,7 @@ function runPipeline(rawInput) {
 
   const { sig, has } = scoreSignals(normalized);
   const multiRoute   = resolveSignals(sig, has);
+  const confidence   = computeRouteConfidence(sig, entities);
 
   return {
     normalized,
@@ -55,11 +68,23 @@ function runPipeline(rawInput) {
     route,
     guidance,
     multiRoute,
-    gibberish: looksLikeGibberish(normalized),
-    urgent:    entities.urgent || route?.next === "HEAVY_URGENT",
-    actualRoute: route?.next ?? null,
-    scenario:  guidance?.scenario ?? null,
+    confidence,
+    gibberish:     looksLikeGibberish(normalized),
+    urgent:        entities.urgent || route?.next === "HEAVY_URGENT",
+    actualRoute:   route?.next ?? null,
+    scenario:      guidance?.scenario ?? null,
+    downplaying:   detectDownplaying(normalized),
+    ambiguous:     detectAmbiguousInput(normalized, entities) !== null,
+    contradiction: detectContradiction(normalized, entities) !== null,
+    missingContext: detectMissingContext(entities, normalized) !== null,
   };
+}
+
+// Runs a multi-turn case: history = array of prior messages, current = the final message
+function runMultiTurnCumulative(history, current) {
+  const allMessages = [...(history || []), current];
+  const entityHistory = allMessages.map(msg => extractEntities(pipelineNormalize(msg)));
+  return checkCumulativeRisk(entityHistory);
 }
 
 
@@ -100,6 +125,43 @@ function evaluateCase(c) {
     checks.push({ name: "scenario", pass, expected: exp.scenario, got: result.scenario });
   }
 
+  // Check: downplaying detection
+  if (exp.downplaying !== undefined) {
+    const pass = result.downplaying === exp.downplaying;
+    checks.push({ name: "downplaying", pass, expected: exp.downplaying, got: result.downplaying });
+  }
+
+  // Check: ambiguity question fires
+  if (exp.ambiguous !== undefined) {
+    const pass = result.ambiguous === exp.ambiguous;
+    checks.push({ name: "ambiguous", pass, expected: exp.ambiguous, got: result.ambiguous });
+  }
+
+  // Check: contradiction detected
+  if (exp.contradiction !== undefined) {
+    const pass = result.contradiction === exp.contradiction;
+    checks.push({ name: "contradiction", pass, expected: exp.contradiction, got: result.contradiction });
+  }
+
+  // Check: missing context probe fires
+  if (exp.missingContext !== undefined) {
+    const pass = result.missingContext === exp.missingContext;
+    checks.push({ name: "missingContext", pass, expected: exp.missingContext, got: result.missingContext });
+  }
+
+  // Check: confidence tier (high / medium / low)
+  if (exp.confidence !== undefined) {
+    const pass = result.confidence?.tier === exp.confidence;
+    checks.push({ name: "confidence", pass, expected: exp.confidence, got: result.confidence?.tier });
+  }
+
+  // Check: cumulative escalation (multi-turn case — uses c.history field)
+  if (exp.cumulativeEscalation !== undefined) {
+    const cumResult = runMultiTurnCumulative(c.history || [], c.input);
+    const pass = cumResult.escalate === exp.cumulativeEscalation;
+    checks.push({ name: "cumulativeEscalation", pass, expected: exp.cumulativeEscalation, got: cumResult.escalate });
+  }
+
   const passed = checks.every(ch => ch.pass);
   return { ...c, result, checks, passed };
 }
@@ -123,8 +185,13 @@ function computeMetrics(evaluated) {
   );
   const redFlagCaught = redFlagCases.filter(c => c.result.urgent === true).length;
 
-  // 3. False reassurance — urgent cases where urgent was NOT caught
-  const falseReassurance = redFlagCases.filter(c => c.result.urgent === false).length;
+  // 3. False reassurance — urgent cases where urgent was NOT caught.
+  //    Exclude cumulative-escalation-only cases (single-turn pipeline cannot flag them
+  //    as urgent by design; urgency is only detectable across turns via checkCumulativeRisk).
+  const falseReassurance = redFlagCases.filter(c =>
+    c.result.urgent === false &&
+    !(c.expected.cumulativeEscalation !== undefined && c.expected.urgent === undefined)
+  ).length;
 
   // 4. Fallback quality — fallback cases with gibberish or noRoute checks
   const fallbackCases = evaluated.filter(c => c.category === "fallback");

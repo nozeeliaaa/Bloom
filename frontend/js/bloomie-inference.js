@@ -20,22 +20,22 @@ export function extractEntities(text) {
 function extractSymptoms(t) {
   return {
     // ── ORIGINAL 8 (kept exactly — inferRoute depends on these names) ────────
-    late:           /\b(late|missed|no period|period.*not come|period.*nuh come|period.*hasn't|period.*didn't)\b/.test(t),
-    heavy:          /\b(heavy|soaking|soaked|bleed.*bad|bleed.*nuff|flooding|clot|clots|bleed through)\b/.test(t),
+    late:           /\b(late|missed|no period|period.*not come|period.*nuh come|period.*hasn't|period.*didn't|period skipped|period skip|period is missing|haven't seen.*my period|haven't had.*period|period hasn't arrived|period hasn't come)\b/.test(t),
+    heavy:          /\b(heavy|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through)\b/.test(t),
     spotting:       /\b(spot|spotting|pink|brown.*discharge|blood.*between|between.*period)\b/.test(t),
-    pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly)\b/.test(t),
-    mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful)\b/.test(t),
-    discharge:      /\b(discharge|smell|odor|white.*coming|something.*coming)\b/.test(t),
+    pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly|one.sided.*pain|one.side.*hurt|one side.*hurt|lower.*abdominal.*pain|side.*hurts)\b/.test(t),
+    mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it)\b/.test(t),
+    discharge:      /\b(discharge|smell|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation)\b/.test(t),
     nausea:         /\b(nausea|nauseous|vomit|sick to.*stomach|throw up|queasy)\b/.test(t),
-    dizziness:      /\b(dizzy|dizziness|lightheaded|faint|head.*spin|head.*swim|feel.*weak)\b/.test(t),
+    dizziness:      /\b(dizzy|dizziness|lightheaded|faint|head.*spin|head.*swim)\b/.test(t),
 
     // ── BLEEDING ─────────────────────────────────────────────────────────────
-    large_clots:    /\b(large clot|big clot|clot.*size|liver.*clot|quarter.*size|golf.*clot)\b/.test(t),
+    large_clots:    /\b(large clot|big clot|clot.*size|liver.*clot|quarter.*size|golf.*clot|passing clots|pass clots)\b/.test(t),
 
     // ── PAIN ─────────────────────────────────────────────────────────────────
     ovulation_pain: /\b(ovulation pain|mittelschmerz|pain.*ovulat|ovulat.*pain|one.?sided.*pain.*mid|mid.*cycle.*pain)\b/.test(t),
     headache:       /\b(headache|head.*ache|migraine|head.*pounding|head.*throbbing|head.*hurting)\b/.test(t),
-    joint_pain:     /\b(joint.*pain|muscle.*pain|body.*ache|body.*pain|achy|aches|joints.*hurt|muscles.*sore|muscle.*sore)\b/.test(t),
+    joint_pain:     /\b(joint.*pain|muscle.*pain|body.*ache|body.*pain|achy|aches|joints.*hurt|muscles.*sore|muscle.*sore|lower.*back.*pain|back.*pain.*lower)\b/.test(t),
     breast_tender:  /\b(breast.*tender|breast.*sore|breast.*hurt|boob.*sore|boob.*tender|nipple.*sore|chest.*tender)/.test(t),
 
     // ── DIGESTIVE ────────────────────────────────────────────────────────────
@@ -46,10 +46,10 @@ function extractSymptoms(t) {
     diarrhea:       /\b(diarrhea|loose.*stool|watery.*stool|running.*belly|belly.*running|running stomach|running to bathroom)\b/.test(t),
 
     // ── DISCHARGE (typed) ────────────────────────────────────────────────────
-    discharge_eggwhite: /\b(egg.?white|clear.*stretchy|stretchy.*clear|slippery.*discharge|watery.*discharge)\b/.test(t),
+    discharge_eggwhite: /\b(ewcm|egg.?white|egg white discharge|clear.*stretchy|stretchy.*clear|slippery.*discharge|watery.*discharge)\b/.test(t),
     discharge_creamy:   /\b(creamy.*discharge|white.*discharge|milky.*discharge|lotion.*discharge)\b/.test(t),
     discharge_sticky:   /\b(sticky.*discharge|thick.*discharge|clumpy.*discharge|cottage.*cheese|chunky.*discharge)\b/.test(t),
-    unusual_discharge:  /\b(unusual.*discharge|strange.*discharge|funny.*smell|fishy.*smell|yellow.*discharge|green.*discharge|grey.*discharge)\b/.test(t),
+    unusual_discharge:  /\b(unusual.*discharge|strange.*discharge|funny.*smell|fishy.*smell|yellow.*discharge|green.*discharge|grey.*discharge|vaginal.*burning|burning.*down.*there|vaginal.*itching|itching.*down.*there|unusual.*odour|unusual.*odor)\b/.test(t),
 
     // ── SKIN / HAIR ──────────────────────────────────────────────────────────
     acne:           /\b(acne|pimple|pimples|breakout|breaking out|spots.*face|face.*spots|blemish|blemishes|zit|zits)\b/.test(t),
@@ -63,7 +63,7 @@ function extractSymptoms(t) {
     bbt_shift:      /\b(basal.*temp|bbt|body.*temperature.*shift|temp.*rise|temperature.*drop.*cycle)\b/.test(t),
 
     // ── COGNITIVE / MENTAL ───────────────────────────────────────────────────
-    brain_fog:      /\b(brain fog|foggy|can't think|cant think|think.*slow|head.*cloudy|cloudy.*head|not thinking.*clear|mental.*fog)\b/.test(t),
+    brain_fog:      /\b(brain fog|foggy|can't think|cant think|think.*slow|head.*cloudy|cloudy.*head|not thinking.*clear|mental.*fog|not.*thinking.*clearly|i'm not thinking|can't concentrate clearly)\b/.test(t),
     forgetful:      /\b(forgetful|forgetting|forget.*everything|can't remember|cant remember|memory.*bad|bad memory)\b/.test(t),
     poor_concentration: /\b(can't concentrate|cant concentrate|can't focus|cant focus|losing.*focus|trouble.*focusing|hard.*concentrate|distracted)\b/.test(t),
     anxiety:        /\b(anxiety|anxious|panic|panic attack|overthink|racing.*thought|heart.*racing|worry.*lot)\b/.test(t),
@@ -72,7 +72,7 @@ function extractSymptoms(t) {
     irritability:   /\b(irritable|irritability|snappy|short.*temper|easily.*annoyed|annoyed.*easy|angry.*lot|fly.*off.*handle)\b/.test(t),
 
     // ── SLEEP ────────────────────────────────────────────────────────────────
-    insomnia:       /\b(insomnia|can't sleep|cant sleep|cyan sleep|trouble.*sleep|waking up.*night|wake.*middle.*night|sleep.*bad|poor.*sleep|restless.*sleep|tossing.*turning)\b/.test(t),
+    insomnia:       /\b(insomnia|can't sleep|cant sleep|cyan sleep|trouble sleeping|trouble.*sleep\b|waking up.*night|wake.*middle.*night|sleep.*bad|poor.*sleep|restless.*sleep|tossing.*turning)\b/.test(t),
 
     // ── APPETITE / CRAVINGS ──────────────────────────────────────────────────
     craving_sweet:  /\b(sweet.*crav|crav.*sweet|want.*sugar|sugar.*crav|chocolate.*crav|ice cream.*crav)\b/.test(t),
@@ -100,6 +100,13 @@ function extractSymptoms(t) {
     weight_change:  /\b(weight.*change|gained.*weight|gaining.*weight|losing.*weight|weight.*gain|weight.*loss|scale.*up|scale.*down)\b/.test(t),
     smell_sensitivity: /\b(smell.*sensitive|sensitive.*smell|everything.*smell|smell.*strong|can smell.*everything|smell.*bother)\b/.test(t),
     nasal_congestion:  /\b(stuffy.*nose|congested|nasal.*congestion|blocked.*nose|nose.*block)\b/.test(t),
+
+    // ── PERIMENOPAUSE / MENOPAUSE ─────────────────────────────────────────
+    peri_mention:       /\b(perimenopause|peri menopause|peri-menopause|going through the change|the change|change of life|premenopause)\b/.test(t),
+    menopause_mention:  /\b(menopause|menopausal|post.?menopause|no period for months|period stopped|period done|period finish)\b/.test(t),
+    mood_rage:          /\b(rage|raging|uncontrollable anger|mood all over|emotions all over|feel crazy|feel mad|feel like mi going mad|mi feel like mi losing it)\b/.test(t),
+    memory_issues:      /\b(memory|forget everything|can't remember anything|mind blank|memory gone|mi forget everything|losing my mind)\b/.test(t),
+    body_temp:          /\b(temperature|body heat|burning up|feel like fire|overheating|always hot|always cold|temperature all over)\b/.test(t),
   };
 }
 
@@ -161,6 +168,11 @@ export const SYMPTOM_TO_CATALOG_KEYS = {
   weight_change:      ["WEIGHT_CHANGE"],
   smell_sensitivity:  ["SMELL_SENSITIVITY"],
   nasal_congestion:   ["NASAL_CONGESTION"],
+  peri_mention:       ["IRREGULAR_PERIOD", "HOT_FLASHES"],
+  menopause_mention:  ["MISSED_PERIOD", "HOT_FLASHES"],
+  mood_rage:          ["MOOD_SWINGS", "IRRITABILITY"],
+  memory_issues:      ["FORGETFUL", "BRAIN_FOG", "POOR_CONCENTRATION"],
+  body_temp:          ["HOT_FLASHES", "COLD_FLASHES"],
 };
 
 // Friendly display labels for symptom catalog codes (used in Bloomie responses)
@@ -226,6 +238,14 @@ export const CATALOG_LABELS = {
 function extractDuration(t) {
   // Matches: "two week", "2 weeks", "a few days", "3 days", "one month" etc.
   const patterns = [
+    // ── Shorthand time formats (e.g. "2wks", "3dys") ──────────────────────────
+    { rx: /\b2wks?\b/,                                        days: 14, weeks: 2,   unit: "weeks", value: 2 },
+    { rx: /\b1wks?\b/,                                        days: 7,  weeks: 1,   unit: "week",  value: 1 },
+    { rx: /\b3wks?\b/,                                        days: 21, weeks: 3,   unit: "weeks", value: 3 },
+    { rx: /\b4wks?\b/,                                        days: 28, weeks: 4,   unit: "weeks", value: 4 },
+    { rx: /\b2dys?\b/,                                        days: 2,  weeks: null, unit: "days", value: 2 },
+    { rx: /\b3dys?\b/,                                        days: 3,  weeks: null, unit: "days", value: 3 },
+    { rx: /\b1dy\b/,                                          days: 1,  weeks: null, unit: "days", value: 1 },
     { rx: /\b(a few|couple|2|two)\s*(days?)\b/,              days: 2,  weeks: null, unit: "days",  value: 2 },
     { rx: /\b(3|three)\s*(days?)\b/,                          days: 3,  weeks: null, unit: "days",  value: 3 },
     { rx: /\b(4|5|four|five|6|six)\s*(days?)\b/,              days: 5,  weeks: null, unit: "days",  value: 5 },
@@ -276,18 +296,22 @@ function extractTiming(t) {
 
 // ── 1e. Pregnancy signals ─────────────────────────────────────────────────────
 function extractPregnancy(t) {
-  const chance = /\b(sex|slept with|unprotected|might be pregnant|could be pregnant|think.*pregnant|pregnant|breed)\b/.test(t);
-  const testedYet = /\b(took.*test|took a test|tested|pregnancy test|test.*positive|test.*negative)\b/.test(t);
+  const chance = /\b(sex|slept with|unprotected|might be pregnant|could be pregnant|think.*pregnant|pregnant|breed|catch belly|belly catch|pickney deh)\b/.test(t);
+  const testedYet = /\b(took.*test|took a test|tested|pregnancy test|test.*positive|test.*negative|test result|test come back)\b/.test(t);
   let result = null;
-  if (/\b(positive|two lines|two line|it positive)\b/.test(t)) result = "positive";
-  if (/\b(negative|one line|it negative)\b/.test(t)) result = "negative";
+  if (/\b(positive|two lines|two line|it positive|bfp|positive pregnancy test|positive test)\b/.test(t)) result = "positive";
+  if (/\b(negative|one line|it negative|bfn|negative pregnancy test|negative test)\b/.test(t)) result = "negative";
+  // TTC context flags
+  const ttc = /\b(two week wait|2ww|days past ovulation|dpo|trying to conceive|ttc)\b/.test(t);
 
-  return { chance, testedYet, result };
+  return { chance, testedYet, result, ttc };
 }
 
 // ── 1f. Urgency flags ─────────────────────────────────────────────────────────
 export function extractUrgency(t) {
-  return /\b(faint|fainting|passed out|pass out|passing out|can't breathe|cant breathe|shortness of breath|soaking through|bleeding through|bleed through|bleed.*pants|soaked.*pants|blood.*pants|severe.*pain|one.sided.*pain|pain.*one.sided|sharp.*pain.*one side|bleed.*so bad|blood.*so bad|emergency|hospital|urgent|collaps\w*|can't stand|cant stand|too weak)\b/.test(t);
+  // Exclude "emergency contraception" before testing for standalone "emergency"
+  const cleaned = t.replace(/\bemergency contraception\b/g, "");
+  return /\b(faint|fainting|passed out|pass out|passing out|can't breathe|cant breathe|shortness of breath|soaking through|bleeding through|bleed through|bleed.*pants|soaked.*pants|blood.*pants|severe.*pain|one.sided.*pain|pain.*one.sided|sharp.*pain.*one side|bleed.*so bad|blood.*so bad|emergency|hospital|urgent|collaps\w*|can't stand|cant stand|too weak|i feel faint|about to faint|very weak|nearly fainted|i collapsed|heavy bleeding everywhere|i can't breathe|i can.t stand|ago dead|ago die|going to die)\b/.test(cleaned);
 }
 
 
@@ -299,7 +323,7 @@ export function inferRoute(entities) {
   const raw = entities.raw || "";
 
   // ── CRISIS / SELF-HARM: always before urgency ──────────────────────────────
-  if (/\b(hurt(?:ing)? myself|harm(?:ing)? myself|end it all|end my life|want to die|dont want to be here|cant go on|unsafe|feeling unsafe|cyan cope)\b/.test(raw)) {
+  if (/\b(hurt(?:ing)? myself|harm(?:ing)? myself|end it all|end my life|want to die|dont want to be here|cant go on|unsafe|feeling unsafe|cyan cope|can'?t cope|cannot cope)\b/.test(raw)) {
     return { next: "MOOD_SAFETY_ROUTE", payload: { inferred: true, reason: "self_harm_language" } };
   }
 
@@ -314,19 +338,19 @@ export function inferRoute(entities) {
 
   // ── MULTI-SYMPTOM COMBOS ───────────────────────────────────────────────────
 
-  // Late + pregnancy chance + no test yet → intent-first entry
-  if (sym.late && pregnancy.chance && !pregnancy.testedYet) {
-    return { next: "PREGNANCY_ENTRY", payload: { inferred: true, reason: "late+pregnancy_chance+no_test" } };
-  }
-
-  // Late + positive test → skip to positive result node
+  // Late + positive test → skip to positive result node (checked before chance+no_test)
   if (sym.late && pregnancy.result === "positive") {
     return { next: "LATE_POSITIVE", payload: { inferred: true, reason: "late+positive_test" } };
   }
 
-  // Late + negative/unclear test → skip to that node
+  // Late + negative/unclear test → skip to that node (checked before chance+no_test)
   if (sym.late && (pregnancy.result === "negative" || pregnancy.result === "unclear")) {
     return { next: "LATE_NEG_UNCLEAR", payload: { inferred: true, reason: "late+negative_test" } };
+  }
+
+  // Late + pregnancy chance + no test yet → intent-first entry
+  if (sym.late && pregnancy.chance && !pregnancy.testedYet) {
+    return { next: "PREGNANCY_ENTRY", payload: { inferred: true, reason: "late+pregnancy_chance+no_test" } };
   }
 
   // Late + long duration (2+ weeks) → go straight to yes-preg branch
@@ -344,19 +368,19 @@ export function inferRoute(entities) {
     return { next: "HEAVY_RISK_SYMPTOMS", payload: { inferred: true, reason: "heavy+severe" } };
   }
 
-  // Spotting + mid-cycle + mild → likely ovulation spotting
-  if (sym.spotting && timing === "mid_cycle" && (severity === "mild" || !severity)) {
-    return { next: "SPOT_MIDCYCLE_NOTE", payload: { inferred: true, reason: "spotting+mid_cycle" } };
-  }
-
-  // Spotting + pregnancy chance → skip to preg info
+  // Spotting + pregnancy chance → skip to preg info (checked before mid_cycle so pregnancy wins)
   if (sym.spotting && pregnancy.chance) {
     return { next: "SPOT_PREG_INFO", payload: { inferred: true, reason: "spotting+pregnancy_chance" } };
   }
 
-  // Spotting + unusual discharge/odor → provider soon
+  // Spotting + unusual discharge/odor → provider soon (checked before mid_cycle so discharge wins)
   if (sym.spotting && sym.discharge) {
     return { next: "SPOT_PROVIDER_SOON", payload: { inferred: true, reason: "spotting+discharge" } };
+  }
+
+  // Spotting + mid-cycle + mild → likely ovulation spotting
+  if (sym.spotting && timing === "mid_cycle" && (severity === "mild" || !severity)) {
+    return { next: "SPOT_MIDCYCLE_NOTE", payload: { inferred: true, reason: "spotting+mid_cycle" } };
   }
 
   // Pelvic pain + after sex
@@ -395,6 +419,11 @@ export function inferRoute(entities) {
     return { next: "HEAVY_DURATION_CHECK", payload: { inferred: true, reason: "heavy+moderate" } };
   }
 
+  // Spotting + mild (not before-period timing) → mid-cycle/ovulation spotting default
+  if (sym.spotting && severity === "mild" && timing !== "before_period" && !pregnancy.chance && !sym.discharge) {
+    return { next: "SPOT_MIDCYCLE_NOTE", payload: { inferred: true, reason: "spotting+mild" } };
+  }
+
   // Discharge without spotting → else intro discharge
   if (sym.discharge && !sym.spotting && !sym.pelvic) {
     return { next: "ELSE_DISCHARGE", payload: { inferred: true, reason: "discharge_only" } };
@@ -404,6 +433,7 @@ export function inferRoute(entities) {
   if (sym.nausea && sym.late) {
     return { next: "LATE_TEST_Q", payload: { inferred: true, reason: "nausea+late" } };
   }
+
 
   // ── No strong inference → return null, fall through to keyword router ──────
   return null;
@@ -428,4 +458,216 @@ export function summarizeEntities(entities) {
   if (urgent)     lines.push("⚠️ Urgency flags detected");
 
   return lines.length ? lines.join(" | ") : "No structured entities extracted";
+}
+
+
+// ─── 3. SAFETY SIGNAL ANALYSIS ────────────────────────────────────────────────
+
+// ── 3a. Downplaying detector ──────────────────────────────────────────────────
+// Returns true when the user uses minimising language alongside potentially
+// serious symptoms. text should be already lowercased.
+export function detectDownplaying(text) {
+  const t = String(text || "").toLowerCase();
+  const englishMin = /\b(just a little|only a bit|not that bad|kinda|sort of|i think i(?:'|')?m okay|i think im okay|probably nothing|might be nothing|don(?:'|')?t want to overreact|dont want to overreact|maybe i(?:'|')?m being dramatic|maybe im being dramatic|not sure if it(?:'|')?s serious)\b/.test(t);
+  const patoisMin  = /\b(likkle bit|nuh too bad|mi aight|a nuh nutten|a no nutten|probably nutten|mi probably fine)\b/.test(t);
+  return englishMin || patoisMin;
+}
+
+// ── 3b. Ambiguous input detector ─────────────────────────────────────────────
+// Returns a targeted clarifying question string when the input is too vague to
+// route safely, or null when input is clear enough to proceed.
+export function detectAmbiguousInput(text, entities) {
+  const t   = String(text || "").toLowerCase().trim();
+  const sym = entities?.symptoms || {};
+  const words = t.split(/\s+/).filter(Boolean);
+
+  // "dizzy" or "dizziness" alone (short message, dizziness signal, no other anchor)
+  if (
+    sym.dizziness &&
+    !sym.heavy && !sym.pelvic && !sym.late && !sym.spotting && !sym.nausea &&
+    words.length <= 5
+  ) {
+    return "Is the dizziness happening alongside any bleeding, or more on its own?";
+  }
+
+  // "feeling sick" / "feel sick" alone — must match text directly (nausea regex misses this phrase)
+  if (
+    /\b(feeling sick|feel sick|feel unwell|feeling unwell)\b/.test(t) &&
+    words.length <= 6 &&
+    !sym.pelvic && !sym.late && !sym.heavy
+  ) {
+    return "Is it more like nausea and stomach discomfort, or do you feel generally unwell with things like chills or fever?";
+  }
+
+  // Generic "pain" or "it hurts" alone with no location or severity
+  const hasBarePain = /\b(pain|hurt|hurts|hurting|it hurts|i have pain)\b/.test(t);
+  if (
+    hasBarePain &&
+    !sym.pelvic && !sym.headache && !sym.joint_pain &&
+    !entities?.severity &&
+    !sym.heavy && !sym.late && !sym.dizziness &&
+    words.length <= 5
+  ) {
+    return "Where is the pain — is it more in your lower belly, pelvic area, or somewhere else? And on a scale of 1 to 5, how intense is it?";
+  }
+
+  // "heavy bleeding" without severity context (and not already urgent)
+  if (
+    sym.heavy &&
+    !entities?.severity &&
+    !entities?.urgent &&
+    words.length <= 8
+  ) {
+    return "When you say heavy — are you soaking through a pad or tampon in about an hour or less, or is it heavier than usual but manageable?";
+  }
+
+  // "is this normal?" — seeking reassurance without specific context
+  if (
+    /\b(is this normal|is that normal|dat normal|is it normal)\b/.test(t) &&
+    !sym.heavy && !sym.late && !sym.pelvic && !sym.dizziness
+  ) {
+    return "That depends on what's going on 🩷 Tell me more about what you're experiencing and I can give you a much better answer.";
+  }
+
+  return null;
+}
+
+// ── 3c. Contradiction detector ────────────────────────────────────────────────
+// Returns a clarifying prompt when the message contains logically contradictory
+// signals, or null when the message is internally consistent.
+export function detectContradiction(text, _entities) {
+  const t = String(text || "").toLowerCase();
+
+  // "heavy" / "soaking" + "just spotting" / minimising bleed word
+  if (
+    /\b(heavy|soaking)\b/.test(t) &&
+    /\b(just spotting|just a spot|likkle|light spotting|only spotting)\b/.test(t)
+  ) {
+    return "You mentioned both heavy bleeding and spotting — could you describe what you're seeing? Are you soaking through protection, or is it more of a light stain?";
+  }
+
+  // "late" / "missed period" + "my period started"
+  if (
+    /\b(late|missed period|period.*late|my period is late)\b/.test(t) &&
+    /\b(my period started|period started|period came|period come|period begin|period began|it started yesterday|started yesterday|started today)\b/.test(t)
+  ) {
+    return "It sounds like you might be saying your period started but was also late — is that right? When did bleeding begin?";
+  }
+
+  // "negative" test + "positive" test in same message
+  if (/\bnegative\b/.test(t) && /\bpositive\b/.test(t) && /\btest(s|ed|ing)?\b/.test(t)) {
+    return "I want to make sure I understood — did you get a negative result, a positive result, or both on different tests?";
+  }
+
+  // "no pain" / "not in pain" + pain descriptor
+  if (
+    /\b(no pain|not in pain|don(?:'|')?t have pain|dont have pain|pain free|no cramps)\b/.test(t) &&
+    /\b(severe|really bad|unbearable|bad pain|so much pain|cramps badly)\b/.test(t)
+  ) {
+    return "You mentioned no pain but also described pain — could you clarify? Is it mild, or is it actually quite uncomfortable?";
+  }
+
+  // "not sexually active" / "haven't had sex" + "had sex" / "unprotected"
+  if (
+    /\b(not sexually active|haven(?:'|')?t had sex|havent had sex|not having sex|i don(?:'|')?t have sex|i dont have sex)\b/.test(t) &&
+    /\b(had sex|we had sex|unprotected|slept with|breed)\b/.test(t)
+  ) {
+    return "I want to make sure I understand your situation so I can give you the right guidance — is there any chance of pregnancy this cycle?";
+  }
+
+  // "fine" / "okay" + urgency-adjacent severity signal — minimising serious symptoms
+  if (
+    /\b(i(?:'|')?m fine|im fine|i(?:'|')?m okay|im okay|i(?:'|')?m alright|im alright|feel fine|feel okay|i(?:'|')?m good|im good)\b/.test(t) &&
+    /\b(severe|really bad|unbearable|can(?:'|')?t stand|faint|passing out|bleed.*bad|bleed.*nuff)\b/.test(t)
+  ) {
+    const symptomWord =
+      /\bfaint|\bpass out/.test(t) ? "fainting" :
+      /\bbleed/.test(t) ? "bleeding" :
+      /\bpain/.test(t) ? "pain" : "the symptom you mentioned";
+    return `I want to make sure — you mentioned ${symptomWord} but also said you're okay. Is the ${symptomWord} manageable or actually quite uncomfortable?`;
+  }
+
+  // Multiple conflicting timing words for the same event
+  if (
+    /\byesterday\b/.test(t) &&
+    /\blast week\b/.test(t) &&
+    /\blast month\b/.test(t)
+  ) {
+    return "I want to get the timing right — when did this start? Yesterday, last week, or longer ago?";
+  }
+
+  // "no cramps" / "cramp free" + severe cramping description
+  if (
+    /\b(no cramps|cramp free|no period pain)\b/.test(t) &&
+    /\b(severe cramps|bad cramps|cramps are bad|cramps so bad|cramps killing|cramping badly)\b/.test(t)
+  ) {
+    return "You mentioned no cramps but also described severe cramping — could you clarify? Are the cramps manageable or actually quite bad?";
+  }
+
+  return null;
+}
+
+// ── 3d. Missing context detector ─────────────────────────────────────────────
+// Returns a single targeted probe question when a health symptom is present but
+// critical context is missing, or null when context is sufficient.
+export function detectMissingContext(entities, text) {
+  const t   = String(text || "").toLowerCase();
+  const sym = entities?.symptoms || {};
+
+  // Pain signal but no location and no pelvic/belly entity
+  const hasPain = /\b(pain|hurt|hurts|hurting|ache|aches|sore)\b/.test(t);
+  if (hasPain && !sym.pelvic && !sym.headache && !sym.joint_pain && !entities?.severity) {
+    return "Where does the pain feel like it's coming from — more in your belly, lower pelvic area, or somewhere else?";
+  }
+
+  // Bleeding but no severity/amount (and not already urgent)
+  if ((sym.heavy || sym.spotting) && !entities?.severity && !entities?.urgent) {
+    return "Is it light spotting, more like a normal period, or heavier than usual?";
+  }
+
+  // Discharge with no descriptor
+  if (
+    sym.discharge &&
+    !sym.unusual_discharge && !sym.discharge_sticky &&
+    !sym.discharge_eggwhite && !sym.discharge_creamy
+  ) {
+    return "Has the colour, smell, or texture changed, or does it just seem like more than usual?";
+  }
+
+  return null;
+}
+
+// ── 3e. Cumulative risk checker ───────────────────────────────────────────────
+// Takes an array of entity objects (from extractEntities calls) representing the
+// last N messages. Returns { escalate: boolean, reason: string|null }.
+// Used by the eval harness for multi-turn test cases.
+export function checkCumulativeRisk(entityHistory) {
+  if (!entityHistory || entityHistory.length < 2) return { escalate: false, reason: null };
+
+  const recent = entityHistory.slice(-5);
+
+  const hasHeavy        = recent.some(e => e.symptoms?.heavy || e.symptoms?.large_clots);
+  const hasDizziness    = recent.some(e => e.symptoms?.dizziness);
+  const hasLate         = recent.some(e => e.symptoms?.late);
+  const hasOnesidedPain = recent.some(e => e.urgent || /one.sided|one side/.test(e.raw || ""));
+  const hasPositiveTest = recent.some(e => e.pregnancy?.result === "positive");
+  const hasPelvicPain   = recent.some(e => e.symptoms?.pelvic);
+  const hasBleeding     = recent.some(e => e.symptoms?.heavy || e.symptoms?.spotting);
+  const hasNightSweats  = recent.some(e => e.symptoms?.night_sweats);
+  const hasChills       = recent.some(e => e.symptoms?.cold_flashes);
+
+  if (hasHeavy && hasDizziness) {
+    return { escalate: true, reason: "cumulative: heavy_bleeding + dizziness" };
+  }
+  if (hasLate && hasOnesidedPain) {
+    return { escalate: true, reason: "cumulative: late_period + one_sided_pain (ectopic risk)" };
+  }
+  if (hasPositiveTest && (hasPelvicPain || hasBleeding)) {
+    return { escalate: true, reason: "cumulative: positive_test + pain_or_bleeding" };
+  }
+  if (hasNightSweats && hasChills && hasPelvicPain) {
+    return { escalate: true, reason: "cumulative: fever_proxy + pelvic_pain" };
+  }
+
+  return { escalate: false, reason: null };
 }

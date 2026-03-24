@@ -50,9 +50,9 @@
 
 const PHRASE_MAP = [
   // ── Greetings ──────────────────────────────────────────────────────────────
-  ["wah gwaan",          "hello"],
-  ["wagwaan",            "hello"],
-  ["wha gwan",           "hello"],
+  ["wah gwaan",          "what's going on"],
+  ["wagwaan",            "what's going on"],
+  ["wha gwan",           "what's going on"],
   ["wha di scene",       "hello"],
   ["ow yuh stay",        "how are you"],
   ["how yuh deh",        "how are you"],
@@ -79,6 +79,14 @@ const PHRASE_MAP = [
   ["clot big",                      "large clots"],
   ["pass clot",                     "passing clots"],
   ["a pass clot",                   "passing clots"],
+  ["mi period late",                "my period is late"],
+  ["period nuh come",               "period hasn't come"],
+  ["period nuh reach",              "period hasn't arrived"],
+  ["period a play",                 "period is irregular"],
+  ["period skip",                   "period skipped"],
+  ["no see mi period",              "haven't seen my period"],
+  ["period gone missing",           "period is missing"],
+  ["waiting pon mi period",         "waiting for my period"],
 
   // ── Pregnancy ──────────────────────────────────────────────────────────────
   ["mi feel like mi pregnant",      "i think i might be pregnant"],
@@ -94,10 +102,18 @@ const PHRASE_MAP = [
   ["mi did sleep wid someone",      "i had sex"],
   ["him breed mi",                  "i might be pregnant"],
   ["mi think mi breed",             "i think i might be pregnant"],
+  ["catch belly",                   "pregnant"],
+  ["belly catch",                   "pregnant"],
+  ["pickney deh",                   "might be pregnant"],
+  ["haffi do test",                 "need to take a test"],
+  ["test come back",                "test result"],
+  ["two line",                      "positive test"],
+  ["two lines",                     "positive test"],
+  ["one line",                      "negative test"],
 
   // ── Pain / cramps ──────────────────────────────────────────────────────────
-  ["mi belly a hurt mi bad",        "i have severe stomach pain"],
-  ["mi belly a kill mi",            "i have severe stomach pain"],
+  ["mi belly a hurt mi bad",        "i have stomach pain"],
+  ["mi belly a kill mi",            "i have stomach pain"],
   ["mi belly a murder mi",          "i have very severe stomach pain"],
   ["mi belly a cramp bad",          "i have severe cramps"],
   ["mi belly a cramp",              "i have cramps"],
@@ -108,10 +124,29 @@ const PHRASE_MAP = [
   ["mi waist a hurt",               "i have pelvic pain"],
   ["bottom belly a hurt",           "lower abdominal pain"],
   ["mi bottom belly a hurt",        "i have lower abdominal pain cramps"],
-  ["cramp bad",                     "severe cramps"],
+  ["cramp bad",                     "bad cramps"],
   ["pain bad",                      "severe pain"],
   ["pain a kill mi",                "severe pain"],
   ["hurt bad",                      "severe pain"],
+  ["pain kill mi",                  "pain is severe"],
+  ["pain murder mi",                "pain is severe"],
+  ["cramp a tear mi",               "severe cramps"],
+  ["belly bottom pain",             "lower abdominal pain"],
+  ["front bottom hurt",             "pelvic pain"],
+  ["underneath hurt",               "pelvic pain"],
+  ["pain pon one side",             "one-sided pain"],
+  ["one side a hurt",               "one-sided pain"],
+  ["sharp pain one side",           "sharp one-sided pain"],
+
+  // ── Bleeding ──────────────────────────────────────────────────────────────
+  ["bleeding bad",                  "bleeding heavily"],
+  ["blood nuff",                    "a lot of blood"],
+  ["bleed out",                     "bleeding heavily"],
+  ["pad soaking",                   "soaking through pad"],
+  ["tampon soaking",                "soaking through tampon"],
+  ["clot pass",                     "passing clots"],
+  ["clot drop",                     "passing clots"],
+  ["nuff blood",                    "heavy bleeding"],
 
   // ── Spotting ───────────────────────────────────────────────────────────────
   ["likkle blood a come",           "light spotting bleeding"],
@@ -132,6 +167,16 @@ const PHRASE_MAP = [
   ["mi head a spin",                "i feel dizzy"],
   ["mi feel weak bad",              "i feel very weak"],
 
+  // ── Mood ──────────────────────────────────────────────────────────────────
+  ["mi feel empty",                 "i feel empty"],
+  ["mi head gone",                  "i'm not thinking clearly"],
+  ["mi brains gone",                "brain fog"],
+  ["mi feel crazy",                 "i feel overwhelmed"],
+  ["everything get to mi",          "everything is getting to me"],
+  ["mi cyan manage",                "i can't cope"],
+  ["mi break down",                 "i'm breaking down"],
+  ["mi a lose it",                  "i'm losing it"],
+
   // ── Dizziness / fainting ───────────────────────────────────────────────────
   ["mi feel like mi a go faint",    "i feel like i am going to faint"],
   ["mi did faint",                  "i fainted"],
@@ -139,6 +184,14 @@ const PHRASE_MAP = [
   ["mi pass out",                   "i passed out fainted"],
   ["mi head feel light",            "i feel lightheaded dizzy"],
   ["mi head swim",                  "i feel dizzy lightheaded"],
+  ["mi feel faint",                 "i feel faint"],
+  ["mi a go drop",                  "i'm about to faint"],
+  ["mi weak bad",                   "very weak"],
+  ["mi cyan stand",                 "i can't stand"],
+  ["mi collapse",                   "i collapsed"],
+  ["mi nearly drop",                "i nearly fainted"],
+  ["blood all over",                "heavy bleeding everywhere"],
+  ["mi cyan breathe",               "i can't breathe"],
 
   // ── Discharge ──────────────────────────────────────────────────────────────
   ["something a come from mi",      "unusual discharge"],
@@ -146,10 +199,17 @@ const PHRASE_MAP = [
   ["smelly discharge",              "discharge with odor"],
   ["it smell funny",                "discharge with odor"],
   ["it have a smell",               "discharge with odor"],
+  ["sumn white coming out",         "white discharge"],
+  ["wet down there",                "vaginal discharge"],
+  ["smell funny down deh",          "unusual odour"],
+  ["smell off down there",          "unusual odour"],
+  ["itchy down deh",                "vaginal itching"],
+  ["burning down deh",              "vaginal burning"],
+  ["funny feeling down there",      "unusual vaginal sensation"],
 
   // ── General / uncertainty ──────────────────────────────────────────────────
   ["mi nuh know wah wrong wid mi",  "i do not know what is wrong with me"],
-  ["something wrong wid mi",        "something is wrong"],
+  ["something wrong wid mi",        "something is wrong with me"],
   ["mi body a act up",              "my body is acting strangely"],
   ["mi nuh feel good",              "i do not feel well"],
   ["mi feel off",                   "i feel off unwell"],
@@ -209,6 +269,220 @@ const PHRASE_MAP = [
   ["mi exercise hard",                  "i exercise intensely lifestyle change"],
   ["mi been sick",                      "i have been sick illness lifestyle change"],
   ["mi travel recent",                  "i traveled recently lifestyle change"],
+
+  // ── Medication: specific requests ─────────────────────────────────────────
+  ["wah something fi di pain",      "want something for the pain"],
+  ["something fi ease it",          "something to ease it"],
+  ["anything fi help",              "anything to help"],
+  ["wah buy medicine",              "want to buy medicine"],
+  ["need tablet",                   "need tablet"],
+  ["need pill",                     "need pill"],
+  ["take away the pain",            "pain relief"],
+  ["stop di pain",                  "stop the pain"],
+
+  // ── Medication: wanting / needing ─────────────────────────────────────────
+  // Longer / more specific phrases first so "mi wah get" beats "wah get" etc.
+  ["mi wah get",                         "i want to get"],
+  ["mi wah buy",                         "i want to buy"],
+  ["mi wah some",                        "i want some"],
+  ["mi wah a",                           "i want a"],
+  ["me wah get",                         "i want to get"],
+  ["me wah buy",                         "i want to buy"],
+  ["me wah some",                        "i want some"],
+  ["me wah a",                           "i want a"],
+  ["mi need some",                       "i need some"],
+  ["mi need a",                          "i need a"],
+  ["me need some",                       "i need some"],
+  ["me need a",                          "i need a"],
+  ["need fi get",                        "need to get"],
+  ["wah fi get",                         "want to get"],
+  ["wah buy",                            "want to buy"],
+  ["wah get",                            "want to get"],
+
+  // ── Medication: taking ────────────────────────────────────────────────────
+  ["should mi tek",                      "should i take"],
+  ["mi wah tek",                         "i want to take"],
+  ["me wah tek",                         "i want to take"],
+  ["mi a tek",                           "i am taking"],
+  ["me a tek",                           "i am taking"],
+  ["can mi tek",                         "can i take"],
+  ["can me tek",                         "can i take"],
+  ["alright fi tek",                     "alright to take"],
+  ["safe fi tek",                        "safe to take"],
+  ["okay fi tek",                        "okay to take"],
+  ["wah tek",                            "want to take"],
+  ["fi tek",                             "to take"],
+  ["tek dem",                            "take them"],
+  ["tek one",                            "take one"],
+  ["tek it",                             "take it"],
+  ["a tek",                              "taking"],
+
+  // ── Medication: pain expressions triggering need ───────────────────────────
+  ["mi cyan manage di pain",             "i cannot manage the pain"],
+  ["belly a hurt mi bad",                "stomach hurting me badly"],
+  ["front bottom a hurt",                "pelvic area is hurting"],
+  ["belly bottom a hurt",                "lower abdomen is hurting"],
+  ["down deh a hurt",                    "down there is hurting"],
+  ["cramp a kill mi",                    "cramps are killing me"],
+  ["pain bad bad",                       "pain is very bad"],
+  ["pain too bad",                       "pain is too bad"],
+  ["a murder mi",                        "is killing me"],
+
+  // ── Medication: asking what helps ─────────────────────────────────────────
+  ["how fi ease di",                     "how to ease the"],
+  ["how fi stop di",                     "how to stop the"],
+  ["wah fi do fi",                       "what to do for"],
+  ["wah good fi",                        "what is good for"],
+  ["wah work fi",                        "what works for"],
+  ["wah can help",                       "what can help"],
+  ["something fi di pain",               "something for the pain"],
+  ["anyting fi",                         "anything for"],
+  ["nutten fi",                          "nothing for"],
+
+  // ── Frustration and confusion ──────────────────────────────────────────────
+  ["u nuh understand",                   "you don't understand"],
+  ["u nuh get it",                       "you don't get it"],
+  ["u cyaan understand",                 "you can't understand"],
+  ["u doh understand",                   "you don't understand"],
+  ["mi nuh understand u",                "i don't understand you"],
+  ["wah u a seh",                        "what are you saying"],
+  ["wah u mean",                         "what do you mean"],
+  ["dat nuh make sense",                 "that doesn't make sense"],
+  ["u confuse mi",                       "you're confusing me"],
+  ["mi confuse",                         "i'm confused"],
+
+  // ── Correction and disagreement ────────────────────────────────────────────
+  ["dat nuh wah mi seh",                 "that's not what i said"],
+  ["dat nuh wah mi mean",                "that's not what i mean"],
+  ["dat nuh right",                      "that's not right"],
+  ["dat wrong",                          "that's wrong"],
+  ["u get it wrong",                     "you got it wrong"],
+  ["dat nuh di answer",                  "that's not the answer"],
+  ["dat nuh wah mi ask",                 "that's not what i asked"],
+  ["mi nuh ask dat",                     "i didn't ask that"],
+  ["u nuh answer mi question",           "you didn't answer my question"],
+  ["answer mi question",                 "answer my question"],
+  ["dat nuh helpful",                    "that's not helpful"],
+  ["dat nuh help",                       "that doesn't help"],
+
+  // ── Expressing uselessness ─────────────────────────────────────────────────
+  ["u useless",                          "you're useless"],
+  ["u nuh helpful",                      "you're not helpful"],
+  ["u nuh helping",                      "you're not helping"],
+  ["u cyan help mi",                     "you can't help me"],
+  ["u nuh help mi",                      "you didn't help me"],
+  ["u a waste",                          "you're a waste"],
+  ["u a di worst",                       "you're the worst"],
+  ["nutten nuh work",                    "nothing is working"],
+  ["dis nuh work",                       "this isn't working"],
+  ["nuh helpful at all",                 "not helpful at all"],
+
+  // ── Agreement ─────────────────────────────────────────────────────────────
+  ["yes dat",                            "yes that"],
+  ["yeah dat",                           "yeah that"],
+  ["dat right",                          "that's right"],
+  ["dat correct",                        "that's correct"],
+  ["exactly dat",                        "exactly that"],
+  ["true dat",                           "that's true"],
+  ["mi agree",                           "i agree"],
+  ["dat make sense",                     "that makes sense"],
+  ["mi understand",                      "i understand"],
+  ["mi get it",                          "i get it"],
+
+  // ── Reset and restart ──────────────────────────────────────────────────────
+  ["mi wah start ova",                   "i want to start over"],
+  ["start ova",                          "start over"],
+  ["nuh mind",                           "never mind"],
+  ["forget dat",                         "forget that"],
+
+  // ── General conversational Patois ──────────────────────────────────────────
+  ["mi deh yah",                         "i'm here"],
+  ["everyting criss",                    "everything is fine"],
+  ["nuh problem",                        "no problem"],
+  ["mi appreciate it",                   "i appreciate it"],
+  ["tank you",                           "thank you"],
+  ["mi straight",                        "i'm fine"],
+  ["mi aight",                           "i'm alright"],
+  ["mi good",                            "i'm good"],
+  ["nuh worry",                          "don't worry"],
+  ["tanks",                              "thanks"],
+  ["bless",                              "thank you"],
+  ["respect",                            "thank you"],
+
+  // ── Asking for help ────────────────────────────────────────────────────────
+  ["can u help mi",                      "can you help me"],
+  ["u can help mi",                      "can you help me"],
+  ["mi need fi know",                    "i need to know"],
+  ["wah should mi do",                   "what should i do"],
+  ["explain to mi",                      "explain to me"],
+  ["mi wah know",                        "i want to know"],
+  ["mi need help",                       "i need help"],
+  ["how mi fi",                          "how do i"],
+  ["show mi",                            "show me"],
+  ["tell mi",                            "tell me"],
+  ["help mi",                            "help me"],
+  ["wah fi do",                          "what to do"],
+  ["how fi",                             "how to"],
+
+  // ── Date / time uncertainty (Part 7) ──────────────────────────────────────
+  ["mi cyaan remember",                  "i can't remember"],
+  ["mi nuh remember",                    "i can't remember"],
+  ["mi nuh sure when",                   "i'm not sure when"],
+  ["di odda week",                       "the other week"],
+  ["di odda day",                        "the other day"],
+  ["nuh long ago",                       "not long ago"],
+  ["round bout",                         "around"],
+  ["couple weeks",                       "a couple of weeks"],
+  ["couple days",                        "a couple of days"],
+  ["long time ago",                      "a long time ago"],
+  ["long time",                          "a long time ago"],
+  ["sometime around",                    "sometime around"],
+  ["mi forget",                          "i forgot"],
+
+  // ── Negative states ────────────────────────────────────────────────────────
+  ["sumn wrong wid mi",                  "something is wrong with me"],
+  ["mi nuh know wah happen",             "i don't know what's happening"],
+  ["mi feel sick bad",                   "i feel very sick"],
+  ["mi nuh feel well",                   "i don't feel well"],
+  ["mi stress out",                      "i'm stressed out"],
+  ["mi tired bad",                       "i'm very tired"],
+  ["mi cyan cope",                       "i can't cope"],
+  ["mi give up",                         "i give up"],
+  ["mi done",                            "i'm done"],
+  ["mi vex",                             "i'm angry"],
+  ["mi upset",                           "i'm upset"],
+  ["mi frighten",                        "i'm scared"],
+
+  // ── Vague / indirect health wording ─────────────────────────────────────────
+  ["something feels off",          "i feel off unwell"],
+  ["something is wrong",           "something is wrong with me unwell"],
+  ["sumn wrong",                   "something is wrong with me unwell"],
+  ["feel off",                     "feel unwell"],
+  ["not right",                    "not feeling right unwell"],
+  ["nuh feel right",               "not feeling right unwell"],
+  ["it hurts there",               "pelvic pain"],
+  ["hurts down there",             "pelvic pain lower abdomen"],
+  ["pain down there",              "pelvic pain lower abdomen"],
+  ["down deh hurting",             "pelvic pain lower abdomen"],
+  ["something is coming out",      "unusual discharge"],
+  ["sumn a come out",              "unusual discharge"],
+  ["sumn coming out",              "unusual discharge"],
+  ["it won't stop",                "bleeding won't stop continuing"],
+  ["it nuh stop",                  "bleeding won't stop continuing"],
+  ["i don't feel like myself",     "i feel sad low mood emotional"],
+  ["i dont feel like myself",      "i feel sad low mood emotional"],
+  ["mi nuh feel like miself",      "i feel sad low mood emotional"],
+  ["my body feels weird",          "my body feels strange unwell"],
+  ["mi body feel strange",         "my body feels strange unwell"],
+  ["is this normal",               "seeking reassurance is this normal"],
+  ["dat normal",                   "seeking reassurance is this normal"],
+  ["is that normal",               "seeking reassurance is this normal"],
+
+  // ── Time shorthand phrases ───────────────────────────────────────────────────
+  ["lst wk",                       "last week"],
+  ["lst mth",                      "last month"],
+  ["bc pill",                      "birth control pill"],
+  ["2ww",                          "two week wait"],
 ];
 
 // ─── 2. WORD-LEVEL DICTIONARY ─────────────────────────────────────────────────
@@ -303,60 +577,267 @@ const WORD_MAP = [
   ["irregular", "irregular"],
   ["absent",    "absent"],
   ["missing",   "missing"],
+
+  // Medication-related tokens (residual after phrase-level processing)
+  ["wah",       "what"],
+  ["tek",       "take"],
+
+  // ── Health shorthand abbreviations ───────────────────────────────────────────
+  ["bfp",       "positive pregnancy test"],
+  ["bfn",       "negative pregnancy test"],
+  ["ewcm",      "egg white discharge cervical mucus"],
+  ["ttc",       "trying to conceive"],
+  ["dpo",       "days past ovulation"],
+  ["hpt",       "pregnancy test"],
+  ["opk",       "ovulation test"],
+  ["lmp",       "last period"],
+  ["bcp",       "birth control pill"],
+  ["preg",      "pregnant"],
+  ["preggo",    "pregnant"],
+  ["prego",     "pregnant"],
+  ["af",        "period"],
+  ["pg",        "pregnant"],
+
+  // ── Time shorthands ──────────────────────────────────────────────────────────
+  ["2wks",      "2 weeks"],
+  ["1wk",       "1 week"],
+  ["3wks",      "3 weeks"],
+  ["4wks",      "4 weeks"],
+  ["2dys",      "2 days"],
+  ["3dys",      "3 days"],
+  ["1dy",       "1 day"],
+  ["2mths",     "2 months"],
+  ["1mth",      "1 month"],
+  ["tmrw",      "tomorrow"],
+  ["ystdy",     "yesterday"],
+
+  // ── Internet slang (strip filler / normalize) ────────────────────────────────
+  ["fr",        "for real"],
+  ["ngl",       ""],
+  ["tbh",       ""],
+  ["omg",       "oh my"],
+  ["wtf",       ""],
+  ["lol",       "lol"],
+  ["lmao",      ""],
+  ["ugh",       ""],
+  ["smh",       ""],
+  ["bruh",      ""],
+  ["bestie",    ""],
 ];
 
-// ─── 3. FUZZY MATCHING (Levenshtein distance) ─────────────────────────────────
+// ─── 3. FUZZY MATCHING (Damerau-Levenshtein + phonetic variants) ──────────────
 //
-// This is Stage 3 of the preprocessing pipeline. It has two sub-stages:
+// Pipeline for each user message token:
+//   1. PHONETIC_VARIANTS lookup  — fast O(1), catches known Jamaican/Caribbean
+//      spelling patterns that Levenshtein alone won't handle within threshold.
+//   2. Exact-match check against FUZZY_DICTIONARY — skip correction if already correct.
+//   3. Damerau-Levenshtein (OSA) — handles insertions, deletions, substitutions,
+//      and adjacent transpositions. Threshold based on max(token, dictWord) length:
+//        1–4 chars  → distance 0 (no fuzzy — "pad" must not match "pain")
+//        5–7 chars  → distance ≤ 1
+//        8–11 chars → distance ≤ 2
+//        12+ chars  → distance ≤ 3
+//   4. PROTECTED_TOKENS — valid Patois words, never corrected.
+//   5. Correction cache — Map keyed on token, avoids re-running Levenshtein.
 //
-// 3a. PATOIS FUZZY — matches near-miss Patois tokens against WORD_MAP entries.
-//     Catches regional spelling variation, dropped letters, transpositions.
-//
-// 3b. MEDICAL FUZZY — matches near-miss English tokens against MEDICAL_TERMS.
-//     Catches common misspellings of health vocabulary ("pregnacy", "ovultaion",
-//     "endometrisos") so the scoring engine sees the canonical form.
-//
-// THRESHOLD (applies to both sub-stages):
-//   - Token length < 8 characters: distance ≤ 1 (conservative — short words
-//     are more collision-prone)
-//   - Token length ≥ 8 characters: distance ≤ 2 (allows one transposition +
-//     one drop, or two single-character changes)
-//
-// SAFETY: Only applied to tokens that did NOT match in Stage 1 or 2.
-// Minimum token length: 3 characters (prevents "a" matching "i" etc.)
-// Proportion guard: token length ≥ 70% of dictionary word length
-// (prevents short tokens matching long words).
+// fuzzyCorrect() is exported and handles both single-token and full-sentence input.
+// When given a sentence (contains whitespace), it corrects each token independently
+// and rejoins. Called explicitly AFTER normalizePatois() in the pipeline.
 
-// ── 3a. Patois fuzzy targets — extracted from WORD_MAP ────────────────────────
-const FUZZY_TARGETS = WORD_MAP.map(([patois, english]) => ({ patois, english }));
+// ── Phonetic variants — run FIRST before Levenshtein ─────────────────────────
+const PHONETIC_VARIANTS = {
+  // Pregnancy
+  "pregnat":        "pregnant",
+  "pregnent":       "pregnant",
+  "pragnant":       "pregnant",
+  "pregnacy":       "pregnancy",
+  "pregnency":      "pregnancy",
+  "pegnancy":       "pregnancy",
+  // Spotting
+  "spotian":        "spotting",
+  "spoting":        "spotting",
+  "spottng":        "spotting",
+  // Bleeding
+  "bleding":        "bleeding",
+  "bleading":       "bleeding",
+  "bleedin":        "bleeding",
+  "blleding":       "bleeding",
+  // Discharge
+  "disscharge":     "discharge",
+  "dischage":       "discharge",
+  "discharje":      "discharge",
+  "discharg":       "discharge",
+  // Panadol
+  "panandol":       "panadol",
+  "panadoll":       "panadol",
+  "panaodl":        "panadol",
+  "pnadol":         "panadol",
+  "panadal":        "panadol",
+  // Ibuprofen
+  "ibupropen":      "ibuprofen",
+  "ibuproffen":     "ibuprofen",
+  "ibuprofin":      "ibuprofen",
+  "ibruprofen":     "ibuprofen",
+  "ibprofen":       "ibuprofen",
+  // Ovulation
+  "ovualtion":      "ovulation",
+  "ovulaion":       "ovulation",
+  "ovulaton":       "ovulation",
+  "ovultion":       "ovulation",
+  // Menstrual / menstruation
+  "menstral":       "menstrual",
+  "menstruel":      "menstrual",
+  "menstrul":       "menstrual",
+  "menstrall":      "menstrual",
+  "mensural":       "menstrual",
+  "menstration":    "menstruation",
+  "mensturation":   "menstruation",
+  "menstartion":    "menstruation",
+  // Period
+  "perriod":        "period",
+  "priod":          "period",
+  "peroid":         "period",
+  "periood":        "period",
+  "peirod":         "period",
+  // Cramping
+  "craming":        "cramping",
+  // Nauseous / nauseating
+  "nausous":        "nauseous",
+  "nausious":       "nauseous",
+  "nauseus":        "nauseous",
+  "nausiating":     "nauseating",
+  // Dizzy / dizziness
+  "diszzy":         "dizzy",
+  "dizy":           "dizzy",
+  "dizzyness":      "dizziness",
+  "dizyness":       "dizziness",
+  // Endometriosis
+  "endometrosis":   "endometriosis",
+  "endometrisis":   "endometriosis",
+  "endometrious":   "endometriosis",
+  "endrometriosis": "endometriosis",
+  // Polycystic
+  "polycistic":     "polycystic",
+  "polycitic":      "polycystic",
+  // Fibroids
+  "fibriods":       "fibroids",
+  "fibrods":        "fibroids",
+  "fiborids":       "fibroids",
+  // Menopause / perimenopause
+  "menapose":       "menopause",
+  "menapause":      "menopause",
+  "menopase":       "menopause",
+  "menopaue":       "menopause",
+  "perimenapose":   "perimenopause",
+  "perimenapause":  "perimenopause",
+  // Contraception
+  "contraceptoin":  "contraception",
+  "contraceptin":   "contraception",
+  "contraseption":  "contraception",
+  "contreception":  "contraception",
+  // Chlamydia
+  "chlamidia":      "chlamydia",
+  "chlamedia":      "chlamydia",
+  "clamydia":       "chlamydia",
+  // Gonorrhea
+  "gonorhea":       "gonorrhea",
+  "gonorrea":       "gonorrhea",
+  "gonnorhea":      "gonorrhea",
+  // Syphilis
+  "sifilis":        "syphilis",
+  "syphillis":      "syphilis",
+  // Vaginosis
+  "vaginossis":     "vaginosis",
+  "vaginoisis":     "vaginosis",
+  // Infertility
+  "inferility":     "infertility",
+  // Implantation
+  "implanation":    "implantation",
+  "implantaion":    "implantation",
+  // Miscarriage
+  "miscarige":      "miscarriage",
+  "miscarrige":     "miscarriage",
+  // Ectopic
+  "ectopik":        "ectopic",
+  "ectoppic":       "ectopic",
+};
 
-// ── 3b. Medical terms dictionary — canonical health/reproductive vocabulary ────
-// Used by fuzzyCorrect() to normalise near-miss spellings of medical words.
-const MEDICAL_TERMS = [
-  "spotting", "bleeding", "pregnant", "pregnancy", "period", "periods",
-  "discharge", "cramps", "cramping", "ovulation", "ovulating", "nausea",
-  "dizziness", "dizzy", "irregular", "endometriosis", "contraception",
-  "implantation", "miscarriage", "menstrual", "menstruation", "cycle",
-  "hormones", "hormonal", "progesterone", "estrogen", "testosterone",
-  "cervical", "cervix", "uterus", "uterine", "fibroids", "fibroid",
-  "fallopian", "pelvic", "bloating", "bloated", "fatigue", "exhausted",
-  "insomnia", "anxiety", "depression", "irritable", "irritability",
-  "breastfeeding", "postpartum", "perimenopause", "menopause", "menopausal",
-  "trimester", "placenta", "ultrasound", "gynecologist", "gynecology",
-  "obstetrician", "contraceptive", "iud", "implant", "injection", "condom",
-  "abstinence", "fertile", "fertility", "infertility", "conception",
-  "intercourse", "libido", "vaginal", "vagina", "vulva", "clitoris", "hymen",
-  "labia", "endometrium", "polycystic", "pcos", "adenomyosis", "ectopic",
-  "miscarry", "stillbirth", "abortion", "spotty", "clotting", "clots",
-  "faint", "fainting", "collapse", "hemorrhage", "infection", "bacterial",
-  "vaginosis", "thrush", "yeast", "sti", "std", "chlamydia", "gonorrhea",
-  "syphilis", "herpes",
-];
+// ── Fuzzy dictionary — organized by category ──────────────────────────────────
+const FUZZY_DICTIONARY = {
+  reproductive_core: [
+    "spotting", "bleeding", "pregnant", "pregnancy", "period", "periods",
+    "discharge", "cramps", "cramping", "ovulation", "ovulating", "nausea",
+    "nauseous", "dizziness", "dizzy", "irregular", "menstrual", "menstruation",
+    "cycle", "cycles", "hormones", "hormonal",
+  ],
+  anatomy: [
+    "cervical", "cervix", "uterus", "uterine", "fallopian", "pelvic",
+    "vaginal", "vagina", "ovarian", "ovaries", "endometrium", "placenta",
+  ],
+  conditions: [
+    "endometriosis", "polycystic", "fibroids", "fibroid", "adenomyosis",
+    "amenorrhea", "dysmenorrhea", "menopause", "perimenopause", "postpartum",
+    "trimester", "implantation", "miscarriage", "ectopic",
+  ],
+  symptoms: [
+    "bloating", "bloated", "fatigue", "exhausted", "insomnia", "anxiety",
+    "depression", "irritability", "headache", "migraine", "constipation",
+    "diarrhea", "heartburn", "swelling", "tenderness", "sensitivity",
+  ],
+  medications: [
+    "panadol", "ibuprofen", "buscopan", "ponstan", "naproxen", "aspirin",
+    "diclofenac", "tramadol", "voltaren", "clomid", "metformin", "provera",
+    "primolut", "duphaston", "tranexamic", "norethisterone", "mefenamic",
+    "paracetamol", "tylenol", "advil", "nurofen",
+  ],
+  contraception: [
+    "contraception", "contraceptive", "condom", "implant", "injection",
+    "abstinence", "fertile", "fertility", "infertility", "conception",
+    "intercourse",
+  ],
+  sexual_health: [
+    "chlamydia", "gonorrhea", "syphilis", "herpes", "vaginosis", "thrush",
+    "infection", "bacterial", "inflammation",
+  ],
+  fertility_conception: [
+    "ovulation", "conception", "fertile", "fertility", "infertility",
+    "implantation", "embryo", "trimester", "gestation",
+  ],
+  emotional: [
+    "emotional", "overwhelmed", "exhaustion", "concentration", "forgetful",
+    "forgetfulness", "motivation",
+  ],
+  tracking: [
+    "positive", "negative", "temperature", "tracking", "logging", "calendar",
+  ],
+  abbreviations: [
+    "pcos", "iud", "sti", "std", "ttc",
+  ],
+};
 
-/**
- * levenshtein(a, b) → Number
- * Standard dynamic-programming Levenshtein distance.
- */
+// Deduplicated flat array and O(1) set for exact-match lookup
+const ALL_FUZZY_TERMS_ARRAY = [...new Set(Object.values(FUZZY_DICTIONARY).flat())];
+const ALL_FUZZY_TERMS = new Set(ALL_FUZZY_TERMS_ARRAY);
+
+// ── Protected Patois tokens — must never be fuzzy-corrected ───────────────────
+const PROTECTED_TOKENS = new Set([
+  "mi", "di", "fi", "nuh", "wah", "yuh", "dem", "seh", "deh", "ting",
+  "man", "gal", "bad", "good", "real",
+]);
+
+// ── Correction cache — avoids re-running Levenshtein for repeated tokens ──────
+const _correctionCache = new Map();
+let _cacheHits = 0;
+
+/** Reset cache and hit counter (for testing). */
+export function _resetFuzzyCache() { _correctionCache.clear(); _cacheHits = 0; }
+
+/** Return cache hit count (for testing). */
+export function _getFuzzyCacheHits() { return _cacheHits; }
+
+// ── Damerau-Levenshtein distance (Optimal String Alignment) ───────────────────
+// Handles insertions, deletions, substitutions, and adjacent transpositions.
+// Transpositions cost 1 — this is why "peroid" → "period" now works (dist 1).
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, (_, i) =>
@@ -364,123 +845,116 @@ function levenshtein(a, b) {
   );
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        // Adjacent transposition
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          dp[i][j] = Math.min(dp[i][j], dp[i - 2][j - 2] + 1);
+        }
+      }
     }
   }
   return dp[m][n];
 }
 
-// Common English words that must never be re-mapped by fuzzy matching.
-// These are words that might be a distance-1 or distance-2 near-miss for a
-// Patois entry but are completely unambiguous standard English.
-const ENGLISH_EXCLUSION_SET = new Set([
-  "week","bell","feel","deal","meal","heal","real","seal","tell","sell",
-  "well","fell","cell","fill","will","hill","bill","mill","kill","pill",
-  "till","skill","spill","still","grill","chill","spell","smell","shell",
-  "bell","dwell","yell","fell","gel","eel","heel","keel","peel","reel",
-  "blood","good","need","seed","feed","weed","deed","heed","reed","bead",
-  "lead","read","head","dead","bread","spread","thread","dread","tread",
-  "pain","main","rain","vain","gain","lane","sane","same","fame","came",
-  "game","name","tame","lame","blame","flame","frame","shame","claim",
-  "late","fate","rate","gate","hate","mate","date","plate","state","crate",
-  "hurt","part","cart","dart","fart","mart","tart","art","bar","car",
-  "sick","tick","pick","kick","lick","nick","quick","trick","thick","stick",
-  "heavy","gravy","navy","wavy","davy",
-  "faint","aint","paint","saint","quaint","taint","feint",
-  "dizzy","fizzy","busy","easy","cozy","rosy","nosy","cosy",
-  "weak","leak","beak","peak","freak","sneak","creak","streak","speak",
-  "clot","slot","plot","blot","shot","trot","knot","dot","got","hot","lot",
-  "late","gate","mate","fate","hate","rate","plate",
-  "mood","food","good","wood","hood","blood","flood",
-  "hurt","curt","dirt","girt","shirt","skirt","squirt",
-  "come","home","dome","some","Rome","foam","roam","loam",
-]);
+// ── Threshold by max(token, dictWord) length ───────────────────────────────────
+function getThreshold(maxLen) {
+  if (maxLen <= 4)  return 0;  // no fuzzy — "pad" must not match "pain"
+  if (maxLen <= 7)  return 1;
+  if (maxLen <= 11) return 2;
+  return 3;
+}
 
+// ── Internal single-token corrector ───────────────────────────────────────────
+function _correctToken(token) {
+  // 1. Phonetic variant lookup (known Jamaican/Caribbean patterns)
+  const phonetic = PHONETIC_VARIANTS[token];
+  if (phonetic !== undefined && phonetic !== token) {
+    console.log(`[Bloomie Fuzzy] ${token} → ${phonetic} (phonetic)`);
+    return phonetic;
+  }
 
-/**
- * fuzzyCorrect(token) → String | null
- *
- * Checks token against the MEDICAL_TERMS list and returns the canonical
- * spelling if a close enough match is found, or null otherwise.
- *
- * Threshold: distance ≤ 1 for tokens < 8 chars, distance ≤ 2 for tokens ≥ 8.
- * This prevents short medical codes ("iud", "std") from over-correcting to
- * unrelated terms while still catching long-word misspellings ("pregnacy").
- *
- * Exported so it can be tested directly in __tests__/bloomie-patois.test.js.
- */
-export function fuzzyCorrect(token) {
-  if (!token || token.length < 3) return null;
+  // 2. Exact match in dictionary — already correct, no change needed
+  if (ALL_FUZZY_TERMS.has(token)) return token;
 
-  const threshold = token.length < 8 ? 1 : 2;
+  // 3. Levenshtein — only for tokens ≥ 5 chars (short words too collision-prone)
+  if (token.length < 5) return null;
 
   let bestMatch = null;
   let bestDist = Infinity;
+  const firstCode = token.charCodeAt(0);
 
-  for (const term of MEDICAL_TERMS) {
+  for (const term of ALL_FUZZY_TERMS_ARRAY) {
+    // First-character filter: skip terms starting with a very different letter
+    if (Math.abs(term.charCodeAt(0) - firstCode) > 2) continue;
+
+    const maxLen = Math.max(token.length, term.length);
+    const threshold = getThreshold(maxLen);
+    if (threshold === 0) continue;
+
+    // Length-difference filter — eliminates most comparisons immediately
     if (Math.abs(token.length - term.length) > threshold) continue;
-    if (token.length < term.length * 0.70) continue;
-    if (term.length < token.length * 0.70) continue;
 
     const dist = levenshtein(token, term);
-    if (dist <= threshold && dist < bestDist) {
+    if (dist > 0 && dist <= threshold && dist < bestDist) {
       bestDist = dist;
       bestMatch = term;
     }
   }
 
+  if (bestMatch) console.log(`[Bloomie Fuzzy] ${token} → ${bestMatch} (dist ${bestDist})`);
   return bestMatch;
 }
 
 /**
- * applyFuzzyMatching(text, alreadyMatchedTokens) → String
+ * fuzzyCorrect(input) → String | null
  *
- * Tokenizes the text and for each unresolved token finds the best match
- * across BOTH the Patois dictionary (3a) and the medical terms list (3b),
- * picking the candidate with the lowest Levenshtein distance. This prevents
- * a Patois near-miss from shadowing a closer medical-term correction.
+ * Medical-term spell correction using phonetic variants + Damerau-Levenshtein.
+ *
+ * Single-token mode (no whitespace):
+ *   Returns the corrected spelling, or null if no close match found.
+ *   Exact matches return the term itself. Protected Patois tokens return null.
+ *
+ * Sentence mode (input contains whitespace):
+ *   Corrects each token independently and returns the full corrected sentence.
+ *   Always returns a string (never null) in sentence mode.
+ *
+ * Threshold rules (based on max(token, dictWord) length):
+ *   1–4 chars  → no fuzzy  |  5–7 → dist ≤ 1  |  8–11 → dist ≤ 2  |  12+ → dist ≤ 3
+ *
+ * Exported so it can be called after normalizePatois() in the pipeline and
+ * tested directly in __tests__/bloomie-patois.test.js.
  */
-function applyFuzzyMatching(text, alreadyMatchedSet) {
-  const tokens = text.split(/\s+/);
-  const result = tokens.map((token) => {
-    if (alreadyMatchedSet.has(token)) return token;
-    if (token.length < 3) return token;
+export function fuzzyCorrect(input) {
+  if (!input) return null;
 
-    const threshold = token.length < 8 ? 1 : 2;
-    let bestResult = null;
-    let bestDist = Infinity;
+  // ── Sentence mode ────────────────────────────────────────────────────────────
+  if (/\s/.test(input)) {
+    return input.trim().split(/\s+/).map(token => {
+      if (!token) return token;
+      if (PROTECTED_TOKENS.has(token)) return token;
 
-    // 3a. Patois targets (skip plain English words)
-    if (!ENGLISH_EXCLUSION_SET.has(token)) {
-      for (const { patois, english } of FUZZY_TARGETS) {
-        if (Math.abs(token.length - patois.length) > threshold) continue;
-        if (token.length < patois.length * 0.70) continue;
-        if (patois.length < token.length * 0.70) continue;
-        const dist = levenshtein(token, patois);
-        if (dist <= threshold && dist < bestDist) {
-          bestDist = dist;
-          bestResult = english;
-        }
-      }
-    }
+      if (_correctionCache.has(token)) { _cacheHits++; return _correctionCache.get(token); }
 
-    // 3b. Medical terms — wins over Patois if it scores strictly better
-    for (const term of MEDICAL_TERMS) {
-      if (Math.abs(token.length - term.length) > threshold) continue;
-      if (token.length < term.length * 0.70) continue;
-      if (term.length < token.length * 0.70) continue;
-      const dist = levenshtein(token, term);
-      if (dist <= threshold && dist < bestDist) {
-        bestDist = dist;
-        bestResult = term;
-      }
-    }
+      const result = _correctToken(token);
+      const output = result ?? token;
+      _correctionCache.set(token, output);
+      return output;
+    }).join(" ");
+  }
 
-    return bestResult !== null ? bestResult : token;
-  });
-  return result.join(" ");
+  // ── Single-token mode ────────────────────────────────────────────────────────
+  const token = input;
+  if (token.length < 3) return null;
+  if (PROTECTED_TOKENS.has(token)) return null;
+
+  if (_correctionCache.has(token)) { _cacheHits++; return _correctionCache.get(token); }
+
+  const result = _correctToken(token);
+  _correctionCache.set(token, result);
+  return result;
 }
 
 // ─── 4. INTENT BOOSTERS ───────────────────────────────────────────────────────
@@ -489,20 +963,24 @@ function applyFuzzyMatching(text, alreadyMatchedSet) {
 
 const INTENT_BOOSTERS = [
   {
-    patterns: [/period.*not.*come|period.*late|missed.*period|no.*period/i],
+    patterns: [/period.*not.*come|period.*late|missed.*period|\bno\b.*period/i],
     boost: " late missed period",
   },
   {
+    // NOTE: boost must NOT include "pain" — combined with "severe" it triggers
+    // extractUrgency's severe.*pain pattern causing false escalation.
     patterns: [/cramp|pelvic pain|stomach pain|belly pain|lower abdom/i],
-    boost: " cramp pelvic pain",
+    boost: " cramp pelvic",
   },
   {
     patterns: [/spotting|light bleed|brown discharge|pink discharge/i],
-    boost: " spotting between periods",
+    boost: " spotting light stain",
   },
   {
+    // NOTE: "missed period" removed from boost — it activated sym.late prematurely,
+    // causing the late+pregnancy combo rule to fire before spotting+pregnancy rules.
     patterns: [/pregnant|pregnancy|positive test|might be pregnant/i],
-    boost: " pregnant missed period",
+    boost: " pregnant pregnancy",
   },
   {
     patterns: [/heavy bleed|soaking through|bleed through|passing clots/i],
@@ -513,8 +991,11 @@ const INTENT_BOOSTERS = [
     boost: " mood anxious sad irritable",
   },
   {
-    patterns: [/faint|dizzy|lightheaded|weak|pass out/i],
-    boost: " faint dizzy weak",
+    // NOTE: boost must NOT include "faint" — it is in extractUrgency's regex and
+    // causes false escalation when the user only mentions weakness (not fainting).
+    // "dizziness" and "lightheaded" are NOT urgency keywords so they are safe.
+    patterns: [/faint|dizzy|lightheaded|pass out/i],
+    boost: " dizzy lightheaded",
   },
   {
     // Amenorrhea — periods missing for extended time
@@ -567,6 +1048,14 @@ export function normalizePatois(rawText) {
 
   let text = rawText.toLowerCase().trim();
 
+  // Collapse repeated characters: "helpppppp" → "help", "noooooo" → "no"
+  // Runs before all stages so the phrase/word maps see the cleaned form.
+  const _preCollapse = text;
+  text = text.replace(/(.)\1{3,}/g, '$1');
+  if (text !== _preCollapse) {
+    console.log(`[Bloomie Input] collapsed: "${_preCollapse}" → "${text}"`);
+  }
+
   // Build a set of tokens that will be resolved by exact matching (Stages 1-2)
   // so Stage 3 knows which tokens to skip.
   const exactMatchedTokens = new Set();
@@ -590,10 +1079,12 @@ export function normalizePatois(rawText) {
     }
   }
 
-  // ── Stage 3: fuzzy matching for unresolved tokens ─────────────────────────
-  // Only tokens NOT already handled by Stages 1-2 go through Levenshtein.
-  // This prevents double-replacing already-normalized English words.
-  text = applyFuzzyMatching(text, exactMatchedTokens);
+  // ── Stage 3: medical spell correction ────────────────────────────────────
+  // fuzzyCorrect() is called here as part of the normalizePatois pipeline so
+  // that tests and internal callers get a fully-corrected result in one step.
+  // assistant.js also calls it explicitly after normalizePatois() per the
+  // canonical pipeline order (normalizePatois → fuzzyCorrect → extractEntities).
+  text = fuzzyCorrect(text) ?? text;
 
   // ── Stage 4: intent boosters ──────────────────────────────────────────────
   for (const booster of INTENT_BOOSTERS) {
@@ -791,6 +1282,85 @@ export function updateSessionTone(ctx, text) {
   }
 
   return ctx.currentTone;
+}
+
+// ─── 5. PIPELINE STAGE HELPERS (exported for explicit use in assistant.js) ───
+//
+// These are extracted as named exports so assistant.js can call each stage
+// explicitly in the documented pipeline order and debugPipeline() can log
+// each intermediate result.
+
+/**
+ * collapseRepeatedLetters(text) → string
+ *
+ * Collapses runs of 4+ identical consecutive characters to a single instance.
+ * "helpppppp" → "help", "noooooo" → "no", "sooooo bad" → "so bad".
+ * This is the same logic normalizePatois() applies internally, exposed as a
+ * standalone export so assistant.js can invoke and log it as an explicit step.
+ *
+ * @param  {string} text
+ * @returns {string}
+ */
+export function collapseRepeatedLetters(text) {
+  if (!text) return text;
+  return String(text).replace(/(.)\1{3,}/g, "$1");
+}
+
+/**
+ * expandShorthand(text) → string
+ *
+ * Expands health/time shorthand abbreviations that the WORD_MAP already
+ * handles inside normalizePatois(). Exposed as a standalone export so
+ * assistant.js can call it explicitly as pipeline step 6 and so
+ * debugPipeline() can log the result after fuzzyCorrect and before
+ * extractEntities.
+ *
+ * Covered abbreviations (whole-word, case-insensitive):
+ *   2wks → 2 weeks   |  ewcm → egg white discharge cervical mucus
+ *   bfp  → positive pregnancy test  |  bfn → negative pregnancy test
+ *   ttc  → trying to conceive       |  dpo → days past ovulation
+ *   hpt  → pregnancy test           |  opk → ovulation test
+ *   lmp  → last period              |  bcp → birth control pill
+ *   2ww  → two week wait            |  bc pill → birth control pill
+ *
+ * @param  {string} text
+ * @returns {string}
+ */
+export function expandShorthand(text) {
+  if (!text) return text;
+  let t = String(text);
+  const SHORTHANDS = [
+    [/\bewcm\b/gi,    "egg white discharge cervical mucus"],
+    [/\bbfp\b/gi,     "positive pregnancy test"],
+    [/\bbfn\b/gi,     "negative pregnancy test"],
+    [/\bttc\b/gi,     "trying to conceive"],
+    [/\bdpo\b/gi,     "days past ovulation"],
+    [/\bhpt\b/gi,     "pregnancy test"],
+    [/\bopk\b/gi,     "ovulation test"],
+    [/\blmp\b/gi,     "last period"],
+    [/\bbcp\b/gi,     "birth control pill"],
+    [/\baf\b/gi,      "period"],
+    [/\bpg\b/gi,      "pregnant"],
+    [/\b2ww\b/gi,     "two week wait"],
+    [/\b2wks?\b/gi,   "2 weeks"],
+    [/\b1wk\b/gi,     "1 week"],
+    [/\b3wks?\b/gi,   "3 weeks"],
+    [/\b4wks?\b/gi,   "4 weeks"],
+    [/\b2dys?\b/gi,   "2 days"],
+    [/\b3dys?\b/gi,   "3 days"],
+    [/\b1dy\b/gi,     "1 day"],
+    [/\b2mths?\b/gi,  "2 months"],
+    [/\b1mth\b/gi,    "1 month"],
+    [/\btmrw\b/gi,    "tomorrow"],
+    [/\bystdy\b/gi,   "yesterday"],
+    [/\blst wk\b/gi,  "last week"],
+    [/\blst mth\b/gi, "last month"],
+    [/\bbc pill\b/gi, "birth control pill"],
+  ];
+  for (const [rx, replacement] of SHORTHANDS) {
+    t = t.replace(rx, replacement);
+  }
+  return t;
 }
 
 // ─── INTERNAL HELPER ─────────────────────────────────────────────────────────

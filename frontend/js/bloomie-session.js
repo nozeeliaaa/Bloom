@@ -89,5 +89,32 @@ export function createCtx() {
     currentTone:        null,       // tone resolved for the current message ('distressed'|'angry'|…|'neutral')
     previousTone:       null,       // tone from the prior turn — used for session stability blending
     usedOpeners:        new Set(),  // opener strings already shown — prevents repetition within a session
+    symptomSignals:     null,       // pre-computed SymptomSignal[] from bloom-symptom-engine, or null
+    cumulativeRiskFlags:      new Set(),  // accumulates risk signal flags across conversation
+    pendingAmbiguityContext:  null,        // stored when ambiguity question was asked
+    pendingContradictionContext: null,     // stored when contradiction was detected
+    pendingContextProbe:      null,        // stored when missing-context probe was asked
+    recentInputs:         [],              // rolling array of last 5 raw user inputs for loop detection
+    pendingConcerns:      [],              // overload handler: remaining concerns after user picks first
+    resolvedContradictions: [],            // contradictions and concerns already surfaced this session
+
+    // ── Confidence-tier routing (Prompt 1) ─────────────────────────────────
+    routeConfidence:      null,            // last computeRouteConfidence() result
+    pendingRoute:         null,            // { next, payload } set when MEDIUM tier asks confirmation
+    narrowingCandidates:  null,            // [{ id, label, next }] for LOW tier NARROWING
+
+    // ── Conversation intelligence (Prompt 2) ───────────────────────────────
+    conversationProfile: {
+      topicsDiscussed:      [],            // topic codes covered this session
+      concernsResolved:     [],            // topics where user received guidance without pushback
+      concernsUnresolved:   [],            // topics raised but not fully addressed
+      lastGuidanceGiven:    null,          // code of last advice surfaced
+      userEngagementLevel:  "normal",      // "high" | "normal" | "low"
+      sessionDepth:         0,             // count of typed free-text messages (not button taps)
+      returnedTopic:        null,          // topic code if user returned to a resolved topic
+    },
+    sessionSymptoms:      new Set(),       // all symptom entity keys detected across the session
+    verbosity:            "normal",        // "concise" | "normal" | "detailed"
+    oosStreakCount:        0,              // consecutive OOS responses (for conversational repair)
   };
 }
