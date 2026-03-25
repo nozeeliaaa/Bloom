@@ -61,12 +61,51 @@ export async function mountChat(user = null, cycleData = null, symptomHistory = 
     onOpenCareMap: () => {
       location.hash = "#/care-map";
     },
-    onRequestPdf: (summaryText) => {
-      console.log("PDF requested:", summaryText);
-      alert("PDF export coming soon 📄");
-    },
-  });
-}
+    onRequestPdf: async (summaryText) => {
+  try {
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+
+    const M   = 18;
+    const CW  = 210 - M * 2;
+    const C   = { primary: [212, 116, 154], text: [42, 24, 44], muted: [138, 108, 138] };
+
+    // Header bar
+    doc.setFillColor(...C.primary);
+    doc.rect(0, 0, 210, 22, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bloom – Chat Summary", M, 14);
+
+    doc.setTextColor(...C.muted);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Not a diagnosis. For educational reference only.", M, 19);
+
+    // Body text
+    doc.setTextColor(...C.text);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const lines = doc.splitTextToSize(summaryText, CW);
+    doc.text(lines, M, 32);
+
+    // Footer
+    const footerY = 285;
+    doc.setDrawColor(...C.primary);
+    doc.setLineWidth(0.4);
+    doc.line(M, footerY - 3, 210 - M, footerY - 3);
+    doc.setTextColor(...C.muted);
+    doc.setFontSize(7);
+    doc.text("Bloom is not a medical tool. Always consult a qualified healthcare provider.", M, footerY);
+
+    doc.save(`bloom-chat-summary-${new Date().toISOString().slice(0,10)}.pdf`);
+  } catch (err) {
+    console.error("PDF export failed:", err);
+    alert("PDF export failed. Please try again.");
+  }
+},
+});
 
 /* ------------------ CHAT ENGINE ------------------ */
 export function initBloomieChat({
