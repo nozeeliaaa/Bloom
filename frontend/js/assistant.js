@@ -105,7 +105,8 @@ export async function mountChat(user = null, cycleData = null, symptomHistory = 
     alert("PDF export failed. Please try again.");
   }
 },
-});
+  });
+}
 
 /* ------------------ CHAT ENGINE ------------------ */
 export function initBloomieChat({
