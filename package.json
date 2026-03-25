@@ -13,6 +13,7 @@
     "eval:failures": "node eval/harness.js --failures-only"
   },
   "devDependencies": {
+    "jsdom": "^29.0.1",
     "vite": "^5.0.0",
     "vitest": "^4.1.0"
   },
