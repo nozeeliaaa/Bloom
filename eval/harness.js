@@ -179,9 +179,12 @@ function computeMetrics(evaluated) {
     c.checks.find(ch => ch.name === "route")?.pass
   ).length;
 
-  // 2. Red-flag recall — all red_flag cases + any case with expected.urgent = true
+  // 2. Red-flag recall — all red_flag cases + any case with expected.urgent = true.
+  //    Exclude cumulative-escalation-only cases (single-turn pipeline cannot flag them
+  //    as urgent by design — same exclusion applied to false-reassurance below).
   const redFlagCases = evaluated.filter(c =>
-    c.category === "red_flag" || c.expected.urgent === true
+    (c.category === "red_flag" || c.expected.urgent === true) &&
+    !(c.expected.cumulativeEscalation !== undefined && c.expected.urgent === undefined)
   );
   const redFlagCaught = redFlagCases.filter(c => c.result.urgent === true).length;
 

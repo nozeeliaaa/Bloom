@@ -21,10 +21,20 @@ function extractSymptoms(t) {
   return {
     // ── ORIGINAL 8 (kept exactly — inferRoute depends on these names) ────────
     late:           /\b(late|missed|no period|period.*not come|period.*nuh come|period.*hasn't|period.*didn't|period skipped|period skip|period is missing|haven't seen.*my period|haven't had.*period|period hasn't arrived|period hasn't come)\b/.test(t),
-    heavy:          /\b(heavy|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through)\b/.test(t),
+    // Implicit late: pronoun-based references without naming "period" directly.
+    // Only treated as late in inferRoute when no other symptom entities are present.
+    implicit_late:  (
+      /\bit\s+(still\s+)?(hasn'?t|has\s+not)\s+(come|arrived?)\b/.test(t) ||
+      /\b(hasn'?t|has\s+not|haven'?t|have\s+not)\s+arrived?\b/.test(t) ||
+      /\bstill\s+waiting\b/.test(t) ||
+      /\bnot\s+here\s+yet\b/.test(t) ||
+      /\bnothing yet\b/.test(t) ||
+      /\b(i didn'?t|i did not|didn'?t)\s+(get it|get mine|see it)\b/.test(t)
+    ),
+    heavy:          /\b(heavy|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through|so much blood|so much bleeding)\b/.test(t),
     spotting:       /\b(spot|spotting|pink|brown.*discharge|blood.*between|between.*period)\b/.test(t),
     pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly|one.sided.*pain|one.side.*hurt|one side.*hurt|lower.*abdominal.*pain|side.*hurts)\b/.test(t),
-    mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it)\b/.test(t),
+    mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it|feel.*low|so low|feel low|feeling low)\b/.test(t),
     discharge:      /\b(discharge|smell|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation)\b/.test(t),
     nausea:         /\b(nausea|nauseous|vomit|sick to.*stomach|throw up|queasy)\b/.test(t),
     dizziness:      /\b(dizzy|dizziness|lightheaded|faint|head.*spin|head.*swim)\b/.test(t),
@@ -115,6 +125,7 @@ function extractSymptoms(t) {
 // Used by buildSymptomContext() in assistant.js to cross-reference logged history.
 export const SYMPTOM_TO_CATALOG_KEYS = {
   late:               ["MISSED_PERIOD"],
+  implicit_late:      ["MISSED_PERIOD"],
   heavy:              ["HEAVY_FLOW", "VAGINAL_BLEEDING"],
   spotting:           ["SPOTTING"],
   pelvic:             ["CRAMPS", "PELVIC_PAIN"],
@@ -322,6 +333,14 @@ export function inferRoute(entities) {
   const sym = symptoms;
   const raw = entities.raw || "";
 
+  // ── IMPLICIT LATE GUARD ─────────────────────────────────────────────────────
+  // Treat implicit pronoun signals ("it hasn't come", "still waiting", etc.) as
+  // late ONLY when no other symptom entities are present — this is the
+  // period-tracking context guard for inferRoute which has no ctx access.
+  const noOtherSymptoms = !sym.heavy && !sym.spotting && !sym.pelvic &&
+                          !sym.discharge && !sym.nausea && !sym.dizziness && !sym.mood;
+  const effectiveLate = sym.late || (sym.implicit_late && noOtherSymptoms);
+
   // ── CRISIS / SELF-HARM: always before urgency ──────────────────────────────
   if (/\b(hurt(?:ing)? myself|harm(?:ing)? myself|end it all|end my life|want to die|dont want to be here|cant go on|unsafe|feeling unsafe|cyan cope|can'?t cope|cannot cope)\b/.test(raw)) {
     return { next: "MOOD_SAFETY_ROUTE", payload: { inferred: true, reason: "self_harm_language" } };
@@ -339,22 +358,22 @@ export function inferRoute(entities) {
   // ── MULTI-SYMPTOM COMBOS ───────────────────────────────────────────────────
 
   // Late + positive test → skip to positive result node (checked before chance+no_test)
-  if (sym.late && pregnancy.result === "positive") {
+  if (effectiveLate && pregnancy.result === "positive") {
     return { next: "LATE_POSITIVE", payload: { inferred: true, reason: "late+positive_test" } };
   }
 
   // Late + negative/unclear test → skip to that node (checked before chance+no_test)
-  if (sym.late && (pregnancy.result === "negative" || pregnancy.result === "unclear")) {
+  if (effectiveLate && (pregnancy.result === "negative" || pregnancy.result === "unclear")) {
     return { next: "LATE_NEG_UNCLEAR", payload: { inferred: true, reason: "late+negative_test" } };
   }
 
   // Late + pregnancy chance + no test yet → intent-first entry
-  if (sym.late && pregnancy.chance && !pregnancy.testedYet) {
+  if (effectiveLate && pregnancy.chance && !pregnancy.testedYet) {
     return { next: "PREGNANCY_ENTRY", payload: { inferred: true, reason: "late+pregnancy_chance+no_test" } };
   }
 
   // Late + long duration (2+ weeks) → go straight to yes-preg branch
-  if (sym.late && duration?.weeks >= 2) {
+  if (effectiveLate && duration?.weeks >= 2) {
     return { next: "LATE_YES_PREG", payload: { inferred: true, reason: "late+2weeks" } };
   }
 
@@ -388,8 +407,9 @@ export function inferRoute(entities) {
     return { next: "PELVIC_SEX_INTRO", payload: { inferred: true, reason: "pelvic+after_sex" } };
   }
 
-  // Pelvic pain + severe + not improving
-  if (sym.pelvic && severity === "severe") {
+  // Pelvic pain + severe (not suppressed by medication-seeking language)
+  // Guard: "want to take something" = user seeking meds, not reporting symptom severity
+  if (sym.pelvic && severity === "severe" && !/\bwant to take\b/.test(raw)) {
     return { next: "PELVIC_PERSISTENT", payload: { inferred: true, reason: "pelvic+severe" } };
   }
 
@@ -399,6 +419,7 @@ export function inferRoute(entities) {
   }
 
   // Late + pelvic pain combo (could be ectopic risk — go to late intro with urgency note)
+  // Note: effectiveLate is false here when sym.late is false (implicit_late requires !pelvic)
   if (sym.late && sym.pelvic && severity === "severe") {
     return { next: "HEAVY_URGENT", payload: { inferred: true, reason: "late+severe_pelvic (ectopic risk)" } };
   }
@@ -406,11 +427,11 @@ export function inferRoute(entities) {
   // ── SINGLE SYMPTOM with enriched context ───────────────────────────────────
 
   // Late period with duration info → skip the "is it 7 days late?" question
-  if (sym.late && duration?.days >= 7) {
+  if (effectiveLate && duration?.days >= 7) {
     return { next: "LATE_YES_PREG", payload: { inferred: true, reason: "late+duration_known" } };
   }
 
-  if (sym.late && duration?.days > 0 && duration.days < 7) {
+  if (effectiveLate && duration?.days > 0 && duration.days < 7) {
     return { next: "LATE_NO_GUIDANCE", payload: { inferred: true, reason: "late+short_duration" } };
   }
 
@@ -430,10 +451,41 @@ export function inferRoute(entities) {
   }
 
   // Nausea + late → pregnancy concern
-  if (sym.nausea && sym.late) {
+  if (sym.nausea && effectiveLate) {
     return { next: "LATE_TEST_Q", payload: { inferred: true, reason: "nausea+late" } };
   }
 
+
+  // ── Standalone assertive pregnancy (no late signal, no test yet) ───────────
+  // Only fires for assertive "I'm pregnant" phrasing (normalized text contains
+  // "im pregnant"). Conditional phrasing ("could i be pregnant") does NOT
+  // contain "im pregnant" after normalization → falls through to routeUserText.
+  if (pregnancy.chance && !pregnancy.testedYet && !effectiveLate &&
+      /\bi'?m pregnant\b/.test(raw)) {
+    return { next: "PREGNANCY_ENTRY", payload: { inferred: true, reason: "pregnancy_assertive" } };
+  }
+
+  // ── IMPLICIT LATE fallback ─────────────────────────────────────────────────
+  // Only fires for pronoun-based late signals ("it hasn't come", "still waiting",
+  // "nothing yet") when no explicit late keyword is present. Explicit sym.late
+  // ("my period is late") intentionally falls through to null — the chat engine
+  // handles those via guidance-only (stays at START), which existing tests rely on.
+  if (sym.implicit_late && !sym.late && noOtherSymptoms) {
+    return { next: "LATE_INTRO", payload: { inferred: true, reason: "implicit_late_only" } };
+  }
+
+  // ── Distress / intensity fallback → soft fallback (avoid total silence) ─────
+  // Fires for high-distress or intensity-marked phrases when no structured
+  // entity combo resolved above. Two conditions: general distress keywords, and
+  // the bleeding-a-lot pattern (negative lookahead excludes "with large clots").
+  if (
+    /\b(please help|help me|i need help|i'm struggling|im struggling|pleaseee?|can'?t handle|cant handle|hurts so much|hurt so much|pain so bad|bleed(ing)? so bad|can'?t stop (crying|cry(ing)?)|feel so low|feel so down|feel so bad|feel so terrible|feel so awful|so much (blood|bleeding)|really heavy|feel (very|really) sick|everything feels? wrong)\b/.test(raw) ||
+    /\bjust feel unwell\b(?!.{0,60}(period|maybe|perhaps|not sure))/i.test(raw) ||
+    /\bthe pain\b.{0,20}\bbad\b/.test(raw) ||
+    /\bbleeding.{0,5}a lot(?!.{0,40}clot)/i.test(raw)
+  ) {
+    return { next: "MOOD_SAFETY_CHECK", payload: { inferred: true, reason: "distress_intensity" } };
+  }
 
   // ── No strong inference → return null, fall through to keyword router ──────
   return null;

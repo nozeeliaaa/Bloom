@@ -178,8 +178,19 @@ export function createOOS(env) {
     {
       name: "diagnosis_request",
       patterns: [
-        /\b(do i have|is this|could this be|might i have|am i developing|could i have)\b.{0,30}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|anemia|cancer|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // Direct diagnostic questions: "do i have pcos", "could this be endo"
+        /\b(do i have|is this|could this be|might i have|am i developing|could i have)\b.{0,35}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|anemia|cancer|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I think I have / I think I might have"
+        /\b(i think i (have|might have|could have)|i feel like i (have|might have))\b.{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I'm scared I have / what if I have / do you think I have"
+        /\b(i('m| am) scared (i|i might) have|what if i have|do you think i have|you think i have|could i possibly have)\b.{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I heard/read about X and think I have it / relate to it"
+        /\b(i (heard|read|learned|saw).{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|cyst).{0,50}\b(think i have|think i might|relate|sounds like me|could be me|similar|same))\b/,
+        // "[condition] sounds like me / sounds like what I have"
+        /\b(pcos|endometriosis|fibroids?|adenomyosis|cyst)\b.{0,50}\b(think i have|might have|sounds like me|sounds like (my situation|what i have)|relate to|could be me)\b/,
+        // Generic: diagnose me / what's wrong with me
         /\b(diagnose me|what is wrong with me|what condition|tell me what i have|is this normal or serious|what disease)\b/,
+        // Condition name + diagnosis-intent word
         /\b(pcos|endometriosis|adenomyosis|fibroids?)\b.{0,30}\b(do i|have i|test for|signs of|symptom)\b/,
       ],
       replies: [
@@ -772,7 +783,7 @@ export function createOOS(env) {
     const isHeavyC = heavyRouteC.some((p) => t.includes(p)) || /\bweak\b/.test(t);
     const isHeavyA = heavyRouteA.some((p) => t.includes(p));
     const isHeavyB = heavyRouteB.some((p) => t.includes(p));
-    if (isHeavyC && (isHeavyA || isHeavyB || /\bbleed|\bperiod|\bblood|\bheavy\b/.test(t))) return { next: "HEAVY_ROUTE_C" };
+    if (isHeavyC && (isHeavyA || isHeavyB || /\bbleed|\bperiod|\bblood|\bheavy\b/.test(t))) return { next: "HEAVY_ROUTE_C_GATE" };
     if (isHeavyA) return { next: "HEAVY_INTRO" };
     if (isHeavyB) return { next: "HEAVY_ROUTE_B" };
 
@@ -913,7 +924,7 @@ export function createOOS(env) {
       /belly (a )?hurting/.test(t) ||
       /waist a hurt/.test(t) ||
       /pain between mi legs/.test(t)
-    ) return { next: "PELVIC_SAFETY_CHECK" };
+    ) return { next: "PELVIC_SAFETY_GATE" };
 
     const { sig, has } = scoreSignals(t);
     const combo = resolveSignals(sig, has);
@@ -954,7 +965,7 @@ export function createOOS(env) {
     if (bestIntent === "pregnancy") return { next: "PREGNANCY_ENTRY" };
     if (bestIntent === "discharge") return { next: "ELSE_DISCHARGE" };
     if (bestIntent === "pelvic") {
-      return { next: "PELVIC_SAFETY_CHECK" };
+      return { next: "PELVIC_SAFETY_GATE" };
     }
 
     // Late check with cycle data

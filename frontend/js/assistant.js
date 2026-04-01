@@ -1,10 +1,11 @@
 import { normalizePatois, detectPatois, detectUserTone, fuzzyCorrect, collapseRepeatedLetters, expandShorthand } from "./bloomie-patois.js";
+import { resolveTone, applyToneToLines, applyToneToChoices } from "./bloomie-tone.js";
 import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory } from "./db.js";
-import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence } from "./bloomie-routing.js";
+import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent } from "./bloomie-routing.js";
 import { createCtx } from "./bloomie-session.js";
-import { logSafetyEvent } from "./bloomie-logger.js";
+import { logSafetyEvent, logAnalyticsEvent } from "./bloomie-logger.js";
 import { getIdToken, getUser } from "./auth.js";
 import { generateIntegratedSignals, getBloomieSymptomContext } from "./algorithms/bloom-symptom-engine.js";
 import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhaseConfidence } from "./algorithms/bloom-date-utils.js";
@@ -407,6 +408,12 @@ export function initBloomieChat({
   function mergeEntities(current, history) {
     if (!history.length) return current;
 
+    // Don't merge history into a zero-symptom message (e.g. OOS inputs).
+    // Doing so causes irrelevant messages to inherit prior health context and
+    // trigger guidance responses that should only fire for health inputs.
+    const currentHasSymptoms = Object.values(current.symptoms || {}).some(Boolean);
+    if (!currentHasSymptoms && !current.urgent) return current;
+
     const merged = {
       symptoms:  { ...current.symptoms },
       duration:  current.duration,
@@ -484,6 +491,14 @@ export function initBloomieChat({
   // ---------- State ----------
   const ctx = createCtx();
 
+  // ── Session end analytics ─────────────────────────────────────────────────
+  // Fire-and-forget on tab close / navigation. No ctx teardown at this point
+  // so sessionDepth and state are still accurate.
+  const _sessionEndHandler = () => {
+    logAnalyticsEvent("session_end", { sessionDepth: ctx.conversationProfile?.sessionDepth ?? 0 }, ctx);
+  };
+  window.addEventListener("beforeunload", _sessionEndHandler, { once: true });
+
   // ── Populate cycle variability from historical cycle data ─────────────────
   // cycleData.previousCycleLengths (or cycleLengths) is an optional array of
   // recent cycle lengths. When available, compute max−min across the last 3
@@ -534,9 +549,15 @@ export function initBloomieChat({
       if (sessionDate >= oneDayAgo) {
         // Recent — merge into active entity history so routing picks it up.
         ctx.entityHistory = [seedEntry];
+        // MEMORY AUDIT: ctx.entityHistory — seeded from recent session (<24 h).
+        //   Recent symptoms stay active for inferRoute merging. Handled correctly.
+        logAnalyticsEvent("memory_recall_used", { type: "entity_history" }, ctx);
       } else {
         // Stale (>24 h) — park in backgroundContext for reference only.
         ctx.backgroundContext = { ...seedEntry, seededAt: bloomieMemory.lastSessionDate };
+        // MEMORY AUDIT: ctx.backgroundContext — stale session data (>24 h) parked here,
+        //   invisible to inferRoute. Readable by recall helpers and PDF export only.
+        logAnalyticsEvent("memory_recall_used", { type: "background_context" }, ctx);
       }
     }
   }
@@ -584,6 +605,12 @@ export function initBloomieChat({
     });
     // Keep backward-compatible reference
     ctx.symptomSignals = ctx.integratedSignals.symptomSignals;
+
+    // Logging gap proactive surfacing — flag for START node to show once
+    const loggingGapSignal = ctx.integratedSignals.symptomSignals?.find(s => s.code === "SYMPTOM_LOGGING_GAP");
+    if (loggingGapSignal?.level === "high" && !ctx.adviceGiven.has("logging_gap_surfaced")) {
+      ctx.loggingGapPending = true;
+    }
   }
 
   if ($input) {
@@ -624,7 +651,7 @@ export function initBloomieChat({
   ];
 
   if ($form && $input) {
-    $form.addEventListener("submit", (e) => {
+    $form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (ctx.locked) return;
 
@@ -887,18 +914,34 @@ export function initBloomieChat({
       advanceFlow();
       pushMsg("user", text);
 
+      // Start AI tone detection early — runs in parallel with sync normalization.
+      // Awaited at Step 12 (before extractEntities) once pipeline is ready.
+      const _tonePromise = resolveTone(text, ctx);
+
       // ── Loop detection — track recent inputs ─────────────────────────────
       ctx.recentInputs = ctx.recentInputs || [];
       ctx.recentInputs.push(text);
       if (ctx.recentInputs.length > 5) ctx.recentInputs.shift();
 
-      // Exact repeat detection: same message sent 3+ times in last 5
+      // Exact repeat detection: same message sent multiple times in last 5
       const _last4 = ctx.recentInputs.slice(0, -1).slice(-4);
       const _exactCount = _last4.filter(m => m === text).length;
-      if (_exactCount >= 2) {
+      if (_exactCount >= 3) {
+        // Third repeat → give up and redirect
+        ctx.isRetryAttempt = false;
         say("I heard you the first time 🩷 I want to help — let me try a different approach.");
         transition("ELSE_NOT_SURE_ROUTE");
         return;
+      } else if (_exactCount === 2) {
+        // Second repeat → empathetic acknowledgment, continue routing
+        say(pick([
+          "I want to make sure I'm actually helping 🩷 Let me try to understand this differently.",
+          "It sounds like this really matters to you — let me look at this from another angle 🩷",
+          "I hear you 🩷 Let me try approaching this a different way and see if I can do better.",
+        ]));
+        ctx.isRetryAttempt = true;
+      } else {
+        ctx.isRetryAttempt = false;
       }
 
       // "idk" loop — 3+ times total in recent inputs
@@ -1032,8 +1075,17 @@ export function initBloomieChat({
       // Step 6: Expand health/time shorthand ("ewcm", "bfp", "2wks", etc.)
       const normalizedText = expandShorthand(_collapsed);
 
-      // Step 12: Detect emotional tone from the normalized text
-      ctx.currentTone = detectUserTone(normalizedText);
+      // Step 12: Resolve tone — use synchronous detection immediately so the
+      // rest of the pipeline runs without suspension.  The async AI result
+      // (resolveTone) updates ctx when it resolves, so subsequent say() /
+      // render() calls (which run inside setTimeout) still benefit from it.
+      ctx.previousTone = ctx.currentTone;
+      ctx.currentTone  = detectUserTone(text) ?? ctx.currentTone;
+      _tonePromise.then(result => {
+        ctx.currentTone = result.tone;
+        ctx.toneResult  = result;
+        logAnalyticsEvent("emotion_classified", { tone: result.tone, source: result.source }, ctx);
+      }).catch(() => {});
 
       // ── Inference layer ──────────────────────────────────────────────
       // Step 7: Extract entities (symptoms, duration, severity, timing, pregnancy, urgency)
@@ -1077,6 +1129,7 @@ export function initBloomieChat({
             topic:     ctx.topic,
             riskLevel: ctx.riskLevel,
           });
+          logAnalyticsEvent("urgency_escalation", { route: "HEAVY_URGENT", reason }, ctx);
           transition("HEAVY_URGENT", { entities });
           return;
         }
@@ -1333,6 +1386,20 @@ export function initBloomieChat({
             .map(r => typeof r === "function" ? r(normalizedText) : r)
             .filter(Boolean);
           ctx.lastOOS = medCat.name;
+
+          // For diagnosis concerns, extract the named condition so DIAGNOSIS_REDIRECT
+          // can personalise its follow-up question without re-parsing the text.
+          if (medCat.name === "diagnosis_request") {
+            const _diagText = normalizedText.toLowerCase();
+            if      (/\bpcos\b|\bpolycystic\b/.test(_diagText))       ctx.diagnosisCondition = "pcos";
+            else if (/\bendometriosis\b|\bendo\b/.test(_diagText))     ctx.diagnosisCondition = "endometriosis";
+            else if (/\bfibroids?\b/.test(_diagText))                  ctx.diagnosisCondition = "fibroids";
+            else if (/\badenomyosis\b/.test(_diagText))                ctx.diagnosisCondition = "adenomyosis";
+            else if (/\bcyst\b|\bovarian\b/.test(_diagText))           ctx.diagnosisCondition = "cyst";
+            else if (/\bthyroid\b/.test(_diagText))                    ctx.diagnosisCondition = "thyroid";
+            else                                                        ctx.diagnosisCondition = null;
+          }
+
           const delay = estimateSayTime(medLines);
           say(medLines, { keepLocked: true });
           const tid = setTimeout(() => {
@@ -1354,6 +1421,16 @@ export function initBloomieChat({
         mergedEntities.urgent,
         null // route resolved below
       );
+
+      // ── Safety escalation from symptom clusters ───────────────────────────
+      const safetyEsc = ctx.integratedSignals?.symptomSignals?.find(
+        s => s.code === "SAFETY_ESCALATION" && s.level === "high"
+      );
+      if (safetyEsc && !ctx.urgency) {
+        ctx.urgency = true;
+        transition("HEAVY_URGENT");
+        return;
+      }
 
       const inferred   = inferRoute(mergedEntities);
 
@@ -1377,6 +1454,8 @@ export function initBloomieChat({
         // Store on ctx so buildSummaryText can include them in PDF export
         ctx.lastEntities = mergedEntities;
         ctx.lastInferredReason = inferred?.payload?.reason || null;
+        ctx.lastIntent = inferred?.payload?.reason?.split("+")[0] || inferred?.next
+          || guidance.scenario?.split("_")[0] || null;
         ctx.lastCycleCtx = cycleCtx;
         persistMemory(mergedEntities, ctx.lastInferredReason);
         // Show the structured template response THEN transition.
@@ -1434,6 +1513,7 @@ export function initBloomieChat({
           topic:     ctx.topic,
           riskLevel: ctx.riskLevel,
         });
+        logAnalyticsEvent("urgency_escalation", { route: "HEAVY_URGENT", reason: "keyword_router" }, ctx);
       }
 
       // ── Safety log: oos_fallback ────────────────────────────────────────────
@@ -1459,11 +1539,39 @@ export function initBloomieChat({
         // clearTimers() inside transition() does not nuke the reply bubbles.
         const lines = Array.isArray(routed.reply) ? routed.reply : [routed.reply];
         const isOOS = !!routed.payload?.oos;
-        if (isOOS) ctx.oosStreakCount = (ctx.oosStreakCount || 0) + 1;
-        else ctx.oosStreakCount = 0;
+        if (isOOS) {
+          ctx.oosStreakCount = (ctx.oosStreakCount || 0) + 1;
+          logAnalyticsEvent("oos_event", { streak: ctx.oosStreakCount }, ctx);
+        } else {
+          ctx.oosStreakCount = 0;
+        }
+
+        // ── Track unresolved concerns on OOS ──────────────────────────────────────
+        // If user goes OOS while a health topic was in progress and not yet
+        // resolved, stash it so the CLOSE guard can surface it.
+        if (isOOS && ctx.lastIntent) {
+          const INTENT_TO_TOPIC = {
+            LATE_INTRO: "late", LATE_PERIOD_CHECK: "late", TEST_INTRO: "late",
+            HEAVY_INTRO: "heavy", HEAVY_ROUTE_B: "heavy", HEAVY_ROUTE_C: "heavy", HEAVY_ROUTE_C_GATE: "heavy",
+            SPOT_INTRO: "spot", SPOT_PREG_INFO: "spot",
+            MOOD_SAFETY_CHECK: "mood", MOOD_INTRO: "mood", MOOD_GUIDE: "mood",
+            PELVIC_INTRO: "pelvic", PELVIC_SAFETY_CHECK: "pelvic", PELVIC_SAFETY_GATE: "pelvic",
+            PREGNANCY_ENTRY: "pregnancy",
+            ELSE_DISCHARGE: "discharge", ELSE_DISCHARGE_ENTRY: "discharge",
+            late: "late", heavy: "heavy", spot: "spot", mood: "mood",
+            pelvic: "pelvic", pregnancy: "pregnancy", discharge: "discharge",
+          };
+          const prof = ctx.conversationProfile;
+          const topicCode = INTENT_TO_TOPIC[ctx.lastIntent];
+          if (topicCode && !prof.concernsResolved.includes(topicCode) &&
+              !prof.concernsUnresolved.includes(topicCode)) {
+            prof.concernsUnresolved.push(topicCode);
+          }
+        }
 
         // ── Conversational repair: 2+ OOS after meaningful session depth ──────────
         if (isOOS && ctx.oosStreakCount >= 2 && ctx.conversationProfile.sessionDepth >= 3) {
+          logAnalyticsEvent("oos_repair", { sessionDepth: ctx.conversationProfile.sessionDepth }, ctx);
           say([
             "I’ve been having trouble understanding what you need, and that’s on me 💗",
             "Let me try differently. Can you pick the closest thing from below?",
@@ -1518,33 +1626,63 @@ export function initBloomieChat({
           transition(routed.next, routed.payload || {});
           return;
         }
+
+        // Pairs of intents that are commonly ambiguous and warrant a soft confirmation
+        // even when signal scores are otherwise strong enough for HIGH.
+        const CLARIFICATION_PAIRS = new Set([
+          "late+pelvic", "pelvic+late",
+          "late+pregnancy", "pregnancy+late",
+          "pelvic+heavy", "heavy+pelvic",
+          "spot+discharge", "discharge+spot",
+          "mood+heavy", "heavy+mood",
+        ]);
+
         const conf = ctx.routeConfidence;
+        ctx.lastConfidence = conf || null;
+
+        // Check whether the top two intents form a clarification pair.
+        const _primary    = conf?.primaryIntent || null;
+        const _firstComp  = conf?.competingIntents?.[0] || null;
+        const _pairKey    = _primary && _firstComp ? _primary + "+" + _firstComp : null;
+        const _isPair     = _pairKey ? CLARIFICATION_PAIRS.has(_pairKey) : false;
+
         if (conf && conf.tier === "low") {
-          // LOW: surface NARROWING with top scored candidate buttons
-          const INTENT_TO_CANDIDATE = {
-            late:        { id: "cycle",  label: "Late or irregular cycle",  next: "LATE_INTRO" },
-            heavy:       { id: "heavy",  label: "Bleeding or flow",         next: "HEAVY_INTRO" },
-            spot:        { id: "spot",   label: "Spotting",                 next: "SPOT_INTRO" },
-            mood:        { id: "mood",   label: "Mood or energy changes",   next: "MOOD_INTRO" },
-            pelvic:      { id: "pain",   label: "Pain or cramps",           next: "PELVIC_INTRO" },
-            pregnancy:   { id: "preg",   label: "Pregnancy concerns",       next: "PREGNANCY_ENTRY" },
-            discharge:   { id: "dis",    label: "Discharge",                next: "ELSE_DISCHARGE" },
-            urgent_care: { id: "urgent", label: "Urgent concern",           next: "HEAVY_URGENT" },
-          };
-          const candidateIntents = [conf.primaryIntent, ...conf.competingIntents]
-            .filter(Boolean).slice(0, 3);
-          const candidates = candidateIntents
-            .map(i => INTENT_TO_CANDIDATE[i]).filter(Boolean);
-          ctx.narrowingCandidates = candidates.length ? candidates : null;
-          transition("NARROWING");
-        } else if (conf && conf.tier === "medium") {
-          // MEDIUM: ask soft confirmation, store pending route for next turn
-          ctx.pendingRoute = { next: routed.next, payload: routed.payload || {} };
-          say([conf.confidenceNote]);
-          render();
+          // LOW: if we've already fallen back twice, go to CONFIDENCE_FALLBACK
+          // instead of NARROWING to avoid an infinite loop.
+          if (ctx.confidenceFallbackCount >= 2) {
+            ctx.confidenceFallbackCount++;
+            logAnalyticsEvent("route_fallback", { fallbackCount: ctx.confidenceFallbackCount }, ctx);
+            transition("CONFIDENCE_FALLBACK");
+          } else {
+            // Build candidate buttons from the confidence result's competitors.
+            const INTENT_TO_CANDIDATE = {
+              late:        { id: "cycle",  label: "Late or irregular cycle",  next: "LATE_INTRO" },
+              heavy:       { id: "heavy",  label: "Bleeding or flow",         next: "HEAVY_INTRO" },
+              spot:        { id: "spot",   label: "Spotting",                 next: "SPOT_INTRO" },
+              mood:        { id: "mood",   label: "Mood or energy changes",   next: "MOOD_INTRO" },
+              pelvic:      { id: "pain",   label: "Pain or cramps",           next: "PELVIC_INTRO" },
+              pregnancy:   { id: "preg",   label: "Pregnancy concerns",       next: "PREGNANCY_ENTRY" },
+              discharge:   { id: "dis",    label: "Discharge",                next: "ELSE_DISCHARGE" },
+              urgent_care: { id: "urgent", label: "Urgent concern",           next: "HEAVY_URGENT" },
+            };
+            const candidateIntents = [conf.primaryIntent, ...conf.competingIntents]
+              .filter(Boolean).slice(0, 3);
+            const candidates = candidateIntents
+              .map(i => INTENT_TO_CANDIDATE[i]).filter(Boolean);
+            ctx.narrowingCandidates = candidates.length ? candidates : null;
+            ctx.confidenceFallbackCount++;
+            logAnalyticsEvent("route_no_match", { input: normalizedText, primaryIntent: conf.primaryIntent }, ctx);
+            transition("NARROWING");
+          }
+        } else if (conf && (conf.tier === "medium" || _isPair)) {
+          // MEDIUM (or a clarification pair at HIGH): ask soft confirmation
+          ctx.pendingRoute = { next: conf.route || routed.next, payload: routed.payload || {} };
+          logAnalyticsEvent("route_clarification", { route: conf.route || routed.next }, ctx);
+          transition("MEDIUM_CONFIRM");
         } else {
           // HIGH (or no confidence data): route directly
           ctx.lastIntent = routed.next;
+          logAnalyticsEvent("route_matched", { route: routed.next, reason: routed.payload?.reason }, ctx);
           transition(routed.next, routed.payload || {});
         }
       } else {
@@ -1669,30 +1807,57 @@ export function initBloomieChat({
 
     const t = normalizePatois(rawText).toLowerCase().trim();
 
-    // ── Alias map: common typed phrases → choice id ──────────────────────
-    const YES_WORDS  = ["yes", "yeah", "yep", "yup", "yah", "ya", "definitely",
-                        "for sure", "correct", "true", "i have", "i did", "i do",
-                        "mi have", "mi did", "mi do", "yes i", "yeah i"];
-    const NO_WORDS   = ["no", "nah", "nope", "not really", "i have not", "i don't",
-                        "i dont", "no i", "nah i", "mi nuh", "mi never",
-                        "no me", "nah me", "definitely not", "not at all"];
-    const UNSURE_WORDS = ["not sure", "unsure", "idk", "i don't know", "i dont know",
-                          "maybe", "not really sure", "mi nuh know", "dunno",
-                          "hard to say", "not certain"];
+    // ── Semantic choice lookup helpers ────────────────────────────────────
+    // resolveChoiceByIntent checks `choice.intent` first, then falls back to
+    // the static CHOICE_INTENT_MAP keyed on choice id.  This means nodes that
+    // already use ids like "yes", "no", "ns" continue to work unchanged, while
+    // future nodes can declare any id and tag it with an explicit intent field.
+    const choiceAffirm = resolveChoiceByIntent(choices, "affirm");
+    const choiceDeny   = resolveChoiceByIntent(choices, "deny");
+    const choiceUnsure = resolveChoiceByIntent(choices, "unsure");
 
-    // Check for yes/no/not sure pattern on nodes that have those choices
-    const hasYes    = choices.find(c => c.id === "yes");
-    const hasNo     = choices.find(c => c.id === "no");
-    const hasNs     = choices.find(c => c.id === "ns");
+    // ── Typed phrase → intent word lists ─────────────────────────────────
+    // Soft denials MUST be checked before soft affirmations so that
+    // "probably not" never accidentally fires the "probably" affirm match.
+    const SOFT_DENY  = [
+      "probably not", "don't think so", "i don't think so",
+      "i dont think so", "dont think so", "not really think so",
+    ];
+    const YES_WORDS  = [
+      "yes", "yeah", "yep", "yup", "yah", "ya", "definitely",
+      "for sure", "correct", "true", "i have", "i did", "i do",
+      "mi have", "mi did", "mi do", "yes i", "yeah i",
+      // soft affirmations
+      "i think so", "think so", "i believe so", "believe so",
+      "probably", "most likely", "i'd say yes", "id say yes",
+    ];
+    const NO_WORDS   = [
+      "no", "nah", "nope", "not really", "i have not", "i don't",
+      "i dont", "no i", "nah i", "mi nuh", "mi never",
+      "no me", "nah me", "definitely not", "not at all",
+    ];
+    const UNSURE_WORDS = [
+      "not sure", "unsure", "idk", "i don't know", "i dont know",
+      "not really sure", "mi nuh know", "dunno", "hard to say", "not certain",
+      // added
+      "maybe", "can't tell", "cant tell", "could be", "possibly",
+      "not totally sure", "i'm not sure", "im not sure", "i'm unsure",
+    ];
 
-    if (hasYes && YES_WORDS.some(w => t === w || t.startsWith(w + " ") || t.endsWith(" " + w))) {
-      return hasYes;
+    // ── Match order: soft denials → affirm → deny → unsure ───────────────
+    // Soft denials are checked first to prevent "probably" from stealing
+    // "probably not" before the deny path gets a chance to evaluate it.
+    if (choiceDeny && SOFT_DENY.some(w => t === w || t.startsWith(w + " "))) {
+      return choiceDeny;
     }
-    if (hasNo && NO_WORDS.some(w => t === w || t.startsWith(w + " ") || t.endsWith(" " + w))) {
-      return hasNo;
+    if (choiceAffirm && YES_WORDS.some(w => t === w || t.startsWith(w + " ") || t.endsWith(" " + w))) {
+      return choiceAffirm;
     }
-    if (hasNs && UNSURE_WORDS.some(w => t.includes(w))) {
-      return hasNs;
+    if (choiceDeny && NO_WORDS.some(w => t === w || t.startsWith(w + " ") || t.endsWith(" " + w))) {
+      return choiceDeny;
+    }
+    if (choiceUnsure && UNSURE_WORDS.some(w => t.includes(w))) {
+      return choiceUnsure;
     }
 
     // ── Positive/negative phrasing on choice labels ───────────────────────
@@ -1739,7 +1904,7 @@ export function initBloomieChat({
       "new":     ["new", "different", "changed", "never before", "first time"],
     };
 
-    for (const choice of node.choices) {
+    for (const choice of node._resolvedChoices) {
       const hints = CHOICE_HINTS[choice.id];
       if (hints && hints.some(h => t.includes(h))) return choice;
     }
@@ -1900,7 +2065,13 @@ export function initBloomieChat({
   //              (default) each gap is calculated from the previous bubble's
   //              length via calcDelay() using BLOOMIE_TIMING buckets.
   function say(lines, { delayMs = null, keepLocked = false } = {}) {
-    const arr = Array.isArray(lines) ? lines : [lines];
+    const _rawArr = Array.isArray(lines) ? lines : [lines];
+    // Apply tone-aware line transforms (only when source ≠ rule_only AND depth ≥ 2)
+    const arr = applyToneToLines(
+      _rawArr,
+      ctx.toneResult ?? null,
+      ctx.conversationProfile?.sessionDepth ?? 0
+    );
     lockUI(true);
     // Show typing indicator immediately so the user sees Bloomie "thinking"
     ctx.isTyping = true;
@@ -1956,6 +2127,19 @@ export function initBloomieChat({
   function transition(nextState, payload = {}) {
     if (!nextState) return;
 
+    // ── MEDIUM confirm sentinel handlers ──────────────────────────────────
+    if (nextState === "_MEDIUM_YES") {
+      const route = ctx.pendingRoute;
+      ctx.pendingRoute = null;
+      if (route) transition(route.next, route.payload || {});
+      return;
+    }
+    if (nextState === "_MEDIUM_NO") {
+      ctx.pendingRoute = null;
+      transition("NARROWING");
+      return;
+    }
+
     // ── Safety log: escalation — "seek care" node reached ─────────────────
     if (nextState === "HEAVY_URGENT") {
       logSafetyEvent("escalation", {
@@ -1975,10 +2159,10 @@ export function initBloomieChat({
       const prof = ctx.conversationProfile;
       const TOPIC_NODE_MAP = {
         LATE_INTRO: "late", LATE_PERIOD_CHECK: "late", TEST_INTRO: "late",
-        HEAVY_INTRO: "heavy", HEAVY_ROUTE_B: "heavy", HEAVY_ROUTE_C: "heavy",
+        HEAVY_INTRO: "heavy", HEAVY_ROUTE_B: "heavy", HEAVY_ROUTE_C: "heavy", HEAVY_ROUTE_C_GATE: "heavy",
         SPOT_INTRO: "spot", SPOT_PREG_INFO: "spot",
-        MOOD_SAFETY_CHECK: "mood", MOOD_INTRO: "mood",
-        PELVIC_INTRO: "pelvic", PELVIC_SAFETY_CHECK: "pelvic",
+        MOOD_SAFETY_CHECK: "mood", MOOD_INTRO: "mood", MOOD_GUIDE: "mood",
+        PELVIC_INTRO: "pelvic", PELVIC_SAFETY_CHECK: "pelvic", PELVIC_SAFETY_GATE: "pelvic",
         PREGNANCY_ENTRY: "pregnancy",
         ELSE_DISCHARGE: "discharge", ELSE_DISCHARGE_ENTRY: "discharge",
       };
@@ -2117,7 +2301,7 @@ export function initBloomieChat({
       told_to_seek_care: "See a healthcare provider soon",
       told_to_monitor:   "Keep track of your symptoms over the next few days",
       told_to_rest:      "Rest and monitor how you feel",
-      told_to_call_911:  "Call emergency services or go to A&E immediately",
+      told_to_call_119:  "Call emergency services or go to A&E immediately",
       told_about_sti:    "Speak with a provider about STI screening",
     };
 
@@ -2330,7 +2514,11 @@ export function initBloomieChat({
     }
 
     const node = NODES[ctx.state];
-    const _choices = resolveChoices(node);
+    const _choices = applyToneToChoices(
+      resolveChoices(node),
+      ctx.toneResult ?? null,
+      ctx.conversationProfile?.sessionDepth ?? 0
+    );
     // Snapshot the flow ID at render time so buttons can detect if they're stale.
     const renderedFlowId = ctx.flowId;
     if (_choices.length) {
@@ -2403,12 +2591,104 @@ export function initBloomieChat({
   }
 
 
+  // Returns "you tend to log [X] around this time" or null.
+  // Guards: no symptomHistory, no SYMPTOM_PATTERN signal with show:true, already shown.
+  function buildSymptomPatternLine(catalogCodes) {
+    if (!Array.isArray(symptomHistory) || !symptomHistory.length) return null;
+    if (!Array.isArray(catalogCodes) || !catalogCodes.length) return null;
+    if (ctx.adviceGiven.has("symptom_pattern_line")) return null;
+
+    const PATTERN_CODES = new Set([
+      "SYMPTOMS_MATCH_PMS_PATTERN",
+      "SYMPTOMS_MATCH_MENSTRUAL_PATTERN",
+      "SYMPTOMS_MATCH_OVULATION_PATTERN",
+      "SYMPTOMS_MATCH_PERIMENOPAUSE_PATTERN",
+      "SYMPTOMS_MATCH_HORMONAL_PATTERN",
+    ]);
+    const hasPatternSignal = ctx.integratedSignals?.symptomSignals?.some(
+      s => PATTERN_CODES.has(s.code) && s.show
+    );
+    if (!hasPatternSignal) return null;
+
+    const matchedLabels = catalogCodes
+      .filter(code => {
+        const count = symptomHistory.filter(entry =>
+          Array.isArray(entry.items) && entry.items.some(item => item.code === code)
+        ).length;
+        return count >= 2;
+      })
+      .map(code => CATALOG_LABELS[code] || code.replace(/_/g, " ").toLowerCase())
+      .filter(Boolean);
+
+    if (!matchedLabels.length) return null;
+
+    ctx.adviceGiven.add("symptom_pattern_line");
+
+    const list = matchedLabels.length === 1
+      ? matchedLabels[0]
+      : `${matchedLabels.slice(0, -1).join(", ")} and ${matchedLabels.at(-1)}`;
+
+    return pick([
+      `I can see from your logs that you tend to experience **${list}** around this time 🩷`,
+      `Your logs show **${list}** tends to come up around this point in your cycle 🩷`,
+      `Looking at your history, **${list}** is something you tend to log around now 🩷`,
+    ]);
+  }
+
+  // Returns one personalised cycle-context line, or null.
+  // Guards: urgency, no signals, already shown this session.
+  function buildCyclePersonalisationLine(context) {
+    if (ctx.urgency) return null;
+    const cycleSignals = ctx.integratedSignals?.cycleSignals;
+    if (!cycleSignals?.length) return null;
+    if (ctx.adviceGiven.has("cycle_line_late")) return null;
+
+    const codes = new Set(cycleSignals.map(s => s.code));
+
+    // late + IRREGULAR_CYCLE → variability days line
+    if (context === "late" && codes.has("IRREGULAR_CYCLE")) {
+      const v = ctx.cycleVariability;
+      ctx.adviceGiven.add("cycle_line_late");
+      return (v !== null && v !== undefined && v > 0)
+        ? `Your recent cycles have varied by up to ${v} days — that kind of pattern makes it harder to know exactly when to expect your period 🩷`
+        : "Your recent cycles have shown more variability than usual, which can make it harder to know when to expect your period 🩷";
+    }
+
+    // late + LATE_PERIOD → signal message
+    if (context === "late" && codes.has("LATE_PERIOD")) {
+      const sig = cycleSignals.find(s => s.code === "LATE_PERIOD" && s.show && s.message);
+      if (!sig) return null;
+      ctx.adviceGiven.add("cycle_line_late");
+      return sig.message;
+    }
+
+    // irregular context → pattern acknowledgment
+    if (context === "irregular") {
+      const sig = cycleSignals.find(s => s.code === "IRREGULAR_CYCLE" && s.show && s.message);
+      if (!sig) return null;
+      ctx.adviceGiven.add("cycle_line_late");
+      return sig.message;
+    }
+
+    // CYCLE_TREND medium/high → trend note (context-independent)
+    const trendSig = cycleSignals.find(s =>
+      (s.code === "LENGTHENING_CYCLE_TREND" || s.code === "SHORTENING_CYCLE_TREND") &&
+      s.show && s.level === "medium" && s.message
+    );
+    if (trendSig) {
+      ctx.adviceGiven.add("cycle_line_late");
+      return trendSig.message;
+    }
+
+    return null;
+  }
+
   const env = {
     ctx, cd, userMode, say, transition, pick, ack, qualifier, consent, estimate,
     quickSummary, safeFooter, urgentFooter, effectiveLmp, effectiveCycleLength,
     effectiveMode, hasLmpData, getCurrentPhase, phaseNudge, insightFor, addDays, fmtDate,
     buildSummaryCard, applySessionMode, canGiveAdvice, filterDedup,
-    daysBetween, daysUntilNextPeriod, buildRecallLine, greet, buildCycleCtx,
+    daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildSymptomPatternLine, greet, buildCycleCtx,
     pickPriorityConcern, getPhaseInsight, getToneOpener, buildGuidanceResponse,
     getStructuredSummary, computePhaseConfidence, logSafetyEvent,
     parseNaturalDate, validateCycleDate, validateCalendarDate,

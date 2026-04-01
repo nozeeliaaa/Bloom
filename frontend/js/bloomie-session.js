@@ -94,14 +94,19 @@ export function createCtx() {
     pendingAmbiguityContext:  null,        // stored when ambiguity question was asked
     pendingContradictionContext: null,     // stored when contradiction was detected
     pendingContextProbe:      null,        // stored when missing-context probe was asked
+    pendingQuestion:          null,        // { type: "yes_no"|"severity"|"timing"|"duration"|"test_result"|"choice", nodeState: string }
+                                          // set whenever Bloomie renders a node with choices; cleared after exactly
+                                          // one user message so extended answer matching is strictly turn-bound.
     recentInputs:         [],              // rolling array of last 5 raw user inputs for loop detection
     pendingConcerns:      [],              // overload handler: remaining concerns after user picks first
     resolvedContradictions: [],            // contradictions and concerns already surfaced this session
 
     // ── Confidence-tier routing (Prompt 1) ─────────────────────────────────
-    routeConfidence:      null,            // last computeRouteConfidence() result
-    pendingRoute:         null,            // { next, payload } set when MEDIUM tier asks confirmation
-    narrowingCandidates:  null,            // [{ id, label, next }] for LOW tier NARROWING
+    routeConfidence:        null,          // last computeRouteConfidence() result
+    pendingRoute:           null,          // { next, payload } set when MEDIUM tier asks confirmation
+    narrowingCandidates:    null,          // [{ id, label, next }] for LOW tier NARROWING
+    lastConfidence:         null,          // last full ConfidenceResult (including route/competitors/ambiguous)
+    confidenceFallbackCount: 0,            // how many times CONFIDENCE_FALLBACK has been shown this session
 
     // ── Conversation intelligence (Prompt 2) ───────────────────────────────
     conversationProfile: {
@@ -116,5 +121,7 @@ export function createCtx() {
     sessionSymptoms:      new Set(),       // all symptom entity keys detected across the session
     verbosity:            "normal",        // "concise" | "normal" | "detailed"
     oosStreakCount:        0,              // consecutive OOS responses (for conversational repair)
+    isRetryAttempt:       false,          // true when user has sent same message twice (second repeat handling)
+    loggingGapPending:    false,          // true when a symptom-logging-gap nudge is queued for next response
   };
 }

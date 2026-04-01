@@ -34,6 +34,7 @@ onAuthChange(async (user) => {
 
   initTabs();
   loadOverview();
+  loadBloomieAnalytics();
 });
 
 // ─────────────────────────────────────────
@@ -80,16 +81,19 @@ function initTabs() {
       if (target === "users") loadUsers();
       if (target === "pamphlets") loadPamphlets();
       if (target === "clinics") loadClinics();
+      if (target === "overview") loadBloomieAnalytics();
     });
   });
 
   document.getElementById("admin-refresh-btn").addEventListener("click", () => {
     const active = document.querySelector(".admin-tab.active")?.dataset.tab;
-    if (active === "overview") loadOverview();
+    if (active === "overview") { loadOverview(); loadBloomieAnalytics(); }
     if (active === "users") loadUsers();
     if (active === "pamphlets") loadPamphlets();
     if (active === "clinics") loadClinics();
   });
+
+  document.getElementById("ba-refresh-btn")?.addEventListener("click", loadBloomieAnalytics);
 
   document.getElementById("users-refresh")?.addEventListener("click", loadUsers);
 }
@@ -559,4 +563,90 @@ function goalName(id) {
     unknown: "Unknown / not set",
   };
   return map[id] || id;
+}
+
+// ─────────────────────────────────────────
+// BLOOMIE ANALYTICS
+// ─────────────────────────────────────────
+async function loadBloomieAnalytics() {
+  const statusEl = document.getElementById("ba-status");
+  if (statusEl) { statusEl.textContent = "Loading…"; statusEl.hidden = false; }
+
+  try {
+    const { summary } = await api("GET", "/bloomie-analytics/summary");
+
+    if (statusEl) statusEl.hidden = true;
+
+    // KPIs
+    setText("ba-fallbacks", summary.fallbackCount ?? 0);
+    setText("ba-no-match",  summary.noMatchCount  ?? 0);
+    setText("ba-urgency",   summary.urgencyEscalationCount ?? 0);
+    setText("ba-oos",       summary.oosEventCount ?? 0);
+    setText("ba-avg-depth", summary.avgSessionDepth ?? 0);
+
+    // Confidence tiers
+    const tiers = summary.confidenceTierDistribution || {};
+    setText("ba-confidence-high",   tiers.HIGH   ?? 0);
+    setText("ba-confidence-medium", tiers.MEDIUM ?? 0);
+    setText("ba-confidence-low",    tiers.LOW    ?? 0);
+
+    // Route distribution (top 10)
+    const routeEl = document.getElementById("ba-route-list");
+    if (routeEl) {
+      const routes = Object.entries(summary.routeDistribution || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      routeEl.innerHTML = routes.length
+        ? routes.map(([route, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <code style="font-size:.82rem;">${escHtml(route)}</code>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Tone distribution
+    const toneEl = document.getElementById("ba-tone-list");
+    if (toneEl) {
+      const tones = Object.entries(summary.toneDistribution || {})
+        .sort((a, b) => b[1] - a[1]);
+      toneEl.innerHTML = tones.length
+        ? tones.map(([tone, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.88rem;">${escHtml(tone)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Emotion source distribution
+    const sourceEl = document.getElementById("ba-source-list");
+    if (sourceEl) {
+      const sources = Object.entries(summary.emotionSourceDistribution || {})
+        .sort((a, b) => b[1] - a[1]);
+      sourceEl.innerHTML = sources.length
+        ? sources.map(([src, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.88rem;">${escHtml(src)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Top no-match phrases
+    const phraseEl = document.getElementById("ba-no-match-phrases");
+    if (phraseEl) {
+      const phrases = summary.topNoMatchPhrases || [];
+      phraseEl.innerHTML = phrases.length
+        ? phrases.map(({ phrase, count }) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.82rem;word-break:break-word;max-width:160px;">${escHtml(phrase)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = `Failed to load: ${err.message}`; statusEl.hidden = false; }
+  }
 }

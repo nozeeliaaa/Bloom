@@ -229,6 +229,84 @@ export function scoreSignals(t) {
 }
 
 
+// ─── 3b. SEMANTIC CHOICE INTENTS ─────────────────────────────────────────────
+
+/**
+ * CHOICE_INTENT_MAP — maps a choice id to a semantic intent string.
+ *
+ * Intents are used by resolveChoiceByIntent() so that typed yes/no/unsure
+ * answers can match choice objects even when their id isn't literally "yes",
+ * "no", or "ns".  Nodes can also attach an explicit `intent` field to a
+ * choice object to override this lookup.
+ *
+ * Intent vocabulary:
+ *   affirm            — affirmative answer (yes, yeah, i think so, probably…)
+ *   deny              — negative answer (no, nope, probably not…)
+ *   unsure            — uncertain answer (not sure, idk, maybe, can't tell…)
+ *   test_positive     — pregnancy/OPK test read as positive
+ *   test_negative     — pregnancy/OPK test read as negative
+ *   test_unclear      — test result unclear or faint
+ *   pregnancy_possible — user is or might be pregnant
+ *   irregular_cycle   — user has or suspects an irregular cycle
+ */
+export const CHOICE_INTENT_MAP = {
+  yes:         "affirm",
+  no:          "deny",
+  ns:          "unsure",
+  pos:         "test_positive",
+  neg:         "test_negative",
+  unc:         "test_unclear",
+  yes_preg:    "pregnancy_possible",
+  irregular:   "irregular_cycle",
+};
+
+/**
+ * resolveChoiceByIntent(choices, intent) → choice | null
+ *
+ * Pure function. Finds the first choice in `choices` that carries the given
+ * semantic intent, either via an explicit `choice.intent` field or via the
+ * CHOICE_INTENT_MAP lookup on the choice id.  Preserves backward
+ * compatibility: nodes that already use "yes"/"no"/"ns" ids work unchanged.
+ */
+export function resolveChoiceByIntent(choices, intent) {
+  if (!Array.isArray(choices) || !intent) return null;
+  // Explicit field wins (allows future per-node overrides without map changes)
+  const explicit = choices.find(c => c.intent === intent);
+  if (explicit) return explicit;
+  // Fallback: derive intent from choice id via the static map
+  return choices.find(c => CHOICE_INTENT_MAP[c.id] === intent) || null;
+}
+
+
+/**
+ * classifyNodeQuestion(choices) → question type string | null
+ *
+ * Pure function. Inspects a resolved choices array and returns the semantic
+ * "shape" of the question the node is asking.  Used to set ctx.pendingQuestion
+ * so the next message is interpreted as an answer of the right type before
+ * falling through to the full intent pipeline.
+ *
+ * Types:
+ *   "yes_no"      — yes / no / not-sure (ids: yes, no, ns)
+ *   "test_result" — positive / negative / unclear (ids: pos, neg, unc)
+ *   "severity"    — mild / moderate / severe (ids: mild, mod, sev)
+ *   "timing"      — before / during / any / other time-relative ids
+ *   "duration"    — few days / a week / most of cycle (ids: few, week, most)
+ *   "choice"      — has choices but none of the above shapes
+ *   null          — no choices (open-text node or no relevant shape)
+ */
+export function classifyNodeQuestion(choices) {
+  if (!Array.isArray(choices) || !choices.length) return null;
+  const ids = new Set(choices.map(c => c.id));
+  if (ids.has("yes") || ids.has("no") || ids.has("ns"))           return "yes_no";
+  if (ids.has("pos") || ids.has("neg") || ids.has("unc"))         return "test_result";
+  if (ids.has("mild") || ids.has("mod") || ids.has("sev"))        return "severity";
+  if (ids.has("before") || ids.has("during") || ids.has("any"))   return "timing";
+  if (ids.has("few") || ids.has("week") || ids.has("most"))       return "duration";
+  return "choice";
+}
+
+
 // ─── 4. MULTI-SIGNAL ROUTE RESOLUTION ────────────────────────────────────────
 
 /**
@@ -297,6 +375,22 @@ const INTENT_LABELS = {
 };
 
 /**
+ * INTENT_TO_NODE — maps a resolved intent key to its entry node
+ */
+export const INTENT_TO_NODE = {
+  late:        "LATE_INTRO",
+  heavy:       "HEAVY_INTRO",
+  spot:        "SPOT_INTRO",
+  mood:        "MOOD_SAFETY_CHECK",
+  pelvic:      "PELVIC_SAFETY_GATE",
+  pregnancy:   "PREGNANCY_ENTRY",
+  discharge:   "ELSE_DISCHARGE",
+  late_check:  "LATE_INTRO",
+  red_flag:    "SEE_DOCTOR_GUIDE",
+  urgent_care: "HEAVY_URGENT",
+};
+
+/**
  * computeRouteConfidence(sig, entities) -> ConfidenceResult
  *
  * Pure function. Takes the raw score map from scoreSignals() and the entity
@@ -319,15 +413,19 @@ const INTENT_LABELS = {
  *   7. top >= 4, no close competitor -> HIGH (single dominant, no real competition)
  */
 export function computeRouteConfidence(sig, entities) {
+  // Helper: build the full result shape
+  function result(tier, score, primaryIntent, competingIntents, confidenceNote) {
+    const route      = INTENT_TO_NODE[primaryIntent] || null;
+    const competitors = competingIntents
+      .map(function(i) { return INTENT_TO_NODE[i] || null; })
+      .filter(Boolean);
+    const ambiguous  = tier !== "high";
+    return { tier, score, primaryIntent, competingIntents, confidenceNote, route, competitors, ambiguous };
+  }
+
   // Rule 1 -- urgency always HIGH
   if (entities && entities.urgent) {
-    return {
-      tier: "high",
-      score: 10,
-      primaryIntent: "urgent_care",
-      competingIntents: [],
-      confidenceNote: null,
-    };
+    return result("high", 10, "urgent_care", [], null);
   }
 
   // Build sorted list of signals with a positive score
@@ -336,13 +434,7 @@ export function computeRouteConfidence(sig, entities) {
     .sort(function(a, b) { return b[1] - a[1]; });
 
   if (scored.length === 0) {
-    return {
-      tier: "low",
-      score: 0,
-      primaryIntent: null,
-      competingIntents: [],
-      confidenceNote: null,
-    };
+    return result("low", 0, null, [], null);
   }
 
   const topScore    = scored[0][1];
@@ -371,47 +463,35 @@ export function computeRouteConfidence(sig, entities) {
 
   // Special: late period + confirmed positive test → unambiguous positive result
   if (entities?.symptoms?.late && entities?.pregnancy?.result === "positive") {
-    return { tier: "high", score: topScore, primaryIntent: "late", competingIntents: [], confidenceNote: null };
+    return result("high", topScore, "late", [], null);
   }
 
   // Rule 2 -- low score
   if (topScore < 3) {
-    return { tier: "low", score: topScore, primaryIntent, competingIntents, confidenceNote: null };
+    return result("low", topScore, primaryIntent, competingIntents, null);
   }
 
   // Rule 3 -- 3+ signals within 2 points of each other
   const closeSignals = scored.filter(function(pair) { return topScore - pair[1] <= 2; });
   if (closeSignals.length >= 3) {
-    return { tier: "low", score: topScore, primaryIntent, competingIntents, confidenceNote: null };
+    return result("low", topScore, primaryIntent, competingIntents, null);
   }
 
   // Rule 4 -- two competing signals
   if (secondScore >= topScore - 2) {
-    return {
-      tier: "medium",
-      score: topScore,
-      primaryIntent,
-      competingIntents,
-      confidenceNote: medNote(primaryIntent),
-    };
+    return result("medium", topScore, primaryIntent, competingIntents, medNote(primaryIntent));
   }
 
   // Rule 5 -- moderate+ score but pelvic AND late both present (competing entities)
   if (topScore >= 4 && (sig.pelvic || 0) > 0 && (sig.late || 0) > 0) {
-    return {
-      tier: "medium",
-      score: topScore,
-      primaryIntent,
-      competingIntents,
-      confidenceNote: medNote(primaryIntent),
-    };
+    return result("medium", topScore, primaryIntent, competingIntents, medNote(primaryIntent));
   }
 
   // Rule 6 -- clear dominant winner at high score
   if (topScore >= 7 && secondScore < topScore / 2) {
-    return { tier: "high", score: topScore, primaryIntent, competingIntents, confidenceNote: null };
+    return result("high", topScore, primaryIntent, competingIntents, null);
   }
 
   // Rule 7 -- dominant signal, no close competitor
-  return { tier: "high", score: topScore, primaryIntent, competingIntents, confidenceNote: null };
+  return result("high", topScore, primaryIntent, competingIntents, null);
 }

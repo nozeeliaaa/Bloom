@@ -425,7 +425,14 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
     }
   }
 
-  // Line 4: Short, friendly disclaimer — no "Remember:" prefix.
+  // Lines 4–5: Optional cycle personalisation — appended after main content,
+  // before the disclaimer, only when callers supply them via cycleCtx.
+  const cycleLine   = cycleCtx?.cycleLine   || null;
+  const patternLine = cycleCtx?.patternLine || null;
+  if (cycleLine)   lines.push(cycleLine);
+  if (patternLine) lines.push(patternLine);
+
+  // Line (last): Short, friendly disclaimer — no "Remember:" prefix.
   // Tone: angry — strip any exclamation marks from all lines (calm, steady tone).
   lines.push("This is educational info, not a diagnosis — you know your body best 🩷");
 
