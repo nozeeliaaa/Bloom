@@ -137,6 +137,10 @@ const PHRASE_MAP = [
   ["pain pon one side",             "one-sided pain"],
   ["one side a hurt",               "one-sided pain"],
   ["sharp pain one side",           "sharp one-sided pain"],
+  ["hurt till mi cyaan move",       "pain so severe i cannot move"],
+  ["barely managing",               "barely coping"],
+  ["mi barely a manage",            "i can barely cope"],
+  ["mi a deal wid it",              "i am managing it"]
 
   // ── Bleeding ──────────────────────────────────────────────────────────────
   ["bleeding bad",                  "bleeding heavily"],
@@ -302,6 +306,7 @@ const PHRASE_MAP = [
   // ── Medication: taking ────────────────────────────────────────────────────
   ["should mi tek",                      "should i take"],
   ["mi wah tek",                         "i want to take"],
+  ["mi hear seh mi fi tek",                 "i heard that i should take"],
   ["me wah tek",                         "i want to take"],
   ["mi a tek",                           "i am taking"],
   ["me a tek",                           "i am taking"],
@@ -368,6 +373,7 @@ const PHRASE_MAP = [
   // ── Expressing uselessness ─────────────────────────────────────────────────
   ["u useless",                          "you're useless"],
   ["u nuh helpful",                      "you're not helpful"],
+  ["u nah help mi",                       "you're not helping me"],
   ["u nuh helping",                      "you're not helping"],
   ["u cyan help mi",                     "you can't help me"],
   ["u nuh help mi",                      "you didn't help me"],
@@ -427,6 +433,9 @@ const PHRASE_MAP = [
   // ── Date / time uncertainty (Part 7) ──────────────────────────────────────
   ["mi cyaan remember",                  "i can't remember"],
   ["mi nuh remember",                    "i can't remember"],
+  ["mi cyan recall",                    "i can't recall"],
+  ["mi nuh recall",                      "i can't recall"],
+  ["mi nuh memba",                     "i can't remember"],
   ["mi nuh sure when",                   "i'm not sure when"],
   ["di odda week",                       "the other week"],
   ["di odda day",                        "the other day"],
@@ -483,7 +492,44 @@ const PHRASE_MAP = [
   ["lst mth",                      "last month"],
   ["bc pill",                      "birth control pill"],
   ["2ww",                          "two week wait"],
+
+
+  // Sleep/fatigue expressions 
+  ["cyaan sleep",            "can't sleep"],
+  ["cya sleep",             "can't sleep"],
+  ["tiyad",                "tired"],
+  ["mi tired bad",         "i'm very tired"],
+  ["mi weak out",         "i feel weak"],
+  ["mi weak bad",         "i feel very weak"],
+
+  //Perimenopause/menopause
+  ["sweat up a night",     "night sweats"],
+  ["just a sweat",         "i keep sweating"],
+  ["hot flash tek mi", "i am having a hot flash"],
+  ["memory gone", "brain fog"],
+
+
+  //Seeking help / clinic phrases
+  ["mi need help", "i need help"],
+  ["mi need fi see doctor", "i need to see a doctor"],
+  ["mi need fi go clinic", "i need to go to a clinic"],
+  ["mi need fi go hospital", "i need to go to a hospital"],
+  ["clinic open", "clinic is open"],
+  ["clinic close", "clinic is closed"],
+  ["weh di clinic deh", "where is the clinic"],
+  ["mi cyaan afford doctor", "i cannot afford a doctor"]
+
+
+  //Dismissive/minimising expressions
+  ["it nuh dat serious", "it is not that serious"],
+  ["it nuh dat bad", "it is not that bad"],
+  ["mi alright still", "i am okay"],
+  ["a nuttn", "it is nothing"],
+  ["annuh nutn", "it is nothing"],
+
 ];
+
+
 
 // ─── 2. WORD-LEVEL DICTIONARY ─────────────────────────────────────────────────
 // Applied after phrase swaps, handles remaining Patois tokens.

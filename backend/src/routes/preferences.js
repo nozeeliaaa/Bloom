@@ -11,6 +11,7 @@ import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
+
 const router = express.Router();
 
 // Valid preference values for server-side validation
@@ -40,6 +41,21 @@ router.put("/", requireAuth, async (req, res) => {
     const uid = req.user.uid;
     const body = req.body;
 
+    if (body.pregnancyMode !== undefined && req.user.ageBand === "10-17") {
+      // Run the consent check manually for this field only
+      const consentSnap = await db.collection("consents")
+        .where("teenUid", "==", req.user.uid)
+        .where("status", "==", "approved")
+        .limit(1)
+        .get();
+
+      if (consentSnap.empty || !consentSnap.docs[0].data().scope?.pregnancyMode) {
+        return res.status(403).json({
+          error: "Guardian consent is required to enable pregnancy mode.",
+          code: "PREGNANCY_CONSENT_REQUIRED",
+        });
+      }
+    }
     // Build a validated preferences object — never blindly store req.body
     const prefs = {};
 

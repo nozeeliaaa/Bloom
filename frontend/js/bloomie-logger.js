@@ -36,7 +36,7 @@ async function _send(type, payload) {
     ...sanitize(payload),
   };
 
-  await fetch(`${API_BASE}/api/bloomie-safety-log`, {
+  await fetch(`${API_BASE}/bloomie-safety-log`, {
     method:  "POST",
     headers: {
       "Content-Type": "application/json",

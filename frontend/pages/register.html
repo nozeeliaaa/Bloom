@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css" />
-
+ 
   <style>
     .auth-page {
       display: flex;
@@ -42,9 +42,21 @@
       text-decoration: none;
       margin-bottom: 1.5rem;
     }
+<<<<<<< HEAD
     .brand-link img { height: 72px; width: auto; }
 
     /* Password strength */
+=======
+    .brand-link svg { width: 24px; height: 24px; }
+    .age-notice {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+ 
+    /* Password strength bar */
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
     .pw-strength-bar {
       height: 5px; border-radius: 4px;
       background: var(--color-border);
@@ -60,6 +72,7 @@
     .pw-rules li { list-style: none; display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.15rem; }
     .pw-rules li.pass { color: #27ae60; }
     .pw-rules li.fail { color: var(--color-text-muted); }
+<<<<<<< HEAD
 
     /* Age states */
     .age-block-msg {
@@ -100,16 +113,29 @@
     .guardian-name-label {
       font-weight: 400;
       color: var(--color-text-muted);
+=======
+ 
+    /* Verification success panel */
+    #verify-panel { display: none; text-align: center; }
+    #verify-panel .verify-icon { font-size: 3rem; margin-bottom: 1rem; }
+    #verify-panel h2 { color: var(--color-primary-dark); margin-bottom: 0.5rem; }
+    #verify-panel p { color: var(--color-text-muted); font-size: 0.95rem; margin-bottom: 1.25rem; }
+    #verify-panel .spam-note {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      margin-top: 0.75rem;
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
     }
   </style>
 </head>
-
+ 
 <body>
   <main class="auth-page">
     <div class="card auth-card">
       <a href="/pages/home.html" class="brand-link">
         <img src="/assets/bloom-logo.png" alt="Bloom" />
       </a>
+<<<<<<< HEAD
 
       <h1>Create Your Account</h1>
       <p class="subtitle">Unlock cloud sync, advanced insights, and data export.</p>
@@ -187,17 +213,103 @@
         <p class="auth-anon-link">
           <a href="/pages/survey.html" id="btn-anon">Continue anonymously instead</a>
         </p>
+=======
+ 
+      <!-- ── Registration form ── -->
+      <div id="form-panel">
+        <h1>Create Your Account</h1>
+        <p class="subtitle">Unlock cloud sync, advanced insights, and data export.</p>
+ 
+        <div id="error-msg" class="banner banner-warning hidden" role="alert"></div>
+ 
+        <form id="register-form">
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input class="form-input" type="email" id="email" name="email" required
+              autocomplete="email" placeholder="you@example.com">
+          </div>
+ 
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input class="form-input" type="password" id="password" name="password" required
+              autocomplete="new-password" placeholder="Min 8 chars, uppercase, number, symbol">
+ 
+            <div class="pw-strength-bar">
+              <div class="pw-strength-fill" id="pw-strength-fill"></div>
+            </div>
+            <div class="pw-strength-label" id="pw-strength-label"></div>
+ 
+            <ul class="pw-rules" id="pw-rules">
+              <li id="rule-length" class="fail">✗ At least 8 characters</li>
+              <li id="rule-upper"  class="fail">✗ At least one uppercase letter</li>
+              <li id="rule-number" class="fail">✗ At least one number</li>
+              <li id="rule-symbol" class="fail">✗ At least one special character (!, @, #…)</li>
+            </ul>
+          </div>
+ 
+          <div class="form-group">
+            <label class="form-label" for="confirm-password">Confirm Password</label>
+            <input class="form-input" type="password" id="confirm-password" name="confirm-password"
+              required autocomplete="new-password" placeholder="Re-enter your password">
+          </div>
+ 
+          <div class="form-group">
+            <label class="form-check">
+              <input type="checkbox" id="age-confirm" required>
+              <span>I confirm that I am <strong>18 years or older</strong></span>
+            </label>
+          </div>
+ 
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="register-btn">
+            Create Account
+          </button>
+        </form>
+ 
+        <p class="age-notice">You must be 18 or older to create an account.</p>
+ 
+        <div class="auth-links">
+          <p>Already have an account? <a href="/pages/login.html">Log in</a></p>
+          <p style="margin-top:0.75rem;">
+            <a href="/pages/survey.html" id="btn-anon">Continue anonymously instead</a>
+          </p>
+        </div>
+      </div>
+ 
+      <!-- ── Verification sent panel (shown after successful registration) ── -->
+      <div id="verify-panel">
+        <div class="verify-icon">📬</div>
+        <h2>Check your inbox!</h2>
+        <p id="verify-email-msg">We've sent a verification link to your email. Click it to activate your account, then log in.</p>
+ 
+        <div id="resend-msg" class="banner banner-warning hidden" role="alert"></div>
+        <div id="resend-ok"  class="banner banner-success hidden" role="status"></div>
+ 
+        <button class="btn btn-outline btn-block" id="btn-resend" type="button">
+          Resend verification email
+        </button>
+ 
+        <p class="spam-note"> Don't see it? Check your <strong>spam or junk folder</strong>.</p>
+ 
+        <div class="auth-links" style="margin-top:1.5rem;">
+          <a href="/pages/login.html" class="btn btn-primary btn-block">Go to Login</a>
+        </div>
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
       </div>
     </div>
   </main>
-
+ 
   <script type="module">
+<<<<<<< HEAD
     import { register, getPasswordStrength, validatePassword, getIdToken, getUser } from '/js/auth.js';
+=======
+    import { register, getPasswordStrength, validatePassword, resendVerificationEmail } from '/js/auth.js';
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
-
+ 
     renderFooter();
+<<<<<<< HEAD
 
     const form            = document.getElementById('register-form');
     const errorMsg        = document.getElementById('error-msg');
@@ -254,12 +366,38 @@
       strengthFill.style.background = color;
       strengthLabel.textContent     = val.length ? label : '';
       strengthLabel.style.color     = color;
+=======
+ 
+    const formPanel    = document.getElementById('form-panel');
+    const verifyPanel  = document.getElementById('verify-panel');
+    const form         = document.getElementById('register-form');
+    const errorMsg     = document.getElementById('error-msg');
+    const registerBtn  = document.getElementById('register-btn');
+    const pwInput      = document.getElementById('password');
+    const strengthFill = document.getElementById('pw-strength-fill');
+    const strengthLabel = document.getElementById('pw-strength-label');
+ 
+    // Stored after registration so resend doesn't need re-entry
+    let _registeredEmail    = null;
+    let _registeredPassword = null;
+ 
+    // ── Live password strength feedback ──
+    pwInput.addEventListener('input', () => {
+      const val = pwInput.value;
+      const { score, label, color } = getPasswordStrength(val);
+ 
+      strengthFill.style.width = `${(score / 4) * 100}%`;
+      strengthFill.style.background = color;
+      strengthLabel.textContent = val.length ? label : '';
+      strengthLabel.style.color = color;
+ 
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
       setRule('rule-length', val.length >= 8);
       setRule('rule-upper',  /[A-Z]/.test(val));
       setRule('rule-number', /[0-9]/.test(val));
       setRule('rule-symbol', /[^A-Za-z0-9]/.test(val));
     });
-
+ 
     function setRule(id, passing) {
       const el = document.getElementById(id);
       if (!el) return;
@@ -267,25 +405,41 @@
       el.textContent = (passing ? '✓ ' : '✗ ') + text;
       el.className   = passing ? 'pass' : 'fail';
     }
-
+ 
     function showError(msg) {
       errorMsg.textContent = msg;
       errorMsg.classList.remove('hidden');
-      successMsg.classList.add('hidden');
     }
+<<<<<<< HEAD
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.classList.add('hidden');
 
+=======
+ 
+    function showVerifyPanel(email) {
+      document.getElementById('verify-email-msg').textContent =
+        `We've sent a verification link to ${email}. Click it to activate your account, then log in.`;
+      formPanel.style.display  = 'none';
+      verifyPanel.style.display = 'block';
+    }
+ 
+    // ── Form submit ──
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.classList.add('hidden');
+ 
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
       if (!isFirebaseConfigured()) {
         showError('Firebase is not configured. Please continue anonymously.');
         return;
       }
-
+ 
       const email           = document.getElementById('email').value.trim();
       const password        = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirm-password').value;
+<<<<<<< HEAD
       const dob             = dobInput.value;
 
       if (!email || !password || !dob) {
@@ -360,10 +514,38 @@
           successMsg.classList.remove('hidden');
         }
 
+=======
+      const ageConfirm      = document.getElementById('age-confirm').checked;
+ 
+      if (!email || !password) { showError('Please fill in all fields.'); return; }
+ 
+      const { valid, errors } = validatePassword(password);
+      if (!valid) { showError('Password requirements not met: ' + errors.join(', ') + '.'); return; }
+ 
+      if (password !== confirmPassword) { showError('Passwords do not match.'); return; }
+ 
+      if (!ageConfirm) { showError('You must confirm that you are 18 or older.'); return; }
+ 
+      registerBtn.disabled = true;
+      registerBtn.textContent = 'Creating account...';
+ 
+      try {
+        await register(email, password);
+ 
+        // Store credentials so resend works without asking again
+        _registeredEmail    = email;
+        _registeredPassword = password;
+ 
+        showVerifyPanel(email);
+ 
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
       } catch (err) {
         let msg = 'Registration failed. Please try again.';
         if (err.code === 'auth/email-already-in-use') {
-          msg = 'An account with this email already exists.';
+          msg = 'An account with this email already exists. <a href="/pages/login.html">Log in instead?</a>';
+          errorMsg.innerHTML = msg;
+          errorMsg.classList.remove('hidden');
+          return;
         } else if (err.code === 'auth/weak-password' || err.code === 'auth/weak-password-custom') {
           msg = err.errors
             ? 'Password requirements not met: ' + err.errors.join(', ') + '.'
@@ -374,6 +556,7 @@
         showError(msg);
       } finally {
         registerBtn.disabled = false;
+<<<<<<< HEAD
         if (registerBtn.style.display !== 'none') {
           const a = getAge(dobInput.value);
           registerBtn.textContent = (a !== null && a < 18)
@@ -384,6 +567,40 @@
     });
 
     document.getElementById('btn-anon')?.addEventListener('click', () => setMode('anon'));
+=======
+        registerBtn.textContent = 'Create Account';
+      }
+    });
+ 
+    // ── Resend verification ──
+    document.getElementById('btn-resend').addEventListener('click', async () => {
+      const btn      = document.getElementById('btn-resend');
+      const resendMsg = document.getElementById('resend-msg');
+      const resendOk  = document.getElementById('resend-ok');
+ 
+      resendMsg.classList.add('hidden');
+      resendOk.classList.add('hidden');
+ 
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+ 
+      try {
+        await resendVerificationEmail(_registeredEmail, _registeredPassword);
+        resendOk.textContent = `Verification email resent to ${_registeredEmail}. Check your inbox and spam folder.`;
+        resendOk.classList.remove('hidden');
+        btn.style.display = 'none';
+      } catch (e) {
+        resendMsg.textContent = 'Could not resend. Please try again shortly.';
+        resendMsg.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Resend verification email';
+      }
+    });
+ 
+    document.getElementById('btn-anon')?.addEventListener('click', () => {
+      setMode('anon');
+    });
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
   </script>
 </body>
 </html>

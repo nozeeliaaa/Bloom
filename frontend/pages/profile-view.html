@@ -393,12 +393,45 @@
 
     // Save personal details
     saveBtn.addEventListener("click", async () => {
+<<<<<<< HEAD
       const nickname   = nicknameEl.value.trim();
       const yob        = yobEl.value;
       const wasLocked  = !!localStorage.getItem(LS_YOB_LOCKED);
       const prevProfile = loadProfile();
 
       const profile = { ...prevProfile, nickname, yob: yob ? Number(yob) : "" };
+=======
+      const nickname = nicknameEl.value.trim();
+      const yob      = yobEl.value.trim();
+
+      if (yob) {
+        const n = Number(yob);
+        if (!Number.isFinite(n) || n < 1900 || n > 2100) {
+          showStatus("Year of Birth must be between 1900 and 2100.");
+          return;
+        }
+
+        // Send YOB to backend if signed in
+        const user = getUser();
+        if (user) {
+          try {
+            const token = await user.getIdToken();
+            await fetch(`${window.BLOOM_API_BASE || ""}/api/user/profile`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ yearOfBirth: Number(yob) }),
+            });
+          } catch (e) {
+            showStatus("Could not sync year of birth to server. Saved locally only.");
+          }
+        }
+      }
+      
+      const profile = { ...loadProfile(), nickname, yob: yob ? Number(yob) : "" };
+>>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
       localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
 
       // Lock YOB after it is set for the first time
