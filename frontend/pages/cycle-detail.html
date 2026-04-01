@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cycle Details – Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
+  <style>
+    .detail-shell {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 0 0 3rem;
+    }
+
+    .detail-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: none;
+      border: none;
+      font: inherit;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 1.25rem;
+      transition: color 0.15s;
+    }
+    .detail-back:hover { color: var(--color-primary); }
+
+    .detail-range {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--color-text);
+      margin: 0 0 0.75rem;
+      line-height: 1.2;
+    }
+
+    /* Dot timeline */
+    .detail-dot-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 0.5rem;
+    }
+    .detail-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .detail-dot.dot-period     { background: #E8597A; }
+    .detail-dot.dot-fertile    { background: #7EC8C8; }
+    .detail-dot.dot-ovulation  { background: #1A8080; }
+    .detail-dot.dot-follicular { background: #A8C8E8; }
+    .detail-dot.dot-luteal     { background: #E8B86D; }
+
+    .detail-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .detail-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      font-weight: 700;
+    }
+
+    /* Stat cards */
+    .detail-stat-card {
+      background: var(--color-bg-card, #fff);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius, 16px);
+      padding: 1rem 1.1rem;
+      margin-bottom: 0.75rem;
+    }
+    .detail-stat-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      margin-bottom: 0.25rem;
+    }
+    .detail-stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .detail-stat-number {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--color-text);
+      line-height: 1.1;
+    }
+    .detail-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-normal   { background: #e6f7ee; color: #1a7a46; }
+    .badge-abnormal { background: #fff8e7; color: #92600a; }
+    .detail-divider {
+      border: none;
+      border-top: 1px solid var(--color-border);
+      margin: 0.6rem 0;
+    }
+    .detail-stat-note {
+      font-size: 0.88rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* Events card */
+    .detail-events-card {
+      background: var(--color-bg-card, #fff);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius, 16px);
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+    }
+    .detail-event {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.85rem 1.1rem;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .detail-event:last-child { border-bottom: none; }
+    .detail-event-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+    .detail-event-icon.period-icon     { background: rgba(224, 92, 138, 0.15); }
+    .detail-event-icon.fertile-icon    { background: rgba(61, 184, 130, 0.15); }
+    .detail-event-icon.ovulation-icon  { background: rgba(61, 184, 130, 0.10); border: 2px dashed rgba(61,184,130,0.5); }
+    .detail-event-text {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--color-text);
+      line-height: 1.4;
+    }
+
+    .detail-disclaimer {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      margin-top: 1rem;
+    }
+
+    .no-data-msg {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--color-text-muted);
+    }
+    .detail-page-header { margin-bottom: 0.5rem; }
+    .detail-page-title  { margin: 0 0 0.15rem; }
+  </style>
+</head>
+<body>
+  <div id="banner-area"></div>
+  <main>
+    <div class="detail-shell">
+      <div class="page-header detail-page-header">
+        <button type="button" class="detail-back" id="back-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+        <h1 class="detail-page-title">Cycle details</h1>
+      </div>
+      <div id="detail-content">
+        <p class="text-muted">Loading…</p>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner, formatDate, toDateKey } from '/js/utils.js';
+    import { getAllLogs } from '/js/db.js';
+
+    renderNav();
+    renderFooter();
+    renderModeBanner(document.getElementById('banner-area'));
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      if (document.referrer.includes('/pages/dashboard')) {
+        history.back();
+      } else {
+        window.location.href = '/pages/dashboard.html';
+      }
+    });
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function addDaysStr(dateStr, n) {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + n);
+      return toDateKey(d);
+    }
+
+    function diffDays(a, b) {
+      return Math.round(
+        (new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000
+      );
+    }
+
+    function fmtShort(dateStr) {
+      return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric',
+      });
+    }
+
+    // ── Main ───────────────────────────────────────────────────────────────────
+    const params    = new URLSearchParams(location.search);
+    const startKey  = params.get('start');
+    const nextKey   = params.get('next'); // start of the following cycle (null = current)
+    const container = document.getElementById('detail-content');
+
+    if (!startKey) {
+      container.innerHTML = `<div class="no-data-msg"><p>No cycle selected.</p><a href="/pages/dashboard.html" class="btn btn-primary">Go to Dashboard</a></div>`;
+    } else {
+      const logsByDate = await getAllLogs();
+      render(logsByDate);
+    }
+
+    function render(logsByDate) {
+      const todayKey     = toDateKey(new Date());
+      const isCurrent    = !nextKey;
+      const cycleEndKey  = nextKey ? addDaysStr(nextKey, -1) : todayKey;
+      const cycleLen     = nextKey ? diffDays(startKey, nextKey) : null;
+
+      // Estimated phase dates (based on next period start)
+      const ovulationKey    = nextKey ? addDaysStr(nextKey, -14) : null;
+      const fertileStartKey = nextKey ? addDaysStr(nextKey, -19) : null;
+      const fertileEndKey   = nextKey ? addDaysStr(nextKey, -13) : null;
+
+      // Collect period days within this cycle
+      const periodDays = [];
+      let d = new Date(startKey + 'T00:00:00');
+      const endDate = new Date(cycleEndKey + 'T00:00:00');
+      while (d <= endDate) {
+        const dk = toDateKey(d);
+        const log = logsByDate[dk];
+        if (log?.flow && log.flow !== 'none') periodDays.push(dk);
+        d.setDate(d.getDate() + 1);
+      }
+
+      const periodStart = periodDays.length ? periodDays[0]    : startKey;
+      const periodEnd   = periodDays.length ? periodDays[periodDays.length - 1] : null;
+      const periodLen   = periodDays.length;
+
+      // Cycle length classification
+      const cycleLenNormal = cycleLen ? (cycleLen >= 21 && cycleLen <= 35) : null;
+
+      // Period length classification
+      const periodLenNormal = periodLen >= 2 && periodLen <= 7;
+
+      // Build dots (cap at 45 for display)
+      const displayLen = Math.min(cycleLen ?? diffDays(startKey, todayKey) + 1, 45);
+      const dots = [];
+      for (let i = 0; i < displayLen; i++) {
+        const dk = addDaysStr(startKey, i);
+        const log = logsByDate[dk];
+        const isPeriod = !!(log?.flow && log.flow !== 'none');
+        let cls = 'dot-follicular';
+        if (isPeriod) {
+          cls = 'dot-period';
+        } else if (ovulationKey && dk === ovulationKey) {
+          cls = 'dot-ovulation';
+        } else if (fertileStartKey && dk >= fertileStartKey && dk <= fertileEndKey) {
+          cls = 'dot-fertile';
+        } else if (ovulationKey && dk > ovulationKey) {
+          cls = 'dot-luteal';
+        }
+        dots.push(`<span class="detail-dot ${cls}" title="${dk}"></span>`);
+      }
+
+      // Range header
+      const rangeLabel = `${fmtShort(startKey)} – ${isCurrent ? 'present' : fmtShort(cycleEndKey)}`;
+
+      // Cycle length card
+      const cycleLenCard = cycleLen ? `
+        <div class="detail-stat-card">
+          <div class="detail-stat-label">Cycle length</div>
+          <div class="detail-stat-row">
+            <div class="detail-stat-number">${cycleLen} days</div>
+            <span class="detail-badge ${cycleLenNormal ? 'badge-normal' : 'badge-abnormal'}">
+              ${cycleLenNormal
+                ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Normal'
+                : '⚠️ Abnormal'}
+            </span>
+          </div>
+          <hr class="detail-divider">
+          <p class="detail-stat-note">
+            ${cycleLenNormal
+              ? 'This cycle was within the <strong>normal</strong> range (21–35 days).'
+              : cycleLen < 21
+                ? 'This cycle was <strong>short</strong> (under 21 days).'
+                : 'This cycle was <strong>long</strong> (36 days or more).'}
+          </p>
+        </div>` : '';
+
+      // Period length card
+      const periodLenCard = periodLen ? `
+        <div class="detail-stat-card">
+          <div class="detail-stat-label">Period length</div>
+          <div class="detail-stat-row">
+            <div class="detail-stat-number">${periodLen} day${periodLen !== 1 ? 's' : ''}</div>
+            <span class="detail-badge ${periodLenNormal ? 'badge-normal' : 'badge-abnormal'}">
+              ${periodLenNormal
+                ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Normal'
+                : '⚠️ Abnormal'}
+            </span>
+          </div>
+          <hr class="detail-divider">
+          <p class="detail-stat-note">
+            ${periodLenNormal
+              ? 'The length of this period was within the <strong>normal</strong> range (2–7 days).'
+              : periodLen < 2
+                ? 'This period was <strong>shorter than usual</strong> (under 2 days).'
+                : 'This period was <strong>longer than usual</strong> (more than 7 days).'}
+          </p>
+        </div>` : '';
+
+      // Events card
+      const events = [];
+
+      if (periodStart && periodEnd) {
+        events.push(`
+          <div class="detail-event">
+            <div class="detail-event-icon period-icon">🩸</div>
+            <div class="detail-event-text">Your period lasted from <strong>${fmtShort(periodStart)}</strong> to <strong>${fmtShort(periodEnd)}</strong></div>
+          </div>`);
+      } else if (periodStart) {
+        events.push(`
+          <div class="detail-event">
+            <div class="detail-event-icon period-icon">🩸</div>
+            <div class="detail-event-text">Period logged on <strong>${fmtShort(periodStart)}</strong></div>
+          </div>`);
+      }
+
+      if (fertileStartKey && fertileEndKey) {
+        events.push(`
+          <div class="detail-event">
+            <div class="detail-event-icon fertile-icon">🌿</div>
+            <div class="detail-event-text">Estimated fertile window: <strong>${fmtShort(fertileStartKey)}</strong> to <strong>${fmtShort(fertileEndKey)}</strong></div>
+          </div>`);
+      }
+
+      if (ovulationKey) {
+        events.push(`
+          <div class="detail-event">
+            <div class="detail-event-icon ovulation-icon">🌸</div>
+            <div class="detail-event-text">Estimated ovulation: <strong>${fmtShort(ovulationKey)}</strong></div>
+          </div>`);
+      }
+
+      const eventsCard = events.length ? `
+        <div class="detail-events-card">${events.join('')}</div>` : '';
+
+      container.innerHTML = `
+        <p class="detail-range">${rangeLabel}</p>
+        <div class="detail-dot-row">${dots.join('')}</div>
+        <div class="detail-legend">
+          <span class="detail-legend-item"><span class="detail-dot dot-period" style="display:inline-block"></span>Period</span>
+          <span class="detail-legend-item"><span class="detail-dot dot-fertile" style="display:inline-block"></span>Fertile</span>
+          <span class="detail-legend-item"><span class="detail-dot dot-ovulation" style="display:inline-block"></span>Ovulation</span>
+          <span class="detail-legend-item"><span class="detail-dot dot-luteal" style="display:inline-block"></span>Luteal</span>
+        </div>
+        ${cycleLenCard}
+        ${periodLenCard}
+        ${eventsCard}
+        ${isCurrent ? '' : '<p class="detail-disclaimer">Fertile window and ovulation are estimates based on cycle timing. Not medical advice.</p>'}
+      `;
+    }
+  </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 /**
- * settings.js — Preferences UI
+ * settings.js - Preferences UI
  * - Loads from backend (account mode) or localStorage (anon mode)
  * - Saves to backend + localStorage in account mode
  * - Local-only in anon mode
@@ -32,6 +32,7 @@ const els = {
   periodReminder: document.getElementById("pref-period-reminder"),
   fertileAlert:   document.getElementById("pref-fertile-alert"),
   compact:        document.getElementById("pref-compact"),
+  discreetNotif:  document.getElementById("pref-discreet-notif"),
   save:           document.getElementById("save-prefs"),
   reset:          document.getElementById("reset-prefs"),
   status:         document.getElementById("prefs-status"),
@@ -64,7 +65,7 @@ async function loadFromBackend() {
     const headers = await authHeaders();
     if (!headers) return null;
 
-    const res = await fetch(`${API_BASE}/preferences`, { headers });
+    const res = await fetch(`${API_BASE}/api/preferences`, { headers });
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -85,7 +86,7 @@ async function saveToBackend(prefs) {
       compact:        prefs.compact        ?? false,
       reminders: {
         enabled:      prefs.reminders      ?? false,
-        discreetCopy: false,
+        discreetCopy: prefs.discreetNotif ?? false,
         types: [
           ...(prefs.periodReminder ? ["PERIOD_SOON"] : []),
           ...(prefs.fertileAlert   ? ["FERTILE_WINDOW"] : []),
@@ -93,7 +94,7 @@ async function saveToBackend(prefs) {
       },
     };
 
-    const res = await fetch(`${API_BASE}/preferences`, {
+    const res = await fetch(`${API_BASE}/api/preferences`, {
       method:  "PUT",
       headers,
       body:    JSON.stringify(payload),
@@ -120,7 +121,7 @@ function applyPrefsToUI(prefs) {
   if (els.hideSensitive)  els.hideSensitive.checked  = !!prefs.hideSensitive;
   if (els.compact)        els.compact.checked        = !!prefs.compact;
 
-  // Reminders — flatten from backend shape or local shape
+  // Reminders - flatten from backend shape or local shape
   const remindersEnabled = prefs.reminders?.enabled ?? !!prefs.reminders;
   if (els.reminders) els.reminders.checked = remindersEnabled;
 
@@ -130,6 +131,9 @@ function applyPrefsToUI(prefs) {
   }
   if (els.fertileAlert) {
     els.fertileAlert.checked = types.includes("FERTILE_WINDOW") || !!prefs.fertileAlert;
+  }
+  if (els.discreetNotif) {
+    els.discreetNotif.checked = prefs.reminders?.discreetCopy ?? !!prefs.discreetNotif;
   }
 }
 
@@ -146,7 +150,7 @@ async function init() {
   if (isAccountMode()) {
     const cloudPrefs = await loadFromBackend();
     if (cloudPrefs) {
-      // Cloud is source of truth — merge into local cache
+      // Cloud is source of truth - merge into local cache
       prefs = { ...prefs, ...cloudPrefs };
       setLocalPrefs(prefs);
     }
@@ -173,6 +177,7 @@ els.save?.addEventListener("click", async () => {
     periodReminder: els.periodReminder?.checked ?? false,
     fertileAlert:   els.fertileAlert?.checked   ?? false,
     compact:        els.compact?.checked        ?? false,
+    discreetNotif:  els.discreetNotif?.checked  ?? false,
   };
 
   // Always save locally first

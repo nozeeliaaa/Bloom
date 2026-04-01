@@ -1,5 +1,5 @@
 /**
- * auth.js — Firebase Authentication Helpers (Frontend)
+ * auth.js - Firebase Authentication Helpers (Frontend)
  * - Login / Register / Logout
  * - Email verification enforcement
  * - Password reset flow
@@ -204,7 +204,7 @@ export async function register(email, password) {
 // ─────────────────────────────────────────
 
 /**
- * Login — blocks if email not verified.
+ * Login - blocks if email not verified.
  * Throws err.code = "auth/email-not-verified" so UI can offer resend.
  */
 export async function login(email, password) {
@@ -256,7 +256,28 @@ export async function resendVerificationEmail(email, password) {
 // LOGOUT
 // ─────────────────────────────────────────
 
+// All localStorage keys that belong to the signed-in user.
+// These must be cleared on logout so the next user starts with a clean slate.
+const USER_LOCAL_KEYS = [
+  "bloom_daily_logs",
+  "bloom_assistant_session",
+  "bloom_bloomie_memory",
+  "bloom_avatar",
+  "bloom_goal",
+  "bloom_onboarded",
+  "bloom_yob_locked",
+  "bloom_profile",
+  "bloom_lmp",
+  "bloom_user_name",
+  "bloom_notification_inbox",
+  "bloom_notified",
+  "bloom_preferences",
+  "bloom_show_mode_banner_once",
+];
+
 export async function logout() {
   clearCachedRole();
+  USER_LOCAL_KEYS.forEach(key => localStorage.removeItem(key));
+  setMode("anon");
   await signOut(auth());
 }

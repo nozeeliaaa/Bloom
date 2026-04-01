@@ -67,6 +67,15 @@
     .lmp-field { display: none; }
     .lmp-field.visible { display: block; }
     .tiny { font-size: 0.88rem; color: var(--color-text-muted); }
+    #yob-locked-note { color: var(--color-text-muted); font-style: italic; }
+    #yob-display { margin: 0; padding: 0.5rem 0.75rem; background: var(--color-bg-subtle, #f5f0f3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 1rem; color: var(--color-text); }
+    .weight-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; }
+    .weight-label-row .form-label { margin: 0; }
+    .unit-toggle { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+    .unit-btn { padding: 0.2rem 0.65rem; font-size: 0.78rem; font-weight: 700; border: none; background: var(--color-bg); color: var(--color-text-muted); cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .unit-btn.active { background: var(--color-primary); color: #fff; }
+    .height-imperial { display: flex; gap: 0.5rem; }
+    .height-imperial .form-input { flex: 1; }
   </style>
 </head>
 
@@ -104,14 +113,18 @@
               Nickname
               <input class="form-input" id="nickname" type="text" placeholder="e.g.,Jane" maxlength="40" autocomplete="off" />
             </label>
-            <label class="form-label">
-              Year of Birth
-              <input class="form-input" id="yob" type="number" placeholder="e.g., 2006" min="1900" max="2100" />
-            </label>
+            <div>
+              <label class="form-label" for="yob">Year of Birth</label>
+              <select class="form-input" id="yob">
+                <option value="">- Select year -</option>
+              </select>
+              <p id="yob-display" hidden></p>
+              <p class="form-hint form-hint-mt" id="yob-hint">Your year of birth helps us age-appropriate your content. You can only set this once.</p>
+              <p class="form-hint form-hint-mt" id="yob-locked-note" hidden>Contact support to change your year of birth.</p>
+            </div>
           </div>
           <div class="row-actions">
             <button class="btn btn-primary" id="save-btn" type="button">Save</button>
-            <button class="btn btn-outline" id="logout-btn" type="button">Log out</button>
           </div>
         </section>
 
@@ -126,6 +139,30 @@
               Typical period duration (days)
               <input class="form-input" id="period-duration" type="number" placeholder="e.g., 5" min="1" max="14" />
             </label>
+            <div>
+              <div class="weight-label-row">
+                <label class="form-label" for="weight">Weight</label>
+                <div class="unit-toggle" id="weight-unit-toggle" role="group" aria-label="Weight unit">
+                  <button type="button" class="unit-btn active" data-unit="kg">kg</button>
+                  <button type="button" class="unit-btn" data-unit="lb">lb</button>
+                </div>
+              </div>
+              <input class="form-input" id="weight" type="number" placeholder="e.g., 60" min="20" max="700" step="0.1" />
+            </div>
+            <div>
+              <div class="weight-label-row">
+                <label class="form-label" for="height-cm">Height</label>
+                <div class="unit-toggle" id="height-unit-toggle" role="group" aria-label="Height unit">
+                  <button type="button" class="unit-btn active" data-unit="cm">cm</button>
+                  <button type="button" class="unit-btn" data-unit="ft">ft</button>
+                </div>
+              </div>
+              <input class="form-input" id="height-cm" type="number" placeholder="e.g., 165" min="50" max="272" step="0.1" />
+              <div class="height-imperial" id="height-imperial" hidden>
+                <input class="form-input" id="height-ft" type="number" placeholder="ft" min="1" max="8" step="1" />
+                <input class="form-input" id="height-in" type="number" placeholder="in" min="0" max="11" step="1" />
+              </div>
+            </div>
             <div class="lmp-field" id="lmp-field">
               <label class="form-label">
                 Last Menstrual Period (LMP) date
@@ -161,7 +198,7 @@
 
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner } from "/js/utils.js";
-    import { logout, onAuthChange, getUser } from "/js/auth.js";
+    import { onAuthChange, getUser, getIdToken } from "/js/auth.js";
     import { setMode } from "/js/mode.js";
     import { getFirebaseAuth, isFirebaseConfigured } from "/js/firebase.js";
     import { getUserGoal } from "/js/goals.js";
@@ -170,9 +207,12 @@
     renderFooter();
     renderModeBanner(document.getElementById("banner-area"));
 
-    const LS_PROFILE = "bloom_profile";
-    const LS_AVATAR  = "bloom_avatar";
-    const LS_LMP     = "bloom_lmp";
+    const LS_PROFILE     = "bloom_profile";
+    const LS_AVATAR      = "bloom_avatar";
+    const LS_LMP         = "bloom_lmp";
+    const LS_YOB_LOCKED  = "bloom_yob_locked";
+    const LS_WEIGHT_UNIT = "bloom_weight_unit";
+    const LS_HEIGHT_UNIT = "bloom_height_unit";
 
     const statusEl         = document.getElementById("status");
     const avatarBig        = document.getElementById("avatar-big");
@@ -183,12 +223,92 @@
     const periodDurEl      = document.getElementById("period-duration");
     const lmpFieldEl       = document.getElementById("lmp-field");
     const lmpDateEl        = document.getElementById("lmp-date");
+    const yobLockedNote    = document.getElementById("yob-locked-note");
+    const yobDisplay       = document.getElementById("yob-display");
+    const yobHint          = document.getElementById("yob-hint");
     const saveBtn          = document.getElementById("save-btn");
+    const weightEl         = document.getElementById("weight");
+    const weightUnitToggle = document.getElementById("weight-unit-toggle");
+    const heightCmEl       = document.getElementById("height-cm");
+    const heightFtEl       = document.getElementById("height-ft");
+    const heightInEl       = document.getElementById("height-in");
+    const heightImperial   = document.getElementById("height-imperial");
+    const heightUnitToggle = document.getElementById("height-unit-toggle");
     const saveLifestyleBtn = document.getElementById("save-lifestyle-btn");
-    const logoutBtn        = document.getElementById("logout-btn");
+    let weightUnit = localStorage.getItem(LS_WEIGHT_UNIT) || "kg";
+    let heightUnit = localStorage.getItem(LS_HEIGHT_UNIT) || "cm";
     const deleteBtn        = document.getElementById("delete-btn");
     const deleteHint       = document.getElementById("delete-hint");
     const accountLine      = document.getElementById("account-line");
+
+    function kgToLb(kg) { return +(kg * 2.20462).toFixed(1); }
+    function lbToKg(lb) { return +(lb / 2.20462).toFixed(1); }
+
+    function cmToFtIn(cm) {
+      const totalIn = cm / 2.54;
+      return { ft: Math.floor(totalIn / 12), in: Math.round(totalIn % 12) };
+    }
+    function ftInToCm(ft, inches) { return +((ft * 30.48) + (inches * 2.54)).toFixed(1); }
+
+    function setHeightUnit(unit) {
+      const prev = heightUnit;
+      heightUnit = unit;
+      localStorage.setItem(LS_HEIGHT_UNIT, unit);
+      heightUnitToggle.querySelectorAll(".unit-btn").forEach(b =>
+        b.classList.toggle("active", b.dataset.unit === unit)
+      );
+      if (unit === "ft") {
+        heightCmEl.hidden = true;
+        heightImperial.hidden = false;
+        // Convert existing cm value to ft/in
+        const cm = parseFloat(heightCmEl.value);
+        if (!isNaN(cm)) {
+          const { ft, in: ins } = cmToFtIn(cm);
+          heightFtEl.value = ft;
+          heightInEl.value = ins;
+        }
+      } else {
+        heightImperial.hidden = true;
+        heightCmEl.hidden = false;
+        // Convert existing ft/in to cm
+        const ft = parseFloat(heightFtEl.value);
+        const ins = parseFloat(heightInEl.value) || 0;
+        if (!isNaN(ft)) {
+          heightCmEl.value = ftInToCm(ft, ins);
+        }
+      }
+    }
+
+    function setWeightUnit(unit) {
+      const prev = weightUnit;
+      weightUnit = unit;
+      localStorage.setItem(LS_WEIGHT_UNIT, unit);
+      weightUnitToggle.querySelectorAll(".unit-btn").forEach(b =>
+        b.classList.toggle("active", b.dataset.unit === unit)
+      );
+      // Convert displayed value when switching units
+      const val = parseFloat(weightEl.value);
+      if (!isNaN(val)) {
+        weightEl.value = unit === "lb" && prev === "kg" ? kgToLb(val) : lbToKg(val);
+      }
+      weightEl.placeholder = unit === "kg" ? "e.g., 60" : "e.g., 132";
+    }
+
+    function lockYobUI(year) {
+      yobEl.hidden = true;
+      if (yobHint) yobHint.hidden = true;
+      if (yobDisplay) { yobDisplay.textContent = year; yobDisplay.hidden = false; }
+      if (yobLockedNote) yobLockedNote.hidden = false;
+    }
+
+    function populateYobSelect() {
+      const currentYear = new Date().getFullYear();
+      const opts = ['<option value="">- Select year -</option>'];
+      for (let y = currentYear; y >= 1930; y--) {
+        opts.push(`<option value="${y}">${y}</option>`);
+      }
+      yobEl.innerHTML = opts.join("");
+    }
 
     function showStatus(msg) {
       statusEl.textContent = msg;
@@ -207,6 +327,18 @@
       document.querySelectorAll(".avatar-btn").forEach(b =>
         b.classList.toggle("active", b.dataset.avatar === emoji)
       );
+      // Persist avatar to backend profile
+      if (getUser()) {
+        getIdToken().then(token => {
+          if (!token) return;
+          const apiBase = window.BLOOM_API_BASE || "http://localhost:4000";
+          fetch(`${apiBase}/api/user/profile`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ avatar: emoji }),
+          }).catch(() => {});
+        });
+      }
     }
 
     function initAvatarPicker() {
@@ -230,6 +362,29 @@
       periodDurEl.value = p.periodDuration || "";
       const lmp = localStorage.getItem(LS_LMP);
       if (lmp) lmpDateEl.value = lmp;
+
+      // Load weight in the current unit (stored internally as kg)
+      setWeightUnit(weightUnit);
+      if (p.weightKg) {
+        weightEl.value = weightUnit === "kg" ? p.weightKg : kgToLb(p.weightKg);
+      }
+
+      // Load height in the current unit (stored internally as cm)
+      setHeightUnit(heightUnit);
+      if (p.heightCm) {
+        if (heightUnit === "cm") {
+          heightCmEl.value = p.heightCm;
+        } else {
+          const { ft, in: ins } = cmToFtIn(p.heightCm);
+          heightFtEl.value = ft;
+          heightInEl.value = ins;
+        }
+      }
+
+      if (p.yob || localStorage.getItem(LS_YOB_LOCKED)) {
+        localStorage.setItem(LS_YOB_LOCKED, "true");
+        lockYobUI(p.yob || "");
+      }
     }
 
     function toggleLmpField() {
@@ -237,18 +392,34 @@
     }
 
     // Save personal details
-    saveBtn.addEventListener("click", () => {
-      const nickname = nicknameEl.value.trim();
-      const yob      = yobEl.value.trim();
-      if (yob) {
-        const n = Number(yob);
-        if (!Number.isFinite(n) || n < 1900 || n > 2100) {
-          showStatus("Year of Birth must be between 1900 and 2100.");
-          return;
-        }
-      }
-      const profile = { ...loadProfile(), nickname, yob: yob ? Number(yob) : "" };
+    saveBtn.addEventListener("click", async () => {
+      const nickname   = nicknameEl.value.trim();
+      const yob        = yobEl.value;
+      const wasLocked  = !!localStorage.getItem(LS_YOB_LOCKED);
+      const prevProfile = loadProfile();
+
+      const profile = { ...prevProfile, nickname, yob: yob ? Number(yob) : "" };
       localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+
+      // Lock YOB after it is set for the first time
+      if (yob && !wasLocked) {
+        localStorage.setItem(LS_YOB_LOCKED, "true");
+        lockYobUI(yob);
+      }
+
+      // Persist nickname to Firestore via backend (account mode only)
+      if (getUser()) {
+        try {
+          const token = await getIdToken();
+          const apiBase = window.BLOOM_API_BASE || "http://localhost:4000";
+          await fetch(`${apiBase}/api/user/profile`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ nickname }),
+          });
+        } catch (_) { /* non-critical - localStorage is the source of truth locally */ }
+      }
+
       showStatus("Profile saved ✓");
     });
 
@@ -257,10 +428,25 @@
       const avgCycle  = avgCycleEl.value.trim();
       const periodDur = periodDurEl.value.trim();
       const lmp       = lmpDateEl.value;
+      const weightRaw = parseFloat(weightEl.value);
+      const weightKg  = isNaN(weightRaw) ? "" : (weightUnit === "kg" ? weightRaw : lbToKg(weightRaw));
+
+      let heightCm = "";
+      if (heightUnit === "cm") {
+        const v = parseFloat(heightCmEl.value);
+        if (!isNaN(v)) heightCm = v;
+      } else {
+        const ft = parseFloat(heightFtEl.value);
+        const ins = parseFloat(heightInEl.value) || 0;
+        if (!isNaN(ft)) heightCm = ftInToCm(ft, ins);
+      }
+
       const profile   = {
         ...loadProfile(),
         avgCycleLength: avgCycle  ? Number(avgCycle)  : "",
         periodDuration: periodDur ? Number(periodDur) : "",
+        weightKg,
+        heightCm,
       };
       localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
       if (getUserGoal() === "pregnancy" && lmp) {
@@ -272,12 +458,6 @@
       showStatus("Lifestyle details saved ✓");
     });
 
-    // Logout
-    logoutBtn.addEventListener("click", async () => {
-      await logout();
-      setMode("anon");
-      window.location.href = "/index.html";
-    });
 
     // Delete account
     deleteBtn.addEventListener("click", async () => {
@@ -316,7 +496,15 @@
       }
     });
 
+    weightUnitToggle.querySelectorAll(".unit-btn").forEach(btn =>
+      btn.addEventListener("click", () => setWeightUnit(btn.dataset.unit))
+    );
+    heightUnitToggle.querySelectorAll(".unit-btn").forEach(btn =>
+      btn.addEventListener("click", () => setHeightUnit(btn.dataset.unit))
+    );
+
     initAvatarPicker();
+    populateYobSelect();
     fillFields();
     toggleLmpField();
   </script>

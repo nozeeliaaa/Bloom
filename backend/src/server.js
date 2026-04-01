@@ -5,6 +5,10 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import cycleLogRoutes from "./routes/cycleLogs.js";
 import symptomLogRoutes from "./routes/symptomLogs.js";
 import consentRoutes from "./routes/consent.js";
@@ -34,6 +38,9 @@ app.use(
   })
 );
 app.use(express.json());
+
+// Serve the frontend folder at the root so localhost:4000/pages/clinics.html works
+app.use(express.static(path.join(__dirname, "../../frontend")));
 
 // --- Rate limiting ---
 // General limiter for all API routes: 200 requests / 15 minutes per IP

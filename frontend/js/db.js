@@ -1,5 +1,5 @@
 /**
- * db.js — Hybrid persistence:
+ * db.js - Hybrid persistence:
  * - anon mode: localStorage only
  * - account mode: sync to backend using Firebase ID token
  *
@@ -41,6 +41,30 @@ function writeJSON(key, value) {
 
 function setCloudSyncedBanner() {
   localStorage.setItem(MODE_BANNER_ONCE_KEY, "1");
+}
+
+// In-memory cache for getAllLogs — avoids repeated API calls within the same page session
+let _logsCache = null;
+let _logsCacheMode = null;
+
+export function invalidateLogsCache() {
+  _logsCache = null;
+}
+
+function showSyncWarning() {
+  // Show a toast warning that cloud save failed — data is local only
+  if (document.getElementById("db-sync-warn")) return; // already showing
+  const el = document.createElement("div");
+  el.id = "db-sync-warn";
+  el.style.cssText = `
+    position:fixed; bottom:1.25rem; left:50%; transform:translateX(-50%);
+    background:#b91c1c; color:#fff; font-weight:700; font-size:0.85rem;
+    padding:0.6rem 1.1rem; border-radius:999px; z-index:9999;
+    box-shadow:0 4px 16px rgba(0,0,0,0.18); max-width:90vw; text-align:center;
+  `;
+  el.textContent = "⚠️ Could not save to cloud — your data may be lost on logout. Check the backend is running.";
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 8000);
 }
 
 async function authHeaders() {
@@ -86,13 +110,16 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
     const dateKey = entry?.dateKey;
     if (!dateKey) continue;
 
+    // Map numeric flowLevel back to string used by the frontend
+    const NUM_TO_FLOW = { 0: "none", 1: "light", 2: "medium", 3: "heavy" };
+    const flowStr = entry.flowLevel != null
+      ? (NUM_TO_FLOW[entry.flowLevel] ?? "none")
+      : "none";
+
     merged[dateKey] = {
       ...(merged[dateKey] || {}),
       date: dateKey,
-      flow:
-        entry.flowLevel && entry.flowLevel !== "none"
-          ? entry.flowLevel
-          : "none",
+      flow: flowStr,
       notes: entry.notes || "",
     };
   }
@@ -142,15 +169,18 @@ export async function saveDailyLog(dateKey, log) {
 
     const localEntry = all[dateKey];
 
+    // Map flow string to numeric level expected by backend
+    const FLOW_TO_NUM = { none: 0, spotting: 1, light: 1, medium: 2, heavy: 3 };
+    const flowNum = localEntry.flow && localEntry.flow !== "none"
+      ? (FLOW_TO_NUM[localEntry.flow] ?? null)
+      : null;
+
     // 1) Save cycle data
     const cycleRes = await fetch(apiUrl(`/api/logs/${encodeURIComponent(dateKey)}`), {
       method: "PUT",
       headers,
       body: JSON.stringify({
-        flowLevel:
-          localEntry.flow && localEntry.flow !== "none"
-            ? localEntry.flow
-            : null,
+        flowLevel: flowNum,
         notes: localEntry.notes || "",
       }),
     });
@@ -158,6 +188,7 @@ export async function saveDailyLog(dateKey, log) {
     if (!cycleRes.ok) {
       const txt = await cycleRes.text().catch(() => "");
       console.warn("Cycle cloud save failed:", cycleRes.status, txt);
+      showSyncWarning();
       return all[dateKey];
     }
 
@@ -200,9 +231,11 @@ export async function saveDailyLog(dateKey, log) {
     }
 
     setCloudSyncedBanner();
+    invalidateLogsCache();
     return all[dateKey];
   } catch (e) {
     console.warn("Cloud save error:", e);
+    showSyncWarning();
     return all[dateKey];
   }
 }
@@ -220,6 +253,9 @@ export async function getAllLogs() {
   const local = readJSON(LOGS_KEY, {});
 
   if (!isAccountMode()) return local;
+
+  // Return cached result if available for this session
+  if (_logsCache && _logsCacheMode === "account") return _logsCache;
 
   try {
     const headers = await authHeaders();
@@ -259,10 +295,18 @@ export async function getAllLogs() {
 
     const logs = mergeCloudLogs(cycleItems, symptomItems);
 
-    writeJSON(LOGS_KEY, logs);
-    setCloudSyncedBanner();
+    // Only overwrite local cache if cloud actually returned data.
+    // If cloud is empty but local has entries, keep local to avoid
+    // wiping logs that were saved before a sync had a chance to run.
+    if (Object.keys(logs).length > 0) {
+      writeJSON(LOGS_KEY, logs);
+      setCloudSyncedBanner();
+      _logsCache = logs;
+      _logsCacheMode = "account";
+      return logs;
+    }
 
-    return logs;
+    return local;
   } catch (e) {
     console.warn("Cloud fetch error:", e);
     return local;

@@ -4,13 +4,13 @@
  * Fire-and-forget safety event logger.
  *
  * Writes structured events to POST /api/bloomie-safety-log.
- * Never throws — logging must never interrupt the chat flow.
+ * Never throws - logging must never interrupt the chat flow.
  * Silently skips if user is not in account mode (not signed in).
  *
  * Three event types:
- *   urgent_trigger  — inferRoute / keyword router resolved to HEAVY_URGENT
- *   oos_fallback    — user input fell to OOS handler (no health route matched)
- *   escalation      — HEAVY_URGENT node actually rendered ("seek care" shown)
+ *   urgent_trigger  - inferRoute / keyword router resolved to HEAVY_URGENT
+ *   oos_fallback    - user input fell to OOS handler (no health route matched)
+ *   escalation      - HEAVY_URGENT node actually rendered ("seek care" shown)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -20,7 +20,7 @@ import { isAccountMode } from "./mode.js";
 const API_BASE = window.BLOOM_API_BASE || "";
 
 export function logSafetyEvent(type, payload = {}) {
-  // Skip logging for anonymous users — no account, no record
+  // Skip logging for anonymous users - no account, no record
   if (!isAccountMode()) return;
 
   // Kick off async without awaiting or propagating errors

@@ -148,7 +148,7 @@ export function detectPeriodStatusSignal({
       show: true,
       title: "Period may be late",
       message: stressDelay
-        ? "Periods can sometimes be delayed by stress, travel, or illness — this may be one of those cycles."
+        ? "Periods can sometimes be delayed by stress, travel, or illness - this may be one of those cycles."
         : irregular
           ? "Bloom noticed your period may be running late, though your recent cycles also look more variable than usual."
           : "Bloom noticed your period may be running late based on your expected cycle window.",
@@ -212,11 +212,11 @@ export function detectPeriodStatusSignal({
  * Detect statistical instability in recent cycle lengths.
  *
  * Accepts optional context flags:
- *   isPostpartum          — suppress IRREGULAR_CYCLE for first 3 post-birth cycles
- *   postpartumCycleCount  — cycles logged since birth
- *   recentlyStoppedBC     — suppress for first 3 cycles after stopping hormonal BC
- *   recentlyStoppedBCCycleCount — cycles since stopping BC
- *   userAge               — teen users (< 18) get relaxed thresholds
+ *   isPostpartum          - suppress IRREGULAR_CYCLE for first 3 post-birth cycles
+ *   postpartumCycleCount  - cycles logged since birth
+ *   recentlyStoppedBC     - suppress for first 3 cycles after stopping hormonal BC
+ *   recentlyStoppedBCCycleCount - cycles since stopping BC
+ *   userAge               - teen users (< 18) get relaxed thresholds
  */
 export function detectIrregularCycleSignal({
   cycleLengths = [],
@@ -229,7 +229,7 @@ export function detectIrregularCycleSignal({
   recentlyStoppedBCCycleCount = 0,
   userAge = null,
 } = {}) {
-  // Teen users — relax thresholds (cycles 21–45 days are normal variation)
+  // Teen users - relax thresholds (cycles 21–45 days are normal variation)
   const effectiveStdDevThreshold = (userAge !== null && userAge < 18) ? 8  : stdDevThreshold;
   const effectiveRangeThreshold  = (userAge !== null && userAge < 18) ? 15 : rangeThreshold;
 
@@ -242,7 +242,7 @@ export function detectIrregularCycleSignal({
     });
   }
 
-  // Postpartum: first 3 cycles are expected to be irregular — show a gentle note instead
+  // Postpartum: first 3 cycles are expected to be irregular - show a gentle note instead
   if (isPostpartum && postpartumCycleCount < 3) {
     return makeSignal({
       code: "IRREGULAR_CYCLE",
@@ -255,7 +255,7 @@ export function detectIrregularCycleSignal({
     });
   }
 
-  // Recently stopped BC: first 3 settling cycles — suppress irregular signal
+  // Recently stopped BC: first 3 settling cycles - suppress irregular signal
   if (recentlyStoppedBC && recentlyStoppedBCCycleCount < 3) {
     return makeSignal({
       code: "IRREGULAR_CYCLE",
@@ -679,7 +679,7 @@ export function groupSignalsByCategory(signals = []) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Track Changes mode template — store in Firebase when user taps "Enable Track Changes".
+ * Track Changes mode template - store in Firebase when user taps "Enable Track Changes".
  * Generates a 28-day tracking plan with 6 check-in prompts.
  */
 export function buildTrackChangesPlan({ today = new Date() } = {}) {
@@ -708,10 +708,10 @@ export function buildTrackChangesPlan({ today = new Date() } = {}) {
 /**
  * Deduplicate a list of period start dates.
  * Any two dates within dedupDays of each other are treated as the same
- * period — the earlier date is kept and the later one is discarded.
+ * period - the earlier date is kept and the later one is discarded.
  *
  * @param  {(Date|string|number)[]} dates
- * @param  {number} dedupDays  — threshold (default 3)
+ * @param  {number} dedupDays  - threshold (default 3)
  * @returns {Date[]}
  */
 export function deduplicatePeriods(dates = [], dedupDays = 3) {
@@ -736,7 +736,7 @@ export function deduplicatePeriods(dates = [], dedupDays = 3) {
  * (within windowDays, default 10) but not close enough to be obvious duplicates.
  *
  * @param  {(Date|string|number)[]} dates
- * @param  {number} windowDays — threshold (default 10)
+ * @param  {number} windowDays - threshold (default 10)
  * @returns {{ suspicious: boolean, pairs: Array<{date1: Date, date2: Date, gapDays: number}> }}
  */
 export function detectSuspiciousEntries(dates = [], windowDays = 10) {
@@ -761,14 +761,14 @@ export function detectSuspiciousEntries(dates = [], windowDays = 10) {
 
 /**
  * Compute average cycle length with:
- *   — sparse data guard (0 or 1 cycles → return default 28)
- *   — 90-day gap detection (exclude pre-gap cycles and the gap cycle itself)
- *   — outlier exclusion (> 2 standard deviations from the remaining mean)
+ *   - sparse data guard (0 or 1 cycles → return default 28)
+ *   - 90-day gap detection (exclude pre-gap cycles and the gap cycle itself)
+ *   - outlier exclusion (> 2 standard deviations from the remaining mean)
  *
  * @param  {number[]} cycleLengths
  * @param  {Object}   opts
- * @param  {number}   opts.defaultLength    — returned when data is insufficient (default 28)
- * @param  {number}   opts.gapThresholdDays — gap that triggers pre-gap exclusion (default 90)
+ * @param  {number}   opts.defaultLength    - returned when data is insufficient (default 28)
+ * @param  {number}   opts.gapThresholdDays - gap that triggers pre-gap exclusion (default 90)
  * @returns {{
  *   average: number,
  *   usedDefault: boolean,
@@ -846,9 +846,9 @@ export function computeRobustAverageCycleLength(cycleLengths = [], {
  * Signal when symptom history is rich but no cycle data has been logged.
  *
  * @param {Object} params
- * @param {number}  params.symptomEntryCount — total logged symptom entries
- * @param {boolean} params.hasCycleData      — true if any period dates are logged
- * @param {number}  params.minEntries        — threshold before signal fires (default 30)
+ * @param {number}  params.symptomEntryCount - total logged symptom entries
+ * @param {boolean} params.hasCycleData      - true if any period dates are logged
+ * @param {number}  params.minEntries        - threshold before signal fires (default 30)
  * @returns {CycleSignal}
  */
 export function detectSymptomWithoutCycleData({
@@ -863,7 +863,7 @@ export function detectSymptomWithoutCycleData({
     show,
     title: "Add period dates to unlock insights",
     message: show
-      ? "You've been logging symptoms — great 🩷 Adding your period start dates will help Bloom connect your symptoms to your cycle and give you much better insights."
+      ? "You've been logging symptoms - great 🩷 Adding your period start dates will help Bloom connect your symptoms to your cycle and give you much better insights."
       : "",
     debug: { symptomEntryCount, hasCycleData, minEntries },
   });
@@ -886,7 +886,7 @@ export function detectLongBleedingEntry(periodEntries = []) {
     show,
     title: "Extended bleeding flagged",
     message: show
-      ? "You logged bleeding for more than 10 days — this has been noted but won't affect your average period length. If this is ongoing, it's worth mentioning to a provider 🩷"
+      ? "You logged bleeding for more than 10 days - this has been noted but won't affect your average period length. If this is ongoing, it's worth mentioning to a provider 🩷"
       : "",
     debug: { longEntries: long },
   });
@@ -908,7 +908,7 @@ export function detectSuspiciousEntrySignal(dates = []) {
     show: suspicious,
     title: "Unusual period entries",
     message: suspicious
-      ? "It looks like two period start dates were logged close together. Bloom will use the earlier one — you can update your calendar if needed."
+      ? "It looks like two period start dates were logged close together. Bloom will use the earlier one - you can update your calendar if needed."
       : "",
     debug: { pairs: pairs.map((p) => ({ gapDays: p.gapDays })) },
   });

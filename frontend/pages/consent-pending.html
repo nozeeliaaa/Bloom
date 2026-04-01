@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Waiting for Approval - Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <style>
+    .pending-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 120px);
+      padding: 2rem 1rem;
+    }
+    .pending-card {
+      width: 100%;
+      max-width: 460px;
+      text-align: center;
+    }
+    .envelope-anim {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-10px); }
+    }
+    .pending-card h1 {
+      font-size: 1.6rem;
+      color: var(--color-primary-dark);
+      margin-bottom: 0.5rem;
+    }
+    .pending-card .subtitle {
+      color: var(--color-text-muted);
+      font-size: 0.95rem;
+      line-height: 1.65;
+      margin-bottom: 1.5rem;
+    }
+    .guardian-email-display {
+      font-weight: 700;
+      color: var(--color-text);
+    }
+    .pending-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+    .resend-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .countdown-note {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      margin-top: 0.25rem;
+    }
+    /* Update email inline form */
+    .update-email-toggle {
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+      margin-top: 0.5rem;
+    }
+    .update-email-form {
+      margin-top: 0.75rem;
+      text-align: left;
+    }
+    .update-email-form .form-group { margin-bottom: 0.65rem; }
+    .polling-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      animation: pulse 1.4s ease-in-out infinite;
+      margin-right: 0.35rem;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.8); }
+    }
+    .checking-label {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="pending-page">
+    <div class="card pending-card">
+
+      <div class="envelope-anim" aria-hidden="true">📩</div>
+
+      <h1>Waiting for approval</h1>
+      <p class="subtitle">
+        We sent an email to <span class="guardian-email-display" id="guardian-email-display">your guardian</span>.<br>
+        Once they approve, you're in!
+      </p>
+
+      <div id="error-msg" class="banner banner-warning hidden" role="alert"></div>
+      <div id="success-msg" class="banner banner-success hidden" role="status"></div>
+
+      <p class="checking-label">
+        <span class="polling-dot"></span>Checking for approval…
+      </p>
+
+      <div class="pending-actions">
+        <button class="btn btn-outline resend-btn" id="resend-btn" type="button">
+          Resend Email
+        </button>
+        <p class="countdown-note hidden" id="countdown-note"></p>
+
+        <button class="update-email-toggle" id="update-email-toggle" type="button">
+          Wrong email? Update it here
+        </button>
+
+        <form id="update-email-form" class="update-email-form hidden">
+          <div class="form-group">
+            <label class="form-label" for="new-guardian-email">New Guardian Email</label>
+            <input class="form-input" type="email" id="new-guardian-email"
+              placeholder="parent@example.com" autocomplete="email" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="update-email-btn">
+            Update &amp; Resend
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </main>
+
+  <script type="module">
+    import { onAuthChange, getIdToken } from '/js/auth.js';
+    import { renderFooter } from '/js/utils.js';
+
+    renderFooter();
+
+    const guardianEmailDisplay = document.getElementById('guardian-email-display');
+    const resendBtn            = document.getElementById('resend-btn');
+    const countdownNote        = document.getElementById('countdown-note');
+    const updateToggle         = document.getElementById('update-email-toggle');
+    const updateForm           = document.getElementById('update-email-form');
+    const updateEmailBtn       = document.getElementById('update-email-btn');
+    const errorMsg             = document.getElementById('error-msg');
+    const successMsg           = document.getElementById('success-msg');
+
+    const storedEmail = localStorage.getItem('bloom_consent_guardian_email');
+    if (storedEmail) guardianEmailDisplay.textContent = storedEmail;
+
+    function showError(msg)   { errorMsg.textContent = msg; errorMsg.classList.remove('hidden'); successMsg.classList.add('hidden'); }
+    function showSuccess(msg) { successMsg.textContent = msg; successMsg.classList.remove('hidden'); errorMsg.classList.add('hidden'); }
+
+    let countdownInterval = null;
+
+    function startCountdown(seconds) {
+      resendBtn.disabled = true;
+      countdownNote.classList.remove('hidden');
+
+      function tick() {
+        if (seconds <= 0) {
+          clearInterval(countdownInterval);
+          resendBtn.disabled = false;
+          countdownNote.classList.add('hidden');
+          return;
+        }
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        countdownNote.textContent = `You can resend in ${h}h ${m}m ${s}s`;
+        seconds--;
+      }
+      tick();
+      countdownInterval = setInterval(tick, 1000);
+    }
+
+    // ── Poll for status changes ──
+    let pollInterval = null;
+
+    async function checkStatus(token, uid) {
+      try {
+        const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+        const res     = await fetch(`${apiBase}/api/consent/status`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.status === 'approved') {
+          clearInterval(pollInterval);
+          localStorage.setItem(`bloom_consent_status_${uid}`, 'approved');
+          window.location.href = '/pages/consent-approved.html';
+        } else if (data.status === 'denied') {
+          clearInterval(pollInterval);
+          localStorage.setItem(`bloom_consent_status_${uid}`, 'denied');
+          window.location.href = '/pages/consent-denied.html';
+        }
+      } catch (_) { /* silent - will retry on next tick */ }
+    }
+
+    onAuthChange(async (user) => {
+      if (!user) {
+        window.location.href = '/pages/login.html';
+        return;
+      }
+
+      const token = await getIdToken();
+
+      // Check immediately, then poll every 8 seconds
+      await checkStatus(token, user.uid);
+      pollInterval = setInterval(() => checkStatus(token, user.uid), 8000);
+
+      // ── Resend ──
+      resendBtn.addEventListener('click', async () => {
+        errorMsg.classList.add('hidden');
+        resendBtn.disabled    = true;
+        resendBtn.textContent = 'Sending…';
+
+        try {
+          const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+          const res     = await fetch(`${apiBase}/api/consent/resend`, {
+            method:  'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          const data = await res.json();
+
+          if (res.status === 429) {
+            startCountdown(data.retryAfterSeconds || 86400);
+            return;
+          }
+          if (!res.ok) {
+            showError(data.error || 'Could not resend. Please try again.');
+            resendBtn.disabled = false;
+            return;
+          }
+
+          showSuccess('Email resent! Ask your guardian to check their inbox.');
+          startCountdown(86400); // 24h
+        } catch (_) {
+          showError('Could not resend. Please check your connection.');
+          resendBtn.disabled = false;
+        } finally {
+          resendBtn.textContent = 'Resend Email';
+        }
+      });
+
+      // ── Update email toggle ──
+      updateToggle.addEventListener('click', () => {
+        updateForm.classList.toggle('hidden');
+      });
+
+      // ── Update email submit ──
+      updateForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorMsg.classList.add('hidden');
+        const newEmail = document.getElementById('new-guardian-email').value.trim();
+        if (!newEmail) return;
+
+        updateEmailBtn.disabled    = true;
+        updateEmailBtn.textContent = 'Updating…';
+
+        try {
+          const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+          const res     = await fetch(`${apiBase}/api/consent/update-email`, {
+            method:  'PATCH',
+            headers: {
+              'Content-Type':  'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ guardianEmail: newEmail }),
+          });
+          const data = await res.json();
+
+          if (!res.ok) {
+            showError(data.error || 'Could not update email. Please try again.');
+            return;
+          }
+
+          localStorage.setItem('bloom_consent_guardian_email', newEmail);
+          guardianEmailDisplay.textContent = newEmail;
+          updateForm.classList.add('hidden');
+          document.getElementById('new-guardian-email').value = '';
+          showSuccess('Guardian email updated and new request sent!');
+          startCountdown(86400);
+        } catch (_) {
+          showError('Could not update email. Please check your connection.');
+        } finally {
+          updateEmailBtn.disabled    = false;
+          updateEmailBtn.textContent = 'Update & Resend';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

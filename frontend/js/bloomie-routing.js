@@ -7,10 +7,10 @@
  * This makes them independently testable and reusable outside initBloomieChat.
  *
  * Modules:
- *   1. String utilities   — normalizeText, safeEcho, pick, looksLikeGibberish
- *   2. OOS detection      — detectOutOfScope, resolveOOSFollowUp
- *   3. Signal scoring     — scoreSignals(text) → { sig, has }
- *   4. Route resolution   — resolveSignals(sig, has) → route | null
+ *   1. String utilities   - normalizeText, safeEcho, pick, looksLikeGibberish
+ *   2. OOS detection      - detectOutOfScope, resolveOOSFollowUp
+ *   3. Signal scoring     - scoreSignals(text) → { sig, has }
+ *   4. Route resolution   - resolveSignals(sig, has) → route | null
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -52,7 +52,7 @@ export function looksLikeGibberish(t) {
   if (letters / Math.max(1, t.length) < 0.35) return true;
   if (/^(.)\1{5,}$/.test(t.replace(/\s/g, ""))) return true;
   // Detect keyboard smash: unique characters have very few vowels (catches
-  // "asdfjkl" but NOT "helpppppp" — repeated chars don't dilute the unique set)
+  // "asdfjkl" but NOT "helpppppp" - repeated chars don't dilute the unique set)
   const words = t.trim().split(/\s+/);
   if (words.length === 1 && t.length >= 6) {
     const uniqueChars = [...new Set(t.replace(/\s/g, "").split(""))];
@@ -77,7 +77,7 @@ export function looksLikeGibberish(t) {
 export function detectOutOfScope(rawText, oosCategories, healthOverridePatterns) {
   const t = normalizeText(rawText);
 
-  // Cycle questions must be checked FIRST — before the health override —
+  // Cycle questions must be checked FIRST - before the health override -
   // because they contain words like "period" that would otherwise bypass OOS.
   const cycleMatch = oosCategories.find((cat) =>
     ["cycle_phase_q","next_period_q","last_period_q","edd_q","test_timing_q"].includes(cat.name) &&
@@ -162,7 +162,7 @@ export function resolveOOSFollowUp(rawText, lastOOS) {
  * Pure function. Scores the input text against intent signals.
  * Returns the raw score map and a has(key, min=1) convenience helper.
  *
- * No ctx, no side effects — safe to call in tests.
+ * No ctx, no side effects - safe to call in tests.
  */
 export function scoreSignals(t) {
   t = String(t || "").toLowerCase();
@@ -216,7 +216,7 @@ export function scoreSignals(t) {
   // discharge
   if (/discharge|odor|smell/.test(t))                            sig.discharge += 2;
 
-  // "is my period late?" — direct lateness question needing cycle math
+  // "is my period late?" - direct lateness question needing cycle math
   if (/is my period (late|overdue|due|coming)|has my period (come|arrived)/.test(t)) sig.late_check += 3;
   if (/period not (come|here|arrived)|period (supposed|expected) to/.test(t))        sig.late_check += 2;
 
@@ -282,7 +282,7 @@ export function resolveSignals(sig, has) {
 // ─── 5. ROUTE CONFIDENCE SCORING ─────────────────────────────────────────────
 
 /**
- * INTENT_LABELS — human-readable label for each signal key
+ * INTENT_LABELS - human-readable label for each signal key
  */
 const INTENT_LABELS = {
   late:       "late period",

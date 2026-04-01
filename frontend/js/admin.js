@@ -1,5 +1,5 @@
 /**
- * admin.js — Full admin dashboard logic
+ * admin.js - Full admin dashboard logic
  * Tabs: Overview | Users | Pamphlets | Clinics
  */
 
@@ -101,19 +101,19 @@ async function loadOverview() {
   try {
     const { stats } = await api("GET", "/stats");
 
-    setText("stat-users", stats.totalUsers ?? "—");
-    setText("stat-new-users", stats.newUsersThisWeek ?? "—");
-    setText("stat-cycle-logs", stats.totalCycleLogs ?? "—");
-    setText("stat-symptom-logs", stats.totalSymptomLogs ?? "—");
+    setText("stat-users", stats.totalUsers ?? "-");
+    setText("stat-new-users", stats.newUsersThisWeek ?? "-");
+    setText("stat-cycle-logs", stats.totalCycleLogs ?? "-");
+    setText("stat-symptom-logs", stats.totalSymptomLogs ?? "-");
 
     // Pamphlet + clinic counts come from their own endpoints
     api("GET", "/pamphlets")
-      .then((d) => setText("stat-pamphlets", d.pamphlets?.length ?? "—"))
-      .catch(() => setText("stat-pamphlets", "—"));
+      .then((d) => setText("stat-pamphlets", d.pamphlets?.length ?? "-"))
+      .catch(() => setText("stat-pamphlets", "-"));
 
     api("GET", "/clinics")
-      .then((d) => setText("stat-clinics", d.clinics?.length ?? "—"))
-      .catch(() => setText("stat-clinics", "—"));
+      .then((d) => setText("stat-clinics", d.clinics?.length ?? "-"))
+      .catch(() => setText("stat-clinics", "-"));
 
     const distEl = document.getElementById("goal-distribution");
     const dist = stats.goalDistribution || {};
@@ -164,8 +164,8 @@ async function loadUsers(pageToken = null) {
         </div>
         <div class="admin-item-meta">
           UID: ${u.uid} &bull;
-          Joined: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"} &bull;
-          Last sign-in: ${u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString() : "—"}
+          Joined: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"} &bull;
+          Last sign-in: ${u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString() : "-"}
         </div>
         <div style="margin-top:0.5rem;">
           <button class="btn btn-outline btn-sm" data-action="manage-user"
@@ -222,7 +222,7 @@ async function loadPamphlets() {
             ${p.sensitive ? `<span class="admin-badge admin-badge--warning">sensitive</span>` : ""}
           </div>
         </div>
-        <div class="admin-item-meta">${p.readTime ? p.readTime + " read" : ""} ${p.summary ? "— " + escHtml(p.summary.slice(0, 80)) + "…" : ""}</div>
+        <div class="admin-item-meta">${p.readTime ? p.readTime + " read" : ""} ${p.summary ? "- " + escHtml(p.summary.slice(0, 80)) + "…" : ""}</div>
         <div style="margin-top:0.5rem;display:flex;gap:0.4rem;">
           <button class="btn btn-outline btn-sm" data-action="edit-pamphlet" data-id="${p.id}">Edit</button>
           <button class="btn btn-sm" style="background:#ff3b6a;color:#fff;border:none;"

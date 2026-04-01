@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guardian Consent - Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <style>
+    .consent-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 120px);
+      padding: 2rem 1rem;
+    }
+    .consent-card {
+      width: 100%;
+      max-width: 440px;
+    }
+    .consent-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .consent-header h1 {
+      font-size: 1.6rem;
+      color: var(--color-primary-dark);
+      margin-bottom: 0.5rem;
+    }
+    .consent-header p {
+      color: var(--color-text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      font-weight: 600;
+    }
+    .step-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--color-border);
+    }
+    .step-dot.active { background: var(--color-primary); }
+    .consent-why {
+      background: var(--color-primary-lightest, #fce4ec);
+      border-radius: var(--radius);
+      padding: 0.85rem 1rem;
+      font-size: 0.88rem;
+      color: var(--color-text-muted);
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+    .consent-why strong { color: var(--color-text); }
+    .form-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="consent-page">
+    <div class="card consent-card">
+
+      <div class="step-indicator">
+        <span class="step-dot"></span>
+        <span>Step 2 of 2</span>
+        <span class="step-dot active"></span>
+      </div>
+
+      <div class="consent-header">
+        <h1>One more step before you're in 🌸</h1>
+        <p>Because you're under 18, we need a parent or guardian to approve your Bloom account before you can get started.</p>
+      </div>
+
+      <div class="consent-why">
+        <strong>Why do we need this?</strong><br>
+        Bloom handles personal health information. Parental consent helps us keep younger users safe and ensures you have adult support on your health journey.
+      </div>
+
+      <div id="error-msg" class="banner banner-warning hidden" role="alert"></div>
+
+      <form id="guardian-form">
+        <div class="form-group">
+          <label class="form-label" for="guardian-email">Parent / Guardian Email</label>
+          <input class="form-input" type="email" id="guardian-email" required
+            autocomplete="email" placeholder="parent@example.com" />
+          <p class="form-hint">We'll send them a simple approval email. They don't need a Bloom account.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="guardian-name">
+            Their Name <span style="font-weight:400;color:var(--color-text-muted)">(optional)</span>
+          </label>
+          <input class="form-input" type="text" id="guardian-name"
+            placeholder="e.g. Ms. Campbell" maxlength="80" autocomplete="off" />
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="send-btn">
+            Send Consent Request
+          </button>
+          <a href="/pages/register.html" class="btn btn-outline btn-block">Back to Sign Up</a>
+        </div>
+      </form>
+
+    </div>
+  </main>
+
+  <script type="module">
+    import { onAuthChange, getIdToken } from '/js/auth.js';
+    import { renderFooter } from '/js/utils.js';
+
+    renderFooter();
+
+    const form         = document.getElementById('guardian-form');
+    const errorMsg     = document.getElementById('error-msg');
+    const sendBtn      = document.getElementById('send-btn');
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.remove('hidden');
+    }
+
+    onAuthChange(async (user) => {
+      if (!user) {
+        // Not logged in - shouldn't be on this page
+        window.location.href = '/pages/register.html';
+        return;
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorMsg.classList.add('hidden');
+
+        const guardianEmail = document.getElementById('guardian-email').value.trim();
+        const guardianName  = document.getElementById('guardian-name').value.trim();
+
+        if (!guardianEmail) {
+          showError('Please enter your parent or guardian\'s email address.');
+          return;
+        }
+
+        sendBtn.disabled    = true;
+        sendBtn.textContent = 'Sending…';
+
+        try {
+          const token   = await getIdToken();
+          const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+          const res     = await fetch(`${apiBase}/api/consent/request`, {
+            method:  'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ guardianEmail, guardianName }),
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            showError(data.error || 'Something went wrong. Please try again.');
+            return;
+          }
+
+          // Store guardian email for display on pending screen (keyed by UID)
+          localStorage.setItem(`bloom_consent_status_${user.uid}`,         'pending');
+          localStorage.setItem(`bloom_consent_guardian_email_${user.uid}`, guardianEmail);
+
+          window.location.href = '/pages/consent-pending.html';
+
+        } catch (err) {
+          showError('Could not send the request. Please check your connection and try again.');
+        } finally {
+          sendBtn.disabled    = false;
+          sendBtn.textContent = 'Send Consent Request';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

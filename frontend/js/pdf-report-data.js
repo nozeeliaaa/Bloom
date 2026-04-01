@@ -1,15 +1,15 @@
 /**
- * pdf-report-data.js — Report Data Builder
+ * pdf-report-data.js - Report Data Builder
  *
  * Collects, normalises, sorts, and summarises all data required for the
  * Bloom cycle report PDF. The PDF renderer (report.js) receives clean, pre-
  * ordered structures and never performs sorting or business logic inline.
  *
  * Sorting contract:
- *   cyclesNewestFirst   — most recent period start first (for history table)
- *   symptomLog          — most recent date first (for symptom table)
- *   topSymptoms         — descending by occurrence count (for trends section)
- *   alerts              — ordered by severity (cycle outliers before lateness)
+ *   cyclesNewestFirst   - most recent period start first (for history table)
+ *   symptomLog          - most recent date first (for symptom table)
+ *   topSymptoms         - descending by occurrence count (for trends section)
+ *   alerts              - ordered by severity (cycle outliers before lateness)
  */
 
 // ── Sorting utilities (exported for testing) ──────────────────────────────────
@@ -27,7 +27,7 @@ export function sortDatesAsc(dates) {
 /**
  * Sort an array of objects by a date-valued field, descending.
  * @param {Object[]} records
- * @param {string}   field  — key that holds an ISO date string
+ * @param {string}   field  - key that holds an ISO date string
  */
 export function sortRecordsDesc(records, field = "date") {
   return [...records].sort((a, b) =>
@@ -189,10 +189,10 @@ function buildNarrative(d) {
     const { tier, inTypicalRange, range, min, max } = d.regularity;
     if (tier === "tight") {
       if (inTypicalRange) {
-        parts.push("Your cycle has been very consistent — your period tends to arrive on a predictable schedule.");
+        parts.push("Your cycle has been very consistent - your period tends to arrive on a predictable schedule.");
       } else {
         parts.push(
-          "Your cycle is highly consistent and follows a reliable pattern — it falls outside the typical 21–35 day range, " +
+          "Your cycle is highly consistent and follows a reliable pattern - it falls outside the typical 21–35 day range, " +
           "but its consistency means it is predictable for you specifically."
         );
       }
@@ -228,7 +228,7 @@ function buildNarrative(d) {
     const daysUntil  = daysBetween(today, d.nextPeriodDate);
     if (daysUntil > 1) {
       parts.push(
-        `Your next period is expected around ${formatDateLong(d.nextPeriodDate)} — approximately ${daysUntil} day${daysUntil !== 1 ? "s" : ""} away.`
+        `Your next period is expected around ${formatDateLong(d.nextPeriodDate)} - approximately ${daysUntil} day${daysUntil !== 1 ? "s" : ""} away.`
       );
     } else if (daysUntil === 0 || daysUntil === 1) {
       parts.push("Your period is expected very soon based on your cycle history.");
@@ -289,25 +289,25 @@ function buildInterpretation(d) {
   if (regularity?.tier === "tight") {
     if (regularity.inTypicalRange) {
       parts.push(
-        "Your cycle is highly consistent and falls within the typical range — this is one of the clearest signs of a stable, predictable pattern."
+        "Your cycle is highly consistent and falls within the typical range - this is one of the clearest signs of a stable, predictable pattern."
       );
     } else if (avgCycleLength > 35) {
       parts.push(
-        `Your cycle runs longer than the typical 21–35 day range, but it is highly consistent — it follows a reliable rhythm that is your own normal, even if it differs from textbook timing.`
+        `Your cycle runs longer than the typical 21–35 day range, but it is highly consistent - it follows a reliable rhythm that is your own normal, even if it differs from textbook timing.`
       );
     } else {
       parts.push(
-        `Your cycle is shorter than the typical range but highly consistent — it follows a reliable pattern that is your own normal.`
+        `Your cycle is shorter than the typical range but highly consistent - it follows a reliable pattern that is your own normal.`
       );
     }
   } else if (regularity?.tier === "moderate") {
     if (regularity.inTypicalRange) {
       parts.push(
-        "Your cycle falls within the typical 21–35 day range with some natural month-to-month variation — this is a common and healthy pattern."
+        "Your cycle falls within the typical 21–35 day range with some natural month-to-month variation - this is a common and healthy pattern."
       );
     } else {
       parts.push(
-        "Your cycle is outside the typical range and shows some variation from cycle to cycle — continued logging will help clarify whether this is a stable baseline for you."
+        "Your cycle is outside the typical range and shows some variation from cycle to cycle - continued logging will help clarify whether this is a stable baseline for you."
       );
     }
   } else if (regularity?.tier === "loose") {
@@ -323,14 +323,14 @@ function buildInterpretation(d) {
     } else if (avgPeriodLength <= 6) {
       parts.push(`Your periods typically last about ${avgPeriodLength} days, which is within the typical range.`);
     } else {
-      parts.push(`Your periods average about ${avgPeriodLength} days, which is on the longer side — if paired with heavy flow, this is worth noting when you speak with your provider.`);
+      parts.push(`Your periods average about ${avgPeriodLength} days, which is on the longer side - if paired with heavy flow, this is worth noting when you speak with your provider.`);
     }
   }
 
   // Day-in-cycle context for longer cycles
   if (dayInCycle && dayInCycle > 28 && avgCycleLength > 35) {
     parts.push(
-      `Being on day ${dayInCycle} of your cycle is completely expected given your longer cycle pattern — this is not a sign that something is wrong.`
+      `Being on day ${dayInCycle} of your cycle is completely expected given your longer cycle pattern - this is not a sign that something is wrong.`
     );
   }
 
@@ -338,7 +338,7 @@ function buildInterpretation(d) {
   if (topSymptoms?.length >= 3) {
     const top3 = topSymptoms.slice(0, 3).map(([s]) => s.toLowerCase()).join(", ");
     parts.push(
-      `Your most frequently logged symptoms — ${top3} — may be worth discussing with your provider if they are affecting your daily life.`
+      `Your most frequently logged symptoms - ${top3} - may be worth discussing with your provider if they are affecting your daily life.`
     );
   }
 
@@ -355,44 +355,44 @@ function buildPatternInsight(d) {
 
   if (regularity.tier === "tight" && !regularity.inTypicalRange && avgCycleLength > 35) {
     return (
-      "Your cycle is longer than average but highly consistent — this makes it predictable even if it doesn't follow typical timing, and is likely your body's natural rhythm."
+      "Your cycle is longer than average but highly consistent - this makes it predictable even if it doesn't follow typical timing, and is likely your body's natural rhythm."
     );
   }
   if (regularity.tier === "tight" && !regularity.inTypicalRange && avgCycleLength < 21) {
     return (
-      "Your cycle is shorter than average but very consistent — this predictable pattern is likely your body's natural rhythm, even though it differs from typical ranges."
+      "Your cycle is shorter than average but very consistent - this predictable pattern is likely your body's natural rhythm, even though it differs from typical ranges."
     );
   }
   if (regularity.tier === "tight" && regularity.inTypicalRange) {
     return (
-      "Your cycle is both regular and within the typical range — this is one of the clearest signs of a stable, predictable pattern."
+      "Your cycle is both regular and within the typical range - this is one of the clearest signs of a stable, predictable pattern."
     );
   }
   if (regularity.tier === "loose") {
     if (topSymptoms?.length >= 2) {
       return (
-        "Your cycle has shown notable variation alongside recurring symptoms — tracking both together gives your doctor the clearest picture of what is happening."
+        "Your cycle has shown notable variation alongside recurring symptoms - tracking both together gives your doctor the clearest picture of what is happening."
       );
     }
     return (
-      "Your cycle has been variable — continuing to log consistently will help reveal whether this is a stable pattern or something that shifts over time."
+      "Your cycle has been variable - continuing to log consistently will help reveal whether this is a stable pattern or something that shifts over time."
     );
   }
   // moderate
   if (!regularity.inTypicalRange) {
     return (
-      "Your cycle is outside the typical 21–35 day range but shows reasonable consistency — with more data, a clearer personal pattern will emerge."
+      "Your cycle is outside the typical 21–35 day range but shows reasonable consistency - with more data, a clearer personal pattern will emerge."
     );
   }
   return (
-    "Your cycle falls within the typical range with some natural month-to-month variation — this is a common and healthy pattern."
+    "Your cycle falls within the typical range with some natural month-to-month variation - this is a common and healthy pattern."
   );
 }
 
 // ── Date formatters (exported for use in report.js and the HTML preview) ──────
 
 export function formatDateLong(isoDate) {
-  if (!isoDate) return "—";
+  if (!isoDate) return "-";
   const [y, m, d] = isoDate.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric",
@@ -400,7 +400,7 @@ export function formatDateLong(isoDate) {
 }
 
 export function formatDateMed(isoDate) {
-  if (!isoDate) return "—";
+  if (!isoDate) return "-";
   const [y, m, d] = isoDate.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
@@ -413,7 +413,7 @@ export function formatDateMed(isoDate) {
  * buildReportData(logsByDate, cyclePhase, userName?)
  *
  * Assembles all sections of the report from raw log data and the cycle-phase
- * computation result. Returns a single plain object — the PDF renderer and
+ * computation result. Returns a single plain object - the PDF renderer and
  * the HTML preview both read from this same structure.
  *
  * Data model inconsistency fixed here:
@@ -422,9 +422,9 @@ export function formatDateMed(isoDate) {
  *   by the time data reaches this builder everything uses `flow`. No special
  *   casing required here.
  *
- * @param {Object}  logsByDate  — { "YYYY-MM-DD": { date, flow, notes, symptoms[], symptomSeverity } }
- * @param {Object}  cyclePhase  — result of computeCyclePhase(logs)
- * @param {string}  [userName]  — optional display name
+ * @param {Object}  logsByDate  - { "YYYY-MM-DD": { date, flow, notes, symptoms[], symptomSeverity } }
+ * @param {Object}  cyclePhase  - result of computeCyclePhase(logs)
+ * @param {string}  [userName]  - optional display name
  * @returns {Object}
  */
 export function buildReportData(logsByDate, cyclePhase, userName = null) {
@@ -546,13 +546,13 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
     dayInCycle,
 
     // Pre-sorted tables (renderer must NOT re-sort these)
-    cyclesNewestFirst,   // history table  — most recent first
-    symptomLog,          // symptom table  — most recent first
-    topSymptoms,         // trends section — highest frequency first
+    cyclesNewestFirst,   // history table  - most recent first
+    symptomLog,          // symptom table  - most recent first
+    topSymptoms,         // trends section - highest frequency first
 
     // Prose
     narrativeSummary,
-    interpretation,    // "What This Means For You" — 3-4 interpretive sentences
+    interpretation,    // "What This Means For You" - 3-4 interpretive sentences
     patternInsight,    // standout single-sentence insight for trends section
 
     // Alerts (only populated when warranted)

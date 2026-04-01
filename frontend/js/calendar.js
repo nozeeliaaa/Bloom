@@ -13,7 +13,7 @@
 import {
   renderNav, renderFooter, renderModeBanner, renderBloomieFab,
   toDateKey, getMonthName, getDaysInMonth, getFirstDayOfWeek,
-  SYMPTOM_CATEGORIES, FLOW_OPTIONS, openModal, closeModal, showToast
+  SYMPTOM_CATEGORIES, SYMPTOM_ICONS, FLOW_OPTIONS, openModal, closeModal, showToast
 } from "./utils.js";
 
 import { saveDailyLog, getAllLogs, deleteDailyLog, clearAllLogs } from "./db.js";
@@ -51,7 +51,7 @@ function daysBetweenKeys(a, b) {
 }
 
 // Groups logged period days into distinct clusters (gap > 3 days = new period).
-// This handles months of sparse logs correctly — missing days don't keep a period "open".
+// This handles months of sparse logs correctly - missing days don't keep a period "open".
 function getPeriodClusters(logsByDate) {
   const periodDays = Object.keys(logsByDate || {})
     .filter((dk) => { const l = logsByDate[dk]; return l && l.flow && l.flow !== "none"; })
@@ -96,7 +96,7 @@ function buildCycleDataForCalendarFromAlgorithm(pred, baselinePhaseData) {
       ? baselinePhaseData.predictedPeriodDays.length
       : 5;
 
-  // Predicted period days — all future cycles
+  // Predicted period days - all future cycles
   const predictedDays = [];
   (pred.futureCycles || []).forEach((c) => {
     if (!c.periodStart) return;
@@ -114,12 +114,12 @@ function buildCycleDataForCalendarFromAlgorithm(pred, baselinePhaseData) {
     out.nextPeriodDate = toDateKey(pred.futureCycles[0].periodStart);
   }
 
-  // Ovulation dates — all future cycles
+  // Ovulation dates - all future cycles
   out.futureOvulationDates = (pred.futureCycles || [])
     .map((c) => (c.ovulationDay ? toDateKey(c.ovulationDay) : null))
     .filter(Boolean);
 
-  // Fertile window days — all future cycles pre-expanded
+  // Fertile window days - all future cycles pre-expanded
   const allFertileDays = [];
   (pred.futureCycles || []).forEach((c) => {
     if (!c.fertileWindow?.start || !c.fertileWindow?.end) return;
@@ -144,14 +144,14 @@ async function recomputeCycleData() {
   const periodStarts = derivePeriodStartDatesFromLogs(allLogs);
   const { lastStart, lastEnd } = getLastPeriodRange(allLogs);
 
-  console.log("[Bloom] recomputeCycleData — periodStarts:", periodStarts.length, "lastStart:", lastStart, "lastEnd:", lastEnd);
+  console.log("[Bloom] recomputeCycleData - periodStarts:", periodStarts.length, "lastStart:", lastStart, "lastEnd:", lastEnd);
 
   if (lastStart && periodStarts.length >= 1) {
     const resolvedEnd = lastEnd || lastStart;
     let pred = null;
     try {
       pred = runFullPrediction(periodStarts, lastStart, resolvedEnd, 3);
-      console.log("[Bloom] runFullPrediction — ready:", pred?.ready, "cyclesLogged:", pred?.cyclesLogged);
+      console.log("[Bloom] runFullPrediction - ready:", pred?.ready, "cyclesLogged:", pred?.cyclesLogged);
     } catch (e) {
       console.warn("[Bloom] runFullPrediction failed:", e);
     }
@@ -219,7 +219,10 @@ function buildSymptomUI() {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "chip";
-      chip.textContent = s;
+      const iconUrl = SYMPTOM_ICONS[s];
+      chip.innerHTML = iconUrl
+        ? `<span class="chip-icon-wrap"><img src="${iconUrl}" alt="" class="chip-icon-img" loading="lazy"></span>${s}`
+        : s;
       chip.dataset.symptom = s;
       chip.addEventListener("click", () => toggleSymptom(s));
       chips.appendChild(chip);
@@ -266,7 +269,10 @@ function updateSeverityPanel() {
 
     const nameEl = document.createElement("span");
     nameEl.className = "severity-symptom-name";
-    nameEl.textContent = s;
+    const sIconUrl = SYMPTOM_ICONS[s];
+    nameEl.innerHTML = sIconUrl
+      ? `<span class="chip-icon-wrap"><img src="${sIconUrl}" alt="" class="chip-icon-img" loading="lazy"></span>${s}`
+      : s;
     row.appendChild(nameEl);
 
     const btns = document.createElement("div");
@@ -289,6 +295,7 @@ function updateSeverityPanel() {
     row.appendChild(btns);
     list.appendChild(row);
   });
+
 }
 
 // ── Symptom search ─────────────────────────────────────────────────────────
@@ -390,11 +397,13 @@ function renderCalendar() {
 
     if (isPredicted) cell.classList.add("predicted-period");
 
-    if (isOvulation) {
-      cell.classList.add("ovulation-day");
-      if (isFuture) cell.classList.add("predicted-ovulation");
-    } else if (isFertile) {
-      cell.classList.add("fertile-day");
+    if (!isPredicted) {
+      if (isOvulation) {
+        cell.classList.add("ovulation-day");
+        if (isFuture) cell.classList.add("predicted-ovulation");
+      } else if (isFertile) {
+        cell.classList.add("fertile-day");
+      }
     }
 
     cell.addEventListener("click", () => openLogModal(dateKey));
@@ -406,7 +415,27 @@ function renderCalendar() {
 
 function openLogModal(dateKey) {
   selectedDate = dateKey;
-  document.getElementById("modal-title").textContent = `Log: ${formatDateDisplay(dateKey)}`;
+  const isFuture = new Date(dateKey + "T00:00:00") > new Date();
+
+  document.getElementById("modal-title").textContent =
+    `Log: ${formatDateDisplay(dateKey)}${isFuture ? " - notes only" : ""}`;
+
+  // Show/hide the future date notice
+  const notice = document.getElementById("future-date-notice");
+  if (notice) notice.hidden = !isFuture;
+
+  // Disable flow chips for future dates (only "none" is allowed)
+  flowChips.querySelectorAll(".chip").forEach((chip) => {
+    const isNoneChip = chip.dataset.value === "none";
+    chip.disabled = isFuture && !isNoneChip;
+    chip.classList.toggle("chip--disabled", isFuture && !isNoneChip);
+  });
+
+  // Disable symptom chips for future dates
+  document.querySelectorAll("#symptom-categories .chip[data-symptom]").forEach((chip) => {
+    chip.disabled = isFuture;
+    chip.classList.toggle("chip--disabled", isFuture);
+  });
 
   // Reset state
   selectedFlow = "none";
@@ -462,6 +491,15 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
   e.preventDefault();
 
   const dateKey = selectedDate;
+
+  // Block flow and symptoms on future dates regardless of how the modal was reached
+  if (new Date(dateKey + "T00:00:00") > new Date()) {
+    if (selectedFlow !== "none" || selectedSymptoms.size > 0) {
+      showToast("You cannot log flow or symptoms for a future date.", "error");
+      return;
+    }
+  }
+
   const data = {
     flow: selectedFlow,
     symptoms: Array.from(selectedSymptoms),
@@ -469,7 +507,7 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
     notes: document.getElementById("notes").value.trim(),
   };
 
-  // Update in-memory and close modal immediately — don't wait for network
+  // Update in-memory and close modal immediately - don't wait for network
   allLogs[dateKey] = { ...data, date: dateKey };
   closeModal("log-modal");
   renderCalendar();
@@ -542,7 +580,7 @@ document.getElementById("next-month").addEventListener("click", () => {
 // ── Prediction panel ───────────────────────────────────────────────────────
 
 function fmtShort(date) {
-  if (!date) return "—";
+  if (!date) return "-";
   return new Date(date).toLocaleDateString("en-US", { day: "numeric", month: "short" });
 }
 
