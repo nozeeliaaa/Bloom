@@ -3,7 +3,7 @@ import { resolveTone, applyToneToLines, applyToneToChoices } from "./bloomie-ton
 import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory } from "./db.js";
-import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent } from "./bloomie-routing.js";
+import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion } from "./bloomie-routing.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent, logAnalyticsEvent } from "./bloomie-logger.js";
 import { getIdToken, getUser } from "./auth.js";
@@ -1049,6 +1049,9 @@ export function initBloomieChat({
       // Skip when a clarifying question was pending — the user is answering
       // Bloomie's question, not selecting from the previous menu.
       const contextMatch = hasPendingContext ? null : matchTypedToChoice(text);
+      // pendingQuestion is strictly turn-bound: consume it now regardless of
+      // whether matchTypedToChoice succeeded, so it never leaks to a later turn.
+      ctx.pendingQuestion = null;
       if (contextMatch) {
         // Tone detection runs even when a typed choice is matched so ctx.currentTone
         // stays current and toneOpeners apply correctly on the next node.
@@ -1909,6 +1912,39 @@ export function initBloomieChat({
       if (hints && hints.some(h => t.includes(h))) return choice;
     }
 
+    // ── Extended turn-binding: sentence-form answers ──────────────────────
+    // When Bloomie just asked a yes/no question (ctx.pendingQuestion.type ===
+    // "yes_no"), try to match sentence-form answers that the word-list phase
+    // above doesn't catch.  These are longer or less-conventional phrasings
+    // that clearly express agreement, disagreement, or uncertainty but aren't
+    // single-word tokens.  Conservative patterns only — no health keywords.
+    if (ctx.pendingQuestion?.type === "yes_no") {
+      // Soft denials checked first (same rule as the main word-list phase).
+      const EXT_DENY = [
+        "not yet", "haven't yet", "i haven't", "i have not", "i've not",
+        "never had", "never have", "no not at all", "nothing like that",
+        "haven't done", "didn't do it", "i didn't do",
+        "not me", "doesn't apply", "not applicable",
+      ];
+      const EXT_UNSURE = [
+        "i guess", "i suppose", "kind of", "kinda", "sort of", "sorta",
+        "somewhat", "a little bit maybe", "not really sure about that",
+        "hard to say", "i'm really not sure", "not 100%", "not 100 percent",
+      ];
+      const EXT_AFFIRM = [
+        "i guess so", "i suppose so", "i took one", "i took a test",
+        "i did one", "already did", "i already did", "i already have",
+        "i've done it", "i done it", "yeah already", "yes already",
+        "sounds like me", "that sounds like me", "that's what i have",
+        "yes exactly", "exactly that", "literally that", "that's it exactly",
+        "i think that's right", "that describes it",
+      ];
+
+      if (choiceDeny   && EXT_DENY.some(w => t === w || t.startsWith(w)))   return choiceDeny;
+      if (choiceUnsure && EXT_UNSURE.some(w => t === w || t.includes(w)))   return choiceUnsure;
+      if (choiceAffirm && EXT_AFFIRM.some(w => t === w || t.startsWith(w))) return choiceAffirm;
+    }
+
     return null;
   }
 
@@ -2525,6 +2561,10 @@ export function initBloomieChat({
       // Track the epoch at which this node's choices were rendered so that
       // matchTypedToChoice can apply the same staleness guard as button clicks.
       ctx.nodeFlowId = renderedFlowId;
+      // Record the active question shape so the very next typed message is
+      // first interpreted as an answer to this question (turn binding).
+      ctx.pendingQuestion = { type: classifyNodeQuestion(_choices), nodeState: ctx.state };
+
       choicesEl.innerHTML = `
         <div class="quick-replies">
           ${_choices.map((c) => `
@@ -2558,6 +2598,10 @@ export function initBloomieChat({
           transition(effectiveNext, { choiceId });
         });
       });
+    } else {
+      // No choices — clear any stale question type from a previous node so
+      // free-text input nodes don't accidentally apply turn binding.
+      ctx.pendingQuestion = null;
     }
 
     scrollToBottom();
