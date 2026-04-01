@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Consent Response - Bloom</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <style>
+    .result-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    .result-card {
+      width: 100%;
+      max-width: 460px;
+      text-align: center;
+      padding: 2.5rem 2rem;
+    }
+    .result-icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+    }
+    .result-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      color: var(--color-primary-dark);
+    }
+    .result-message {
+      color: var(--color-text-muted);
+      font-size: 1rem;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="result-page">
+    <div class="card result-card">
+      <div class="result-icon" id="result-icon"></div>
+      <h1 class="result-title" id="result-title"></h1>
+      <p class="result-message" id="result-message"></p>
+      <a href="/pages/login.html" class="btn btn-primary">Go to Bloom</a>
+    </div>
+  </main>
+
+  <script>
+    const RESULTS = {
+      approved: {
+        icon:    "✅",
+        title:   "Consent Approved",
+        message: "You've successfully approved access for the teen on your account. They can now access the features you've unlocked for them on Bloom.",
+      },
+      denied: {
+        icon:    "❌",
+        title:   "Consent Denied",
+        message: "You've denied the consent request. The teen will not have access to sensitive features on Bloom.",
+      },
+      expired: {
+        icon:    "⏰",
+        title:   "Link Expired",
+        message: "This consent link has expired. Please ask the teen to send a new invite from their Bloom account.",
+      },
+      "already-used": {
+        icon:    "🔒",
+        title:   "Link Already Used",
+        message: "This consent link has already been used. If you need to make changes, please ask the teen to send a new invite.",
+      },
+      "already-resolved": {
+        icon:    "ℹ️",
+        title:   "Already Responded",
+        message: "This consent request has already been resolved. No further action is needed.",
+      },
+      invalid: {
+        icon:    "⚠️",
+        title:   "Invalid Link",
+        message: "This consent link is invalid or has been tampered with. Please ask the teen to send a new invite.",
+      },
+      error: {
+        icon:    "😕",
+        title:   "Something Went Wrong",
+        message: "We couldn't process your response. Please try again or contact support if the problem persists.",
+      },
+    };
+
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("result") || "invalid";
+    const content = RESULTS[result] || RESULTS.invalid;
+
+    document.getElementById("result-icon").textContent    = content.icon;
+    document.getElementById("result-title").textContent   = content.title;
+    document.getElementById("result-message").textContent = content.message;
+  </script>
+</body>
+</html>

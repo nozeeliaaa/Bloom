@@ -10,10 +10,10 @@
 window.BLOOM_API_BASE = "http://localhost:4000";
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyCoY7010ONRgfc9ic6orCefKgSFAbAaOtg",
-  authDomain: "bloom-8401a.firebaseapp.com",
-  projectId: "bloom-8401a",
-  storageBucket: "bloom-8401a.appspot.com",
-  messagingSenderId: "225367392507",
-  appId: "1:225367392507:web:8c4c8f0c9e8f0c9e8f0c9e"
+  apiKey:            "AIzaSyCoY7010ONRgfc9ic6orCefKgSFAbAaOtg",
+  authDomain:        "bloom-8401a.firebaseapp.com",
+  projectId:         "bloom-8401a",
+  storageBucket:     "bloom-8401a.firebasestorage.app",
+  messagingSenderId: "538005116995",
+  appId:             "1:538005116995:web:09eb9bb0e066ddbfd91cf6",
 };

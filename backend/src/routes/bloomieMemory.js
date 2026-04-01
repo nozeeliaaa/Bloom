@@ -2,6 +2,7 @@
 import express from "express";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
+import { requireConsent } from "../middleware/requireConsent.js";
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ const VALID_SYMPTOM_KEYS = new Set([
 const VALID_SEVERITIES = new Set(["mild", "moderate", "severe"]);
 
 // GET /api/bloomie-memory — load last session snapshot
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", requireAuth, requireConsent, async (req, res) => {
   try {
     const doc = await db.collection("bloomieMemory").doc(req.user.uid).get();
     if (!doc.exists) return res.json(null);
@@ -35,7 +36,7 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 // PUT /api/bloomie-memory — save compact session snapshot
-router.put("/", requireAuth, async (req, res) => {
+router.put("/", requireAuth, requireConsent, async (req, res) => {
   try {
     const { lastSymptoms, lastIntent, lastSeverity, lastDuration, lastPregnancyChance, recentTopics } = req.body;
 

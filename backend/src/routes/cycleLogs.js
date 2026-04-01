@@ -96,14 +96,16 @@ router.get("/", requireAuth, async (req, res) => {
     }
 
     let q = db
-      .collection("cycleLogs")
-      .doc(uid)
-      .collection("entries")
-      .orderBy("dateKey", "desc")
-      .limit(60);
+    .collection("cycleLogs")
+    .doc(uid)
+    .collection("entries")
+    .orderBy("dateKey", "desc");
 
     if (start) q = q.where("dateKey", ">=", start);
     if (end) q = q.where("dateKey", "<=", end);
+
+    // Only apply a cap when filtering by range — not on full history fetch
+    if (start || end) q = q.limit(3650);
 
     const snap = await q.get();
     const items = snap.docs.map((d) => d.data());
@@ -112,6 +114,34 @@ router.get("/", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("GET /cycle-logs error:", err);
     return res.status(500).json({ error: "Failed to fetch cycle logs" });
+  }
+});
+
+// DELETE /api/logs — bulk delete all cycle logs for user
+router.delete("/", requireAuth, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const snap = await db
+      .collection("cycleLogs")
+      .doc(uid)
+      .collection("entries")
+      .get();
+
+    if (snap.empty) return res.json({ ok: true, deleted: 0 });
+
+    // Firestore batch max 500 ops — chunk if needed
+    const BATCH_SIZE = 500;
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
+    return res.json({ ok: true, deleted: docs.length });
+  } catch (err) {
+    console.error("DELETE /api/logs error:", err);
+    return res.status(500).json({ error: "Failed to delete all cycle logs" });
   }
 });
 
@@ -138,5 +168,6 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to delete cycle log" });
   }
 });
+
 
 export default router;

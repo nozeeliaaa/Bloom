@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css" />
-
+ 
   <style>
     .auth-page {
       display: flex;
@@ -55,7 +55,7 @@
       text-align: center;
       margin-top: 0.5rem;
     }
-
+ 
     /* Password strength bar */
     .pw-strength-bar {
       height: 5px;
@@ -90,9 +90,20 @@
     }
     .pw-rules li.pass { color: #27ae60; }
     .pw-rules li.fail { color: var(--color-text-muted); }
+ 
+    /* Verification success panel */
+    #verify-panel { display: none; text-align: center; }
+    #verify-panel .verify-icon { font-size: 3rem; margin-bottom: 1rem; }
+    #verify-panel h2 { color: var(--color-primary-dark); margin-bottom: 0.5rem; }
+    #verify-panel p { color: var(--color-text-muted); font-size: 0.95rem; margin-bottom: 1.25rem; }
+    #verify-panel .spam-note {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      margin-top: 0.75rem;
+    }
   </style>
 </head>
-
+ 
 <body>
   <main class="auth-page">
     <div class="card auth-card">
@@ -106,103 +117,126 @@
         </svg>
         Bloom
       </a>
-
-      <h1>Create Your Account</h1>
-      <p class="subtitle">Unlock cloud sync, advanced insights, and data export.</p>
-
-      <div id="error-msg" class="banner banner-warning hidden" role="alert"></div>
-      <div id="success-msg" class="banner banner-success hidden" role="status"></div>
-
-      <form id="register-form">
-        <div class="form-group">
-          <label class="form-label" for="email">Email</label>
-          <input class="form-input" type="email" id="email" name="email" required
-            autocomplete="email" placeholder="you@example.com">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="password">Password</label>
-          <input class="form-input" type="password" id="password" name="password" required
-            autocomplete="new-password" placeholder="Min 8 chars, uppercase, number, symbol">
-
-          <!-- Strength bar -->
-          <div class="pw-strength-bar">
-            <div class="pw-strength-fill" id="pw-strength-fill"></div>
+ 
+      <!-- ── Registration form ── -->
+      <div id="form-panel">
+        <h1>Create Your Account</h1>
+        <p class="subtitle">Unlock cloud sync, advanced insights, and data export.</p>
+ 
+        <div id="error-msg" class="banner banner-warning hidden" role="alert"></div>
+ 
+        <form id="register-form">
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input class="form-input" type="email" id="email" name="email" required
+              autocomplete="email" placeholder="you@example.com">
           </div>
-          <div class="pw-strength-label" id="pw-strength-label"></div>
-
-          <!-- Rule checklist -->
-          <ul class="pw-rules" id="pw-rules">
-            <li id="rule-length" class="fail">✗ At least 8 characters</li>
-            <li id="rule-upper"  class="fail">✗ At least one uppercase letter</li>
-            <li id="rule-number" class="fail">✗ At least one number</li>
-            <li id="rule-symbol" class="fail">✗ At least one special character (!, @, #…)</li>
-          </ul>
+ 
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input class="form-input" type="password" id="password" name="password" required
+              autocomplete="new-password" placeholder="Min 8 chars, uppercase, number, symbol">
+ 
+            <div class="pw-strength-bar">
+              <div class="pw-strength-fill" id="pw-strength-fill"></div>
+            </div>
+            <div class="pw-strength-label" id="pw-strength-label"></div>
+ 
+            <ul class="pw-rules" id="pw-rules">
+              <li id="rule-length" class="fail">✗ At least 8 characters</li>
+              <li id="rule-upper"  class="fail">✗ At least one uppercase letter</li>
+              <li id="rule-number" class="fail">✗ At least one number</li>
+              <li id="rule-symbol" class="fail">✗ At least one special character (!, @, #…)</li>
+            </ul>
+          </div>
+ 
+          <div class="form-group">
+            <label class="form-label" for="confirm-password">Confirm Password</label>
+            <input class="form-input" type="password" id="confirm-password" name="confirm-password"
+              required autocomplete="new-password" placeholder="Re-enter your password">
+          </div>
+ 
+          <div class="form-group">
+            <label class="form-check">
+              <input type="checkbox" id="age-confirm" required>
+              <span>I confirm that I am <strong>18 years or older</strong></span>
+            </label>
+          </div>
+ 
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="register-btn">
+            Create Account
+          </button>
+        </form>
+ 
+        <p class="age-notice">You must be 18 or older to create an account.</p>
+ 
+        <div class="auth-links">
+          <p>Already have an account? <a href="/pages/login.html">Log in</a></p>
+          <p style="margin-top:0.75rem;">
+            <a href="/pages/survey.html" id="btn-anon">Continue anonymously instead</a>
+          </p>
         </div>
-
-        <div class="form-group">
-          <label class="form-label" for="confirm-password">Confirm Password</label>
-          <input class="form-input" type="password" id="confirm-password" name="confirm-password"
-            required autocomplete="new-password" placeholder="Re-enter your password">
-        </div>
-
-        <div class="form-group">
-          <label class="form-check">
-            <input type="checkbox" id="age-confirm" required>
-            <span>I confirm that I am <strong>18 years or older</strong></span>
-          </label>
-        </div>
-
-        <button type="submit" class="btn btn-primary btn-block btn-lg" id="register-btn">
-          Create Account
+      </div>
+ 
+      <!-- ── Verification sent panel (shown after successful registration) ── -->
+      <div id="verify-panel">
+        <div class="verify-icon">📬</div>
+        <h2>Check your inbox!</h2>
+        <p id="verify-email-msg">We've sent a verification link to your email. Click it to activate your account, then log in.</p>
+ 
+        <div id="resend-msg" class="banner banner-warning hidden" role="alert"></div>
+        <div id="resend-ok"  class="banner banner-success hidden" role="status"></div>
+ 
+        <button class="btn btn-outline btn-block" id="btn-resend" type="button">
+          Resend verification email
         </button>
-      </form>
-
-      <p class="age-notice">You must be 18 or older to create an account.</p>
-
-      <div class="auth-links">
-        <p>Already have an account? <a href="/pages/login.html">Log in</a></p>
-        <p style="margin-top:0.75rem;">
-          <a href="/pages/survey.html" id="btn-anon">Continue anonymously instead</a>
-        </p>
+ 
+        <p class="spam-note"> Don't see it? Check your <strong>spam or junk folder</strong>.</p>
+ 
+        <div class="auth-links" style="margin-top:1.5rem;">
+          <a href="/pages/login.html" class="btn btn-primary btn-block">Go to Login</a>
+        </div>
       </div>
     </div>
   </main>
-
+ 
   <script type="module">
-    import { showBloomLoader, runBloomLoader } from "/js/loadingOverlay.js";
-    import { register, getPasswordStrength, validatePassword } from '/js/auth.js';
+    import { register, getPasswordStrength, validatePassword, resendVerificationEmail } from '/js/auth.js';
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
-
+ 
     renderFooter();
-
+ 
+    const formPanel    = document.getElementById('form-panel');
+    const verifyPanel  = document.getElementById('verify-panel');
     const form         = document.getElementById('register-form');
     const errorMsg     = document.getElementById('error-msg');
-    const successMsg   = document.getElementById('success-msg');
     const registerBtn  = document.getElementById('register-btn');
     const pwInput      = document.getElementById('password');
     const strengthFill = document.getElementById('pw-strength-fill');
     const strengthLabel = document.getElementById('pw-strength-label');
-
+ 
+    // Stored after registration so resend doesn't need re-entry
+    let _registeredEmail    = null;
+    let _registeredPassword = null;
+ 
     // ── Live password strength feedback ──
     pwInput.addEventListener('input', () => {
       const val = pwInput.value;
       const { score, label, color } = getPasswordStrength(val);
-
+ 
       strengthFill.style.width = `${(score / 4) * 100}%`;
       strengthFill.style.background = color;
       strengthLabel.textContent = val.length ? label : '';
       strengthLabel.style.color = color;
-
-      // Update rule checklist
+ 
       setRule('rule-length', val.length >= 8);
       setRule('rule-upper',  /[A-Z]/.test(val));
       setRule('rule-number', /[0-9]/.test(val));
       setRule('rule-symbol', /[^A-Za-z0-9]/.test(val));
     });
-
+ 
     function setRule(id, passing) {
       const el = document.getElementById(id);
       if (!el) return;
@@ -210,75 +244,62 @@
       el.textContent = (passing ? '✓ ' : '✗ ') + text;
       el.className = passing ? 'pass' : 'fail';
     }
-
+ 
     function showError(msg) {
       errorMsg.textContent = msg;
       errorMsg.classList.remove('hidden');
-      successMsg.classList.add('hidden');
     }
-
-    function showSuccess(msg) {
-      successMsg.textContent = msg;
-      successMsg.classList.remove('hidden');
-      errorMsg.classList.add('hidden');
+ 
+    function showVerifyPanel(email) {
+      document.getElementById('verify-email-msg').textContent =
+        `We've sent a verification link to ${email}. Click it to activate your account, then log in.`;
+      formPanel.style.display  = 'none';
+      verifyPanel.style.display = 'block';
     }
-
+ 
     // ── Form submit ──
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.classList.add('hidden');
-      successMsg.classList.add('hidden');
-
+ 
       if (!isFirebaseConfigured()) {
         showError('Firebase is not configured. Please continue anonymously.');
         return;
       }
-
+ 
       const email           = document.getElementById('email').value.trim();
       const password        = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirm-password').value;
       const ageConfirm      = document.getElementById('age-confirm').checked;
-
-      if (!email || !password) {
-        showError('Please fill in all fields.');
-        return;
-      }
-
-      // Password strength check
+ 
+      if (!email || !password) { showError('Please fill in all fields.'); return; }
+ 
       const { valid, errors } = validatePassword(password);
-      if (!valid) {
-        showError('Password requirements not met: ' + errors.join(', ') + '.');
-        return;
-      }
-
-      if (password !== confirmPassword) {
-        showError('Passwords do not match.');
-        return;
-      }
-
-      if (!ageConfirm) {
-        showError('You must confirm that you are 18 or older.');
-        return;
-      }
-
+      if (!valid) { showError('Password requirements not met: ' + errors.join(', ') + '.'); return; }
+ 
+      if (password !== confirmPassword) { showError('Passwords do not match.'); return; }
+ 
+      if (!ageConfirm) { showError('You must confirm that you are 18 or older.'); return; }
+ 
       registerBtn.disabled = true;
       registerBtn.textContent = 'Creating account...';
-
+ 
       try {
         await register(email, password);
-
-        // Show verification notice instead of immediately redirecting
-        form.style.display = 'none';
-        showSuccess(
-          `✅ Account created! A verification email has been sent to ${email}. ` +
-          `Please check your inbox and verify before logging in.`
-        );
-        registerBtn.style.display = 'none';
-
+ 
+        // Store credentials so resend works without asking again
+        _registeredEmail    = email;
+        _registeredPassword = password;
+ 
+        showVerifyPanel(email);
+ 
       } catch (err) {
         let msg = 'Registration failed. Please try again.';
         if (err.code === 'auth/email-already-in-use') {
-          msg = 'An account with this email already exists.';
+          msg = 'An account with this email already exists. <a href="/pages/login.html">Log in instead?</a>';
+          errorMsg.innerHTML = msg;
+          errorMsg.classList.remove('hidden');
+          return;
         } else if (err.code === 'auth/weak-password' || err.code === 'auth/weak-password-custom') {
           msg = err.errors
             ? 'Password requirements not met: ' + err.errors.join(', ') + '.'
@@ -289,12 +310,35 @@
         showError(msg);
       } finally {
         registerBtn.disabled = false;
-        if (registerBtn.style.display !== 'none') {
-          registerBtn.textContent = 'Create Account';
-        }
+        registerBtn.textContent = 'Create Account';
       }
     });
-
+ 
+    // ── Resend verification ──
+    document.getElementById('btn-resend').addEventListener('click', async () => {
+      const btn      = document.getElementById('btn-resend');
+      const resendMsg = document.getElementById('resend-msg');
+      const resendOk  = document.getElementById('resend-ok');
+ 
+      resendMsg.classList.add('hidden');
+      resendOk.classList.add('hidden');
+ 
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+ 
+      try {
+        await resendVerificationEmail(_registeredEmail, _registeredPassword);
+        resendOk.textContent = `Verification email resent to ${_registeredEmail}. Check your inbox and spam folder.`;
+        resendOk.classList.remove('hidden');
+        btn.style.display = 'none';
+      } catch (e) {
+        resendMsg.textContent = 'Could not resend. Please try again shortly.';
+        resendMsg.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Resend verification email';
+      }
+    });
+ 
     document.getElementById('btn-anon')?.addEventListener('click', () => {
       setMode('anon');
     });

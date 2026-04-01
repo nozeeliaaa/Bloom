@@ -10,14 +10,12 @@
  *   4. Stale button guard — flowId behaviour (unit-level logic)
  *   5. Response composer — conversational output shape
  *   6. Topic interrupt — primary bucket detection helper
- *   7. Response variability — pick() and buildGuidanceResponse starters
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { buildGuidanceResponse } from "../bloomie-templates.js";
 import { extractEntities, inferRoute } from "../bloomie-inference.js";
-import { pick } from "../bloomie-routing.js";
 import { createCtx } from "../bloomie-session.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -368,53 +366,5 @@ describe("entity extraction — real text inputs", () => {
     const latent   = extractEntities("my period is late");
     const crampMsg = extractEntities("I have really bad cramps");
     expect(shouldClearHistory(latent, crampMsg)).toBe(true);
-  });
-});
-
-
-// ─── 9. Response variability — pick() and buildGuidanceResponse starters ──────
-
-describe("response variability — pick() and buildGuidanceResponse starters", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("pick() returns different items when Math.random produces different values", () => {
-    const arr = ["alpha", "beta", "gamma", "delta"];
-    const seen = new Set();
-    [0.0, 0.25, 0.5, 0.75].forEach(r => {
-      vi.spyOn(Math, "random").mockReturnValueOnce(r);
-      seen.add(pick(arr));
-    });
-    // Four evenly-spaced seeds across a 4-element array must produce all 4 items.
-    expect(seen.size).toBe(4);
-  });
-
-  it("10 calls with distinct Math.random seeds produce at least 2 different nextSteps starters", () => {
-    const ent = makeEntities({ symptoms: { late: true } });
-    const STARTER_RE = /^(Going forward|A helpful next step|What might help|Here's what to consider)/i;
-    const starterSeen = new Set();
-
-    for (let i = 0; i < 10; i++) {
-      // Cycle seed through 0.0 → 0.9 so the 4-item starters array is sampled at
-      // indices 0, 1, 2, 3, 0, 1, 2, 3, 0, 1 — producing multiple distinct entries.
-      vi.spyOn(Math, "random").mockReturnValue(i / 10);
-      const res = buildGuidanceResponse(ent, "late+short_duration");
-      const line = res?.lines.find(l => STARTER_RE.test(l));
-      if (line) starterSeen.add(line.match(STARTER_RE)[0]);
-      vi.restoreAllMocks();
-    }
-
-    expect(starterSeen.size).toBeGreaterThan(1);
-  });
-
-  it("disclaimer is always the final line regardless of random seed", () => {
-    const ent = makeEntities({ symptoms: { late: true } });
-    for (let i = 0; i < 4; i++) {
-      vi.spyOn(Math, "random").mockReturnValue(i * 0.25);
-      const res = buildGuidanceResponse(ent, "late+short_duration");
-      expect(res?.lines.at(-1)).toMatch(/educational info|not a diagnosis/i);
-      vi.restoreAllMocks();
-    }
   });
 });

@@ -420,9 +420,7 @@
           renderClinics();
         },
         () => {
-          setStatus("Location access denied. Use the parish filter above to find clinics in your area.");
-          const parishFilter = document.getElementById("filter-parish");
-          if (parishFilter) parishFilter.focus();
+          setStatus("Location permission denied. Showing all clinics.");
         },
         { enableHighAccuracy: true, timeout: 8000 }
       );
@@ -456,12 +454,7 @@
 
       initMap();
       populateFilters();
-      renderClinics();
-
-      // Auto-request location when navigated from the chat "Find care near me" button
-      if (new URLSearchParams(window.location.search).get("autolocate") === "true") {
-        requestUserLocation();
-      }
+      renderClinics();  
     }
 
     init();
