@@ -43,10 +43,14 @@ vi.mock("../auth.js", () => ({
   getUser:    vi.fn().mockReturnValue(null),
 }));
 
-vi.mock("../bloomie-logger.js", () => ({
-  logSafetyEvent:    vi.fn(),
-  logAnalyticsEvent: vi.fn(),
-}));
+vi.mock("../bloomie-logger.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    logSafetyEvent:    vi.fn(),
+    logAnalyticsEvent: vi.fn(),
+  };
+});
 
 // Stub patois to identity + neutral tone (prevents PHRASE_MAP iteration bug).
 vi.mock("../bloomie-patois.js", async (importOriginal) => {

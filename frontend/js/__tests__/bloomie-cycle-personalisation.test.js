@@ -51,10 +51,14 @@ vi.mock("../auth.js", () => ({
   getUser:     vi.fn().mockReturnValue(null),
 }));
 
-vi.mock("../bloomie-logger.js", () => ({
-  logSafetyEvent:    vi.fn(),
-  logAnalyticsEvent: vi.fn(),
-}));
+vi.mock("../bloomie-logger.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    logSafetyEvent:    vi.fn(),
+    logAnalyticsEvent: vi.fn(),
+  };
+});
 
 // Bypass Patois normalisation (non-iterable PHRASE_MAP in test env).
 vi.mock("../bloomie-patois.js", async (importOriginal) => {

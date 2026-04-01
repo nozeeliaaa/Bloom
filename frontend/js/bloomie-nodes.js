@@ -322,11 +322,17 @@ export function createNodes(env) {
     },
 
     NARROWING: {
-      say: pick([
-        "I want to make sure I help you with the right thing 💗 Which area is closest to what you're dealing with?",
-        "Let me point you in the right direction 💗 Which of these is closest to what's going on?",
-        "Happy to help — which area fits best?",
-      ]),
+      say(ctx) {
+        if (ctx.narrowingRepair) {
+          ctx.narrowingRepair = false;
+          return "I want to make sure I help you with the right thing 💗 Which area is closest to what you're dealing with?";
+        }
+        return pick([
+          "I want to make sure I help you with the right thing 💗 Which area is closest to what you're dealing with?",
+          "Let me point you in the right direction 💗 Which of these is closest to what's going on?",
+          "Happy to help — which area fits best?",
+        ]);
+      },
       choices() {
         // When LOW confidence routing set narrowingCandidates, show those specific
         // topic buttons instead of the generic 6. Always append "Something else".

@@ -30,10 +30,14 @@ vi.mock("../auth.js", () => ({
   getUser: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock("../bloomie-logger.js", () => ({
-  logSafetyEvent:    vi.fn(),
-  logAnalyticsEvent: vi.fn(),
-}));
+vi.mock("../bloomie-logger.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    logSafetyEvent:    vi.fn(),
+    logAnalyticsEvent: vi.fn(),
+  };
+});
 
 // normalizePatois / detectUserTone iterate PHRASE_MAP, a large const array
 // literal that Vite's transform renders non-iterable in the test environment

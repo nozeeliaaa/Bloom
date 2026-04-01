@@ -4,6 +4,7 @@ import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory } from "./db.js";
 import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion } from "./bloomie-routing.js";
+import { resolveIntentAssist } from "./bloomie-intent.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent, logAnalyticsEvent, bloomieDebug } from "./bloomie-logger.js";
 import { getIdToken, getUser } from "./auth.js";
@@ -1510,6 +1511,7 @@ export function initBloomieChat({
       {
         const { sig: routeSig } = scoreSignals(normalizedText);
         ctx.routeConfidence = computeRouteConfidence(routeSig, mergedEntities);
+        ctx.lastConfidence  = ctx.routeConfidence;
         bloomieDebug("confidence", {
           tier:          ctx.routeConfidence.tier,
           primaryIntent: ctx.routeConfidence.primaryIntent ?? null,
@@ -1523,6 +1525,13 @@ export function initBloomieChat({
           });
         }
       }
+
+      // ── Intent assist: fire AI in parallel when rule confidence is LOW ────────
+      // Fired immediately after confidence scoring so the network request runs
+      // while the sync pipeline (safety logs, OOS handling) continues.
+      // Awaited only if we actually reach the LOW-tier routing decision below.
+      // Returns null silently when: rule is confident, no health keywords, API fails.
+      const _intentAssistPromise = resolveIntentAssist(normalizedText, ctx.routeConfidence);
 
       // ── Safety log: urgent_trigger (keyword router path) ──────────────────
       if (routed?.next === "HEAVY_URGENT") {
@@ -1612,6 +1621,7 @@ export function initBloomieChat({
           ]);
           ctx.oosStreakCount = 0;
           ctx.narrowingCandidates = null;
+          ctx.narrowingRepair = true;
           transition("NARROWING");
           return;
         }
@@ -1681,14 +1691,14 @@ export function initBloomieChat({
         const _isPair     = _pairKey ? CLARIFICATION_PAIRS.has(_pairKey) : false;
 
         if (conf && conf.tier === "low") {
-          // LOW: if we've already fallen back twice, go to CONFIDENCE_FALLBACK
-          // instead of NARROWING to avoid an infinite loop.
+          // LOW: rule layer couldn't resolve a clear route.
+          // Safety valve: loop-prevention always takes priority.
           if (ctx.confidenceFallbackCount >= 2) {
             ctx.confidenceFallbackCount++;
             logAnalyticsEvent("route_fallback", { fallbackCount: ctx.confidenceFallbackCount }, ctx);
             transition("CONFIDENCE_FALLBACK");
           } else {
-            // Build candidate buttons from the confidence result's competitors.
+            // Build candidate buttons from the rule-layer competitors.
             const INTENT_TO_CANDIDATE = {
               late:        { id: "cycle",  label: "Late or irregular cycle",  next: "LATE_INTRO" },
               heavy:       { id: "heavy",  label: "Bleeding or flow",         next: "HEAVY_INTRO" },
@@ -1707,6 +1717,47 @@ export function initBloomieChat({
             ctx.confidenceFallbackCount++;
             logAnalyticsEvent("route_no_match", { input: normalizedText, primaryIntent: conf.primaryIntent }, ctx);
             transition("NARROWING");
+
+            // ── AI intent assist (non-blocking) ──────────────────────────────
+            // _intentAssistPromise was fired above after confidence scoring.
+            // Settle via .then() so the submit handler is never suspended
+            // (same pattern as _tonePromise).  Two outcomes:
+            //
+            //   high confidence → clear NARROWING timers and route directly.
+            //   medium confidence → prepend AI candidate to narrowingCandidates
+            //     before NARROWING's choices() render (say timers still pending).
+            //
+            // ctx.state guard ensures we only act while still in NARROWING.
+            _intentAssistPromise.then(_aiIntent => {
+              ctx.intentAssist = _aiIntent ?? null;
+              if (!_aiIntent || _aiIntent.intent === "else") return;
+
+              bloomieDebug("ai", {
+                intent:     _aiIntent.intent,
+                confidence: _aiIntent.confidence,
+                source:     _aiIntent.source,
+              });
+
+              const aiCandidate = INTENT_TO_CANDIDATE[_aiIntent.intent];
+              if (!aiCandidate || ctx.state !== "NARROWING") return;
+
+              if (_aiIntent.confidence === "high") {
+                // Upgrade: cancel NARROWING and route directly.
+                clearTimers();
+                ctx.lastIntent = _aiIntent.route;
+                logAnalyticsEvent("route_matched", {
+                  route:  _aiIntent.route,
+                  reason: "ai_primary",
+                }, ctx);
+                transition(_aiIntent.route, {});
+              } else if (_aiIntent.confidence === "medium") {
+                // Refine: prepend AI candidate so it appears first in NARROWING.
+                const existing = ctx.narrowingCandidates ?? [];
+                if (!existing.some(c => c.id === aiCandidate.id)) {
+                  ctx.narrowingCandidates = [aiCandidate, ...existing].slice(0, 3);
+                }
+              }
+            }).catch(() => {});
           }
         } else if (conf && (conf.tier === "medium" || _isPair)) {
           // MEDIUM (or a clarification pair at HIGH): ask soft confirmation
