@@ -5,7 +5,7 @@ import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseIns
 import { loadBloomieMemory, saveBloomieMemory } from "./db.js";
 import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion } from "./bloomie-routing.js";
 import { createCtx } from "./bloomie-session.js";
-import { logSafetyEvent, logAnalyticsEvent } from "./bloomie-logger.js";
+import { logSafetyEvent, logAnalyticsEvent, bloomieDebug } from "./bloomie-logger.js";
 import { getIdToken, getUser } from "./auth.js";
 import { generateIntegratedSignals, getBloomieSymptomContext } from "./algorithms/bloom-symptom-engine.js";
 import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhaseConfidence } from "./algorithms/bloom-date-utils.js";
@@ -60,7 +60,7 @@ export async function mountChat(user = null, cycleData = null, symptomHistory = 
     bloomieMemory,
     onSaveMemory: saveBloomieMemory,
     onOpenCareMap: () => {
-      location.hash = "#/care-map";
+      window.location.href = "/pages/clinics.html?autolocate=true";
     },
     onRequestPdf: async (summaryText) => {
   try {
@@ -122,7 +122,7 @@ export function initBloomieChat({
   symptomHistory = null,
   bloomieMemory = null,
   onSaveMemory = null,
-  onOpenCareMap = () => (location.hash = "#/care-map"),
+  onOpenCareMap = () => { window.location.href = "/pages/clinics.html?autolocate=true"; },
   onRequestPdf = (summaryText) => console.log("PDF requested:", summaryText),
   onLogAction = (action, data) => console.log("Log action:", action, data),
 } = {}) {
@@ -1493,7 +1493,12 @@ export function initBloomieChat({
       if (inferred) {
         ctx.lastIntent = inferred.payload?.reason?.split("+")[0] || null;
         persistMemory(mergedEntities, inferred.payload?.reason || null);
-        console.log("[Bloomie inference] routed →", inferred.next, inferred.payload?.reason);
+        bloomieDebug("route", {
+          route:    inferred.next,
+          source:   "inferRoute",
+          reason:   inferred.payload?.reason ?? null,
+          entities: Object.keys(mergedEntities.symptoms).filter(k => mergedEntities.symptoms[k]),
+        });
         transition(inferred.next, { entities: mergedEntities, ...(inferred.payload || {}) });
         return;
       }
@@ -1505,6 +1510,18 @@ export function initBloomieChat({
       {
         const { sig: routeSig } = scoreSignals(normalizedText);
         ctx.routeConfidence = computeRouteConfidence(routeSig, mergedEntities);
+        bloomieDebug("confidence", {
+          tier:          ctx.routeConfidence.tier,
+          primaryIntent: ctx.routeConfidence.primaryIntent ?? null,
+          score:         ctx.routeConfidence.score,
+          ambiguous:     ctx.routeConfidence.ambiguous,
+        });
+        if (routed?.next && routed.next !== "START_MENU" && !routed?.payload?.oos) {
+          bloomieDebug("route", {
+            route:  routed.next,
+            source: "keyword_router",
+          });
+        }
       }
 
       // ── Safety log: urgent_trigger (keyword router path) ──────────────────
@@ -1534,7 +1551,21 @@ export function initBloomieChat({
       }
 
       if (routed?.payload?.oos) {
-        console.log("OOS category:", routed.payload.oos);
+        const _oosHealthy =
+          /\b(bleed|faint|pass out|pain|cramp|late|pregnant|spotting|dizzy|discharge|cycle|period|mood|tired)\b/
+          .test(normalizedText);
+        bloomieDebug("fallback", {
+          route:       routed.next,
+          oosCategory: routed.payload.oos,
+          healthWords: _oosHealthy,
+        });
+        if (_oosHealthy && routed.payload.oos !== "greeting") {
+          bloomieDebug("unhandled_health", {
+            input:    normalizedText.slice(0, 80),
+            category: routed.payload.oos,
+            note:     "health keywords present but fell to OOS reply",
+          });
+        }
       }
 
       if (routed?.reply && routed?.next) {

@@ -128,6 +128,58 @@ export function logAnalyticsEvent(eventType, payload = {}, ctx = null) {
   _sendAnalytics(eventType, payload, ctx).catch(() => {});
 }
 
+// ─── Debug console logger ─────────────────────────────────────────────────────
+//
+// Gated on a localStorage flag — zero output in production by default.
+// Enable from the browser DevTools console:
+//   localStorage.setItem("BLOOMIE_DEBUG", "true")   then refresh
+//   localStorage.removeItem("BLOOMIE_DEBUG")          to disable
+//
+// All Bloomie routing diagnostics go through bloomieDebug() so they can be
+// toggled or removed from one place.  Each call produces one console line,
+// filterable by "[Bloomie:" in the DevTools console search box.
+//
+// Categories and what they record:
+//   "route"            — route chosen, source (inferRoute / keyword_router / intent_ai), reason
+//   "confidence"       — tier (high/medium/low), primary intent, signal score
+//   "ai"               — intent AI source, route chosen, whether it changed routing
+//   "fallback"         — OOS or START_MENU fallback and why rules gave up
+//   "unhandled_health" — health-related message that fell to generic OOS reply
+
+const _DEBUG =
+  typeof window !== "undefined" &&
+  window.localStorage?.getItem("BLOOMIE_DEBUG") === "true";
+
+const _CAT_STYLES = {
+  route:            "color:#6366f1;font-weight:bold",  // indigo  — routing decision
+  confidence:       "color:#0ea5e9;font-weight:bold",  // sky     — confidence tier
+  ai:               "color:#8b5cf6;font-weight:bold",  // violet  — AI layer result
+  fallback:         "color:#f59e0b;font-weight:bold",  // amber   — rule fallback / OOS
+  unhandled_health: "color:#ef4444;font-weight:bold",  // red     — health msg dropped
+};
+
+/**
+ * bloomieDebug(category, fields)
+ *
+ * Structured debug logger for Bloomie routing diagnostics.
+ * Only emits when localStorage.BLOOMIE_DEBUG === "true".
+ *
+ * Usage:
+ *   bloomieDebug("route", { route: "LATE_INTRO", source: "inferRoute" });
+ *
+ * @param {"route"|"confidence"|"ai"|"fallback"|"unhandled_health"} category
+ * @param {Record<string, *>} fields  Key/value pairs printed inline.
+ */
+export function bloomieDebug(category, fields = {}) {
+  if (!_DEBUG) return;
+  const style = _CAT_STYLES[category] ?? "color:#6b7280;font-weight:bold";
+  const parts = Object.entries(fields)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .map(([k, v]) => `${k}:${Array.isArray(v) ? `[${v.join(",")}]` : v}`)
+    .join("  ");
+  console.log(`%c[Bloomie:${category}]%c ${parts}`, style, "color:inherit");
+}
+
 async function _sendAnalytics(eventType, payload, ctx) {
   const body = {
     eventType,
