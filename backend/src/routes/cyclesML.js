@@ -21,8 +21,7 @@ import { requireAuth } from "../middleware/auth.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-const CYCLE_SCRIPT = path.join(__dirname, '../public/ml/inference/cycle_predict.py');
-
+const CYCLE_SCRIPT = path.join(__dirname, '../../ml/inference/cycle_predict.py');
 const router = express.Router();
 
 // ── Python runner ────────────────────────────────────────────
@@ -49,7 +48,6 @@ function runPython(scriptPath, args) {
 
 // ── Fallback: rule-based weighted average ────────────────────
 //
-// Mirrors the Weighted OLS logic from cyclePredictor.js but
 // runs on the backend. Recent cycles get higher weight.
 // Falls back to userTypicalCycleLength if no history exists.
 
