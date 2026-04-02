@@ -48,20 +48,7 @@ import feedbackRoutes from "./src/routes/feedback.js";
 import { runAgeUpgradeJob } from "./src/jobs/ageUpgrade.js";
 import { runTokenExpiryJob } from "./src/jobs/tokenExpiry.js";
 import rateLimit from "express-rate-limit";
-<<<<<<< HEAD
-=======
-import cycleLogRoutes from "./routes/cycleLogs.js";
-import symptomLogRoutes from "./routes/symptomLogs.js";
-import consentRoutes from "./routes/consent.js";
-import catalogRoutes from "./routes/catalog.js";
-import userRoutes from "./routes/user.js";
-import authRoutes from "./routes/auth.js";
-import adminRoutes from "./routes/admin.js";
-import bloomieMemoryRoutes    from "./routes/bloomieMemory.js";
-import bloomieSafetyLogRoutes from "./routes/bloomieSafetyLog.js";
-import feedbackRoutes         from "./routes/feedback.js";
-import cyclesML from "./routes/cyclesML.js";
->>>>>>> 8773842 (Corrected Python path)
+import cyclesML from "./src/routes/cyclesML.js";
 
 const app = express();
 
