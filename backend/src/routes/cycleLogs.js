@@ -1,5 +1,6 @@
 // src/routes/cycleLogs.js
 import express from "express";
+import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateCycleLog } from "../validators/validateCycleLog.js";
@@ -49,6 +50,14 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
     if (!snap.exists) payload.createdAt = new Date();
 
     await docRef.set(payload, { merge: true });
+
+    // Ensure parent doc exists
+    const parentRef = db.collection("cycleLogs").doc(uid);
+    await parentRef.set({
+      uid,
+      updatedAt: new Date(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
 
     return res.json({ ok: true, entry: payload });
   } catch (err) {

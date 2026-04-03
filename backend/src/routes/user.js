@@ -24,7 +24,7 @@ router.post("/profile", requireAuth, async (req, res) => {
     const userRef = db.collection("users").doc(uid);
     const snap = await userRef.get();
     const existing = snap.exists ? snap.data() : null;
-    const existingProfile = existing?.profile || null;
+    const existingProfile = existing?.profile || {};
 
     // ---- Validate incoming body ----
     const validation = validateUserProfile(req.body, existingProfile);
@@ -33,37 +33,76 @@ router.post("/profile", requireAuth, async (req, res) => {
     }
 
     // ---- Build profile object ----
-    const profile = {
-      role: existingProfile?.role || "user",
-      goal: req.body.goal ?? (existingProfile?.goal === "track_cycle" ? "period" : existingProfile?.goal) ?? "period",
-      mode: req.body.mode ?? existingProfile?.mode ?? "account",
-      yearOfBirth:
-        req.body.yearOfBirth === undefined
-        ? existingProfile?.yearOfBirth ?? null
-        : existingProfile?.yearOfBirth  
-        ? existingProfile.yearOfBirth
-        : Number(req.body.yearOfBirth),
-      consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
-      remindersEnabled: req.body.remindersEnabled ?? existingProfile?.remindersEnabled ?? false,
-      reminderTime: req.body.reminderTime ?? existingProfile?.reminderTime ?? "09:00",
+    let yearOfBirth = existingProfile?.yearOfBirth ?? null;
 
-      avgCycleLength: req.body.avgCycleLength !== undefined
-        ? (req.body.avgCycleLength === null ? null : Number(req.body.avgCycleLength))
-        : existingProfile?.avgCycleLength ?? null,
-      periodDuration: req.body.periodDuration !== undefined
-        ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
-        : existingProfile?.periodDuration ?? null,
-      weightKg: req.body.weightKg !== undefined
-        ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
-        : existingProfile?.weightKg ?? null,
-      heightCm: req.body.heightCm !== undefined
-        ? (req.body.heightCm === null ? null : Number(req.body.heightCm))
-        : existingProfile?.heightCm ?? null,
+    if (req.body.yearOfBirth !== undefined && !existingProfile?.yearOfBirth) {
+      yearOfBirth = Number(req.body.yearOfBirth);
+    }
+
+    const profile = {
+      nickname:
+        req.body.nickname !== undefined
+          ? (typeof req.body.nickname === "string"
+            ? req.body.nickname.trim().slice(0, 40)
+            : null)
+          : existingProfile?.nickname ?? null,
+
+      yearOfBirth,
+
+      goal:
+        req.body.goal !== undefined
+          ? req.body.goal
+          : existingProfile?.goal ?? null,
+
+      mode:
+        req.body.mode !== undefined
+          ? req.body.mode
+          : existingProfile?.mode ?? "account",
+
+      consentSensitive:
+        req.body.consentSensitive !== undefined
+          ? req.body.consentSensitive
+          : existingProfile?.consentSensitive ?? false,
+
+      remindersEnabled:
+        req.body.remindersEnabled !== undefined
+          ? req.body.remindersEnabled
+          : existingProfile?.remindersEnabled ?? false,
+
+      reminderTime:
+        req.body.reminderTime !== undefined
+          ? req.body.reminderTime
+          : existingProfile?.reminderTime ?? "09:00",
+    };
+
+    const existingHealthProfile = existing?.healthProfile || {};
+
+    const healthProfile = {
+      avgCycleLength:
+        req.body.avgCycleLength !== undefined
+          ? (req.body.avgCycleLength === null ? null : Number(req.body.avgCycleLength))
+          : existingHealthProfile.avgCycleLength ?? null,
+
+      periodDuration:
+        req.body.periodDuration !== undefined
+          ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
+          : existingHealthProfile.periodDuration ?? null,
+
+      weightKg:
+        req.body.weightKg !== undefined
+          ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
+          : existingHealthProfile.weightKg ?? null,
+
+      heightCm:
+        req.body.heightCm !== undefined
+          ? (req.body.heightCm === null ? null : Number(req.body.heightCm))
+          : existingHealthProfile.heightCm ?? null,
     };
 
     await userRef.set(
       {
         profile,
+        healthProfile,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
       },
@@ -71,8 +110,18 @@ router.post("/profile", requireAuth, async (req, res) => {
     );
 
     // ── Audit: track which fields changed ──
-    const changedFields = Object.keys(req.body).filter(
-      (k) => k !== "role" // role changes go through admin route only
+    const allowedChangedFields = [
+      "nickname",
+      "yearOfBirth",
+      "goal",
+      "mode",
+      "consentSensitive",
+      "remindersEnabled",
+      "reminderTime",
+    ];
+
+    const changedFields = Object.keys(req.body).filter((k) =>
+      allowedChangedFields.includes(k)
     );
 
     // Special case: YOB being set for the first time is a locked action
@@ -111,7 +160,11 @@ router.post("/profile", requireAuth, async (req, res) => {
        });
       }
 
-    return res.json({ ok: true, profile });
+    const savedDoc = await userRef.get();
+    return res.json({
+      ok: true,
+      profile: savedDoc.data()?.profile ?? null,
+     });
   } catch (err) {
     console.error("POST /profile error:", err);
     return res.status(500).json({ error: "Failed to save profile" });
@@ -122,8 +175,29 @@ router.post("/profile", requireAuth, async (req, res) => {
 router.get("/profile", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const doc = await db.collection("users").doc(uid).get();
-    if (!doc.exists) return res.json(null);
+    const userRef = db.collection("users").doc(uid);
+    const doc = await userRef.get();
+
+    if (!doc.exists) {
+      const defaultUser = {
+        profile: {
+          nickname: null,
+          yearOfBirth: null,
+          goal: null,
+          mode: "account",
+          consentSensitive: false,
+          remindersEnabled: false,
+          reminderTime: "09:00",
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await userRef.set(defaultUser, { merge: true });
+      const newDoc = await userRef.get();
+      return res.json(newDoc.data());
+    }
+
     return res.json(doc.data());
   } catch (err) {
     console.error("GET /profile error:", err);

@@ -18,70 +18,83 @@ export async function requireAuth(req, res, next) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      // Brand new user — create full doc
       await userRef.set({
         role: "user",
         profile: {
-          role: "user",
+          nickname: null,
           yearOfBirth: null,
+          goal: null,
+          mode: "account",
           consentSensitive: false,
           remindersEnabled: false,
           reminderTime: "09:00",
-          mode: "account",
-          goal: "track_cycle",
         },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       req.user = {
-        uid:            decoded.uid,
-        email:          decoded.email || null,
+        uid: decoded.uid,
+        email: decoded.email || null,
         email_verified: !!decoded.email_verified,
-        role:           "user",
-        ageBand:        null,
-        yob:            null,
+        role: "user",
+        ageBand: null,
+        yob: null,
       };
 
       return next();
     }
 
-    // Doc exists — read it
-    const data    = userDoc.data();
-    const profile = data?.profile || {};
+    const data = userDoc.data() || {};
+    const profile = data.profile || {};
 
-    // Backfill any missing fields for legacy accounts
-    const needsBackfill = !data.role || !data.profile;
+    const needsBackfill =
+      !data.role ||
+      !data.profile ||
+      data.profile.nickname === undefined ||
+      data.profile.yearOfBirth === undefined ||
+      data.profile.goal === undefined ||
+      data.profile.mode === undefined ||
+      data.profile.consentSensitive === undefined ||
+      data.profile.remindersEnabled === undefined ||
+      data.profile.reminderTime === undefined ||
+      data.profile.role !== undefined ||
+      data.profile.goal === "track_cycle";
+
     if (needsBackfill) {
+      const normalizedGoal =
+        profile.goal === "track_cycle" ? null : (profile.goal ?? null);
+
       const backfill = {
-        role: data.role || profile.role || "user",
+        role: data.role || "user",
         profile: {
-          role:             profile.role             || "user",
-          yearOfBirth:      profile.yearOfBirth      ?? null,
+          nickname: profile.nickname ?? null,
+          yearOfBirth: profile.yearOfBirth ?? null,
+          goal: normalizedGoal,
+          mode: profile.mode ?? "account",
           consentSensitive: profile.consentSensitive ?? false,
           remindersEnabled: profile.remindersEnabled ?? false,
-          reminderTime:     profile.reminderTime     || "09:00",
-          mode:             profile.mode             || "account",
-          goal:             profile.goal             || "track_cycle",
+          reminderTime: profile.reminderTime ?? "09:00",
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
+
       await userRef.set(backfill, { merge: true });
 
-      // Use the backfilled values going forward
-      Object.assign(data, backfill);
-      Object.assign(profile, backfill.profile);
+      data.role = backfill.role;
+      data.profile = backfill.profile;
     }
 
-    const ageBand = deriveAgeBand(profile.yearOfBirth);
+    const safeProfile = data.profile || {};
+    const ageBand = deriveAgeBand(safeProfile.yearOfBirth);
 
     req.user = {
-      uid:            decoded.uid,
-      email:          decoded.email || null,
+      uid: decoded.uid,
+      email: decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role:           decoded.role || data.role || profile.role || "user",
+      role: decoded.role || data.role || "user",
       ageBand,
-      yob:            profile.yearOfBirth || null,
+      yob: safeProfile.yearOfBirth || null,
     };
 
     return next();
@@ -139,7 +152,7 @@ export function deriveAgeBand(yob) {
   const currentYear = new Date().getFullYear();
   if (!Number.isInteger(year) || year < 1900 || year > currentYear) return null;
   const age = currentYear - year;
-  if (age >= 13 && age <= 17) return "13-17";
+  if (age >= 10 && age <= 17) return "10-17";
   if (age >= 18) return "18+";
   return null;
 }
