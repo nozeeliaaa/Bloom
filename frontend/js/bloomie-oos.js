@@ -736,7 +736,7 @@ export function createOOS(env) {
   // Health signals that should ALWAYS beat OOS pattern matches.
   // e.g. "me bleed thru me pants lol" has "lol" but the health signal wins.
   const HEALTH_OVERRIDE_PATTERNS = [
-    /\b(bleed|bleeding|blood|period|cramp|pain|spot|spotting|late|missed|discharge|pregnant|pregnancy|nausea|dizzy|faint|heavy|clot|pelvic|mood|tired|fatigue|cycle|ovulat)\b/,
+    /\b(bleed|bleeding|blood|period|cramp|pain|spot|spotting|late|missed|discharge|pregnant|pregnancy|nausea|dizzy|faint|heavy|clot|pelvic|mood|tired|fatigue|cycle|ovulat|sad|angry|mad|vex|frustrated|happy|excited|emotional|anxious|energy)\b/,
   ];
 
   // Cycle question patterns — checked FIRST before health override

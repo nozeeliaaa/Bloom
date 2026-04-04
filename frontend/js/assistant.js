@@ -2,7 +2,7 @@ import { normalizePatois, detectPatois, detectUserTone, fuzzyCorrect, collapseRe
 import { resolveTone, applyToneToLines, applyToneToChoices } from "./bloomie-tone.js";
 import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
-import { loadBloomieMemory, saveBloomieMemory } from "./db.js";
+import { loadBloomieMemory, saveBloomieMemory, loadLocalBloomieMemory, saveLocalBloomieMemory, loadUserProfile } from "./db.js";
 import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion } from "./bloomie-routing.js";
 import { resolveIntentAssist } from "./bloomie-intent.js";
 import { createCtx } from "./bloomie-session.js";
@@ -46,19 +46,23 @@ export function Chat() {
   `;
 }
 
-export async function mountChat(user = null, cycleData = null, symptomHistory = null) {
+export async function mountChat(user = null, cycleData = null, symptomHistory = null, { isMinor = false, isAnon = false } = {}) {
   const box = document.getElementById("chat-box");
   if (!box) return;
 
-  // Load persistent memory from Firestore (or localStorage fallback)
-  // before mounting so Bloomie can surface recall on first message.
-  const bloomieMemory = await loadBloomieMemory();
+  // Load persistent memory and user profile in parallel before mounting.
+  const [bloomieMemory, profile] = await Promise.all([
+    loadBloomieMemory(),
+    loadUserProfile(),
+  ]);
 
   initBloomieChat({
     userName: user?.nickname || user?.displayName || null,
     cycleData,
     symptomHistory,
     bloomieMemory,
+    isMinor,
+    isAnon,
     onSaveMemory: saveBloomieMemory,
     onOpenCareMap: () => {
       window.location.href = "/pages/clinics.html?autolocate=true";
@@ -126,6 +130,8 @@ export function initBloomieChat({
   onOpenCareMap = () => { window.location.href = "/pages/clinics.html?autolocate=true"; },
   onRequestPdf = (summaryText) => console.log("PDF requested:", summaryText),
   onLogAction = (action, data) => console.log("Log action:", action, data),
+  isMinor = false,
+  isAnon = false,
 } = {}) {
   const $box = document.getElementById(chatBoxId);
   const $input = document.getElementById(inputId);
@@ -174,6 +180,27 @@ export function initBloomieChat({
       return name && useName ? `${prefix}, ${name} 🩷` : `${prefix} 🩷`;
     }
     return name && useName ? `Hey ${name} 🩷` : `Hey 🩷`;
+  }
+
+  // ---------- Nickname helpers ----------
+
+  function getNickname() {
+    return ctx.userNickname ?? null;
+  }
+
+  function canUseNickname() {
+    if (!getNickname()) return false;
+    if (ctx.urgency === true) return false;
+    const depth = ctx.conversationProfile?.sessionDepth ?? 0;
+    if (depth < 2) return false;
+    if (ctx.lastNicknameUsedAtDepth !== null && depth - ctx.lastNicknameUsedAtDepth < 4) return false;
+    return true;
+  }
+
+  function withNickname(text) {
+    if (!canUseNickname()) return text;
+    ctx.lastNicknameUsedAtDepth = ctx.conversationProfile?.sessionDepth ?? 0;
+    return `${text}, ${getNickname()}`;
   }
 
   // ---------- Cycle data helpers ----------
@@ -455,19 +482,21 @@ export function initBloomieChat({
   // Safe to call fire-and-forget — saves to localStorage immediately,
   // Firestore sync happens in the background.
   function persistMemory(entities, reason) {
-    if (!onSaveMemory) return;
     const activeSymptoms = Object.entries(entities.symptoms)
       .filter(([, v]) => v)
       .map(([k]) => k);
     if (!activeSymptoms.length) return;
-    onSaveMemory({
+    const partialUpdate = {
       lastSymptoms:        activeSymptoms,
       lastIntent:          reason || null,
       lastSeverity:        entities.severity,
       lastDuration:        entities.duration,
       lastPregnancyChance: entities.pregnancy?.chance || false,
       recentTopics:        activeSymptoms.slice(0, 5),
-    });
+      lastSessionDate:     new Date().toISOString(),
+    };
+    saveLocalBloomieMemory(partialUpdate);
+    if (onSaveMemory) onSaveMemory(partialUpdate);
   }
 
   // How many days until next period
@@ -491,6 +520,11 @@ export function initBloomieChat({
 
   // ---------- State ----------
   const ctx = createCtx();
+  ctx.isMinor      = isMinor;
+  ctx.isAnon       = isAnon;
+  ctx.userNickname = profile?.nickname ?? null;
+  const memory = loadLocalBloomieMemory();
+  ctx.memory = memory ?? {};
 
   // ── Session end analytics ─────────────────────────────────────────────────
   // Fire-and-forget on tab close / navigation. No ctx teardown at this point
@@ -1060,7 +1094,10 @@ export function initBloomieChat({
         const choice = contextMatch;
         if (NODES[ctx.state]?.question) recordAnswer(NODES[ctx.state].question, choice.label);
         if (choice.action === "OPEN_MAP")      onOpenCareMap();
-        if (choice.action === "REQUEST_PDF")   onRequestPdf(buildSummaryText());
+        if (choice.action === "REQUEST_PDF") {
+          if (ctx.isAnon) { say(["To save a PDF summary, you'll need a free Bloom account 🩷 Sign up to keep a record of your conversations."]); }
+          else { onRequestPdf(buildSummaryText()); }
+        }
         if (choice.action?.startsWith("LOG_")) onLogAction(choice.action, choice.logData || {});
         const effectiveNext = (choice.id === "done" && choice.next === "CLOSE" && ctx.adviceGiven.size > 0)
           ? "SUMMARY"
@@ -1452,7 +1489,7 @@ export function initBloomieChat({
       }
 
       const cycleCtx   = buildCycleCtx();
-      const guidance   = buildGuidanceResponse(mergedEntities, inferred?.payload?.reason, cycleCtx);
+      const guidance   = buildGuidanceResponse(mergedEntities, inferred?.payload?.reason, cycleCtx, ctx.currentTone, minorSafeFooter());
 
       if (guidance) {
         // Store on ctx so buildSummaryText can include them in PDF export
@@ -1487,6 +1524,10 @@ export function initBloomieChat({
           ctx.timers.add(tid);
         } else {
           say(guidanceLines);
+        }
+        if (ctx.isAnon && !ctx.urgency && ctx.conversationProfile.sessionDepth >= 2 && !ctx.state.includes("_URGENT")) {
+          const nudge = anonNudge();
+          if (nudge) say([nudge]);
         }
         return;
       }
@@ -1860,6 +1901,29 @@ export function initBloomieChat({
   }
   function urgentFooter() {
     return ["_If symptoms are severe, sudden, or worsening — please seek medical care._"];
+  }
+  function anonNudge() {
+    if (!ctx.isAnon) return null;
+    if (ctx.adviceGiven.has("anon_account_nudge")) return null;
+    if (ctx.urgency) return null;
+    if (ctx.state.includes("_URGENT")) return null;
+    ctx.adviceGiven.add("anon_account_nudge");
+    return pick([
+      "Creating a free account lets Bloomie remember your cycle so I can give you more personalised help 🩷",
+      "If you ever want more tailored guidance, a free Bloom account lets me track your cycle over time 🩷",
+      "Just so you know — signing up for free means I can remember your history and spot patterns for you 🩷",
+    ]);
+  }
+  function minorSafeFooter() {
+    if (!ctx.isMinor) return [];
+    if (ctx.adviceGiven.has("minor_adult_nudge")) return [];
+    if (ctx.urgency || ctx.state.includes("_URGENT")) return [];
+    ctx.adviceGiven.add("minor_adult_nudge");
+    return [pick([
+      "_If you're ever unsure or worried, it's always okay to talk to a trusted adult or a doctor._",
+      "_Remember, a parent, guardian, or school nurse can also be a great support if you need one._",
+      "_You don't have to figure this out alone — a trusted adult or healthcare provider can help._",
+    ])];
   }
 
 
@@ -2670,7 +2734,10 @@ export function initBloomieChat({
           pushMsg("user", choice.label);
           if (node.question) recordAnswer(node.question, choice.label);
           if (choice.action === "OPEN_MAP")      onOpenCareMap();
-          if (choice.action === "REQUEST_PDF")   onRequestPdf(buildSummaryText());
+          if (choice.action === "REQUEST_PDF") {
+            if (ctx.isAnon) { say(["To save a PDF summary, you'll need a free Bloom account 🩷 Sign up to keep a record of your conversations."]); }
+            else { onRequestPdf(buildSummaryText()); }
+          }
           if (choice.action?.startsWith("LOG_")) onLogAction(choice.action, choice.logData || {});
           if (typeof choice.onSelect === "function") choice.onSelect();
           // "I'm done for now" → SUMMARY when there's advice to show
@@ -2695,6 +2762,7 @@ export function initBloomieChat({
   // e.g. "Last time we talked, you mentioned a missed period and nausea —
   //        is that still going on, or is something new coming up?"
   function buildRecallLine() {
+    if (ctx.isAnon) return null;
     if (!bloomieMemory?.lastSymptoms?.length) return null;
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const sessionDate  = bloomieMemory.lastSessionDate ? new Date(bloomieMemory.lastSessionDate) : null;
@@ -2720,6 +2788,7 @@ export function initBloomieChat({
   // Returns "you tend to log [X] around this time" or null.
   // Guards: no symptomHistory, no SYMPTOM_PATTERN signal with show:true, already shown.
   function buildSymptomPatternLine(catalogCodes) {
+    if (ctx.isAnon) return null;
     if (!Array.isArray(symptomHistory) || !symptomHistory.length) return null;
     if (!Array.isArray(catalogCodes) || !catalogCodes.length) return null;
     if (ctx.adviceGiven.has("symptom_pattern_line")) return null;
@@ -2764,6 +2833,7 @@ export function initBloomieChat({
   // Returns one personalised cycle-context line, or null.
   // Guards: urgency, no signals, already shown this session.
   function buildCyclePersonalisationLine(context) {
+    if (ctx.isAnon) return null;
     if (ctx.urgency) return null;
     const cycleSignals = ctx.integratedSignals?.cycleSignals;
     if (!cycleSignals?.length) return null;
@@ -2811,10 +2881,11 @@ export function initBloomieChat({
 
   const env = {
     ctx, cd, userMode, say, transition, pick, ack, qualifier, consent, estimate,
-    quickSummary, safeFooter, urgentFooter, effectiveLmp, effectiveCycleLength,
+    quickSummary, safeFooter, urgentFooter, minorSafeFooter, effectiveLmp, effectiveCycleLength,
     effectiveMode, hasLmpData, getCurrentPhase, phaseNudge, insightFor, addDays, fmtDate,
     buildSummaryCard, applySessionMode, canGiveAdvice, filterDedup,
     daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildSymptomPatternLine, greet, buildCycleCtx,
+    withNickname, canUseNickname, getNickname,
     pickPriorityConcern, getPhaseInsight, getToneOpener, buildGuidanceResponse,
     getStructuredSummary, computePhaseConfidence, logSafetyEvent,
     parseNaturalDate, validateCycleDate, validateCalendarDate,

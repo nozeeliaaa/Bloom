@@ -127,14 +127,14 @@ export function resolveOOSFollowUp(rawText, lastOOS) {
     case "money":
     case "school":
       if (isYes || /late|missed|period/.test(t)) return "LATE_INTRO";
-      if (/mood|emotional|anxious|sad/.test(t)) return "MOOD_SAFETY_CHECK";
+      if (/mood|emotional|anxious|sad|angry|mad|vex|frustrated|annoyed|happy|excited|good mood|not like myself/.test(t)) return "MOOD_SAFETY_CHECK";
       break;
     case "sleep":
-      if (isYes || /mood|tired|energy/.test(t)) return "MOOD_SAFETY_CHECK";
+      if (isYes || /mood|tired|energy|angry|mad|vex|frustrated|annoyed|happy|excited|good mood|emotional|not like myself/.test(t)) return "MOOD_SAFETY_CHECK";
       if (/period|late|cycle/.test(t)) return "LATE_INTRO";
       break;
     case "mental_health_general":
-      if (isYes || /before|period|cycle/.test(t)) return "MOOD_SAFETY_CHECK";
+      if (isYes || /before|period|cycle|angry|mad|vex|frustrated|annoyed|happy|excited|good mood|emotional|not like myself/.test(t)) return "MOOD_SAFETY_CHECK";
       break;
     case "non_repro_health":
       if (isYes || /late|period|cycle|miss/.test(t)) return "LATE_INTRO";

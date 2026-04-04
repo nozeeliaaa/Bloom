@@ -92,6 +92,10 @@ export function createCtx() {
     symptomSignals:     null,       // pre-computed SymptomSignal[] from bloom-symptom-engine, or null
     cumulativeRiskFlags:      new Set(),  // accumulates risk signal flags across conversation
     pendingAmbiguityContext:  null,        // stored when ambiguity question was asked
+    isMinor:                  false,
+    isAnon:                   false,
+    userNickname:             null,
+    lastNicknameUsedAtDepth:  null,
     pendingContradictionContext: null,     // stored when contradiction was detected
     pendingContextProbe:      null,        // stored when missing-context probe was asked
     pendingQuestion:          null,        // { type: "yes_no"|"severity"|"timing"|"duration"|"test_result"|"choice", nodeState: string }

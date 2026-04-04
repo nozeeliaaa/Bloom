@@ -1,10 +1,11 @@
 export function createNodes(env) {
   const {
     ctx, cd, userMode, say, transition, pick, ack, qualifier, consent, estimate,
-    quickSummary, safeFooter, urgentFooter, effectiveLmp, effectiveCycleLength,
+    quickSummary, safeFooter, urgentFooter, minorSafeFooter, effectiveLmp, effectiveCycleLength,
     effectiveMode, hasLmpData, getCurrentPhase, phaseNudge, insightFor, addDays, fmtDate,
     buildSummaryCard, applySessionMode, canGiveAdvice, filterDedup,
     daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildSymptomPatternLine, greet, buildCycleCtx,
+    withNickname, canUseNickname, getNickname,
     pickPriorityConcern, getPhaseInsight, getToneOpener, buildGuidanceResponse,
     getStructuredSummary, computePhaseConfidence, logSafetyEvent,
     parseNaturalDate, validateCycleDate, validateCalendarDate,
@@ -67,6 +68,22 @@ export function createNodes(env) {
     const recall = buildRecallLine();
     // Appends the recall line (if any) after the core intro messages.
     const r = (lines) => recall ? [...lines, recall] : lines;
+
+    if (ctx.isMinor) {
+      return r([
+        base,
+        "I'm here to help you understand what's going on with your body 🩷 Everything you share with me stays between us.",
+        "I can help with period questions, cramps, mood changes, and more. What's on your mind?",
+      ]);
+    }
+
+    if (ctx.isAnon && !ctx.isMinor) {
+      return r([
+        base,
+        "You're not signed in, so I won't be able to see your cycle history — but I can still help 🩷",
+        "What's going on today?",
+      ]);
+    }
 
     if (userMode.isPregnancy && cd.lmp) {
       const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
@@ -846,10 +863,14 @@ export function createNodes(env) {
 
     // ── Recent unprotected sex ────────────────────────────────────────────────
     TEST_RECENT_SEX_INTRO: {
-      say: [
-        "Okay 🩷 The timing of a reliable test depends on how many days have passed since sex.",
-        "Type the date of the unprotected sex like: 2026-02-08 (YYYY-MM-DD).",
-      ],
+      say(ctx) {
+        const lines = [
+          "Okay 🩷 The timing of a reliable test depends on how many days have passed since sex.",
+          "Type the date of the unprotected sex like: 2026-02-08 (YYYY-MM-DD).",
+        ];
+        if (ctx.isMinor) lines.unshift("This is a safe space — I won't share anything you tell me 🩷");
+        return lines;
+      },
       autoNext(ctx) {
         ctx.capture = { kind: "sexDate", next: "TEST_RECENT_SEX_ROUTE" };
         return null;
@@ -919,13 +940,17 @@ export function createNodes(env) {
 
     // Honest legal context doesn't shame, doesn't lie, doesn't advise
     ABORTION_HONEST_CONTEXT: {
-      say: [
-        "I want to be honest with you because you deserve honesty 🩷",
-        "In Jamaica, abortion is currently illegal under the Offences Against the Person Act. There are no formal legal exceptions, not even for rape or incest.",
-        "This means there is no safe, legal clinical option available in-country right now.",
-        "I can't tell you what to do, and I won't pretend the situation isn't hard.",
-        "What I can do is help you think through your options, your safety, and how to access non-judgmental support, confidentially.",
-      ],
+      say(ctx) {
+        const lines = [
+          "I want to be honest with you because you deserve honesty 🩷",
+          "In Jamaica, abortion is currently illegal under the Offences Against the Person Act. There are no formal legal exceptions, not even for rape or incest.",
+          "This means there is no safe, legal clinical option available in-country right now.",
+          "I can't tell you what to do, and I won't pretend the situation isn't hard.",
+          "What I can do is help you think through your options, your safety, and how to access non-judgmental support, confidentially.",
+        ];
+        if (ctx.isMinor) lines.unshift("You came to the right place — I'm here to help, not to judge 🩷");
+        return lines;
+      },
       choices: [
         { id: "options",   label: "Talk through my options",              next: "ABORTION_DECISION_SUPPORT", primary: true },
         { id: "safe",      label: "What do I need to know to stay safe?", next: "ABORTION_SAFETY_INFO" },
@@ -1202,7 +1227,11 @@ export function createNodes(env) {
     },
     // ── Pregnancy concern: intent-first entry layer ──────────────────────────
     PREGNANCY_ENTRY: {
-      say: ["Got you 🩷 What feels closest to your situation right now?"],
+      say(ctx) {
+        const lines = ["Got you 🩷 What feels closest to your situation right now?"];
+        if (ctx.isMinor) lines.unshift("It's okay to be here — you can share as much or as little as you're comfortable with 🩷");
+        return lines;
+      },
       question: "Pregnancy concern type",
       choices: [
         { id: "late",    label: "My period is late",                     next: "PREG_LATE_ROUTE",    primary: true },
@@ -1612,27 +1641,58 @@ export function createNodes(env) {
     },
 
     // ── Step 1: Safety check always first ──────────────────────────────────
-    MOOD_SAFETY_CHECK: {
-      say() {
-        const phaseInfo = getCurrentPhase();
-        const phaseLine = !ctx.urgency && phaseInfo ? insightFor(phaseInfo.phase, "mood") : null;
-        const patternLine = !ctx.urgency
-          ? buildSymptomPatternLine(["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS"])
-          : null;
-        return [
-          ...(phaseLine ? [phaseLine] : []),
-          ...(patternLine ? [patternLine] : []),
-          "Before we go further, I want to check on you 🩷",
-          "Are these feelings ever making you feel unsafe, completely unable to cope, or like you might hurt yourself?",
-        ];
-      },
-      question: "Safety check before mood questions",
-      choices: [
-        { id: "yes", label: "Yes",          next: "MOOD_SAFETY_ROUTE", primary: true },
-        { id: "no",  label: "No",           next: "MOOD_ENTRY" },
-        { id: "ns",  label: "I'm not sure", next: "MOOD_SAFETY_ROUTE" },
-      ],
-    },
+MOOD_SAFETY_CHECK: {
+  say() {
+    const phaseInfo = getCurrentPhase();
+    const phaseLine = !ctx.urgency && phaseInfo ? insightFor(phaseInfo.phase, "mood") : null;
+    const patternLine = !ctx.urgency
+      ? buildSymptomPatternLine(["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS"])
+      : null;
+
+    const userText = String(
+      ctx?.lastUserMessage ||
+      ctx?.lastUserInput ||
+      ctx?.lastFreeText ||
+      ctx?.rawInput ||
+      ""
+    ).toLowerCase();
+
+    const isPositiveMood = /\b(happy|good|excited|calm|lighter|better|in a good mood)\b/.test(userText);
+    const isAngryMood = /\b(angry|mad|vex|frustrated|annoyed|snappy|irritable)\b/.test(userText);
+    const isLowMood = /\b(sad|down|low|empty|numb|cry|crying|emotional|overwhelmed|tired|exhausted)\b/.test(userText);
+
+    let ackLine = "Thanks for telling me 🩷";
+    let supportLine = "Big feelings can be a lot to carry.";
+
+    if (isPositiveMood) {
+      ackLine = "I’m glad you told me 🩷";
+      supportLine = "It’s good to notice when your mood feels lighter or better too.";
+    } else if (isAngryMood) {
+      ackLine = "I hear you 🩷";
+      supportLine = "Anger or irritability can feel really intense in the moment.";
+    } else if (isLowMood) {
+      ackLine = "I’m really glad you told me 🩷";
+      supportLine = "Feeling low or emotionally heavy can be hard.";
+    }
+
+    return [
+      ackLine,
+      supportLine,
+      ...(phaseLine ? [phaseLine] : []),
+      ...(patternLine ? [patternLine] : []),
+      "Before we go further, quick check-in 🩷",
+      "Are these feelings ever making you feel unsafe, completely unable to cope, or like you might hurt yourself?",
+    ];
+  },
+
+  question: "Safety check before mood questions",
+
+  choices: [
+    { id: "yes", label: "Yes",          next: "MOOD_SAFETY_ROUTE", primary: true },
+    { id: "no",  label: "No",           next: "MOOD_ENTRY" },
+    { id: "ns",  label: "I'm not sure", next: "MOOD_SAFETY_ROUTE" },
+  ],
+},
 
     // ── Safety route crisis support, do not continue mood assessment ───────
     MOOD_SAFETY_ROUTE: {
@@ -3993,12 +4053,16 @@ export function createNodes(env) {
 
     /* ---------------- EDUCATION: CONTRACEPTION ---------------- */
     EDUC_CONTRACEPTION: {
-      say: [
-        "Contraception is something Bloomie can give you a general overview of, but I want to be upfront: I can't recommend a specific method for you, because what works best really depends on your health history, your cycle, and your own goals 🩷",
-        "That said, here's a quick lay of the land: barrier methods (like condoms or diaphragms) work in the moment and don't affect your hormones. Hormonal methods (the pill, patch, ring, shot) use synthetic hormones to prevent pregnancy and can also help with cycle symptoms. Long-acting options (IUDs, hormonal or copper, and implants) are set-and-forget for years at a time.",
-        "Each category has real trade-offs, side effects, how easy they are to use, how quickly fertility returns and a provider or pharmacist can walk you through what fits your situation, your body, and your life.",
-        "If you don't have a regular provider, a sexual health clinic or a pharmacist are both great first steps 🩷",
-      ],
+      say(ctx) {
+        const lines = [
+          "Contraception is something Bloomie can give you a general overview of, but I want to be upfront: I can't recommend a specific method for you, because what works best really depends on your health history, your cycle, and your own goals 🩷",
+          "That said, here's a quick lay of the land: barrier methods (like condoms or diaphragms) work in the moment and don't affect your hormones. Hormonal methods (the pill, patch, ring, shot) use synthetic hormones to prevent pregnancy and can also help with cycle symptoms. Long-acting options (IUDs, hormonal or copper, and implants) are set-and-forget for years at a time.",
+          "Each category has real trade-offs, side effects, how easy they are to use, how quickly fertility returns and a provider or pharmacist can walk you through what fits your situation, your body, and your life.",
+          "If you don't have a regular provider, a sexual health clinic or a pharmacist are both great first steps 🩷",
+        ];
+        if (ctx.isMinor) lines.unshift("Asking about this is a smart, healthy thing to do — you should feel good about looking into it 🩷");
+        return lines;
+      },
       choices: [
         { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: "Back to main menu", next: "START_MENU" },

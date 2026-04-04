@@ -345,7 +345,7 @@ const REASON_TO_SCENARIO = {
 // Scenarios where tone-wording adjustments must NEVER be applied (emergency/safety).
 const SAFETY_SCENARIOS = new Set(["urgent", "heavy_with_dizziness", "heavy_long"]);
 
-export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx = null, tone = null) {
+export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx = null, tone = null, extraFooter = []) {
   const scenario = resolveScenario(entities, inferredReason);
   if (!scenario) return null;
 
@@ -441,6 +441,8 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
       lines[i] = lines[i].replace(/!/g, ".");
     }
   }
+
+  if (extraFooter.length) lines.push(...extraFooter);
 
   return {
     scenario,

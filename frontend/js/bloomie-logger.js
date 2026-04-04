@@ -101,6 +101,8 @@ export function buildSessionMeta(ctx) {
     confidenceFallbackCount: ctx?.confidenceFallbackCount           ?? 0,
     urgency:                 ctx?.riskLevel                         ?? null,
     oosStreakCount:          ctx?.oosStreakCount                     ?? 0,
+    isMinor:                 ctx?.isMinor                           ?? false,
+    isAnon:                  ctx?.isAnon                            ?? false,
   };
 }
 

@@ -14,6 +14,7 @@ import adminRoutes         from "./src/routes/admin.js";
 import authRoutes          from "./src/routes/auth.js";
 import bloomieMemoryRoutes from "./src/routes/bloomieMemory.js";
 import feedbackRoutes      from "./src/routes/feedback.js";
+import userProfileRouter   from "./src/routes/userProfile.js";
 
 import {
   globalLimiter,
@@ -40,6 +41,7 @@ app.use("/catalog",                         catalogRoutes);
 app.use("/auth",            authLimiter,    authRoutes);
 app.use("/bloomie-memory",                  bloomieMemoryRoutes);
 app.use("/feedback",                        feedbackRoutes);
+app.use("/api/user/profile",               userProfileRouter);
 
 app.get("/", (req, res) => {
   res.json({ ok: true, message: "Bloom backend is running" });

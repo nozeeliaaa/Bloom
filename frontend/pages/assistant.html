@@ -173,6 +173,9 @@
     renderModeBanner(document.getElementById('banner-area'));
 
     async function init(user) {
+      const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
+      const isMinor = profile.ageRange === "under18";
+      const isAnon  = !user;
       const logsByDate = await getAllLogs();
       const cycle = computeCyclePhase(logsByDate);
       const goal = getUserGoal();
@@ -203,7 +206,7 @@
           })),
         }));
 
-      await mountChat(user, cycleData, symptomHistory.length ? symptomHistory : null);
+      await mountChat(user, cycleData, symptomHistory.length ? symptomHistory : null, { isMinor, isAnon });
     }
 
     onAuthChange(user => { init(user); });

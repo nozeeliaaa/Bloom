@@ -320,6 +320,65 @@ export async function getAssistantSession() {
 }
 
 // --------------------
+// Bloomie local memory defaults
+// --------------------
+
+const BLOOMIE_MEMORY_KEY = "bloomieMemory";
+
+export const BLOOMIE_MEMORY_DEFAULTS = {
+  lastSymptoms:           [],
+  recentTopics:           [],
+  lastIntent:             null,
+  lastSeverity:           null,
+  lastDuration:           null,
+  lastPregnancyChance:    false,
+  lastUrgencyLevel:       null,
+  recentConcernCategory:  null,
+  lastSessionDate:        null,
+};
+
+/**
+ * getOrInitBloomieMemory()
+ * Reads "bloomieMemory" from localStorage.
+ * Seeds and returns BLOOMIE_MEMORY_DEFAULTS when the key is absent or corrupt.
+ */
+export function getOrInitBloomieMemory() {
+  const stored = readJSON(BLOOMIE_MEMORY_KEY, null);
+  if (stored) return stored;
+  writeJSON(BLOOMIE_MEMORY_KEY, BLOOMIE_MEMORY_DEFAULTS);
+  return { ...BLOOMIE_MEMORY_DEFAULTS };
+}
+
+/**
+ * updateBloomieLocalMemory(patch)
+ * Merges patch into the stored "bloomieMemory" object and persists it.
+ */
+export function updateBloomieLocalMemory(patch) {
+  const current = getOrInitBloomieMemory();
+  const updated  = { ...current, ...patch };
+  writeJSON(BLOOMIE_MEMORY_KEY, updated);
+  return updated;
+}
+
+export function loadLocalBloomieMemory() {
+  try {
+    const data = localStorage.getItem("bloomieMemory");
+    if (!data) return {};
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+export function saveLocalBloomieMemory(update) {
+  try {
+    const existing = loadLocalBloomieMemory();
+    const merged = { ...existing, ...update };
+    localStorage.setItem("bloomieMemory", JSON.stringify(merged));
+  } catch {}
+}
+
+// --------------------
 // Bloomie persistent memory
 // --------------------
 
@@ -357,6 +416,25 @@ export async function saveBloomieMemory(memoryData) {
     });
   } catch (e) {
     console.warn("[Bloomie] memory cloud save failed:", e);
+  }
+}
+
+// Load the authenticated user's profile (nickname) from the backend.
+// Returns { nickname: string | null }. Never throws.
+export async function loadUserProfile() {
+  try {
+    const headers = await authHeaders();
+    if (!headers) return { nickname: null };
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 3000)
+    );
+    const request = fetch(apiUrl("/api/user/profile"), { headers });
+    const res = await Promise.race([request, timeout]);
+    if (!res.ok) return { nickname: null };
+    const data = await res.json();
+    return { nickname: data?.nickname ?? null };
+  } catch {
+    return { nickname: null };
   }
 }
 

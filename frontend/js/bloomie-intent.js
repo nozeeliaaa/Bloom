@@ -49,7 +49,7 @@ export const INTENT_TO_ROUTE = {
 // Gate: only fire AI when at least one health-adjacent keyword is present.
 // Prevents wasting API calls on greetings or pure OOS messages that somehow
 // reached LOW confidence (e.g. very short inputs).
-const HEALTH_GATE = /\b(period|bleed(?:ing)?|blood|late|missed|spotting|spot|cramp|pain|pelvic|pregnant|pregnancy|discharge|mood|tired|exhausted|cycle|irregular|heavy|clot|dizzy|nausea|ovulat|hormone|endo|pcos|fibroid|cyst|symptom|flow|spotty|lmp|irregular)\b/i;
+const HEALTH_GATE = /\b(period|bleed(?:ing)?|blood|late|missed|spotting|spot|cramp|pain|pelvic|pregnant|pregnancy|discharge|mood|tired|exhausted|cycle|irregular|heavy|clot|dizzy|nausea|ovulat|hormone|endo|pcos|fibroid|cyst|symptom|flow|spotty|lmp|irregular|emotional|sad|angry|mad|vex|frustrated|happy|excited|anxious|fatigue|energy)\b/i;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // classifyIntentAI(rawInput, ruleResult)

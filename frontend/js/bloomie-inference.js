@@ -34,7 +34,7 @@ function extractSymptoms(t) {
     heavy:          /\b(heavy|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through|so much blood|so much bleeding)\b/.test(t),
     spotting:       /\b(spot|spotting|pink|brown.*discharge|blood.*between|between.*period)\b/.test(t),
     pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly|one.sided.*pain|one.side.*hurt|one side.*hurt|lower.*abdominal.*pain|side.*hurts)\b/.test(t),
-    mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it|feel.*low|so low|feel low|feeling low)\b/.test(t),
+    mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it|feel.*low|so low|feel low|feeling low|angry|anger|mad|vex|frustrated|frustration|annoyed|snappy|happy|happier|good mood|excited|calm|overwhelmed|don't feel like myself|dont feel like myself|not like myself)\b/.test(t),
     discharge:      /\b(discharge|smell|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation)\b/.test(t),
     nausea:         /\b(nausea|nauseous|vomit|sick to.*stomach|throw up|queasy)\b/.test(t),
     dizziness:      /\b(dizzy|dizziness|lightheaded|faint|head.*spin|head.*swim)\b/.test(t),
@@ -79,7 +79,7 @@ function extractSymptoms(t) {
     anxiety:        /\b(anxiety|anxious|panic|panic attack|overthink|racing.*thought|heart.*racing|worry.*lot)\b/.test(t),
     depression:     /\b(depression|depressed|low mood|feel.*nothing|numb|hopeless|sad.*lot|nothing.*matters)\b/.test(t),
     crying_spells:  /\b(crying|cry.*lot|cry.*nothing|random.*cry|can't stop.*cry|teary|burst.*tears)\b/.test(t),
-    irritability:   /\b(irritable|irritability|snappy|short.*temper|easily.*annoyed|annoyed.*easy|angry.*lot|fly.*off.*handle)\b/.test(t),
+    irritability:   /\b(irritable|irritability|snappy|short.*temper|easily.*annoyed|annoyed.*easy|angry.*lot|fly.*off.*handle|angry|mad|vex|frustrated)\b/.test(t),
 
     // ── SLEEP ────────────────────────────────────────────────────────────────
     insomnia:       /\b(insomnia|can't sleep|cant sleep|cyan sleep|trouble sleeping|trouble.*sleep\b|waking up.*night|wake.*middle.*night|sleep.*bad|poor.*sleep|restless.*sleep|tossing.*turning)\b/.test(t),
