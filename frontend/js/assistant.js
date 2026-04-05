@@ -63,6 +63,7 @@ export async function mountChat(user = null, cycleData = null, symptomHistory = 
     bloomieMemory,
     isMinor,
     isAnon,
+    profile,
     onSaveMemory: saveBloomieMemory,
     onOpenCareMap: () => {
       window.location.href = "/pages/clinics.html?autolocate=true";
@@ -132,6 +133,7 @@ export function initBloomieChat({
   onLogAction = (action, data) => console.log("Log action:", action, data),
   isMinor = false,
   isAnon = false,
+  profile = null,
 } = {}) {
   const $box = document.getElementById(chatBoxId);
   const $input = document.getElementById(inputId);
@@ -1048,6 +1050,21 @@ export function initBloomieChat({
             riskLevel: ctx.riskLevel,
           });
           transition("HEAVY_URGENT");
+          return;
+        }
+      }
+
+      // ── END_CHAT intent detection ─────────────────────────────────────────
+      // Catches goodbye/done phrases typed as free text and shows a
+      // confirmation prompt instead of closing immediately.
+      // Runs after urgency (urgency always wins) but before all other routing.
+      // Never fires in capture mode (capture path returns early above).
+      {
+        const _endChatRaw = text.trim().toLowerCase().replace(/[🩷💗.!]+$/, "").trim();
+        const END_CHAT_PATTERN = /^(bye|bye bye|goodbye|good\s*bye|ok\s+bye|okay\s+bye|alright\s+bye|that'?s\s+all|thanks?,?\s+i'?m\s+done|i'?m\s+done|all\s+done|done\s+for\s+now|thanks\s+bye|thank\s+you\s+bye|take\s+care|that'?s\s+it|i'?m\s+finished|i'?m\s+good\s+thanks)$/i;
+        if (END_CHAT_PATTERN.test(_endChatRaw)) {
+          ctx.preEndChatState = ctx.state;
+          transition("END_CHAT_CONFIRM");
           return;
         }
       }
@@ -2322,6 +2339,42 @@ export function initBloomieChat({
       return;
     }
 
+    // ── END_CHAT sentinels ────────────────────────────────────────────────
+    if (nextState === "_END_CHAT_CANCEL") {
+      const returnTo = ctx.preEndChatState || "START_MENU";
+      ctx.preEndChatState = null;
+      transition(returnTo);
+      return;
+    }
+    if (nextState === "_END_CHAT_RESET") {
+      clearTimers();
+      // Reset session context — mirrors the public reset() method
+      ctx.history                   = [];
+      ctx.answers                   = [];
+      ctx.multiDraft                = null;
+      ctx.locked                    = false;
+      ctx.urgency                   = false;
+      ctx.topic                     = null;
+      ctx.riskLevel                 = "low";
+      ctx.adviceGiven               = new Set();
+      ctx.entityHistory             = [];
+      ctx.lastEntities              = null;
+      ctx.lastInferredReason        = null;
+      ctx.lastCycleCtx              = null;
+      ctx.pendingRoute              = null;
+      ctx.pendingAmbiguityContext   = null;
+      ctx.pendingContradictionContext = null;
+      ctx.pendingContextProbe       = null;
+      ctx.recentInputs              = [];
+      ctx.preEndChatState           = null;
+      ctx.state                     = "START";
+      // Polite goodbye before restarting
+      say("Thanks for chatting with me 🩷 I'm always here if you need support.");
+      const tid = setTimeout(() => transition("START"), 2500);
+      ctx.timers.add(tid);
+      return;
+    }
+
     // ── Safety log: escalation — "seek care" node reached ─────────────────
     if (nextState === "HEAVY_URGENT") {
       logSafetyEvent("escalation", {
@@ -2893,6 +2946,7 @@ export function initBloomieChat({
     extractEntities, inferRoute, summarizeEntities, extractUrgency,
     SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS,
     CONCERN_PRIORITY,
+    bloomieMemory,
   };
   const NODES = createNodes(env);
   const { OOS, OOS_DEFAULT, HEALTH_OVERRIDE_PATTERNS, CYCLE_QUESTION_PATTERNS, routeUserText } = createOOS(env);

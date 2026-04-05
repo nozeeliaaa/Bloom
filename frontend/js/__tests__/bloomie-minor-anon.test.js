@@ -25,8 +25,11 @@ import { initBloomieChat } from "../assistant.js";
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 vi.mock("../db.js", () => ({
-  loadBloomieMemory: vi.fn().mockResolvedValue(null),
-  saveBloomieMemory: vi.fn().mockResolvedValue(),
+  loadBloomieMemory:      vi.fn().mockResolvedValue(null),
+  saveBloomieMemory:      vi.fn().mockResolvedValue(),
+  loadLocalBloomieMemory: vi.fn().mockReturnValue(null),
+  saveLocalBloomieMemory: vi.fn(),
+  loadUserProfile:        vi.fn().mockResolvedValue({ nickname: null }),
 }));
 
 vi.mock("../auth.js", () => ({

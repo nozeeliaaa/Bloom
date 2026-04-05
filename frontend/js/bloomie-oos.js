@@ -16,6 +16,30 @@ export function createOOS(env) {
   // looksLikeGibberish → imported from bloomie-routing.js
 
   const OOS = [
+    // ── About Bloom / Bloomie identity ───────────────────────────────────
+    // Catches questions about what the platform is and what the chatbot does.
+    // Must sit before app_help so "how do i use this" → ABOUT_BLOOM (identity)
+    // rather than APP_HELP (logging tutorial).
+    {
+      name: "about_bloom",
+      patterns: [
+        // "what is bloom" / "what is bloomie" / "what's bloomie"
+        /\b(what (is|are|'?s) bloom(?:ie)?|what does bloom(?:ie)? (do|mean|help with))\b/,
+        // "what can you help with" / "what can you do" / "what do you know about"
+        /\b(what can (you|bloomie?) (help (me |with)?|do|tell me|talk about|discuss))\b/,
+        /\b(what (are|do) you (good for|help with|know about|cover|handle))\b/,
+        // "how do i use this / the chat" (identity questions, not logging how-tos)
+        /\b(how (do i|to|can i) use (this|this chat|the chat|this app|bloomie?))\b/,
+        /\b(how does (this|this chat|bloomie?|it) work)\b/,
+        // "who are you" / "tell me about yourself / bloom / bloomie"
+        /\b(who are you|tell me about (yourself|bloomie?|bloom|this chat))\b/,
+        // "what is this" / "what am i using" / "who am i talking to"
+        /\b(what is this (app|chat|tool|bot|assistant)?|what am i (using|talking to)|who am i talking to)\b/,
+      ],
+      replies: [],
+      forceNext: "ABOUT_BLOOM",
+    },
+
     // ── App help / how to log ─────────────────────────────────────────────
     {
       name: "app_help",
@@ -39,6 +63,60 @@ export function createOOS(env) {
       ],
       replies: [],
       forceNext: "SEE_DOCTOR_GUIDE",
+    },
+
+    // ── Educational: what is a period ─────────────────────────────────────
+    // Specific before broad — wins over symptom_education for identity questions.
+    {
+      name: "educ_what_period",
+      patterns: [
+        /\b(what is (a )?period|what are periods|what is menstruation|what happens during (a )?period)\b/,
+        /\b(why do (i|we|people|women|girls) (get|have) (a )?period|why does (a )?period happen|what causes (a )?period)\b/,
+        /\b(explain (what |a )?(a )?period|tell me (about |what is )(a )?period)\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_PERIOD",
+    },
+
+    // ── Educational: what is ovulation ────────────────────────────────────
+    {
+      name: "educ_what_ovulation",
+      patterns: [
+        /\b(what is ovulation|how does ovulation work|what happens during ovulation)\b/,
+        /\b(what is (the )?ovulation (phase|window|period|process))\b/,
+        /\b(explain ovulation|tell me about ovulation)\b/,
+        /\b(when does (the )?egg (drop|release|get released)|what is (an? )?egg release)\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_OVULATION",
+    },
+
+    // ── Educational: what is the menstrual cycle ──────────────────────────
+    {
+      name: "educ_what_cycle",
+      patterns: [
+        /\b(what is (the )?menstrual cycle|how (long|does) (a|the) (menstrual )?cycle (last|work))\b/,
+        /\b(explain (the )?menstrual cycle|tell me about (the )?menstrual cycle|how does (a|the) cycle work)\b/,
+        /\b(what are (the )?cycle phases|what is (the )?luteal phase|what is (the )?follicular phase|what are (the )?phases of (my |the )?cycle)\b/,
+        /\b(what is (a |the )?normal cycle|explain (the )?cycle phases|how does (the )?cycle (go|work|progress))\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_CYCLE_BASICS",
+    },
+
+    // ── Educational: broad / deep-dive requests → summary + learn link ────
+    // Catches "tell me everything about", "explain fully", "deep dive" etc.
+    // Gives a short summary then directs to pamphlets for depth.
+    {
+      name: "educ_broad",
+      patterns: [
+        /\b(tell me everything about|explain (everything about|fully|in detail|in depth|thoroughly)|give me (a )?full (explanation|overview|breakdown) of)\b/,
+        /\b(everything (about|on) (hormones?|fertility|reproduction|the (menstrual )?cycle|periods?|ovulation|reproductive health))\b/,
+        /\b(deep.?dive (into|on|about)|in.?depth (on|about|into)|comprehensive (guide|overview|explanation) (of|about|on))\b/,
+        /\b(all about (hormones?|fertility|periods?|ovulation|the cycle|my cycle|pcos|endometriosis|reproductive health))\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_BROAD",
     },
 
     // ── Symptom education ─────────────────────────────────────────────────

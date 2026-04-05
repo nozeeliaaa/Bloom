@@ -96,6 +96,7 @@ export function createCtx() {
     isAnon:                   false,
     userNickname:             null,
     lastNicknameUsedAtDepth:  null,
+    preEndChatState:          null,   // state to restore if user cancels END_CHAT_CONFIRM
     pendingContradictionContext: null,     // stored when contradiction was detected
     pendingContextProbe:      null,        // stored when missing-context probe was asked
     pendingQuestion:          null,        // { type: "yes_no"|"severity"|"timing"|"duration"|"test_result"|"choice", nodeState: string }

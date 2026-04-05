@@ -114,6 +114,51 @@
       .bubble { max-width: 90%; }
       .bloomie-card { min-height: calc(100vh - 220px); }
     }
+
+    /* ── Settings toggle switch ──────────────────────────────────────────── */
+    .chat-pref-toggle {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .chat-pref-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .chat-pref-track {
+      position: absolute;
+      inset: 0;
+      background: var(--color-border-dark);
+      border-radius: 999px;
+      transition: background 0.2s ease;
+    }
+    .chat-pref-track::after {
+      content: "";
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      transition: transform 0.2s ease;
+    }
+    .chat-pref-toggle input:checked + .chat-pref-track {
+      background: var(--color-primary);
+    }
+    .chat-pref-toggle input:checked + .chat-pref-track::after {
+      transform: translateX(20px);
+    }
+    .chat-pref-toggle input:focus-visible + .chat-pref-track {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
   </style>
 </head>
 
@@ -135,6 +180,29 @@
               Educational support for cycle, symptom, and reproductive health questions
             </div>
           </div>
+          <button
+            id="chat-settings-btn"
+            class="modal-close"
+            aria-label="Chat settings"
+            title="Settings"
+            style="margin-left:auto;"
+          >
+            <!-- gear icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06
+                       a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
+                       A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83
+                       l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+                       A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83
+                       l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+                       a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83
+                       l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+                       a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
         </div>
 
         <div class="card-body">
@@ -160,6 +228,70 @@
     </div>
   </main>
 
+  <!-- ── Chat settings modal ──────────────────────────────────────────────── -->
+  <div
+    id="chat-settings-overlay"
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="chat-settings-title"
+    aria-hidden="true"
+  >
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header">
+        <h3 id="chat-settings-title">Chat Settings</h3>
+        <button class="modal-close" aria-label="Close settings">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Sound -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;border-bottom:1px solid var(--color-border);">
+        <div>
+          <div style="font-weight:600;font-size:0.95rem;color:var(--color-text);">Sound</div>
+          <div style="font-size:0.82rem;color:var(--color-text-muted);margin-top:0.1rem;">
+            Play sounds for new messages
+          </div>
+        </div>
+        <label class="chat-pref-toggle" aria-label="Toggle sound">
+          <input type="checkbox" id="chat-pref-sound" role="switch" />
+          <span class="chat-pref-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <!-- Language -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;">
+        <div>
+          <div style="font-weight:600;font-size:0.95rem;color:var(--color-text);">Language</div>
+          <div style="font-size:0.82rem;color:var(--color-text-muted);margin-top:0.1rem;">
+            More languages coming soon
+          </div>
+        </div>
+        <select
+          id="chat-pref-language"
+          disabled
+          aria-label="Select language (coming soon)"
+          style="padding:0.4rem 0.75rem;border-radius:var(--radius-sm);border:1px solid var(--color-border);
+                 background:var(--color-bg);font:inherit;font-size:0.88rem;
+                 color:var(--color-text-muted);cursor:not-allowed;opacity:0.6;"
+        >
+          <option value="en">English</option>
+          <option value="es">Español (soon)</option>
+          <option value="fr">Français (soon)</option>
+          <option value="pt">Português (soon)</option>
+        </select>
+      </div>
+
+      <div class="modal-footer" style="margin-top:0.5rem;">
+        <button class="btn btn-primary btn-sm modal-close">Done</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
     import { getAllLogs } from '/js/db.js';
@@ -167,10 +299,12 @@
     import { getUserGoal } from '/js/goals.js';
     import { onAuthChange } from '/js/auth.js';
     import { mountChat } from '/js/assistant.js';
+    import { initChatSettings } from '/js/bloomie-settings.js';
 
     renderNav('assistant');
     renderFooter();
     renderModeBanner(document.getElementById('banner-area'));
+    initChatSettings();
 
     async function init(user) {
       const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");

@@ -6,6 +6,7 @@ export function createNodes(env) {
     buildSummaryCard, applySessionMode, canGiveAdvice, filterDedup,
     daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildSymptomPatternLine, greet, buildCycleCtx,
     withNickname, canUseNickname, getNickname,
+    bloomieMemory,
     pickPriorityConcern, getPhaseInsight, getToneOpener, buildGuidanceResponse,
     getStructuredSummary, computePhaseConfidence, logSafetyEvent,
     parseNaturalDate, validateCycleDate, validateCalendarDate,
@@ -64,82 +65,187 @@ export function createNodes(env) {
   }
 
   function buildIntro() {
-    const base   = `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
-    const recall = buildRecallLine();
-    // Appends the recall line (if any) after the core intro messages.
+    const name        = getNickname();                                    // Firestore nickname or null
+    const isReturning = !ctx.isAnon && !!bloomieMemory?.lastSessionDate;  // has at least one prior session
+    const recall      = buildRecallLine();                                 // symptom recall line, or null
     const r = (lines) => recall ? [...lines, recall] : lines;
 
+    // ── Minor ─────────────────────────────────────────────────────────────
     if (ctx.isMinor) {
       return r([
-        base,
+        `${greet()} I'm Bloomie, Bloom's health assistant 🌸`,
         "I'm here to help you understand what's going on with your body 🩷 Everything you share with me stays between us.",
         "I can help with period questions, cramps, mood changes, and more. What's on your mind?",
       ]);
     }
 
-    if (ctx.isAnon && !ctx.isMinor) {
+    // ── Anonymous ─────────────────────────────────────────────────────────
+    if (ctx.isAnon) {
       return r([
-        base,
+        `${greet()} I'm Bloomie, Bloom's health assistant 🌸`,
         "You're not signed in, so I won't be able to see your cycle history — but I can still help 🩷",
         "What's going on today?",
       ]);
     }
 
+    // ── Pregnancy tracking ────────────────────────────────────────────────
     if (userMode.isPregnancy && cd.lmp) {
       const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
+      const opening = isReturning
+        ? pick([
+            name ? `Hey ${name} 🩷` : greet(),
+            name ? `Good to see you, ${name} 💗` : "Good to see you 💗",
+            greet(),
+          ])
+        : `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
       return r([
-        base,
-        `I can see you're in pregnancy tracking mode${weeksAlong > 0 ? ` you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along` : ""} 🩷`,
+        opening,
+        `I can see you're in pregnancy tracking mode${weeksAlong > 0 ? ` — you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along` : ""} 🩷`,
         "I can help with symptoms, test timing, due dates, or anything else on your mind. What's going on?",
       ]);
     }
 
+    // ── TTC ───────────────────────────────────────────────────────────────
     if (userMode.isTTC) {
+      const opening = isReturning
+        ? pick([
+            name ? `Hey ${name} 🩷` : greet(),
+            name ? `Welcome back, ${name} 🌸` : "Welcome back 🌸",
+            greet(),
+          ])
+        : `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
       return r([
-        base,
+        opening,
         "I can see you're in trying-to-conceive mode 🩷 I can help with ovulation windows, test timing, cycle tracking, and symptoms.",
         "What can I help you with today?",
       ]);
     }
 
+    // ── Postpartum ────────────────────────────────────────────────────────
     if (userMode.isPostpartum) {
+      const opening = isReturning
+        ? pick([
+            name ? `Hey ${name} 🩷` : greet(),
+            name ? `Good to see you, ${name} 💗` : "Good to see you 💗",
+            greet(),
+          ])
+        : `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
       return r([
-        base,
+        opening,
         "I can see you're in postpartum mode 🩷 Your cycle may behave differently for a while, that's completely normal.",
         "What's on your mind today?",
       ]);
     }
 
+    // ── Cycle tracking ────────────────────────────────────────────────────
     if (userMode.isCycleTracking && cd.lmp) {
       const daysLeft = daysUntilNextPeriod();
       const dueSoon  = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
       const overdue  = daysLeft !== null && daysLeft < 0;
-      if (dueSoon) {
-        return r([
-          base,
-          `I can see your period is due in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
-          "If you're already feeling symptoms, I can help. What's going on?",
-        ]);
-      }
+
       if (overdue) {
+        const lateDays = Math.abs(daysLeft);
+        const opening = isReturning
+          ? pick([
+              name ? `Hey ${name} 🩷` : greet(),
+              name ? `Hey ${name} 💗` : "Hey there 💗",
+              greet(),
+            ])
+          : `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
+        const contextLine = pick([
+          `I noticed your period may be a little late${lateDays > 1 ? ` — looks like it could be around ${lateDays} days overdue` : ""} 🩷`,
+          `Looks like your period might be a bit later than expected 🩷`,
+          `I can see your period may not have arrived yet 🩷`,
+        ]);
+        return r([opening, contextLine, "If it hasn't come yet or something feels off, I'm here. What's going on?"]);
+      }
+
+      if (dueSoon) {
+        const opening = isReturning
+          ? pick([
+              name ? `Hey ${name} 🌸` : "Hey 🌸",
+              name ? `Hey ${name} 🩷` : greet(),
+              greet(),
+            ])
+          : `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
+        const contextLine = pick([
+          `Looks like your period might be coming up in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
+          `I can see your period is due in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
+          `Your period window is getting close — around ${daysLeft} day${daysLeft === 1 ? "" : "s"} away 🌸`,
+        ]);
+        return r([opening, contextLine, "If you're already feeling symptoms, I can help. What's going on?"]);
+      }
+
+      // No urgency signal — use phase awareness for returning users
+      const phaseInfo = getCurrentPhase();
+      if (isReturning && phaseInfo) {
+        const phaseGreetings = [
+          ...(name
+            ? [
+                `Hey ${name} 💗 Based on your cycle, you might be in ${phaseInfo.label}.`,
+                `Hey ${name} 🌸 It looks like you're around ${phaseInfo.label} right now.`,
+              ]
+            : [
+                `Hey 💗 Based on your cycle, you might be in ${phaseInfo.label}.`,
+                `Hey 🌸 It looks like you're around ${phaseInfo.label} right now.`,
+              ]),
+          // Neutral variant — avoids leading with phase context every single session
+          name ? `Hey ${name} 🩷` : greet(),
+        ];
+        return r([pick(phaseGreetings), "What can I help you with today?"]);
+      }
+
+      if (isReturning) {
         return r([
-          base,
-          `I can see your period may have been due a few days ago 🩷`,
-          "If it hasn't come yet or something feels off, I'm here. What's going on?",
+          pick([
+            name ? `Hey ${name} 🩷` : greet(),
+            name ? `Good to see you, ${name} 💗` : "Good to see you 💗",
+            "Hey there 🌸",
+          ]),
+          "What can I help you with today?",
         ]);
       }
+
+      // First-time user, cycle tracking
       return r([
-        base,
+        `${greet()} I'm Bloomie, Bloom's health assistant 🌸`,
         "I can help with period concerns, cycle questions, spotting, cramps, mood changes, and more.",
+        name ? `What can I help you with today, ${name}?` : "What can I help you with today?",
+      ]);
+    }
+
+    // ── Default (signed-in, no specific mode or no LMP) ───────────────────
+    if (isReturning) {
+      const phaseInfo = getCurrentPhase();
+      const opening = phaseInfo
+        ? pick([
+            ...(name
+              ? [
+                  `Hey ${name} 💗 Based on your cycle, you might be in ${phaseInfo.label}.`,
+                  `Hey ${name} 🌸`,
+                ]
+              : [
+                  `Hey 💗 Based on your cycle, you might be in ${phaseInfo.label}.`,
+                  greet(),
+                ]),
+          ])
+        : pick([
+            name ? `Hey ${name} 🩷` : greet(),
+            name ? `Good to see you, ${name} 💗` : "Good to see you 💗",
+            "Hey there 🌸",
+          ]);
+      return r([
+        opening,
+        "I can help with period concerns, cycle questions, symptoms, and more.",
         "What can I help you with today?",
       ]);
     }
 
-    // Default / just browsing
+    // First-time user, default
     return r([
-      base,
+      `${greet()} I'm Bloomie, Bloom's health assistant 🌸`,
       "I can help you understand common period-related concerns based on what you decide to share, but I can't provide diagnoses.",
-      "What can I help you with today?",
+      name ? `What can I help you with today, ${name}?` : "What can I help you with today?",
     ]);
   }
 
@@ -149,7 +255,7 @@ export function createNodes(env) {
   const pickMainLabel  = () => pick(["Main options", "Back to start", "Something else", "Other questions"]);
 
   const CLOSE =
-    `${greet(true, "Thanks for talking with me")} If anything changes or you notice new symptoms, you can come back anytime. Remember you know your body best.`;
+    withNickname(greet(true, "Thanks for talking with me")) + " If anything changes or you notice new symptoms, you can come back anytime. Remember you know your body best.";
 
   const NODES = {
     START: {
@@ -346,7 +452,7 @@ export function createNodes(env) {
         }
         return pick([
           "I want to make sure I help you with the right thing 💗 Which area is closest to what you're dealing with?",
-          "Let me point you in the right direction 💗 Which of these is closest to what's going on?",
+          withNickname("Let me point you in the right direction") + " 💗 Which of these is closest to what's going on?",
           "Happy to help — which area fits best?",
         ]);
       },
@@ -1668,7 +1774,7 @@ MOOD_SAFETY_CHECK: {
       ackLine = "I’m glad you told me 🩷";
       supportLine = "It’s good to notice when your mood feels lighter or better too.";
     } else if (isAngryMood) {
-      ackLine = "I hear you 🩷";
+      ackLine = withNickname("I hear you") + " 🩷";
       supportLine = "Anger or irritability can feel really intense in the moment.";
     } else if (isLowMood) {
       ackLine = "I’m really glad you told me 🩷";
@@ -3654,6 +3760,89 @@ MOOD_SAFETY_CHECK: {
       ],
     },
 
+    /* ── TYPE 1: SUPPORTED EDUCATIONAL — specific factual questions ───────── */
+
+    // "what is a period" / "why do periods happen"
+    EDUC_PERIOD: {
+      say: [
+        "A period (menstruation) is the monthly shedding of the uterine lining — the tissue your body built up in case of pregnancy 🩷",
+        "Each cycle, rising oestrogen thickens the lining. When pregnancy doesn't occur, oestrogen and progesterone levels drop, signalling the body to shed that lining as blood and tissue through the vagina.",
+        "A typical period lasts 3–7 days and occurs on a cycle of 21–35 days. Flow can range from light to heavy — what's normal varies widely from person to person.",
+        "Mild cramping in the first 1–2 days is common. It's caused by prostaglandins — hormone-like compounds that trigger uterine contractions to help expel the lining.",
+        ...safeFooter(),
+      ],
+      choices: [
+        { id: "cycle",  label: "What is the menstrual cycle?",  next: "EDUC_CYCLE_BASICS", primary: true },
+        { id: "cramps", label: "Why do cramps happen?",          next: "EDUC_CRAMPS" },
+        { id: "heavy",  label: "What counts as heavy bleeding?", next: "EDUC_HEAVY" },
+        { id: "mine",   label: "My period is a concern",         next: "PERIOD_TRIAGE" },
+        { id: "menu",   label: pickMainLabel(),                  next: "START_MENU" },
+      ],
+    },
+
+    // "what is ovulation" / "how does ovulation work"
+    EDUC_OVULATION: {
+      say: [
+        "Ovulation is when one of your ovaries releases a mature egg, ready to potentially be fertilised 🩷",
+        "It typically happens around 12–14 days before your next expected period — not necessarily on day 14, which is only accurate for a perfect 28-day cycle.",
+        "The process is triggered by a surge in luteinising hormone (LH). The released egg travels down the fallopian tube toward the uterus. It can only be fertilised for 12–24 hours after release.",
+        "Because sperm can survive 3–5 days in the body, the fertile window actually spans about 5–6 days — the 4–5 days before ovulation and the day itself.",
+        "Signs you may be ovulating: cervical mucus becomes clear and stretchy (like egg whites), a slight rise in basal body temperature, and sometimes a mild one-sided pelvic ache called mittelschmerz.",
+        ...safeFooter(),
+      ],
+      choices: [
+        { id: "cycle",  label: "Tell me about the full cycle",  next: "EDUC_CYCLE_BASICS", primary: true },
+        { id: "ttc",    label: "I'm trying to conceive",        next: "TTC_INTRO" },
+        { id: "window", label: "When is my fertile window?",    next: "CYCLE_NEXT_PERIOD" },
+        { id: "menu",   label: pickMainLabel(),                 next: "START_MENU" },
+      ],
+    },
+
+    // "what is the menstrual cycle" / "what are the cycle phases"
+    EDUC_CYCLE_BASICS: {
+      say: [
+        "The menstrual cycle is a monthly hormonal process that prepares the body for possible pregnancy 🩷 It runs from the first day of one period to the first day of the next.",
+        "A typical cycle is 21–35 days long. 28 days is the average, but anything in that range is normal — and cycle length can vary month to month even in the same person.",
+        pick([
+          "There are four phases:\n\n• **Menstrual (days 1–5):** The uterine lining sheds — this is your period.\n• **Follicular (days 1–13):** Oestrogen rises, stimulating follicle growth and thickening the lining.\n• **Ovulation (~day 14):** A surge in LH triggers egg release.\n• **Luteal (days 15–28):** Progesterone rises to prepare for implantation. If no pregnancy occurs, levels drop and the cycle resets.",
+          "The four phases are:\n\n• **Menstrual** — lining sheds (your period)\n• **Follicular** — oestrogen rises, egg follicles develop\n• **Ovulation** — egg releases (~14 days before next period)\n• **Luteal** — progesterone rises; body prepares for pregnancy. When it doesn't happen, levels fall and a new cycle starts.",
+        ]),
+        "Oestrogen drives the first half — energy, mood lift, clear skin. Progesterone takes over after ovulation and can cause PMS symptoms when it drops sharply before your period.",
+        ...safeFooter(),
+      ],
+      choices: [
+        { id: "period",    label: "More about periods",          next: "EDUC_PERIOD",        primary: true },
+        { id: "ovulation", label: "More about ovulation",        next: "EDUC_OVULATION" },
+        { id: "mood",      label: "Why does my mood shift?",      next: "EDUC_MOOD" },
+        { id: "phase",     label: "What phase am I in now?",      next: "CYCLE_PHASE_ANSWER" },
+        { id: "menu",      label: pickMainLabel(),                next: "START_MENU" },
+      ],
+    },
+
+    /* ── TYPE 2: PARTIALLY SUPPORTED — broad topics → summary + learn ────── */
+
+    // "tell me everything about hormones" / "explain fertility fully"
+    EDUC_BROAD: {
+      say: [
+        pick([
+          "That's a big topic — here's a solid overview, and I'll point you to where you can go deeper 🩷",
+          "There's a lot to cover there 🩷 Let me give you the key points, then show you where to read more.",
+          "Great question — here's the short version 🩷",
+        ]),
+        "At the heart of reproductive health are four hormones: oestrogen, progesterone, FSH (follicle-stimulating hormone), and LH (luteinising hormone). They drive every phase of the 21–35 day menstrual cycle — regulating ovulation, period timing, mood, energy, skin, and fertility.",
+        "Fertility depends on the interplay between these hormones, ovulation timing, and the uterine environment. Factors like stress, body weight, thyroid health, and conditions like PCOS or endometriosis can all shift the balance.",
+        "For a deeper read, Bloom's **Learn** section has pamphlets written specifically for this — covering cycle tracking, hormonal conditions, fertility, and what healthy cycles look like. You'll find them in the **Learn** tab in the main navigation 🩷",
+        ...safeFooter(),
+      ],
+      choices: [
+        { id: "cycle",    label: "What is the menstrual cycle?", next: "EDUC_CYCLE_BASICS", primary: true },
+        { id: "ovulation",label: "What is ovulation?",           next: "EDUC_OVULATION" },
+        { id: "ttc",      label: "Fertility and TTC",            next: "TTC_INTRO" },
+        { id: "pcos",     label: "What is PCOS?",                next: "EDUC_PCOS" },
+        { id: "menu",     label: pickMainLabel(),                next: "START_MENU" },
+      ],
+    },
+
     EDUC_HEAVY: {
       say: [
         "Heavy bleeding (called menorrhagia) means soaking through a pad or tampon in 2 hours or less, or passing large clots 🩷",
@@ -3767,6 +3956,41 @@ MOOD_SAFETY_CHECK: {
     },
 
     // App help / how to log
+    // ── About Bloom / Bloomie ────────────────────────────────────────────────
+    // Reached when the user asks what the platform or chatbot is.
+    // Explains simply, lists key features, and invites them to continue.
+    ABOUT_BLOOM: {
+      say: [
+        pick([
+          "Hi, I'm Bloomie 🩷 Your personal reproductive health companion.",
+          "Hey, great question 🩷 I'm Bloomie — your cycle and reproductive health companion.",
+          "Glad you asked 🩷 I'm Bloomie, Bloom's health chat assistant.",
+        ]),
+        pick([
+          "Bloom is a menstrual health platform designed to help you understand your cycle, track symptoms, and get clear, supportive information — no judgment, no jargon.",
+          "Bloom is a women's health app that helps you track your period, understand your cycle, and navigate reproductive health questions — all in one place.",
+          "Bloom is a reproductive health app built around your cycle. Whether you're tracking periods, dealing with symptoms, or just trying to understand your body better — I'm here for it.",
+        ]),
+        pick([
+          "Here's what I can help with 🩷\n\n• **Period concerns** — late, heavy, irregular, or painful periods\n• **Spotting** — between periods or unexpected bleeding\n• **Mood, energy & sleep** — cycle-linked changes\n• **Pelvic pain & cramps** — what they might mean\n• **Discharge** — what's normal, what's not\n• **Hormones & skin** — acne, weight shifts, cycle patterns\n• **Pregnancy & TTC** — test timing, ovulation, trying to conceive\n• **App help** — how to log, track, and navigate Bloom",
+          "I can help with quite a lot 🩷\n\n• Late, heavy, or irregular periods\n• Spotting and unexpected bleeding\n• Cramps, pelvic pain, and discomfort\n• Mood swings, low energy, and sleep changes\n• Discharge and hormonal skin changes\n• Pregnancy questions and TTC support\n• How to use the Bloom app",
+        ]),
+        pick([
+          "I'm not a doctor and can't diagnose anything — but I can help you understand what's going on and what questions to bring to a provider 🩷 What's on your mind?",
+          "I'm not a replacement for medical care, but I can help you understand your body and know when to seek support 🩷 So — what's going on for you?",
+          "Think of me as a knowledgeable, supportive friend who knows a lot about cycles and reproductive health 🩷 What would you like help with today?",
+        ]),
+      ],
+      choices: [
+        { id: "period",   label: "My period",              next: "PERIOD_TRIAGE",    primary: true },
+        { id: "pain",     label: "Pain or cramps",          next: "PELVIC_INTRO" },
+        { id: "mood",     label: "Mood or energy",          next: "MOOD_INTRO" },
+        { id: "preg",     label: "Pregnancy or TTC",        next: "PREGNANCY_ENTRY" },
+        { id: "app_help", label: "Help using the app",      next: "APP_HELP" },
+        { id: "else",     label: "Something else",          next: "ELSE_INTRO" },
+      ],
+    },
+
     APP_HELP: {
       say: [
         "Happy to help you find your way around 🩷",
@@ -3839,6 +4063,18 @@ MOOD_SAFETY_CHECK: {
         { id: "pregnant", label: "Pregnancy questions",   next: "CYCLE_EDD_ANSWER",
           onSelect() { if (!userMode.isPregnancy) transition("EDD_CONFIRM"); } },
         { id: "more",     label: "Other app help",        next: "APP_HELP" },
+      ],
+    },
+
+    // ── End-chat confirmation flow ──────────────────────────────────────────
+    // Reached when the user types a goodbye phrase. Never closes immediately —
+    // shows a confirmation prompt and lets the user cancel back to their
+    // previous state, or confirm to reset and restart from START.
+    END_CHAT_CONFIRM: {
+      say: ["Are you sure you want to end this chat?"],
+      choices: [
+        { id: "end_chat_confirm", label: "End Chat", next: "_END_CHAT_RESET",  primary: true },
+        { id: "cancel",           label: "Cancel",   next: "_END_CHAT_CANCEL" },
       ],
     },
 
