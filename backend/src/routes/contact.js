@@ -1,21 +1,17 @@
 /**
  * backend/src/routes/contact.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Contact form endpoint - called from help.html.
  *
  * POST /api/contact
- *   Body: { subject, message, email? }
- *
- *   1. Saves the submission to Firestore (contactMessages collection).
- *   2. Sends an email notification to bloomhelpdesk@outlook.com.
+ *   Saves the submission to Firestore (contactMessages collection) and
+ *   sends an email notification to bloomhelpdesk@outlook.com.
+ *   Returns a requestId (BLM-YYYY-XXXXX) to show the user.
  *
  * Rate-limited to 5 requests per 15 minutes per IP.
- * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import express        from "express";
-import rateLimit      from "express-rate-limit";
-import { db, admin }  from "../firebaseAdmin.js";
+import express       from "express";
+import rateLimit     from "express-rate-limit";
+import { db, admin } from "../firebaseAdmin.js";
 import { sendToHelpdesk } from "../mailer.js";
 
 const FieldValue = admin.firestore.FieldValue;
@@ -29,9 +25,24 @@ const limiter = rateLimit({
 
 const VALID_SUBJECTS = new Set(["bug", "data", "privacy", "feedback", "accessibility", "other"]);
 
+const SUBJECT_LABELS = {
+  bug:           "Something is not working",
+  data:          "Question about my data",
+  privacy:       "Privacy concern",
+  feedback:      "General feedback",
+  accessibility: "Accessibility issue",
+  other:         "Other",
+};
+
+function generateRequestId() {
+  const year   = new Date().getFullYear();
+  const suffix = Date.now().toString(36).slice(-5).toUpperCase();
+  return `BLM-${year}-${suffix}`;
+}
+
 router.post("/", limiter, async (req, res) => {
   try {
-    const { subject, message, email } = req.body;
+    const { subject, message, email, name, userId } = req.body;
 
     if (!VALID_SUBJECTS.has(subject)) {
       return res.status(400).json({ error: "Invalid subject." });
@@ -42,51 +53,64 @@ router.post("/", limiter, async (req, res) => {
 
     const safeSubject = subject.slice(0, 40);
     const safeMessage = message.trim().slice(0, 1200);
-    const safeEmail   = typeof email === "string" ? email.trim().slice(0, 200) : null;
+    const safeEmail   = typeof email  === "string" ? email.trim().slice(0, 200) : null;
+    const safeName    = typeof name   === "string" ? name.trim().slice(0, 100)  : null;
+    const safeUserId  = typeof userId === "string" ? userId.slice(0, 128)       : null;
 
-    // 1. Save to Firestore
+    const requestId = generateRequestId();
+
+    // 1 = Save to Firestore
     await db.collection("contactMessages").add({
-      subject:   safeSubject,
-      message:   safeMessage,
-      ...(safeEmail && { replyEmail: safeEmail }),
-      createdAt: FieldValue.serverTimestamp(),
+      requestId,
+      subject:    safeSubject,
+      message:    safeMessage,
+      replyEmail: safeEmail   || null,
+      name:       safeName    || null,
+      userId:     safeUserId  || null,
+      status:     "new",
+      source:     "contact-form",
+      createdAt:  FieldValue.serverTimestamp(),
     });
 
-    // 2. Email the helpdesk
-    const subjectLabel = {
-      bug:           "Something is not working",
-      data:          "Question about my data",
-      privacy:       "Privacy concern",
-      feedback:      "General feedback",
-      accessibility: "Accessibility issue",
-      other:         "Other",
-    }[safeSubject] || safeSubject;
+    const subjectLabel = SUBJECT_LABELS[safeSubject] || safeSubject;
 
+    // 2 = Email the helpdesk (non-fatal if it fails)
     const html = `
       <h2 style="font-family:sans-serif;color:#d85a98;">New message via Bloom Contact Form</h2>
       <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse;width:100%;max-width:560px;">
-        <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;width:120px;">Subject</td>
+        <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;width:130px;">Request ID</td>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;font-family:monospace;">${requestId}</td></tr>
+        <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;">Subject</td>
             <td style="padding:6px 12px;border-left:3px solid #d85a98;">${subjectLabel}</td></tr>
+        <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;">Name</td>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;">${safeName || "<em>not provided</em>"}</td></tr>
         <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;">Reply-to</td>
             <td style="padding:6px 12px;border-left:3px solid #d85a98;">${safeEmail || "<em>not provided</em>"}</td></tr>
+        <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;">User ID</td>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;font-family:monospace;">${safeUserId || "<em>anonymous</em>"}</td></tr>
         <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;vertical-align:top;">Message</td>
             <td style="padding:6px 12px;border-left:3px solid #d85a98;white-space:pre-wrap;">${safeMessage}</td></tr>
       </table>
       <p style="font-family:sans-serif;font-size:12px;color:#999;margin-top:16px;">
-        Sent via Bloom Help &amp; Contact page
+        Sent via Bloom Help &amp; Contact page &mdash; ${new Date().toUTCString()}
       </p>
     `;
 
-    await sendToHelpdesk({
-      subject:  `[Bloom Contact] ${subjectLabel}`,
-      html,
-      replyTo:  safeEmail || undefined,
-    });
+    try {
+      await sendToHelpdesk({
+        subject: `[Bloom Contact] ${subjectLabel} = ${requestId}`,
+        html,
+        replyTo: safeEmail || undefined,
+      });
+    } catch (mailErr) {
+      // Email failure must not block the response = message is already saved in Firestore
+      console.warn("[contact] email send failed (message still saved):", mailErr.message);
+    }
 
-    res.json({ ok: true });
+    res.json({ ok: true, requestId });
   } catch (e) {
-    console.error("contact POST error:", e);
-    res.status(500).json({ error: "Failed to send message." });
+    console.error("[contact] POST error:", e);
+    res.status(500).json({ error: "Failed to send message. Please try again." });
   }
 });
 

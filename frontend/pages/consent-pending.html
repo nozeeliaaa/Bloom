@@ -190,7 +190,7 @@
 
     async function checkStatus(token, uid) {
       try {
-        const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+        const apiBase = window.BLOOM_API_BASE ?? '';
         const res     = await fetch(`${apiBase}/api/consent/status`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -228,7 +228,7 @@
         resendBtn.textContent = 'Sending…';
 
         try {
-          const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+          const apiBase = window.BLOOM_API_BASE ?? '';
           const res     = await fetch(`${apiBase}/api/consent/resend`, {
             method:  'POST',
             headers: { 'Authorization': `Bearer ${token}` },
@@ -271,7 +271,7 @@
         updateEmailBtn.textContent = 'Updating…';
 
         try {
-          const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+          const apiBase = window.BLOOM_API_BASE ?? '';
           const res     = await fetch(`${apiBase}/api/consent/update-email`, {
             method:  'PATCH',
             headers: {

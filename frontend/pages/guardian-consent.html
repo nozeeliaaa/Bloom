@@ -157,7 +157,7 @@
 
         try {
           const token   = await getIdToken();
-          const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+          const apiBase = window.BLOOM_API_BASE ?? '';
           const res     = await fetch(`${apiBase}/api/consent/request`, {
             method:  'POST',
             headers: {

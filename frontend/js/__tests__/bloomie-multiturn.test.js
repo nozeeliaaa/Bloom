@@ -89,15 +89,15 @@ afterEach(() => {
 
 // ── 1. Cumulative risk: heavy bleeding + dizziness ────────────────────────────
 
-describe("multi-turn: cumulative risk flags — heavy + dizziness", () => {
+describe("multi-turn: cumulative risk flags - heavy + dizziness", () => {
   it("escalates to HEAVY_URGENT when heavy bleeding is followed by dizziness", () => {
-    // Turn 1: heavy bleeding message — registers the heavy_bleeding flag,
+    // Turn 1: heavy bleeding message - registers the heavy_bleeding flag,
     // routes to HEAVY_INTRO but does NOT yet escalate (dizziness not present).
     sendMessage("my period is really heavy right now");
     expect(chat.getState().cumulativeRiskFlags.has("heavy_bleeding")).toBe(true);
     expect(chat.getState().state).toBe("HEAVY_INTRO");
 
-    // Turn 2: user now reports dizziness — combination triggers cumulative escalation.
+    // Turn 2: user now reports dizziness - combination triggers cumulative escalation.
     sendMessage("i also feel dizzy and lightheaded");
     const state = chat.getState();
     expect(state.cumulativeRiskFlags.has("heavy_bleeding")).toBe(true);
@@ -109,9 +109,9 @@ describe("multi-turn: cumulative risk flags — heavy + dizziness", () => {
 
 // ── 2. Cumulative risk: late period + one-sided pain ─────────────────────────
 
-describe("multi-turn: cumulative risk flags — late + one-sided pain", () => {
+describe("multi-turn: cumulative risk flags - late + one-sided pain", () => {
   it("escalates to HEAVY_URGENT when late period is followed by one-sided pain", () => {
-    // Turn 1: late period — sets late_period flag, routes to late flow.
+    // Turn 1: late period - sets late_period flag, routes to late flow.
     sendMessage("my period is late");
     expect(chat.getState().cumulativeRiskFlags.has("late_period")).toBe(true);
 
@@ -128,13 +128,13 @@ describe("multi-turn: cumulative risk flags — late + one-sided pain", () => {
 
 describe("multi-turn: topic interrupt clears entity history", () => {
   it("resets entityHistory when topic switches from late period to cramps", () => {
-    // Turn 1: late period — builds entity history with late symptoms.
+    // Turn 1: late period - builds entity history with late symptoms.
     sendMessage("my period is late");
     expect(chat.getState().entityHistory.length).toBeGreaterThan(0);
     const firstEntry = chat.getState().entityHistory[chat.getState().entityHistory.length - 1];
     expect(firstEntry.symptoms.late).toBe(true);
 
-    // Turn 2: user switches to pelvic/cramp topic — triggers topic interrupt.
+    // Turn 2: user switches to pelvic/cramp topic - triggers topic interrupt.
     // The old late-period entityHistory should be wiped; only pelvic remains.
     sendMessage("actually i have really bad cramps in my lower abdomen");
     const state = chat.getState();
@@ -148,7 +148,7 @@ describe("multi-turn: topic interrupt clears entity history", () => {
   });
 });
 
-// ── 4. Overload triage — 3+ topics in one message ────────────────────────────
+// ── 4. Overload triage - 3+ topics in one message ────────────────────────────
 
 describe("multi-turn: overload detection", () => {
   it("shows overload triage when 3+ distinct topics appear in one message", () => {
@@ -156,7 +156,7 @@ describe("multi-turn: overload detection", () => {
     sendMessage("my period is late and i have really heavy bleeding and bad cramps all at once");
 
     // The overload handler fires: say() is called with the overload copy and
-    // topic-choice buttons, but transition() is NOT called — state stays at START.
+    // topic-choice buttons, but transition() is NOT called - state stays at START.
     const state = chat.getState();
     const boxText = getChatBoxText();
 
@@ -168,14 +168,14 @@ describe("multi-turn: overload detection", () => {
     const overloadButtons = buttons.filter(id => id.startsWith("overload_"));
     expect(overloadButtons.length).toBeGreaterThanOrEqual(2);
 
-    // State is still START — no transition happened.
+    // State is still START - no transition happened.
     expect(state.state).toBe("START");
   });
 });
 
-// ── 5. Loop detection — same message 3 times ─────────────────────────────────
+// ── 5. Loop detection - same message 3 times ─────────────────────────────────
 
-describe("multi-turn: loop detection — exact repeat", () => {
+describe("multi-turn: loop detection - exact repeat", () => {
   it("routes to ELSE_NOT_SURE_ROUTE after 3 identical messages", () => {
     // First two sends of the same message are processed normally.
     sendMessage("help me");
@@ -190,7 +190,7 @@ describe("multi-turn: loop detection — exact repeat", () => {
   });
 });
 
-// ── 6. IDK loop — "not sure" variants 3 times ────────────────────────────────
+// ── 6. IDK loop - "not sure" variants 3 times ────────────────────────────────
 
 describe("multi-turn: IDK loop", () => {
   it("routes to ELSE_NOT_SURE_ROUTE after 3 idk-variant messages", () => {
@@ -204,19 +204,19 @@ describe("multi-turn: IDK loop", () => {
   });
 });
 
-// ── 7. Conversational repair — OOS streak at sufficient session depth ─────────
+// ── 7. Conversational repair - OOS streak at sufficient session depth ─────────
 
 describe("multi-turn: conversational repair → NARROWING", () => {
   it("transitions to NARROWING after 2 consecutive OOS at session depth ≥ 3", () => {
-    // Turn 1: health message — builds session depth (depth = 1), resets streak.
+    // Turn 1: health message - builds session depth (depth = 1), resets streak.
     sendMessage("my period is late");
     expect(chat.getState().oosStreakCount).toBe(0);
 
-    // Turn 2: clearly OOS — streak = 1, depth = 2 (not yet ≥ 3).
+    // Turn 2: clearly OOS - streak = 1, depth = 2 (not yet ≥ 3).
     sendMessage("what is the weather like today");
     expect(chat.getState().oosStreakCount).toBe(1);
 
-    // Turn 3: another OOS — streak = 2, depth = 3 → conversational repair fires.
+    // Turn 3: another OOS - streak = 2, depth = 3 → conversational repair fires.
     sendMessage("tell me a joke please");
     const state = chat.getState();
     expect(state.state).toBe("NARROWING");
@@ -230,7 +230,7 @@ describe("multi-turn: conversational repair → NARROWING", () => {
 describe("multi-turn: MEDIUM confidence pending route", () => {
   it.skip(
     "confirms a MEDIUM-confidence route when user says 'yes' and clears it on 'no'" +
-    " — SKIP: computeRouteConfidence() MEDIUM tier depends on exact signal score " +
+    " - SKIP: computeRouteConfidence() MEDIUM tier depends on exact signal score " +
     "thresholds that cannot be reliably triggered by a fixed natural-language string " +
     "without mocking scoreSignals(). A deterministic fixture would be brittle.",
     () => {}
@@ -242,7 +242,7 @@ describe("multi-turn: MEDIUM confidence pending route", () => {
 describe("multi-turn: return to resolved topic", () => {
   it.skip(
     "offers follow-up options when user returns to a topic already resolved " +
-    " — SKIP: concernsResolved is only populated when transitioning into a GUIDE " +
+    " - SKIP: concernsResolved is only populated when transitioning into a GUIDE " +
     "node (HEAVY_GUIDE, LATE_GUIDE, etc.) that is currently listed in RESOLVED_NODES " +
     "but not in TOPIC_NODE_MAP, so topicCode is always undefined and the condition " +
     "`RESOLVED_NODES.has(nextState) && topicCode` is never true. " +
@@ -256,7 +256,7 @@ describe("multi-turn: return to resolved topic", () => {
 describe("multi-turn: unresolved concerns before CLOSE", () => {
   it.skip(
     "surfaces the 'Before you go' prompt for unresolved topics before CLOSE " +
-    " — SKIP: concernsUnresolved is never populated in the current codebase " +
+    " - SKIP: concernsUnresolved is never populated in the current codebase " +
     "(no code path writes to prof.concernsUnresolved). The CLOSE guard at " +
     "transition() checks it but it always starts and stays as [].",
     () => {}
@@ -267,7 +267,7 @@ describe("multi-turn: unresolved concerns before CLOSE", () => {
 
 describe("multi-turn: OOS follow-up resolution", () => {
   it("resolves a food OOS follow-up to MOOD_SAFETY_CHECK when user confirms pre-period", () => {
-    // Turn 1: food/craving OOS — sets lastOOS = "food".
+    // Turn 1: food/craving OOS - sets lastOOS = "food".
     sendMessage("i really want to eat junk food all day today");
     expect(chat.getState().lastOOS).toBe("food");
 

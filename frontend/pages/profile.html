@@ -274,8 +274,21 @@
 
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner } from "/js/utils.js";
-    import { onAuthChange, logout } from "/js/auth.js";
+    import { onAuthChange, logout, getIdToken } from "/js/auth.js";
     import { GOALS, getUserGoal, setUserGoal, goalLabel, goalDesc } from "/js/goals.js";
+
+    async function syncGoalToBackend(goalId) {
+      try {
+        const token = await getIdToken();
+        if (!token) return;
+        const apiBase = window.BLOOM_API_BASE || "";
+        await fetch(`${apiBase}/api/user/profile`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ goal: goalId }),
+        });
+      } catch (_) {}
+    }
 
     renderNav("profile");
     renderFooter();
@@ -461,6 +474,7 @@
         confirmBtn.onclick = () => {
           if (leavingPregnancy) localStorage.removeItem("bloom_lmp");
           setUserGoal(goal.id);
+          syncGoalToBackend(goal.id);
           renderGoals();
           updateMeta();
           showSuccess();

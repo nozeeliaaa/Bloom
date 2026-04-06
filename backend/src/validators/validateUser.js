@@ -78,7 +78,7 @@ export function validateUserProfile(body, existingProfile = null) {
     return { valid: false, error: `mode must be one of: ${VALID_MODES.join(", ")}` };
   }
 
-  // --- role (only checked if present — setting role is an admin action) ---
+  // --- role (only checked if present - setting role is an admin action) ---
   if (body.role !== undefined && !VALID_ROLES.includes(body.role)) {
     return { valid: false, error: `role must be one of: ${VALID_ROLES.join(", ")}` };
   }

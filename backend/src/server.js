@@ -1,14 +1,9 @@
 // server.js
 import dotenv from "dotenv";
 dotenv.config();
-// ── Startup env var checks ──────────────────────────────────
-const REQUIRED_ENV_VARS = [
-  "FIREBASE_PROJECT_ID",
-  "FIREBASE_CLIENT_EMAIL", 
-  "FIREBASE_PRIVATE_KEY",
-  "APP_BASE_URL",
-];
 
+// ── Startup env var checks ──────────────────────────────────
+// Firebase credentials are handled by firebaseAdmin.js (uses serviceAccountKey.json as local fallback)
 const WARN_ENV_VARS = [
   "HELPDESK_EMAIL",
   "HELPDESK_EMAIL_PASS",
@@ -16,12 +11,6 @@ const WARN_ENV_VARS = [
   "VAPID_PRIVATE_KEY",
   "ORS_API_KEY",
 ];
-
-const missingRequired = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
-if (missingRequired.length > 0) {
-  console.error(`❌ FATAL: Missing required env vars: ${missingRequired.join(", ")}`);
-  process.exit(1);
-}
 
 const missingWarn = WARN_ENV_VARS.filter(v => !process.env[v]);
 if (missingWarn.length > 0) {
@@ -31,42 +20,66 @@ if (missingWarn.length > 0) {
 import cron from "node-cron";
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 
-import { db } from "./src/firebaseAdmin.js";
-import { runDailyRemindersJob } from "./src/jobs/sendDailyReminders.js";
-import cycleLogRoutes from "./src/routes/cycleLogs.js";
-import notificationRoutes from "./src/routes/notifications.js";
-import symptomLogRoutes from "./src/routes/symptomLogs.js";
-import consentRoutes from "./src/routes/consent.js";
-import catalogRoutes from "./src/routes/catalog.js";
-import userRoutes from "./src/routes/user.js";
-import authRoutes from "./src/routes/auth.js";
-import adminRoutes from "./src/routes/admin.js";
-import bloomieMemoryRoutes from "./src/routes/bloomieMemory.js";
-import bloomieSafetyLogRoutes from "./src/routes/bloomieSafetyLog.js";
-import feedbackRoutes from "./src/routes/feedback.js";
-import { runAgeUpgradeJob } from "./src/jobs/ageUpgrade.js";
-import { runTokenExpiryJob } from "./src/jobs/tokenExpiry.js";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+import { db } from "./firebaseAdmin.js";
+import { runDailyRemindersJob } from "./jobs/sendDailyReminders.js";
+import cycleLogRoutes from "./routes/cycleLogs.js";
+import notificationRoutes from "./routes/notifications.js";
+import symptomLogRoutes from "./routes/symptomLogs.js";
+import consentRoutes from "./routes/consent.js";
+import catalogRoutes from "./routes/catalog.js";
+import userRoutes from "./routes/user.js";
+import authRoutes from "./routes/auth.js";
+import adminRoutes from "./routes/admin.js";
+import bloomieMemoryRoutes from "./routes/bloomieMemory.js";
+import bloomieSafetyLogRoutes from "./routes/bloomieSafetyLog.js";
+import feedbackRoutes from "./routes/feedback.js";
+import preferencesRoutes from "./routes/preferences.js";
+import cyclesMLRoutes from "./routes/cyclesML.js";
+import contactRoutes  from "./routes/contact.js";
+
+import { runAgeUpgradeJob } from "./jobs/ageUpgrade.js";
+import { runTokenExpiryJob } from "./jobs/tokenExpiry.js";
 import rateLimit from "express-rate-limit";
 
 const app = express();
+console.log(">>> SERVER.JS LOADED - version check OK <<<");
 
 // Restrict CORS to known origins; reads from env in production
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-  : ["http://localhost:5173", "http://localhost:4000"];
+  : null; // null = dev mode: allow all localhost
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow server-to-server / curl calls (no origin) in development
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      // Allow server-to-server / curl calls (no origin)
+      if (!origin) return callback(null, true);
+      // In dev (no ALLOWED_ORIGINS set), allow any localhost port
+      if (!allowedOrigins) {
+        if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+      } else {
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+      }
       callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+
+// Global request logger - remove after debugging
+app.use((req, _res, next) => {
+  if (req.method !== 'GET') {
+    console.log(`>>> ${req.method} ${req.path}`);
+  }
+  next();
+});
 
 // Serve the frontend folder at the root so localhost:4000/pages/clinics.html works
 app.use(express.static(path.join(__dirname, "../../frontend")));
@@ -93,10 +106,10 @@ const authLimiter = rateLimit({
 app.use("/api", generalLimiter);
 app.use("/api/auth", authLimiter);
 
-// /api/logs — used by db.js (frontend) for daily log sync
+// /api/logs - used by db.js (frontend) for daily log sync
 app.use("/api/logs", cycleLogRoutes);
 
-// /api/cycle — legacy alias kept for backwards compat
+// /api/cycle - legacy alias kept for backwards compat
 app.use("/api/cycle", cycleLogRoutes);
 
 app.use("/api/symptoms", symptomLogRoutes);
@@ -109,6 +122,9 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/bloomie-memory",    bloomieMemoryRoutes);
 app.use("/api/bloomie-safety-log", bloomieSafetyLogRoutes);
 app.use("/api/feedback",           feedbackRoutes);
+app.use("/api/preferences",        preferencesRoutes);
+app.use("/api/cycles",             cyclesMLRoutes);
+app.use("/api/contact",            contactRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ ok: true, message: "Backend is running 🚀" });

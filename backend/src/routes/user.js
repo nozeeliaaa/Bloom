@@ -20,6 +20,7 @@ function computeAgeBand(yob) {
 router.post("/profile", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
+    console.log(`[profile] POST from uid=${uid} body=`, JSON.stringify(req.body));
 
     const userRef = db.collection("users").doc(uid);
     const snap = await userRef.get();
@@ -29,13 +30,16 @@ router.post("/profile", requireAuth, async (req, res) => {
     // ---- Validate incoming body ----
     const validation = validateUserProfile(req.body, existingProfile);
     if (!validation.valid) {
+      console.log(`[profile] validation failed:`, validation.error);
       return res.status(400).json({ error: validation.error });
     }
 
     // ---- Build profile object ----
     const profile = {
       role: existingProfile?.role || "user",
-      goal: req.body.goal ?? (existingProfile?.goal === "track_cycle" ? "period" : existingProfile?.goal) ?? "period",
+      nickname: req.body.nickname !== undefined ? String(req.body.nickname).slice(0, 40) : (existingProfile?.nickname ?? null),
+      avatar:   req.body.avatar   !== undefined ? String(req.body.avatar).slice(0, 10)   : (existingProfile?.avatar   ?? null),
+      goal: req.body.goal ?? (existingProfile?.goal === "track_cycle" ? "period" : (existingProfile?.goal ?? "period")),
       mode: req.body.mode ?? existingProfile?.mode ?? "account",
       yearOfBirth:
         req.body.yearOfBirth === undefined
@@ -111,10 +115,57 @@ router.post("/profile", requireAuth, async (req, res) => {
        });
       }
 
+    console.log(`[profile] saved uid=${uid}`, JSON.stringify(profile));
     return res.json({ ok: true, profile });
   } catch (err) {
     console.error("POST /profile error:", err);
     return res.status(500).json({ error: "Failed to save profile" });
+  }
+});
+
+// ─── Game progress ────────────────────────────────────────────────────────────
+
+function computeLevel(xp) {
+  if (xp >= 2250) return 10;
+  if (xp >= 1800) return 9;
+  if (xp >= 1400) return 8;
+  if (xp >= 1050) return 7;
+  if (xp >= 750)  return 6;
+  if (xp >= 500)  return 5;
+  if (xp >= 300)  return 4;
+  if (xp >= 150)  return 3;
+  if (xp >= 50)   return 2;
+  return 1;
+}
+
+router.get("/game", requireAuth, async (req, res) => {
+  try {
+    const snap = await db.collection("users").doc(req.user.uid).get();
+    const game = snap.data()?.game || { xp: 0, level: 1, sessionsPlayed: 0 };
+    return res.json({ ok: true, game });
+  } catch (err) {
+    console.error("GET /game error:", err);
+    return res.status(500).json({ error: "Failed to fetch game progress" });
+  }
+});
+
+router.post("/game", requireAuth, async (req, res) => {
+  try {
+    const { xpEarned } = req.body;
+    if (typeof xpEarned !== "number" || xpEarned < 0 || xpEarned > 300) {
+      return res.status(400).json({ error: "Invalid xpEarned value" });
+    }
+    const userRef = db.collection("users").doc(req.user.uid);
+    const snap = await userRef.get();
+    const existing = snap.data()?.game || { xp: 0, level: 1, sessionsPlayed: 0 };
+    const newXP      = (existing.xp || 0) + xpEarned;
+    const newLevel   = computeLevel(newXP);
+    const newSessions = (existing.sessionsPlayed || 0) + 1;
+    await userRef.set({ game: { xp: newXP, level: newLevel, sessionsPlayed: newSessions } }, { merge: true });
+    return res.json({ ok: true, game: { xp: newXP, level: newLevel, sessionsPlayed: newSessions } });
+  } catch (err) {
+    console.error("POST /game error:", err);
+    return res.status(500).json({ error: "Failed to save game progress" });
   }
 });
 
@@ -124,7 +175,12 @@ router.get("/profile", requireAuth, async (req, res) => {
     const uid = req.user.uid;
     const doc = await db.collection("users").doc(uid).get();
     if (!doc.exists) return res.json(null);
-    return res.json(doc.data());
+    const data = doc.data();
+    // Normalize legacy goal value before returning
+    if (data?.profile?.goal === "track_cycle") {
+      data.profile.goal = "period";
+    }
+    return res.json(data);
   } catch (err) {
     console.error("GET /profile error:", err);
     return res.status(500).json({ error: "Failed to fetch profile" });

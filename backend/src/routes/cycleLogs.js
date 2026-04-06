@@ -104,7 +104,7 @@ router.get("/", requireAuth, async (req, res) => {
     if (start) q = q.where("dateKey", ">=", start);
     if (end) q = q.where("dateKey", "<=", end);
 
-    // Only apply a cap when filtering by range — not on full history fetch
+    // Only apply a cap when filtering by range - not on full history fetch
     if (start || end) q = q.limit(3650);
 
     const snap = await q.get();
@@ -117,7 +117,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/logs — bulk delete all cycle logs for user
+// DELETE /api/logs - bulk delete all cycle logs for user
 router.delete("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -129,7 +129,7 @@ router.delete("/", requireAuth, async (req, res) => {
 
     if (snap.empty) return res.json({ ok: true, deleted: 0 });
 
-    // Firestore batch max 500 ops — chunk if needed
+    // Firestore batch max 500 ops - chunk if needed
     const BATCH_SIZE = 500;
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += BATCH_SIZE) {

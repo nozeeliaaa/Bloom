@@ -2,10 +2,10 @@
  * src/middleware/rateLimiter.js
  *
  * Three-tier rate limiting:
- *   1. globalLimiter     — baseline for all routes
- *   2. authLimiter       — strict, for /auth routes
- *   3. consentLimiter    — strict, for /consent/request
- *   4. adminLimiter      — moderate, for /admin routes
+ *   1. globalLimiter     - baseline for all routes
+ *   2. authLimiter       - strict, for /auth routes
+ *   3. consentLimiter    - strict, for /consent/request
+ *   4. adminLimiter      - moderate, for /admin routes
  *
  * Uses express-rate-limit (in-memory store).
  * For multi-instance production deployments, swap the store for
@@ -67,7 +67,7 @@ export const consentLimiter = rateLimit({
 
 // ─── 4. Admin limiter ────────────────────────────────────────────────────────
 // Applied to all /admin routes.
-// Admin actions should be deliberate — low volume expected.
+// Admin actions should be deliberate - low volume expected.
 export const adminLimiter = rateLimit({
   windowMs:         15 * 60 * 1000, // 15 minutes
   max:              60,              // 60 requests per IP per window

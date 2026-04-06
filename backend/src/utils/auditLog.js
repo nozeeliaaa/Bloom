@@ -2,7 +2,7 @@
  * src/utils/auditLog.js
  *
  * Writes a metadata-only audit trail to auditLogs/{logId}.
- * Never stores sensitive content — only actions, actors, and changed field names.
+ * Never stores sensitive content - only actions, actors, and changed field names.
  *
  * Usage:
  *   import { logAudit } from "../utils/auditLog.js";
@@ -65,7 +65,7 @@ export const AUDIT_ACTIONS = {
  * @param {string}  params.entityType  - Type of entity affected ("user","consent","export","clinic",etc.)
  * @param {string}  [params.entityId]  - ID of the affected entity (optional)
  * @param {string}  [params.targetUid] - UID of the affected user (optional, for admin actions)
- * @param {object}  [params.meta]      - Extra metadata — NO sensitive content
+ * @param {object}  [params.meta]      - Extra metadata - NO sensitive content
  *   @param {string[]} [params.meta.changedFields] - Field names that changed (no values)
  *   @param {string}   [params.meta.reasonCode]    - Optional reason code
  */
@@ -78,9 +78,9 @@ export async function logAudit({
   targetUid = null,
   meta = {},
 }) {
-  // Silently skip if core fields are missing — never crash a route over logging
+  // Silently skip if core fields are missing - never crash a route over logging
   if (!actorUid || !action || !entityType) {
-    console.warn("[auditLog] Skipped — missing required fields:", { actorUid, action, entityType });
+    console.warn("[auditLog] Skipped - missing required fields:", { actorUid, action, entityType });
     return;
   }
 
@@ -98,7 +98,7 @@ export async function logAudit({
 
     await db.collection("auditLogs").add(entry);
   } catch (err) {
-    // Log to console but never throw — audit failure should not break the request
+    // Log to console but never throw - audit failure should not break the request
     console.error("[auditLog] Failed to write audit entry:", err.message);
   }
 }

@@ -8,9 +8,17 @@ export default defineConfig({
     host: true,
     port: 5173,
 
-    // Proxy /api requests to the backend (avoids CORS + JSON parse errors)
+    // Proxy requests to the backend (avoids CORS + JSON parse errors)
     proxy: {
       "/api": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+      },
+      "/catalog": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+      },
+      "/health": {
         target: "http://localhost:4000",
         changeOrigin: true,
       },

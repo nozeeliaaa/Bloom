@@ -5,7 +5,7 @@ import { db, auth } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateConsentRequest, validateConsentUpdate } from "../validators/validateConsent.js";
 import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
-import { generateInviteToken, isTokenExpired } from "../utils/consentToken.js";
+import { generateInviteToken, generateRevokeToken, isTokenExpired } from "../utils/consentToken.js";
 
 const router = express.Router();
 
@@ -64,7 +64,7 @@ router.post("/request", requireAuth, async (req, res) => {
       guardianUid = guardianRecord.uid;
       guardianHasAccount = true;
     } catch {
-      // Guardian has no account yet — invite still sent via email
+      // Guardian has no account yet - invite still sent via email
     }
 
     if (guardianUid && guardianUid === teenUid) {
@@ -122,7 +122,7 @@ router.post("/request", requireAuth, async (req, res) => {
     const approveLink = `${baseUrl}/api/consent/approve?token=${token}&consentId=${consentId}`;
     const denyLink    = `${baseUrl}/api/consent/deny?token=${token}&consentId=${consentId}`;
 
-    // Write to mail collection — Firebase Trigger Email picks this up
+    // Write to mail collection - Firebase Trigger Email picks this up
     await db.collection("mail").add({
       to: guardianEmail,
       message: {
@@ -141,7 +141,7 @@ router.post("/request", requireAuth, async (req, res) => {
             : ""}
           <p>If you don't know who sent this, you can safely ignore this email.</p>
           <br/>
-          <p>— The Bloom Team</p>
+          <p>- The Bloom Team</p>
         `,
       },
     });
@@ -296,10 +296,10 @@ router.patch("/update-guardian-email/:consentId", requireAuth, async (req, res) 
         return res.status(400).json({ error: "You cannot link yourself as a guardian" });
       }
     } catch {
-      // No account — fine, invite still goes out
+      // No account - fine, invite still goes out
     }
 
-    // Generate fresh token — invalidates old one by overwriting
+    // Generate fresh token - invalidates old one by overwriting
     const { token, expiresAt } = generateInviteToken();
     const now = admin.firestore.FieldValue.serverTimestamp();
     const baseUrl = process.env.APP_BASE_URL || "https://yourapp.com";
@@ -335,7 +335,7 @@ router.patch("/update-guardian-email/:consentId", requireAuth, async (req, res) 
             : ""}
           <p>If you don't know who sent this, you can safely ignore this email.</p>
           <br/>
-          <p>— The Bloom Team</p>
+          <p>- The Bloom Team</p>
         `,
       },
     });
@@ -443,7 +443,7 @@ router.post("/resend/:consentId", requireAuth, async (req, res) => {
             : ""}
           <p>If you don't know who sent this, you can safely ignore this email.</p>
           <br/>
-          <p>— The Bloom Team</p>
+          <p>- The Bloom Team</p>
         `,
       },
     });
@@ -471,7 +471,7 @@ router.post("/resend/:consentId", requireAuth, async (req, res) => {
 });
 
 // ─── GET /consent/approve ────────────────────────────────────────────────────
-// Unauthenticated — guardian clicks approve link in email
+// Unauthenticated - guardian clicks approve link in email
 // e.g. https://yourapp.com/consent/approve?token=abc&consentId=xyz
 router.get("/approve", async (req, res) => {
   try {
@@ -510,7 +510,7 @@ router.get("/approve", async (req, res) => {
       }
     }
 
-    // Already resolved — idempotent
+    // Already resolved - idempotent
     if (data.status === "approved") {
       return res.redirect(`${baseUrl}/pages/consent-result.html?result=approved`);
     }
@@ -520,6 +520,8 @@ router.get("/approve", async (req, res) => {
     }
 
     const now = admin.firestore.FieldValue.serverTimestamp();
+    const revokeToken = generateRevokeToken();
+    const revokeLink = `${baseUrl}/api/consent/revoke-link?token=${revokeToken}&consentId=${consentId}`;
 
     await consentRef.update({
       status:               "approved",
@@ -527,6 +529,7 @@ router.get("/approve", async (req, res) => {
       statusUpdatedAt:      now,
       decidedAt:            now,
       scope: { sensitiveModules: true, pregnancyMode: false },
+      revokeToken,
     });
 
     // Update relationship doc
@@ -534,6 +537,29 @@ router.get("/approve", async (req, res) => {
       status:      "active",
       activatedAt: now,
     }, { merge: true });
+
+    // Send confirmation email to guardian with revoke link
+    await db.collection("mail").add({
+      to: data.guardianEmail,
+      message: {
+        subject: "You've approved Bloom access for a teen",
+        html: `
+          <p>Hello,</p>
+          <p>You've approved access to <strong>Bloom</strong> for a teen in your care.</p>
+          <p>If you ever want to revoke their access, just click the button below - no login required:</p>
+          <p style="margin-top:1rem;">
+            <a href="${revokeLink}" style="background:#c0003c;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;">
+              Revoke Access
+            </a>
+          </p>
+          <p style="margin-top:1rem;font-size:0.9rem;color:#888;">
+            Keep this email somewhere safe - this link is the easiest way to revoke access later.
+          </p>
+          <br/>
+          <p>- The Bloom Team</p>
+        `,
+      },
+    });
 
     await logAudit({
       actorUid:   data.guardianUid || "unauthenticated-guardian",
@@ -554,7 +580,7 @@ router.get("/approve", async (req, res) => {
 });
 
 // ─── GET /consent/deny ──────────────────────────────────────────────────────
-// Unauthenticated — guardian clicks deny link in email
+// Unauthenticated - guardian clicks deny link in email
 router.get("/deny", async (req, res) => {
   try {
     const { token, consentId } = req.query;
@@ -590,7 +616,7 @@ router.get("/deny", async (req, res) => {
       }
     }
 
-    // Already resolved — idempotent
+    // Already resolved - idempotent
     if (data.status === "denied") {
       return res.redirect(`${baseUrl}/pages/consent-result.html?result=denied`);
     }
@@ -714,6 +740,66 @@ router.get("/pending", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("GET /consent/pending error:", err);
     return res.status(500).json({ error: "Failed to fetch pending requests" });
+  }
+});
+
+// ─── GET /consent/revoke-link ────────────────────────────────────────────────
+// Unauthenticated - guardian clicks revoke link from their approval confirmation email
+router.get("/revoke-link", async (req, res) => {
+  try {
+    const { token, consentId } = req.query;
+    const baseUrl = process.env.APP_BASE_URL || "https://yourapp.com";
+
+    if (!token || !consentId) {
+      return res.redirect(`${baseUrl}/pages/consent-result.html?result=invalid`);
+    }
+
+    const consentRef = db.collection("consents").doc(consentId);
+    const snap = await consentRef.get();
+
+    if (!snap.exists) {
+      return res.redirect(`${baseUrl}/pages/consent-result.html?result=invalid`);
+    }
+
+    const data = snap.data();
+
+    if (data.revokeToken !== token) {
+      return res.redirect(`${baseUrl}/pages/consent-result.html?result=invalid`);
+    }
+
+    if (data.status === "denied") {
+      return res.redirect(`${baseUrl}/pages/consent-result.html?result=already-revoked`);
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    await consentRef.update({
+      status:          "denied",
+      statusUpdatedAt: now,
+      decidedAt:       now,
+      revokeToken:     null, // invalidate so link can't be reused
+    });
+
+    await db.collection("relationships").doc(consentId).set({
+      status:    "revoked",
+      revokedAt: now,
+    }, { merge: true });
+
+    await logAudit({
+      actorUid:   data.guardianUid || "unauthenticated-guardian",
+      actorRole:  "guardian",
+      action:     AUDIT_ACTIONS.CONSENT_REVOKED,
+      entityType: "consent",
+      entityId:   consentId,
+      targetUid:  data.teenUid,
+      meta:       { changedFields: ["status"], reasonCode: "revoke_link" },
+    });
+
+    return res.redirect(`${baseUrl}/pages/consent-result.html?result=revoked`);
+  } catch (err) {
+    console.error("GET /consent/revoke-link error:", err);
+    const baseUrl = process.env.APP_BASE_URL || "https://yourapp.com";
+    return res.redirect(`${baseUrl}/pages/consent-result.html?result=error`);
   }
 });
 

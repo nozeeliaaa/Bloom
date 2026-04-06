@@ -278,3 +278,16 @@
   color: #fff;
   border: none;
 }
+
+/* PDF upload status hint */
+.pamphlet-pdf-status {
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.admin-tab-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}

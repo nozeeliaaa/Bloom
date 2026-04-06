@@ -17,7 +17,7 @@
  *   // With ML prediction from /api/cycles/predict
  *   const result = computeCyclePhaseML(logs, mlPredictedCycleLength);
  *
- * COMP3901: Educational estimation only — not medical advice.
+ * COMP3901: Educational estimation only - not medical advice.
  */
 
 /**
@@ -66,7 +66,7 @@ export function computeCyclePhaseML(logs, mlPredictedCycleLength = null) {
     };
   }
 
-  // One cycle logged — compute phase using ML prediction if available,
+  // One cycle logged - compute phase using ML prediction if available,
   // otherwise fall back to a 28-day default. Confidence is always low
   // here since we have no interval history yet.
   if (cycleStarts.length === 1) {
@@ -87,7 +87,7 @@ export function computeCyclePhaseML(logs, mlPredictedCycleLength = null) {
 
     let phase, phaseLabel;
     if (periodDays.includes(todayKey)) {
-      // Actively bleeding — always menstrual
+      // Actively bleeding - always menstrual
       phase = 'menstrual';  phaseLabel = 'Menstrual';
     } else if (dayInCycle <= follicularEnd) {
       // Period has ended but still early in cycle
@@ -116,7 +116,7 @@ export function computeCyclePhaseML(logs, mlPredictedCycleLength = null) {
       mlPredictedCycleLength: mlPredictedCycleLength ?? null,
       usingML:                !!mlPredictedCycleLength,
       confidence:             'low',
-      message:                'Based on your first cycle — log more periods to improve accuracy.',
+      message:                'Based on your first cycle - log more periods to improve accuracy.',
       cycleStarts,
       nextPeriodDate,
       ovulationDate,
@@ -155,7 +155,7 @@ export function computeCyclePhaseML(logs, mlPredictedCycleLength = null) {
 
   let phase, phaseLabel;
   if (periodDays.includes(todayKey)) {
-    // Actively bleeding — always menstrual
+    // Actively bleeding - always menstrual
     phase = 'menstrual';   phaseLabel = 'Menstrual';
   } else if (dayInCycle <= follicularEnd) {
     // Period has ended but still early in cycle

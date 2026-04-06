@@ -12,16 +12,18 @@ import {
   toDateKey,
 } from "./utils.js";
 import { getAllLogs } from "./db.js";
-import { getMode, isAnonMode } from "./mode.js";
-import { computeCyclePhase } from "./phase.js";
-import { runFullPrediction } from "./algorithms/cyclePredictor.js";
+import { onAuthChange } from "./auth.js";
+import { isAnonMode } from "./mode.js";
 import { getUserGoal, goalLabel, goalDesc } from "./goals.js";
 import { triggerNotifications } from "./notifications.js";
+import { getTodaysPhaseInsights } from "./phase-education.js";
+import { fetchCycleState } from "./cycle-state.js";
 
-// algoPregnancy and algoCycleEngine are loaded lazily inside loadDashboard()
-// to avoid top-level await, which is not supported in the configured build targets.
-let algoPregnancy = null;
-let algoCycleEngine = null;
+// Algorithm modules loaded lazily inside loadDashboard() = no top-level await
+let algoPregnancy    = null;
+let algoCycleEngine  = null;
+let algoSymptomEngine = null;
+let algoAnomalyEngine = null;
 
 renderNav("dashboard");
 renderFooter();
@@ -40,6 +42,46 @@ function addDaysStr(dateStr, n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * Build basic cycle stats from logs using the same cluster logic as calendar.js.
+ * Returns cycleStarts, dayInCycle, avgCycleLength = no phase/confidence (those come from runFullPrediction).
+ */
+function buildCycleBase(logsByDate) {
+  const periodDays = Object.keys(logsByDate)
+    .filter(k => logsByDate[k]?.flow && logsByDate[k].flow !== "none")
+    .sort();
+
+  const cycleStarts = [];
+  let prevDate = null;
+  for (const day of periodDays) {
+    if (!prevDate || diffDays(prevDate, day) > 3) cycleStarts.push(day);
+    prevDate = day;
+  }
+
+  const lastStart = cycleStarts.length ? cycleStarts[cycleStarts.length - 1] : null;
+  const dayInCycle = lastStart ? (diffDays(lastStart, toDateKey(new Date())) + 1) : null;
+
+  const lengths = [];
+  for (let i = 1; i < cycleStarts.length; i++) {
+    lengths.push(diffDays(cycleStarts[i - 1], cycleStarts[i]));
+  }
+  const avgCycleLength = lengths.length
+    ? Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length)
+    : null;
+
+  return {
+    cycleStarts,
+    dayInCycle,
+    avgCycleLength,
+    phase: "unknown",
+    confidence: "low",
+    nextPeriodDate: null,
+    fertileStart: null,
+    fertileEnd: null,
+    ovulationDate: null,
+  };
+}
+
 function show(el, on) {
   if (!el) return;
   el.style.display = on ? "" : "none";
@@ -47,64 +89,7 @@ function show(el, on) {
 
 // ─── Phase-based insights ─────────────────────────────────────────────────────
 
-const PHASE_INSIGHTS = {
-  menstrual: {
-    label: "Menstrual",
-    items: [
-      { t: "Rest & warmth", d: "Your body is shedding the uterine lining. Prioritise rest, warmth, and gentle movement such as light stretching or short walks." },
-      { t: "Stay hydrated", d: "Water and warm herbal teas can ease cramping and reduce bloating." },
-      { t: "Iron-rich foods", d: "Include leafy greens, beans, and fortified foods to replenish iron lost during bleeding." },
-      { t: "Track your flow", d: "Logging flow intensity each day helps identify patterns. Consistently heavy flow over several days is worth discussing with a provider." },
-    ],
-    account_extra: [
-      { t: "Heat therapy", d: "A warm compress on your lower abdomen can relax uterine muscles and ease cramps." },
-    ],
-  },
-  follicular: {
-    label: "Follicular",
-    items: [
-      { t: "Energy rising", d: "Oestrogen levels are increasing. Many people notice improved mood, focus, and energy in this phase." },
-      { t: "Consistent logging", d: "Keep logging even on non-period days - this data improves your cycle predictions over time." },
-      { t: "Nutrition support", d: "Foods rich in B vitamins, zinc, and omega-3 support follicular development." },
-    ],
-    account_extra: [
-      { t: "Fertile window approaching", d: "Ovulation is ahead. Whether planning for or avoiding pregnancy, knowing your cycle timing is valuable." },
-    ],
-  },
-  ovulation: {
-    label: "Ovulation",
-    items: [
-      { t: "Fertile window", d: "You may be near your estimated fertile window. This is an educational estimate based on your logged history." },
-      { t: "Body signals", d: "Some people notice clear stretchy cervical mucus, mild pelvic twinges, or a slight temperature rise around ovulation." },
-      { t: "Stay consistent", d: "Daily logs through this phase greatly improve the accuracy of future predictions." },
-    ],
-    account_extra: [
-      { t: "Peak energy", d: "Elevated oestrogen and testosterone around ovulation often bring peak energy and confidence." },
-      { t: "Disclaimer", d: "Bloom cycle predictions are educational estimates only. Do not use them as a sole method of contraception." },
-    ],
-  },
-  luteal: {
-    label: "Luteal",
-    items: [
-      { t: "PMS awareness", d: "Progesterone rises after ovulation. Some people experience mood changes, bloating, or breast tenderness in this phase." },
-      { t: "Prioritise sleep", d: "Aim for 7–9 hours. Consistent sleep timing helps stabilise mood and energy during the luteal phase." },
-      { t: "Gentle movement", d: "Light exercise and hydration can help reduce bloating and support mood." },
-    ],
-    account_extra: [
-      { t: "Cravings & mood", d: "Cravings for carbs and sweets are common. Balanced meals with protein and complex carbohydrates can help." },
-      { t: "Prepare ahead", d: "Your next period may be approaching. Noting pre-menstrual symptoms builds a useful record over time." },
-    ],
-  },
-  unknown: {
-    label: "Unknown",
-    items: [
-      { t: "Start logging", d: "No cycle data logged. Open Calendar to add your first period." },
-      { t: "Consistency matters", d: "A few weeks of data is sufficient to begin identifying personal cycle patterns." },
-      { t: "Log at your pace", d: "Insights improve as more data is recorded." },
-    ],
-    account_extra: [],
-  },
-};
+// Phase insights are now provided by phase-education.js (getTodaysPhaseInsight)
 
 function getGoalTip(goal, phase) {
   const map = {
@@ -126,20 +111,31 @@ function getGoalTip(goal, phase) {
   return g[phase] ?? g.default ?? null;
 }
 
-function setTodayInsights(phaseKey, goal, mode) {
+function setTodayInsights(phaseKey, goal, phaseLabel, loggedSymptoms = []) {
   const box = document.getElementById("insights");
   if (!box) return;
 
-  const phaseData = PHASE_INSIGHTS[phaseKey] || PHASE_INSIGHTS.unknown;
-  const items = [...phaseData.items];
-  if (mode === "account") items.push(...phaseData.account_extra);
+  // Resolve sub-phase: Late Luteal has its own education variants
+  let resolvedKey = phaseKey;
+  if (phaseLabel === "Late Luteal" || phaseKey === "late_luteal") {
+    resolvedKey = "late_luteal";
+  }
 
-  const tip = getGoalTip(goal, phaseKey);
+  // Pick 3 symptom-relevant education variants for today
+  const insights = getTodaysPhaseInsights({ phase: resolvedKey, loggedSymptoms, count: 3 });
+  const items = insights.map(i => ({ t: i.title, d: i.body }));
+
+  // Prepend goal-specific tip when available
+  const tip = getGoalTip(goal, resolvedKey) || getGoalTip(goal, phaseKey);
   if (tip) items.unshift(tip);
 
-  box.innerHTML = items
-    .map((i) => `<div class="insight-item"><strong>${i.t}:</strong> ${i.d}</div>`)
-    .join("");
+  box.innerHTML = items.map((i, idx) => `
+    <div style="display:flex;gap:0.65rem;align-items:flex-start;padding:0.65rem 0;${idx > 0 ? "border-top:1px solid var(--color-border);" : ""}">
+      <div>
+        <strong style="color:var(--color-primary-dark);font-size:0.9rem;display:block;margin-bottom:0.2rem;">${i.t}</strong>
+        <span style="font-size:0.875rem;color:var(--color-text-muted);line-height:1.55;">${i.d}</span>
+      </div>
+    </div>`).join("");
 }
 
 // ─── Phase card with colour badge ────────────────────────────────────────────
@@ -148,21 +144,43 @@ function renderPhaseCard(cycle) {
   const el = document.getElementById("cycle-phase");
   if (!el) return;
 
-  const key = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
-  const label = PHASE_INSIGHTS[key]?.label ?? "Unknown";
+  const rawPhase = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
+  // Resolve late_luteal from phaseLabel if available
+  const isLateLuteal = cycle.phaseLabel === "Late Luteal";
+  const key = isLateLuteal ? "late_luteal" : rawPhase;
+  // Map internal phase keys → CSS class names (both must use the same class names)
+  const CSS_MAP = { menstrual:"menstrual", follicular:"follicular", ovulation:"ovulation",
+    ovulatory:"ovulation", luteal:"luteal", late_luteal:"luteal" };
+  const cssKey = CSS_MAP[key] ?? "unknown";
+  const PHASE_LABELS = { menstrual:"Menstrual", follicular:"Follicular", ovulatory:"Ovulatory",
+    ovulation:"Ovulatory", luteal:"Luteal", late_luteal:"Late Luteal", unknown:"Calculating" };
+  const label = PHASE_LABELS[key] ?? cycle.phaseLabel ?? "Unknown";
 
-  if (key !== "unknown") {
+  el.style.display = "flex";
+  el.style.flexDirection = "column";
+  el.style.justifyContent = "space-between";
+
+  const isLocal = cycle.source === "local";
+  const confNote = isLocal
+    ? `<p class="card-estimate-note" style="text-align:center;margin:0.25rem 0 0;color:var(--color-text-muted);">Low confidence · rule-based estimate · log more cycles for ML accuracy</p>`
+    : "";
+
+  if (rawPhase !== "unknown") {
     el.innerHTML = `
-      <span class="phase-badge phase-${key}">
-        <span class="phase-dot"></span>${label} phase
-      </span>
-      <p class="text-muted" style="margin-top:0.5rem;font-size:0.88rem;">Estimated from logged history</p>
-      <p class="form-hint">Educational estimate. Not medical advice.</p>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:0.75rem 0;gap:0.35rem;">
+        <span class="phase-badge phase-${cssKey}">
+          <span class="phase-dot"></span>${label} Phase
+        </span>
+        <p class="card-estimate-note" style="text-align:center;margin:0;">Estimated from your logged data · not medical advice</p>
+        ${confNote}
+      </div>
     `;
   } else {
     el.innerHTML = `
-      <span class="phase-badge phase-unknown">Not enough data</span>
-      <p class="text-muted" style="margin-top:0.5rem;">${cycle.message || "Log period days to estimate phase."}</p>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:0.75rem 0;gap:0.35rem;">
+        <span class="phase-badge phase-unknown">Calculating Phase</span>
+        <p class="card-estimate-note" style="text-align:center;margin:0;">Log a period day to see your current phase.</p>
+      </div>
     `;
   }
 }
@@ -188,7 +206,6 @@ function renderGoalToolCard(goal, cycle) {
       el.innerHTML = `
         <div class="stat-number" style="font-size:1.15rem;">Conception Window</div>
         <p class="text-muted" style="margin-top:0.25rem;">${formatDate(cycle.fertileStart)} → ${formatDate(cycle.fertileEnd)}</p>
-        <p class="form-hint">Only shown for "Try to conceive" goal.</p>
       `;
     } else {
       el.innerHTML = `
@@ -210,7 +227,6 @@ function renderGoalToolCard(goal, cycle) {
           el.innerHTML = `
             <div class="stat-number" style="font-size:1.3rem;">Week ${r.currentWeek}</div>
             <p class="text-muted" style="margin-top:0.25rem;">${r.trimesterLabel} · EDD ${formatDate(toDateKey(r.eddAdjusted))}</p>
-            <p class="form-hint">Educational estimate.</p>
           `;
           return;
         }
@@ -230,7 +246,6 @@ function renderGoalToolCard(goal, cycle) {
     el.innerHTML = `
       <div class="stat-number">${formatDate(cycle.nextPeriodDate)}</div>
       <p class="text-muted" style="margin-top:0.25rem;">Next expected period${d >= 0 ? ` · in ${d} day${d !== 1 ? "s" : ""}` : " · may have started"}</p>
-      <p class="form-hint">Estimate only. Not medical advice.</p>
     `;
   } else {
     el.innerHTML = `
@@ -530,7 +545,7 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
           <span class="cycle-legend-item"><span class="cycle-dot-item dot-luteal"></span>Luteal</span>
         </div>`;
 
-      const INITIAL_SHOW = 3;
+      const INITIAL_SHOW = 4;
       const cardHTMLs = buildCycleCards(cycleStarts, cycleLengths, logsByDate);
       const visible = cardHTMLs.slice(0, INITIAL_SHOW);
       const extra   = cardHTMLs.slice(INITIAL_SHOW);
@@ -566,8 +581,8 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
 
   const avg = Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length);
   const labels = cycleStarts.slice(0, -1).map((s) => formatDate(s));
-  const yPad = 8;
-  const yMin = Math.max(10, Math.min(...cycleLengths) - yPad);
+  const yPad = 6;
+  const yMin = Math.max(0, Math.min(...cycleLengths) - yPad);
   const yMax = Math.max(...cycleLengths) + yPad;
 
   // Marker colours: red if outside typical 21–35 day range
@@ -616,19 +631,18 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
         size: 10,
         line: { color: "#fff", width: 2.5 },
       },
-      fill: "tozeroy",
-      fillcolor: "rgba(212,116,154,0.07)",
       hovertemplate: "<b>%{x}</b><br><b>%{y} days</b><extra></extra>",
     },
   ], {
     paper_bgcolor: "transparent",
     plot_bgcolor: "transparent",
-    margin: { t: 14, r: 24, b: 80, l: 52 },
+    margin: { t: 14, r: 16, b: 72, l: 48 },
     showlegend: true,
     legend: {
       orientation: "h",
-      y: -0.38,
+      y: -0.28,
       x: 0,
+      xanchor: "left",
       font: { family: "Nunito, sans-serif", size: 11 },
       bgcolor: "transparent",
     },
@@ -639,6 +653,7 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
       tickfont: { family: "Nunito, sans-serif", size: 11 },
       ticksuffix: "d",
       automargin: true,
+      autorange: false,
     },
     xaxis: {
       showgrid: false,
@@ -671,23 +686,38 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
 
 function signalLabel(code) {
   return {
-    EXTENDED_ABSENCE:          "Extended gap since last period",
-    MISSED_PERIOD:             "Period may be late",
-    LATE_PERIOD:               "Period seems late",
-    IRREGULAR_CYCLE:           "Irregular pattern detected",
-    LOW_PREDICTION_CONFIDENCE: "Prediction confidence low",
-    LOGGING_GAP:               "Logging gap",
-    PREDICTION_DRIFT:          "Prediction updated",
-    SHORT_CYCLE:               "Short cycle noted",
-    LONG_CYCLE:                "Long cycle noted",
-    SHORTENING_CYCLE_TREND:    "Shortening cycle trend",
-    LENGTHENING_CYCLE_TREND:   "Lengthening cycle trend",
-    CYCLE_VARIABILITY_HIGH:    "Higher cycle variability",
-    AMENORRHEA_RISK:           "Prolonged absence of period",
+    // Cycle engine
+    EXTENDED_ABSENCE:             "Extended gap since last period",
+    MISSED_PERIOD:                "Period may be late",
+    LATE_PERIOD:                  "Period seems late",
+    IRREGULAR_CYCLE:              "Irregular pattern detected",
+    LOW_PREDICTION_CONFIDENCE:    "Prediction confidence low",
+    LOGGING_GAP:                  "Logging gap",
+    PREDICTION_DRIFT:             "Prediction updated",
+    SHORTENING_CYCLE_TREND:       "Shortening cycle trend",
+    LENGTHENING_CYCLE_TREND:      "Lengthening cycle trend",
+    SUDDEN_CYCLE_SHIFT:           "Sudden cycle shift",
+    SHORT_CYCLE:                  "Short cycle noted",
+    LONG_CYCLE:                   "Long cycle noted",
+    // Anomaly engine
+    CYCLE_LENGTH_ANOMALY:         "Unusual cycle timing",
+    RESIDUAL_DRIFT:               "Cycle pattern shifting",
+    DEVIATION_CLUSTER:            "Repeated off-pattern cycles",
+    HIGH_CYCLE_VARIABILITY:       "High cycle variability",
+    // Symptom engine
+    SEEK_URGENT_CARE:             "Urgent = seek medical care",
+    URGENT_SYMPTOM_COMBINATION:   "Concerning symptom combination",
+    HEAVY_BLEEDING_FLAG:          "Heavy bleeding flagged",
+    SEVERE_PAIN_FLAG:             "Severe pain flagged",
+    PHASE_UNEXPECTED_SYMPTOMS:    "Unusual symptoms for this phase",
+    PMS_CLUSTER_DETECTED:         "PMS pattern detected",
+    PERIMENOPAUSE_PATTERN:        "Perimenopause pattern",
+    PREGNANCY_TEST_TIMING_RELEVANT: "Pregnancy test timing relevant",
+    HORMONAL_PATTERN_POSSIBLE:    "Hormonal pattern possible",
   }[code] || code.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase());
 }
 
-function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodStart, lastLogDate }) {
+function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodStart, lastLogDate, logsByDate, mlPredictedCycleLength }) {
   if (!advancedEl) return;
 
   const today = new Date();
@@ -699,19 +729,72 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
   } : null;
 
   const lastPeriodDate = lastPeriodStart ? new Date(lastPeriodStart + "T00:00:00") : null;
-  const lastLogDateObj = lastLogDate    ? new Date(lastLogDate    + "T00:00:00") : null;
+  const lastLogDateObj = lastLogDate     ? new Date(lastLogDate     + "T00:00:00") : null;
 
-  // ── Cycle Engine (comprehensive signal set) ──
+  // ── 1. Cycle Engine (bloom-cycle-engine.js) ───────────────────────────────
+  // Detects: late period, irregular cycles, logging gaps, cycle trends, etc.
   if (algoCycleEngine) {
     try {
-      const engineSignals = algoCycleEngine.generateCycleSignals({
+      const cycleSignals = algoCycleEngine.generateCycleSignals({
         expectedNextPeriodWindow: nextWindow,
         today,
         lastPeriodStart: lastPeriodDate,
         lastLogDate:     lastLogDateObj,
         cycleLengths,
       });
-      signals.push(...engineSignals);
+      signals.push(...cycleSignals);
+    } catch (_) {}
+  }
+
+  // ── 2. Anomaly Engine (bloom-anomaly-engine.js) ───────────────────────────
+  // Detects: point anomalies, drift, deviation clusters, high variability
+  if (algoAnomalyEngine && cycleLengths.length >= 4) {
+    try {
+      const anomalyResult = algoAnomalyEngine.generateAnomalySignals({
+        actualCycleLengths:   cycleLengths,
+        predictedCycleLength: mlPredictedCycleLength,
+      });
+      signals.push(...(anomalyResult.shownSignals || []));
+    } catch (_) {}
+  }
+
+  // ── 3. Symptom Engine (bloom-symptom-engine.js) ───────────────────────────
+  // Detects: phase mismatches, PMS clusters, perimenopause patterns, urgent symptoms
+  if (algoSymptomEngine && logsByDate) {
+    try {
+      const todayKey = toDateKey(today);
+      const todayLog = logsByDate[todayKey] || {};
+      const rawSymptoms = todayLog.symptoms || [];
+
+      // Build loggedSymptoms in the shape the engine expects: [{code, severity}]
+      const loggedSymptoms = rawSymptoms.map(code => ({
+        code,
+        severity: todayLog.symptomSeverity?.[code] ?? 3,
+      }));
+
+      // Build symptomHistory from the last 90 days of logs
+      const symptomHistory = Object.entries(logsByDate)
+        .filter(([, l]) => l?.symptoms?.length)
+        .map(([dateKey, l]) => ({
+          dateKey,
+          symptoms: (l.symptoms || []).map(code => ({
+            code,
+            severity: l.symptomSeverity?.[code] ?? 3,
+          })),
+        }))
+        .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+
+      const symptomSignals = algoSymptomEngine.generateSymptomSignals({
+        loggedSymptoms,
+        phase:          cycle.phase,
+        dayOfCycle:     cycle.dayInCycle,
+        cycleLengths,
+        cycleCount:     (cycle.cycleStarts || []).length,
+        symptomHistory,
+        lastPeriodStart: lastPeriodDate,
+        today,
+      });
+      signals.push(...symptomSignals);
     } catch (_) {}
   }
 
@@ -728,12 +811,16 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
     return;
   }
 
-  // Sort: high → medium → low
+  // Sort: high → medium → low, deduplicate by code
+  const seen = new Set();
   const pri = { high: 3, medium: 2, low: 1 };
-  signals.sort((a, b) => (pri[b.level] || 0) - (pri[a.level] || 0));
+  const deduped = signals
+    .filter(s => { if (seen.has(s.code)) return false; seen.add(s.code); return true; })
+    .sort((a, b) => (pri[b.level] || 0) - (pri[a.level] || 0));
 
-  advancedEl.innerHTML = signals.map(s => {
+  advancedEl.innerHTML = deduped.map(s => {
     const label = signalLabel(s.code);
+    const guidance = s.guidance ? ` ${s.guidance}` : "";
     if (s.level === "high") {
       return `
         <div style="
@@ -745,30 +832,30 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
           margin-bottom: 0.75rem;
         ">
           <div style="font-weight:800;font-size:0.88rem;color:#92600a;margin-bottom:0.3rem;">⚠️ ${label}</div>
-          <div style="font-size:0.88rem;color:#555;line-height:1.55;">${s.message} Consider speaking to a healthcare provider.</div>
+          <div style="font-size:0.88rem;color:#555;line-height:1.55;">${s.message}${guidance} Consider speaking to a healthcare provider.</div>
         </div>`;
     }
-    return `<div class="insight-item"><strong>${label}:</strong> ${s.message}</div>`;
+    return `<div class="insight-item"><strong>${label}:</strong> ${s.message}${guidance}</div>`;
   }).join("") + `<p class="form-hint" style="margin-top:0.75rem;">Pattern-based signals only. Not medical diagnoses.</p>`;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function loadDashboard() {
-  // Load algorithm modules here so we never hit a top-level await
-  try {
-    algoPregnancy = await import("./algorithms/pregnancyAlgorithm.js");
-  } catch (_) {}
-  try {
-    algoCycleEngine = await import("./algorithms/bloom-cycle-engine.js");
-  } catch (_) {}
+  // Load algorithm modules lazily = all in parallel
+  [algoPregnancy, algoCycleEngine, algoSymptomEngine, algoAnomalyEngine] =
+    await Promise.all([
+      import("./algorithms/pregnancyAlgorithm.js").catch(() => null),
+      import("./algorithms/bloom-cycle-engine.js").catch(() => null),
+      import("./algorithms/bloom-symptom-engine.js").catch(() => null),
+      import("./algorithms/bloom-anomaly-engine.js").catch(() => null),
+    ]);
 
-  const mode = getMode();
   const logsByDate = await getAllLogs();
   const goal = getUserGoal();
-  const cycle = computeCyclePhase(logsByDate);
+  const cycle = buildCycleBase(logsByDate);
 
-  // Derived data used by algorithms and charts
+  // Derived cycle history
   const cycleStarts = cycle.cycleStarts || [];
   const cycleLengths = [];
   for (let i = 1; i < cycleStarts.length; i++) {
@@ -776,40 +863,34 @@ async function loadDashboard() {
   }
   const lastPeriodStart = cycleStarts.length ? cycleStarts[cycleStarts.length - 1] : null;
 
-  // Override cycle.phase with the predictor's getCurrentPhase if we have enough data
+  // ── Cycle state: backend when signed in, local rule-based otherwise ──────────
+  // fetchCycleState always returns at least a local estimate when period data exists,
+  // so the dashboard degrades gracefully to a low-confidence prediction rather than
+  // showing nothing when the backend is unavailable or the user is in anon mode.
+  let predictedCycleLength = null;
   if (lastPeriodStart) {
-    // Find lastPeriodEnd: scan forward from lastPeriodStart for consecutive flow days
-    let lastPeriodEndStr = lastPeriodStart;
-    const d = new Date(lastPeriodStart + "T00:00:00");
-    for (let i = 1; i <= 14; i++) {
-      d.setDate(d.getDate() + 1);
-      const key = toDateKey(d);
-      if (logsByDate[key]?.flow && logsByDate[key].flow !== "none") {
-        lastPeriodEndStr = key;
-      } else {
-        break;
+    _cycleStatePromise = fetchCycleState(logsByDate);
+    const state = await _cycleStatePromise;
+    if (state?.ready) {
+      cycle.phase          = state.phase          ?? cycle.phase;
+      cycle.phaseLabel     = state.phaseLabel      ?? null;
+      cycle.source         = state.source          ?? "backend";
+      // confidence may be an object {level,message} (local) or a string (old path)
+      const confLevel = typeof state.confidence === "object"
+        ? state.confidence?.level?.toLowerCase()
+        : state.confidence;
+      cycle.confidence     = confLevel             ?? cycle.confidence;
+      cycle.dayInCycle     = state.dayInCycle      ?? cycle.dayInCycle;
+      cycle.avgCycleLength = state.avgCycleLength  ?? cycle.avgCycleLength;
+      predictedCycleLength = state.predictedCycleLength ?? null;
+      if (state.nextPeriodDate) cycle.nextPeriodDate = state.nextPeriodDate;
+      if (state.ovulationDate)  cycle.ovulationDate  = state.ovulationDate;
+      if (state.fertileStart)   cycle.fertileStart   = state.fertileStart;
+      if (state.fertileEnd)     cycle.fertileEnd     = state.fertileEnd;
+      if (state.source === "local") {
+        console.log("[dashboard] using local fallback state = backend unavailable or anon mode");
       }
     }
-    const periodStartDates = cycleStarts.map(s => new Date(s + "T00:00:00"));
-    const lpsDate = new Date(lastPeriodStart + "T00:00:00");
-    const lpeDate = new Date(lastPeriodEndStr + "T00:00:00");
-
-    try {
-      const prediction = runFullPrediction(periodStartDates, lpsDate, lpeDate);
-      if (prediction.ready && prediction.currentPhase && prediction.currentPhase !== "unknown") {
-        cycle.phase = prediction.currentPhase;
-      }
-      if (prediction.ready && prediction.nextPeriodStart) {
-        cycle.nextPeriodDate = toDateKey(prediction.nextPeriodStart);
-      }
-      if (prediction.ready && prediction.futureCycles?.[0]?.fertileWindow) {
-        cycle.fertileStart = toDateKey(prediction.futureCycles[0].fertileWindow.start);
-        cycle.fertileEnd   = toDateKey(prediction.futureCycles[0].fertileWindow.end);
-      }
-      if (prediction.ready && prediction.ovulationDay) {
-        cycle.ovulationDate = toDateKey(prediction.ovulationDay);
-      }
-    } catch (_) {}
   }
 
   const allLogDates = Object.keys(logsByDate)
@@ -826,12 +907,14 @@ async function loadDashboard() {
   const snapshotEl = document.getElementById("cycle-snapshot");
   if (snapshotEl) {
     if (cycle.dayInCycle) {
-      const confCls = cycle.confidence === "high" ? "conf-high" : cycle.confidence === "medium" ? "conf-medium" : "conf-low";
+      const confNorm = (cycle.confidence || "low").toLowerCase();
+      const confCls = confNorm === "high" ? "conf-high" : confNorm === "medium" ? "conf-medium" : "conf-low";
+      const confLabel = confNorm.charAt(0).toUpperCase() + confNorm.slice(1);
       snapshotEl.innerHTML = `
         <div class="stat-number">Day ${cycle.dayInCycle}</div>
         <p class="muted-line">
-          ${cycle.avgCycleLength ? `Avg cycle: ${cycle.avgCycleLength} days` : "Log more data to improve predictions"}
-          &nbsp;·&nbsp;<span class="fertility-conf ${confCls}">${cycle.confidence[0].toUpperCase() + cycle.confidence.slice(1)}</span>
+          ${cycle.avgCycleLength ? `Avg cycle: ${cycle.avgCycleLength} days` : "Log more cycles to improve accuracy"}
+          &nbsp;·&nbsp;<span class="fertility-conf ${confCls}">${confLabel} confidence</span>
         </p>
       `;
     } else {
@@ -847,8 +930,19 @@ async function loadDashboard() {
   renderTtcTools(goal, cycle);
   renderPregnancyTools(goal);
   renderSymptomTools(goal, logsByDate);
-  renderMythCard(logsByDate);
   renderCycleHistoryAndChart(cycle, logsByDate);
+
+  // Append unified estimate note to the three top cards (always last)
+  ["cycle-snapshot", "goal-tool"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    // Remove any pre-existing note so it's not duplicated on re-render
+    el.querySelectorAll(".card-estimate-note").forEach(n => n.remove());
+    const note = document.createElement("p");
+    note.className = "card-estimate-note";
+    note.textContent = "Estimated from your logged data · not medical advice";
+    el.appendChild(note);
+  });
 
   // Anon mode: hide advanced features
   if (isAnonMode()) {
@@ -896,595 +990,37 @@ async function loadDashboard() {
   }
 
   const phaseKey = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
-  setTodayInsights(phaseKey, goal, mode);
+  const todaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
+  setTodayInsights(phaseKey, goal, cycle.phaseLabel, todaySymptoms);
 
   // Advanced insights (algorithm-powered)
   renderAdvancedInsights(document.getElementById("advanced-insights"), {
     cycle, cycleLengths, lastPeriodStart, lastLogDate,
+    logsByDate,
+    mlPredictedCycleLength: predictedCycleLength,
   });
 }
 
-// ─── Myth or Fact quiz card ──────────────────────────────────────────────────
 
-const MYTH_BANK = [
-  // ── Cycle & period basics ──────────────────────────────────────────────────
-  {
-    statement: "You cannot get pregnant during your period.",
-    answer: "myth",
-    explanation: "Pregnancy is less likely during menstruation but still possible. Sperm can survive up to 5 days inside the body, and people with shorter cycles may ovulate shortly after bleeding ends.",
-    tags: ["cycle", "fertility"],
-  },
-  {
-    statement: "A healthy menstrual cycle is always 28 days long.",
-    answer: "myth",
-    explanation: "Cycles between 21 and 35 days are all within the healthy range. Only about 10–15% of people have exactly a 28-day cycle. Consistency matters more than hitting a specific number.",
-    tags: ["cycle"],
-  },
-  {
-    statement: "Period blood contains toxins that need to be 'cleansed' from the body.",
-    answer: "myth",
-    explanation: "Period blood is simply the uterine lining shedding — it contains blood, mucus, and tissue. There are no toxins being expelled. The idea of menstrual blood being impure is a myth with no scientific basis.",
-    tags: ["cycle", "period"],
-  },
-  {
-    statement: "Brown period blood can be a normal part of your cycle.",
-    answer: "fact",
-    explanation: "Brown blood is simply older blood that has taken longer to leave the body and oxidised along the way. It commonly appears at the beginning or end of a period and is usually nothing to worry about.",
-    tags: ["period", "blood"],
-  },
-  {
-    statement: "The average person loses over 500 ml of blood during a period.",
-    answer: "myth",
-    explanation: "The typical amount of blood lost per period is 30–80 ml — roughly 2–6 tablespoons. Losing more than 80 ml (soaking a pad or tampon every hour for several hours) is considered heavy bleeding and worth discussing with a doctor.",
-    tags: ["period", "flow"],
-  },
-  {
-    statement: "Periods always last exactly 7 days.",
-    answer: "myth",
-    explanation: "Period length varies from person to person. Anywhere from 2 to 7 days is considered normal. What matters is that your own pattern stays relatively consistent.",
-    tags: ["cycle", "period"],
-  },
-  {
-    statement: "You can have a period without actually ovulating.",
-    answer: "fact",
-    explanation: "This is called an anovulatory cycle — your uterine lining still sheds, so bleeding occurs, but no egg was released. Anovulatory cycles are common during puberty, perimenopause, and times of high stress.",
-    tags: ["cycle", "ovulation"],
-  },
-  {
-    statement: "Period syncing between people who live together is scientifically proven.",
-    answer: "myth",
-    explanation: "Despite being widely believed, studies have not found reliable evidence that menstrual cycles sync up between housemates or friends. Perceived synchrony is more likely coincidence given how much cycle lengths vary.",
-    tags: ["cycle"],
-  },
+// Shared cycle-state promise = set by loadDashboard, consumed by notifications.
+// Avoids a second POST /api/cycles/state call on the same page load.
+let _cycleStatePromise = null;
 
-  // ── Symptoms & PMS ─────────────────────────────────────────────────────────
-  {
-    statement: "PMS is just being emotional — it is not a real medical condition.",
-    answer: "myth",
-    explanation: "Premenstrual syndrome (PMS) is a recognised medical condition driven by hormonal fluctuations. Symptoms can include bloating, fatigue, breast tenderness, cramps, mood changes, and headaches — all with documented physiological causes.",
-    tags: ["pms", "symptoms"],
-  },
-  {
-    statement: "Severe period pain that disrupts daily life is always normal.",
-    answer: "myth",
-    explanation: "Mild cramping is common, but pain severe enough to miss school, work, or daily activities may be a sign of endometriosis, fibroids, or adenomyosis. It is worth speaking to a healthcare provider about pain that significantly impacts your life.",
-    tags: ["pain", "cramps", "endometriosis"],
-  },
-  {
-    statement: "Exercise can help relieve period cramps.",
-    answer: "fact",
-    explanation: "Gentle movement like walking, yoga, or light stretching encourages blood flow and triggers the release of endorphins, which are natural pain relievers. Many people find low-intensity exercise reduces cramping.",
-    tags: ["cramps", "pain", "exercise"],
-  },
-  {
-    statement: "Hormonal shifts before your period can cause real physical headaches.",
-    answer: "fact",
-    explanation: "Oestrogen levels drop in the days before menstruation begins. This drop is a well-documented trigger for migraines and tension headaches in many people, often called menstrual migraines.",
-    tags: ["headache", "pms", "symptoms"],
-  },
-  {
-    statement: "Bloating during your period means you are gaining permanent weight.",
-    answer: "myth",
-    explanation: "Period bloating is caused by hormonal changes that cause the body to retain water temporarily. It typically resolves within a few days of your period starting. It is not fat gain.",
-    tags: ["bloating", "symptoms", "pms"],
-  },
-  {
-    statement: "Cravings for chocolate or carbs before your period can have a physiological basis.",
-    answer: "fact",
-    explanation: "Drops in serotonin and magnesium before menstruation are linked to carbohydrate and chocolate cravings. Dark chocolate is genuinely high in magnesium, which may explain why it is such a common craving.",
-    tags: ["pms", "cravings", "nutrition"],
-  },
-  {
-    statement: "Caffeine makes period cramps worse for many people.",
-    answer: "fact",
-    explanation: "Caffeine can cause blood vessels to constrict and may increase oestrogen levels, which can worsen cramping. Reducing caffeine intake in the days before and during your period may help ease discomfort.",
-    tags: ["cramps", "caffeine", "nutrition"],
-  },
-  {
-    statement: "Having no PMS symptoms means your hormones are unhealthy.",
-    answer: "myth",
-    explanation: "Some people experience little to no PMS and that is completely normal. The absence of symptoms does not indicate a hormonal problem. PMS severity varies widely and is influenced by genetics, lifestyle, and individual hormonal patterns.",
-    tags: ["pms", "symptoms"],
-  },
+onAuthChange(() => { loadDashboard(); });
 
-  // ── Fertility & pregnancy ──────────────────────────────────────────────────
-  {
-    statement: "You can only get pregnant on one single day per cycle.",
-    answer: "myth",
-    explanation: "The fertile window spans approximately 6 days — the 5 days before ovulation and the day of ovulation itself. Sperm can survive inside the reproductive tract for up to 5 days, so timing does not need to be exact.",
-    tags: ["fertility", "ovulation", "ttc"],
-  },
-  {
-    statement: "Stress can delay or prevent ovulation.",
-    answer: "fact",
-    explanation: "High levels of stress trigger cortisol release, which can interfere with the hormonal signals that trigger ovulation. Chronic stress is a known cause of delayed or absent ovulation and irregular cycles.",
-    tags: ["stress", "ovulation", "fertility"],
-  },
-  {
-    statement: "Fertility drops sharply the moment you turn 30.",
-    answer: "myth",
-    explanation: "Fertility does decline with age, but the significant decline typically begins after 35, not 30. Many people conceive without difficulty in their early-to-mid 30s. The rate of decline accelerates after 37–38.",
-    tags: ["fertility", "age"],
-  },
-  {
-    statement: "After stopping hormonal birth control, it can take up to a year for fertility to return.",
-    answer: "myth",
-    explanation: "For most people, fertility returns within one to three months of stopping hormonal contraception. Some people conceive immediately. The exception is the injectable contraceptive (Depo-Provera), which can delay fertility return for up to a year.",
-    tags: ["fertility", "contraception"],
-  },
-  {
-    statement: "Most people can physically feel when they are ovulating.",
-    answer: "myth",
-    explanation: "The majority of people experience no noticeable ovulation symptoms. Some do feel mild pelvic cramping (mittelschmerz) or notice changes in cervical mucus, but ovulation cannot be reliably confirmed without testing tools.",
-    tags: ["ovulation", "fertility"],
-  },
-  {
-    statement: "Pre-ejaculate (pre-cum) can contain sperm and cause pregnancy.",
-    answer: "fact",
-    explanation: "Pre-ejaculate can contain sperm, particularly if a previous ejaculation occurred without urination between the two. This is why the withdrawal method has a higher failure rate than other forms of contraception.",
-    tags: ["fertility", "contraception"],
-  },
-  {
-    statement: "Morning sickness only happens in the morning.",
-    answer: "myth",
-    explanation: "The name 'morning sickness' is misleading — nausea and vomiting during early pregnancy can occur at any time of day or night. Many people experience it most severely in the afternoon or evening.",
-    tags: ["pregnancy", "symptoms"],
-  },
-  {
-    statement: "A pregnancy test taken on the day of a missed period can be accurate.",
-    answer: "fact",
-    explanation: "Most modern pregnancy tests are sensitive enough to detect hCG levels at around the time of a missed period. However, testing a few days after a missed period increases accuracy, as hCG levels rise rapidly in early pregnancy.",
-    tags: ["pregnancy"],
-  },
-
-  // ── Menopause & perimenopause ──────────────────────────────────────────────
-  {
-    statement: "Menopause happens at exactly age 50 for everyone.",
-    answer: "myth",
-    explanation: "The average age of natural menopause is around 51, but the normal range is 45–55. Perimenopause — the transition phase with irregular cycles and symptoms — can begin in the early-to-mid 40s. Premature menopause can occur even earlier.",
-    tags: ["menopause", "perimenopause"],
-  },
-  {
-    statement: "Hot flashes only happen at night during menopause.",
-    answer: "myth",
-    explanation: "Hot flashes can occur at any time of day or night. Night sweats are simply hot flashes that happen during sleep. Both are caused by changes in oestrogen affecting the body's temperature regulation.",
-    tags: ["menopause", "symptoms"],
-  },
-  {
-    statement: "You cannot get pregnant during perimenopause.",
-    answer: "myth",
-    explanation: "Perimenopause does not mean you are infertile. Ovulation can still occur, even irregularly. Pregnancy is possible until you have gone 12 consecutive months without a period, which marks the official start of menopause.",
-    tags: ["menopause", "perimenopause", "fertility"],
-  },
-  {
-    statement: "Menopause is a single event that happens overnight.",
-    answer: "myth",
-    explanation: "Menopause is defined as 12 consecutive months without a period, but the transition — perimenopause — can last anywhere from 2 to 10 years beforehand. During this time, cycles become irregular and symptoms like hot flashes may begin.",
-    tags: ["menopause", "perimenopause"],
-  },
-  {
-    statement: "After menopause, vaginal bleeding should always be investigated.",
-    answer: "fact",
-    explanation: "Any vaginal bleeding that occurs 12 or more months after the last period is classified as postmenopausal bleeding and should be evaluated by a healthcare provider, as it can sometimes indicate uterine or cervical issues.",
-    tags: ["menopause", "bleeding"],
-  },
-
-  // ── Contraception ──────────────────────────────────────────────────────────
-  {
-    statement: "The contraceptive pill protects against sexually transmitted infections.",
-    answer: "myth",
-    explanation: "Hormonal contraceptives prevent pregnancy but provide no protection against STIs. Only barrier methods such as condoms reduce the risk of STI transmission.",
-    tags: ["contraception"],
-  },
-  {
-    statement: "Using tampons can affect your virginity.",
-    answer: "myth",
-    explanation: "Tampons do not change your hymen in a medically significant way, nor do they have anything to do with sexual activity or virginity, which is a social concept not a physical state. They are safe to use for people of any age.",
-    tags: ["period", "tampons"],
-  },
-  {
-    statement: "Emergency contraception (the morning-after pill) is the same as an abortion pill.",
-    answer: "myth",
-    explanation: "Emergency contraception works primarily by delaying or preventing ovulation. It does not end an established pregnancy. The abortion pill (mifepristone/misoprostol) is a different medication that terminates an existing pregnancy.",
-    tags: ["contraception"],
-  },
-  {
-    statement: "Long-term use of the contraceptive pill can permanently reduce your fertility.",
-    answer: "myth",
-    explanation: "There is no evidence that using the pill for years causes lasting fertility issues. After stopping, most people return to their natural cycle and fertility within a few months.",
-    tags: ["contraception", "fertility"],
-  },
-
-  // ── Conditions ─────────────────────────────────────────────────────────────
-  {
-    statement: "Endometriosis only affects older women.",
-    answer: "myth",
-    explanation: "Endometriosis can begin as early as the first menstrual period and commonly goes undiagnosed for years. It affects people of all ages who menstruate, and symptoms often start in adolescence.",
-    tags: ["endometriosis", "pain", "cramps"],
-  },
-  {
-    statement: "PCOS always causes weight gain.",
-    answer: "myth",
-    explanation: "Polycystic ovary syndrome (PCOS) presents very differently from person to person. While some people with PCOS gain weight due to insulin resistance, many are of average or low body weight. PCOS is a hormonal condition, not a weight condition.",
-    tags: ["pcos", "symptoms"],
-  },
-  {
-    statement: "Irregular periods are always a sign of PCOS.",
-    answer: "myth",
-    explanation: "Irregular cycles have many causes including stress, thyroid disorders, significant weight changes, over-exercise, certain medications, and perimenopause. PCOS is one possible cause, but a proper clinical diagnosis is needed — apps cannot diagnose it.",
-    tags: ["cycle", "pcos", "irregular"],
-  },
-  {
-    statement: "All vaginal discharge is a sign of infection.",
-    answer: "myth",
-    explanation: "Vaginal discharge is normal and healthy — it keeps the vagina clean and maintains its pH balance. Discharge naturally changes in colour, texture, and quantity throughout the cycle. Signs that may suggest infection include a strong unusual smell, unusual colour (green/grey), or significant itching.",
-    tags: ["discharge", "vaginal health"],
-  },
-  {
-    statement: "A Pap smear tests for sexually transmitted infections.",
-    answer: "myth",
-    explanation: "A Pap smear (cervical screening) tests for abnormal cells on the cervix caused by HPV, which can lead to cervical cancer. It is not an STI test. Separate swabs or blood tests are needed to screen for STIs.",
-    tags: ["screening", "cervical health"],
-  },
-  {
-    statement: "Ovarian cysts are always cancerous and dangerous.",
-    answer: "myth",
-    explanation: "Most ovarian cysts are benign (non-cancerous) functional cysts that form during ovulation and resolve on their own within a few weeks. Cancerous ovarian cysts are relatively rare. Many cysts are found incidentally and never cause symptoms.",
-    tags: ["ovarian cysts", "symptoms"],
-  },
-  {
-    statement: "Heavy periods are just inconvenient and not a medical concern.",
-    answer: "myth",
-    explanation: "Heavy menstrual bleeding (menorrhagia) can lead to iron-deficiency anaemia and significantly impact quality of life. It can also be caused by fibroids, endometriosis, thyroid disorders, or clotting issues — all of which benefit from medical evaluation.",
-    tags: ["heavy flow", "flow", "symptoms"],
-  },
-  {
-    statement: "Uterine fibroids always cause noticeable symptoms.",
-    answer: "myth",
-    explanation: "Many people have fibroids and never know it. Fibroids are non-cancerous growths in or around the uterus and are very common. When symptoms do occur, they can include heavy periods, pelvic pressure, or frequent urination.",
-    tags: ["fibroids", "symptoms", "heavy flow"],
-  },
-
-  // ── Nutrition & lifestyle ──────────────────────────────────────────────────
-  {
-    statement: "You should avoid all exercise during your period.",
-    answer: "myth",
-    explanation: "There is no medical reason to avoid exercise during your period. Light to moderate activity is safe and can actually help with cramps, mood, and fatigue through endorphin release.",
-    tags: ["exercise", "cramps", "period"],
-  },
-  {
-    statement: "Eating iron-rich foods can help with period-related fatigue.",
-    answer: "fact",
-    explanation: "Menstruation causes iron loss, which can contribute to low energy. Eating iron-rich foods like leafy greens, lentils, red meat, and fortified cereals — especially with vitamin C to boost absorption — can help maintain iron levels.",
-    tags: ["nutrition", "fatigue", "iron"],
-  },
-  {
-    statement: "Swimming during your period is unsafe or unhygienic.",
-    answer: "myth",
-    explanation: "Swimming during your period is completely safe. Water pressure can temporarily reduce flow while you are submerged. Using a tampon, menstrual cup, or disc makes swimming comfortable and hygienic.",
-    tags: ["period", "exercise"],
-  },
-  {
-    statement: "Cold food and drinks cause menstrual cramps.",
-    answer: "myth",
-    explanation: "There is no scientific evidence that cold food or drinks cause or worsen cramps. Menstrual cramps are caused by prostaglandins — hormone-like chemicals that trigger uterine contractions — not by food temperature.",
-    tags: ["cramps", "nutrition"],
-  },
-  {
-    statement: "Your sleep can be disrupted by hormonal changes during your cycle.",
-    answer: "fact",
-    explanation: "Progesterone levels rise after ovulation and fall before menstruation, which can affect sleep quality. Many people report insomnia, vivid dreams, or night sweats in the days before their period due to these hormonal shifts.",
-    tags: ["sleep", "cycle", "pms"],
-  },
-
-  // ── General reproductive health ────────────────────────────────────────────
-  {
-    statement: "Period cramps and labour contractions are caused by the same chemical.",
-    answer: "fact",
-    explanation: "Both are triggered by prostaglandins — compounds that cause smooth muscle to contract. Higher prostaglandin levels are linked to more intense menstrual cramps. Anti-inflammatory medications like ibuprofen work by reducing prostaglandin production.",
-    tags: ["cramps", "pain"],
-  },
-  {
-    statement: "Your menstrual cycle is always the same length every month.",
-    answer: "myth",
-    explanation: "Natural variation of a few days from cycle to cycle is completely normal. Factors like stress, illness, travel, and sleep changes can all shift the timing of ovulation and therefore cycle length.",
-    tags: ["cycle", "irregular"],
-  },
-  {
-    statement: "Skin breakouts before your period are caused by hormonal changes.",
-    answer: "fact",
-    explanation: "In the days before menstruation, a drop in oestrogen and progesterone can increase oil production in the skin. This hormonal shift is a common trigger for premenstrual breakouts, particularly around the chin and jaw.",
-    tags: ["skin", "pms", "symptoms"],
-  },
-  {
-    statement: "Darker colouring of the vulva or labia is abnormal.",
-    answer: "myth",
-    explanation: "The skin of the vulva and labia comes in a wide range of colours and shades, often darker than surrounding skin. This is entirely normal and caused by higher concentrations of melanin. Variation in appearance is natural.",
-    tags: ["vaginal health"],
-  },
-  {
-    statement: "Menstrual cups have a much higher risk of toxic shock syndrome than tampons.",
-    answer: "myth",
-    explanation: "Toxic shock syndrome (TSS) is associated primarily with leaving tampons in for too long, particularly high-absorbency ones. Menstrual cups are made of silicone or rubber and, when used as directed, carry a very low risk of TSS.",
-    tags: ["period", "menstrual cup"],
-  },
-  {
-    statement: "Hormonal birth control can mask the symptoms of underlying conditions like endometriosis.",
-    answer: "fact",
-    explanation: "Hormonal contraceptives can reduce or eliminate period pain and heavy bleeding, which are common symptoms of endometriosis. While this can provide welcome relief, it may also delay diagnosis if symptoms disappear without the underlying condition being addressed.",
-    tags: ["endometriosis", "contraception"],
-  },
-  {
-    statement: "The luteal phase (after ovulation) is the same length for everyone.",
-    answer: "myth",
-    explanation: "While the luteal phase is more consistent than the follicular phase, it typically ranges from 10 to 16 days. A luteal phase shorter than 10 days can sometimes affect the ability to sustain a pregnancy.",
-    tags: ["cycle", "ovulation", "fertility"],
-  },
-  {
-    statement: "Stress can cause your period to be late.",
-    answer: "fact",
-    explanation: "Psychological and physical stress activates the hypothalamic-pituitary-adrenal axis, which can suppress the hormonal signals needed for ovulation. A delayed or skipped ovulation pushes back the expected period date.",
-    tags: ["stress", "cycle", "irregular"],
-  },
-  {
-    statement: "A light or irregular period always means low fertility.",
-    answer: "myth",
-    explanation: "Period flow and regularity are influenced by many factors. A lighter period does not indicate fewer eggs or lower fertility. Ovulation — not period heaviness — determines fertility potential.",
-    tags: ["fertility", "flow", "irregular"],
-  },
-  {
-    statement: "Skipping periods intentionally on continuous birth control is medically harmful.",
-    answer: "myth",
-    explanation: "The monthly bleed on hormonal contraceptives like the pill is a withdrawal bleed, not a true period. There is no medical evidence that skipping it by running pill packs back-to-back is harmful. Many doctors recommend this for various health reasons.",
-    tags: ["contraception", "cycle"],
-  },
-];
-
-// ── Tags that relate to logged symptoms / user context ──────────────────────
-const SYMPTOM_TAG_MAP = {
-  "Cramps":           ["cramps", "pain"],
-  "Back pain":        ["pain"],
-  "Headache":         ["headache"],
-  "Bloating":         ["bloating"],
-  "Mood swings":      ["pms"],
-  "Fatigue":          ["fatigue"],
-  "Nausea":           ["symptoms"],
-  "Acne":             ["skin"],
-  "Breast tenderness":["pms", "symptoms"],
-  "Hot flashes":      ["menopause"],
-  "Night sweats":     ["menopause"],
-  "Discharge":        ["discharge", "vaginal health"],
-  "Spotting":         ["bleeding"],
-  "Heavy flow":       ["heavy flow", "flow"],
-  "Light flow":       ["flow"],
-};
-
-const SESSION_SIZE = 10; // questions per session
-
-function buildQuizSession(logsByDate) {
-  // Derive tags from recent logs (last 14 days)
-  const recentTags = new Set();
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 14);
-
-  Object.entries(logsByDate || {}).forEach(([dateKey, entry]) => {
-    if (new Date(dateKey + "T00:00:00") < cutoff) return;
-    (entry.symptoms || []).forEach(sym => {
-      (SYMPTOM_TAG_MAP[sym] || []).forEach(t => recentTags.add(t));
-    });
-    if (entry.flow && entry.flow !== "none") recentTags.add("period");
-  });
-
-  // Also factor in user goal
-  const goal = localStorage.getItem("bloom_goal") || "period";
-  if (goal === "ttc")           { recentTags.add("fertility"); recentTags.add("ttc"); }
-  if (goal === "pregnancy")     { recentTags.add("pregnancy"); }
-  if (goal === "perimenopause") { recentTags.add("menopause"); recentTags.add("perimenopause"); }
-
-  // Score each item by relevance
-  const scored = MYTH_BANK.map(item => {
-    const overlap = (item.tags || []).filter(t => recentTags.has(t)).length;
-    return { item, score: overlap + Math.random() * 0.5 }; // small random tiebreak
-  });
-  scored.sort((a, b) => b.score - a.score);
-
-  // Take the top SESSION_SIZE
-  return scored.slice(0, SESSION_SIZE).map(x => x.item);
-}
-
-function renderMythCard(logsByDate) {
-  const card       = document.getElementById("myth-card");
-  const metaEl     = document.getElementById("myth-quiz-meta");
-  const statement  = document.getElementById("myth-statement");
-  const answerRow  = document.getElementById("myth-answer-row");
-  const feedbackEl = document.getElementById("myth-feedback");
-  const factBox    = document.getElementById("myth-fact-box");
-  const nextBtn    = document.getElementById("myth-next-btn");
-  const progressBar = document.getElementById("myth-progress-bar");
-
-  if (!card) return;
-
-  let queue   = buildQuizSession(logsByDate);
-  let qIndex  = 0;
-  let score   = 0;
-  let answered = false;
-
-  function updateMeta() {
-    const total = queue.length;
-    metaEl.innerHTML = `
-      <span>${qIndex + 1} of ${total}</span>
-      <span class="myth-score-pill">Score: ${score}</span>
-    `;
-    progressBar.style.width = `${Math.round((qIndex / total) * 100)}%`;
-  }
-
-  function showQuestion() {
-    answered = false;
-    const item = queue[qIndex];
-
-    updateMeta();
-    statement.textContent = item.statement;
-
-    feedbackEl.textContent = "";
-    feedbackEl.className = "myth-feedback";
-    factBox.textContent = "";
-    factBox.classList.remove("visible");
-    nextBtn.classList.remove("visible");
-
-    // Randomise button order so the correct answer isn't always on the same side
-    const buttons = Math.random() < 0.5
-      ? [{ label: "Fact ✨", value: "fact" }, { label: "Myth 🌷", value: "myth" }]
-      : [{ label: "Myth 🌷", value: "myth" }, { label: "Fact ✨", value: "fact" }];
-
-    answerRow.innerHTML = "";
-    buttons.forEach(({ label, value }) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "myth-quiz-btn";
-      btn.textContent = label;
-      btn.addEventListener("click", () => handleAnswer(value));
-      answerRow.appendChild(btn);
-    });
-  }
-
-  function handleAnswer(chosen) {
-    if (answered) return;
-    answered = true;
-
-    const item    = queue[qIndex];
-    const correct = chosen === item.answer;
-    if (correct) score++;
-
-    // Style buttons
-    answerRow.querySelectorAll(".myth-quiz-btn").forEach(btn => {
-      btn.disabled = true;
-      const btnValue = btn.textContent.toLowerCase().includes("fact") ? "fact" : "myth";
-      if (btnValue === chosen) {
-        btn.classList.add(correct ? "selected-correct" : "selected-wrong");
-      } else if (btnValue === item.answer) {
-        btn.classList.add("reveal-correct");
-      }
-    });
-
-    // Feedback
-    feedbackEl.className = "myth-feedback " + (correct ? "correct" : "wrong");
-    feedbackEl.textContent = correct ? "Correct 🌸" : "Not quite 🌷";
-
-    // Explanation
-    factBox.textContent = item.explanation;
-    factBox.classList.add("visible");
-
-    // Next button
-    const isLast = qIndex >= queue.length - 1;
-    nextBtn.textContent = isLast ? "See results →" : "Next →";
-    nextBtn.classList.add("visible");
-
-    updateMeta();
-  }
-
-  function showResults() {
-    const total = queue.length;
-    const pct   = Math.round((score / total) * 100);
-    let message;
-    if (pct === 100) message = "Perfect score! 🌸 You really know your body.";
-    else if (pct >= 70) message = "Great work! 🌷 Keep exploring.";
-    else if (pct >= 40) message = "Nice effort! 💡 Every question teaches something new.";
-    else message = "Good start! 🌱 Learning about your body takes time.";
-
-    card.querySelector(".card-body").innerHTML = `
-      <div class="myth-session-done">
-        <div class="myth-done-score">${score} / ${total}</div>
-        <div class="myth-done-label">${message}</div>
-        <button type="button" class="myth-replay-btn" id="myth-replay">Play again</button>
-      </div>
-      <div class="myth-progress" style="margin-top:1rem;">
-        <div class="myth-progress-bar" style="width:${pct}%; background:#f59e0b;"></div>
-      </div>
-    `;
-    document.getElementById("myth-replay").addEventListener("click", () => {
-      queue  = buildQuizSession(logsByDate);
-      qIndex = 0;
-      score  = 0;
-      // Re-grab elements after innerHTML reset
-      card.querySelector(".card-body").innerHTML = `
-        <div class="myth-quiz-meta" id="myth-quiz-meta"></div>
-        <p class="myth-statement" id="myth-statement"></p>
-        <div class="myth-answer-row" id="myth-answer-row"></div>
-        <div class="myth-feedback" id="myth-feedback"></div>
-        <div class="myth-fact-box" id="myth-fact-box"></div>
-        <button type="button" class="myth-next-btn" id="myth-next-btn">Next →</button>
-        <div class="myth-progress"><div class="myth-progress-bar" id="myth-progress-bar"></div></div>
-      `;
-      renderMythCard(logsByDate);
-    });
-  }
-
-  nextBtn.addEventListener("click", () => {
-    qIndex++;
-    if (qIndex >= queue.length) {
-      showResults();
-    } else {
-      showQuestion();
-    }
-  });
-
-  showQuestion();
-}
-
-loadDashboard();
-
-// Fire notifications after dashboard loads (cycle data computed inside loadDashboard)
+// Fire notifications using the same cycle state already fetched by loadDashboard.
+// getAllLogs() is cached in db.js so no extra network call there either.
 getAllLogs().then(async logs => {
-  const cycle = computeCyclePhase(logs);
+  const cycle = buildCycleBase(logs);
 
-  // Override with predictor values so notifications use the same dates as the dashboard
-  const cycleStarts = cycle.cycleStarts || [];
-  if (cycleStarts.length >= 1) {
-    const lastPeriodStart = cycleStarts[cycleStarts.length - 1];
-    let lastPeriodEndStr = lastPeriodStart;
-    const d = new Date(lastPeriodStart + "T00:00:00");
-    for (let i = 1; i <= 14; i++) {
-      d.setDate(d.getDate() + 1);
-      const key = toDateKey(d);
-      if (logs[key]?.flow && logs[key].flow !== "none") {
-        lastPeriodEndStr = key;
-      } else { break; }
+  if (!isAnonMode() && (cycle.cycleStarts || []).length >= 1) {
+    // Reuse the in-flight or resolved promise from loadDashboard if available
+    const state = await (_cycleStatePromise ?? fetchCycleState(logs)).catch(() => null);
+    if (state) {
+      if (state.nextPeriodDate) cycle.nextPeriodDate = state.nextPeriodDate;
+      if (state.fertileStart)   cycle.fertileStart   = state.fertileStart;
+      if (state.fertileEnd)     cycle.fertileEnd     = state.fertileEnd;
     }
-    try {
-      const periodStartDates = cycleStarts.map(s => new Date(s + "T00:00:00"));
-      const pred = runFullPrediction(
-        periodStartDates,
-        new Date(lastPeriodStart + "T00:00:00"),
-        new Date(lastPeriodEndStr + "T00:00:00"),
-      );
-      if (pred.ready) {
-        if (pred.nextPeriodStart) cycle.nextPeriodDate = toDateKey(pred.nextPeriodStart);
-        if (pred.futureCycles?.[0]?.fertileWindow) {
-          cycle.fertileStart = toDateKey(pred.futureCycles[0].fertileWindow.start);
-          cycle.fertileEnd   = toDateKey(pred.futureCycles[0].fertileWindow.end);
-        }
-      }
-    } catch (_) {}
   }
 
   triggerNotifications(cycle, logs);

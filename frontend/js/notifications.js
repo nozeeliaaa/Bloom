@@ -7,8 +7,8 @@
  *   - Fertile window alert: fires when fertile window starts or starts tomorrow
  *
  * FCM (when app is closed):
- *   - registerFCMToken()   — requests permission, gets FCM token, saves to backend
- *   - unregisterFCMToken() — removes FCM token from backend
+ *   - registerFCMToken()   - requests permission, gets FCM token, saves to backend
+ *   - unregisterFCMToken() - removes FCM token from backend
  *
  * In-app inbox: persistent notification history in localStorage
  */
@@ -147,7 +147,7 @@ export async function registerFCMToken() {
     // Save token to backend
     const idToken = await getIdToken();
     if (idToken) {
-      await fetch(`${API_BASE}/notifications/token`, {
+      await fetch(`${API_BASE}/api/notifications/token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -182,7 +182,7 @@ export async function unregisterFCMToken() {
     const idToken = await getIdToken();
     if (!idToken) return;
  
-    await fetch(`${API_BASE}/notifications/token`, {
+    await fetch(`${API_BASE}/api/notifications/token`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${idToken}` },
     });
@@ -209,40 +209,22 @@ export async function triggerNotifications(cycle, logsByDate) {
   if (!prefs.periodReminder && !prefs.reminders && !prefs.fertileAlert) return;
  
   await requestPermission();
-<<<<<<< HEAD
 
   const notified  = getNotified();
   const today     = todayKey();
-  const discreet  = !!(prefs.discreetNotif || prefs.reminders?.discreetCopy);
+  const discreet  = !!(prefs.reminders?.discreetCopy ?? prefs.discreetNotif);
 
   // ─── Period Reminder ──────────────────────────────────────────────────────
-=======
- 
-  const notified = getNotified();
-  const today    = todayKey();
- 
-  // ─── Period Reminder ────────────────────────────────────────────────────────
->>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
   if (prefs.periodReminder && cycle.nextPeriodDate) {
     const daysUntil = diffDays(today, cycle.nextPeriodDate);
     const id        = `period-${cycle.nextPeriodDate}`;
  
     if (daysUntil >= 0 && daysUntil <= 3 && !hasNotifiedToday(notified, id)) {
-<<<<<<< HEAD
-      const title = discreet ? "Bloom reminder" : "Period coming up";
-      const body  = discreet
-        ? "You have a reminder in Bloom. Open the app to view details."
-        : daysUntil === 0
-          ? `Your period may start today (${friendlyDate(cycle.nextPeriodDate)}). Take care of yourself.`
-          : `Your period is expected in ${daysUntil} day${daysUntil !== 1 ? "s" : ""} on ${friendlyDate(cycle.nextPeriodDate)}.`;
-
-      sendNotification(title, body, id);
-=======
       const body = daysUntil === 0
         ? `Your period may start today (${friendlyDate(cycle.nextPeriodDate)}). Take care of yourself.`
         : `Your period is expected in ${daysUntil} day${daysUntil !== 1 ? "s" : ""} on ${friendlyDate(cycle.nextPeriodDate)}.`;
+
       sendNotification("Period coming up", body, id);
->>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
       markNotified(notified, id);
     }
   }
@@ -251,7 +233,7 @@ export async function triggerNotifications(cycle, logsByDate) {
   if (prefs.reminders) {
     const id             = `log-${today}`;
     const hasLoggedToday = !!(logsByDate[today]?.flow || logsByDate[today]?.symptoms?.length);
- 
+
     if (!hasLoggedToday && !hasNotifiedToday(notified, id)) {
       const title = discreet ? "Bloom reminder" : "Don't forget to log today";
       const body  = discreet
@@ -289,15 +271,11 @@ export async function triggerNotifications(cycle, logsByDate) {
     const id            = `fertile-${cycle.fertileStart}`;
  
     if (daysToFertile >= 0 && daysToFertile <= 1 && !hasNotifiedToday(notified, id)) {
-<<<<<<< HEAD
-      const title = discreet ? "Bloom reminder" : "Fertile window";
-      const body  = discreet
-        ? "You have a reminder in Bloom. Open the app to view details."
-        : daysToFertile === 0
-          ? `Your fertile window starts today! It runs until ${friendlyDate(cycle.fertileEnd)}.`
-          : `Your fertile window begins tomorrow (${friendlyDate(cycle.fertileStart)}).`;
+      const body = daysToFertile === 0
+        ? `Your fertile window starts today! It runs until ${friendlyDate(cycle.fertileEnd)}.`
+        : `Your fertile window begins tomorrow (${friendlyDate(cycle.fertileStart)}).`;
 
-      sendNotification(title, body, id);
+      sendNotification("Fertile window", body, id);
       markNotified(notified, id);
     }
   }
@@ -335,13 +313,3 @@ export async function triggerNotifications(cycle, logsByDate) {
     }
   }
 }
-=======
-      const body = daysToFertile === 0
-        ? `Your fertile window starts today! It runs until ${friendlyDate(cycle.fertileEnd)}.`
-        : `Your fertile window begins tomorrow (${friendlyDate(cycle.fertileStart)}).`;
-      sendNotification("Fertile window", body, id);
-      markNotified(notified, id);
-    }
-  }
-}
->>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df

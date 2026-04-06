@@ -7,7 +7,7 @@ export function createOOS(env) {
 
   const OOS_DEFAULT = [
     () => pick([
-      "I'm not sure I caught that 🩷 I focus on period and cycle concerns — tap a button below or tell me what's going on.",
+      "I'm not sure I caught that 🩷 I focus on period and cycle concerns - tap a button below or tell me what's going on.",
       "Hmm, I'm not sure how to help with that one 🩷 I'm best with period, cycle, spotting, cramps, or mood changes.",
       "That one's a bit outside my lane 🩷 What's going on with your cycle?",
     ]),
@@ -53,7 +53,7 @@ export function createOOS(env) {
     },
 
     // ── Mode confirmation phrases ─────────────────────────────────────────
-    // User explicitly tells Bloomie their context — highest priority
+    // User explicitly tells Bloomie their context - highest priority
     {
       name: "mode_confirmation_pregnant",
       patterns: [
@@ -67,7 +67,7 @@ export function createOOS(env) {
       patterns: [
         /(trying to conceive|trying to get pregnant|ttc|trying for a baby|trying for baby|want to get pregnant|want to be pregnant|we're trying)/,
       ],
-      replies: ["Got it — TTC mode 🩷 Let me pull up your ovulation info."],
+      replies: ["Got it - TTC mode 🩷 Let me pull up your ovulation info."],
       forceNext: "TTC_INTRO",
     },
     {
@@ -75,7 +75,7 @@ export function createOOS(env) {
       patterns: [
         /(just had a baby|i had a baby|postpartum|after (?:giving )?birth|gave birth|just gave birth|recently had a baby|recovering from (?:giving )?birth|after delivery)/,
       ],
-      replies: ["Thanks for sharing that 🩷 Postpartum bodies are on their own timeline — let me help."],
+      replies: ["Thanks for sharing that 🩷 Postpartum bodies are on their own timeline - let me help."],
       forceNext: "POSTPARTUM_INTRO",
     },
     // ── Cycle prediction questions ────────────────────────────────────────
@@ -137,7 +137,7 @@ export function createOOS(env) {
         () => ctx.greeted
           ? pick([
               "Still here 🩷 What's going on?",
-              "I'm here — what would you like help with?",
+              "I'm here - what would you like help with?",
               "Hey again 🩷 Pick something below or just tell me what's up.",
               "Still with you 🩷 What can I do for you?",
               "I didn't go anywhere 😄 What's on your mind?",
@@ -145,18 +145,18 @@ export function createOOS(env) {
             ])
           : pick([
               "Heyy 🩷 What can I help with today? You can tap a button below or just type what's going on.",
-              "Hi there 🩷 I'm here for period and cycle concerns — tap an option or just tell me what's up.",
+              "Hi there 🩷 I'm here for period and cycle concerns - tap an option or just tell me what's up.",
               "Hey! 🩷 What's going on? You can type it out or pick from the options below.",
-              "Welcome 🩷 I'm Bloomie — here to help with anything cycle or reproductive health. What's on your mind?",
+              "Welcome 🩷 I'm Bloomie - here to help with anything cycle or reproductive health. What's on your mind?",
               "Hey, glad you're here 🩷 Tell me what's going on or pick a topic below and we'll sort it out together.",
-              "Wah gwaan 🩷 I'm here for cycle, period, and reproductive health questions — what can I help you with today?",
+              "Wah gwaan 🩷 I'm here for cycle, period, and reproductive health questions - what can I help you with today?",
             ]),
       ],
     },
 
     // ── Self-harm (always first in priority) ───────────────────────────────
     // ── Emergency / urgent symptoms ───────────────────────────────────────
-    // High priority — must catch before other health buckets
+    // High priority - must catch before other health buckets
     {
       name: "emergency_symptoms",
       patterns: [
@@ -168,7 +168,7 @@ export function createOOS(env) {
         /\b(call.*ambulance|need.*emergency|going to (hospital|er|emergency)|send.*help)\b/,
       ],
       replies: [
-        () => "What you're describing sounds like it could be urgent 🩷 Please don't wait — go to your nearest emergency room or call emergency services (119 in Jamaica) right now.",
+        () => "What you're describing sounds like it could be urgent 🩷 Please don't wait - go to your nearest emergency room or call emergency services (119 in Jamaica) right now.",
         () => "I'm not able to assess emergencies, and I don't want you to delay getting real care.",
       ],
       forceNext: "EMERGENCY_REDIRECT",
@@ -184,7 +184,7 @@ export function createOOS(env) {
       ],
       replies: [
         () => "I completely understand wanting clarity about what's happening in your body 🩷",
-        () => "I'm not able to diagnose conditions — that takes a proper clinical exam and tests. But I can help you understand your symptoms and what questions to bring to a provider.",
+        () => "I'm not able to diagnose conditions - that takes a proper clinical exam and tests. But I can help you understand your symptoms and what questions to bring to a provider.",
       ],
       forceNext: "DIAGNOSIS_REDIRECT",
     },
@@ -193,7 +193,7 @@ export function createOOS(env) {
     {
       name: "medication_dosage",
       patterns: [
-        // ── Brand names — Jamaican market + common (standalone is enough) ────
+        // ── Brand names - Jamaican market + common (standalone is enough) ────
         /\b(panadol|panadeine|ibuprofen|advil|brufen|nurofen|tylenol|buscopan|ponstan|naproxen|aleve|aspirin|disprin|codeine|co-codamol|diclofenac|voltaren|tramadol|tranexamic|norethisterone|provera|metformin|clomid|clomiphene|primolut|duphaston|mefenamic)\b/i,
         // ── Generic pain relief phrases ──────────────────────────────────────
         /\b(pain relief|painkiller|pain killer|pain medication|pain medicine|pain tablet|pain pill|cramp relief|period pain relief|cramp medicine|menstrual relief)\b/i,
@@ -227,54 +227,54 @@ export function createOOS(env) {
           // ── Medication-specific warm openers ───────────────────────────────
           if (/panadol/i.test(t)) return pick([
             "Panadol is one of the most common things people reach for for period pain 🩷",
-            "A lot of people reach for Panadol when cramps hit — you're not alone in that 🩷",
-            "Panadol fi di pain is real and valid — cramps bad enough to need relief deserve to be taken seriously 🩷",
+            "A lot of people reach for Panadol when cramps hit - you're not alone in that 🩷",
+            "Panadol fi di pain is real and valid - cramps bad enough to need relief deserve to be taken seriously 🩷",
             "Yeah, Panadol is probably the most reached-for thing for period pain in Jamaica 🩷",
           ]);
           if (/ibuprofen/i.test(t)) return pick([
             "Ibuprofen is actually one of the better options for period pain since it targets inflammation too 🩷",
-            "Ibuprofen can really help with cramps — it works differently from Panadol and often more effectively 🩷",
+            "Ibuprofen can really help with cramps - it works differently from Panadol and often more effectively 🩷",
             "Cramps bad enough to want ibuprofen are real and valid 🩷",
-            "Ibuprofen fi period pain — that's a solid instinct 🩷",
+            "Ibuprofen fi period pain - that's a solid instinct 🩷",
           ]);
           if (/buscopan/i.test(t)) return pick([
-            "Buscopan is often used for spasm-type cramps — makes sense that you're asking about it 🩷",
-            "Buscopan fi di cramp pain — that's something a lot of people find helpful 🩷",
+            "Buscopan is often used for spasm-type cramps - makes sense that you're asking about it 🩷",
+            "Buscopan fi di cramp pain - that's something a lot of people find helpful 🩷",
             "Cramps bad enough to want Buscopan are real and deserve proper care 🩷",
           ]);
           if (/ponstan|mefenamic/i.test(t)) return pick([
-            "Ponstan (mefenamic acid) is one of the strongest options for period pain — your instinct is solid 🩷",
+            "Ponstan (mefenamic acid) is one of the strongest options for period pain - your instinct is solid 🩷",
             "Mefenamic acid is specifically designed for period pain, so you're on the right track 🩷",
-            "Ponstan fi period pain — that's actually one of the more targeted options out there 🩷",
+            "Ponstan fi period pain - that's actually one of the more targeted options out there 🩷",
           ]);
           if (/naproxen|aleve/i.test(t)) return pick([
             "Naproxen is one of the options that works well for period pain 🩷",
-            "Naproxen / Aleve is a solid choice for cramps — you're thinking about it right 🩷",
+            "Naproxen / Aleve is a solid choice for cramps - you're thinking about it right 🩷",
           ]);
           if (/aspirin|disprin/i.test(t)) return pick([
-            "Aspirin / Disprin is something a lot of people reach for — good that you're thinking about it carefully 🩷",
+            "Aspirin / Disprin is something a lot of people reach for - good that you're thinking about it carefully 🩷",
           ]);
           if (/tramadol|codeine|co-codamol/i.test(t)) return pick([
             "Tramadol and codeine are stronger pain medications that really do need a provider's involvement 🩷",
           ]);
           // ── Pain-focused openers (no specific brand detected) ──────────────
           if (/killing me|kill mi|murder mi|cannot manage|too bad|bad bad/i.test(t)) return pick([
-            "Cramps bad enough to feel like they're killing you are real and valid — you deserve actual relief 🩷",
+            "Cramps bad enough to feel like they're killing you are real and valid - you deserve actual relief 🩷",
             "Pain that bad shouldn't just be pushed through 🩷",
             "When the pain gets that intense, it absolutely makes sense to want something for it 🩷",
-            "Mi know that feeling — when di cramp a kill you, you need real help, not just toughing it out 🩷",
+            "Mi know that feeling - when di cramp a kill you, you need real help, not just toughing it out 🩷",
           ]);
           // ── Generic openers ───────────────────────────────────────────────
           return pick([
             "That's a really common thing to wonder about 🩷 Pain relief for period cramps is something a lot of people navigate.",
             "Cramps bad enough to need pain relief are real and valid 🩷",
             "Wanting something for the pain is completely understandable 🩷",
-            "Period pain that needs medication is legitimate — you shouldn't have to just push through 🩷",
-            "Mi hear you — when di pain bad, you need something fi help 🩷",
+            "Period pain that needs medication is legitimate - you shouldn't have to just push through 🩷",
+            "Mi hear you - when di pain bad, you need something fi help 🩷",
           ]);
         },
-        () => "I can't tell you how much to take or whether a specific medication is right for your situation — that really needs a pharmacist or provider who knows your full health picture.",
-        () => "A pharmacist is actually the fastest option here — you can walk in, describe your symptoms, and they can advise on the spot. No appointment needed.",
+        () => "I can't tell you how much to take or whether a specific medication is right for your situation - that really needs a pharmacist or provider who knows your full health picture.",
+        () => "A pharmacist is actually the fastest option here - you can walk in, describe your symptoms, and they can advise on the spot. No appointment needed.",
       ],
       forceNext: "MEDICATION_REDIRECT",
     },
@@ -294,7 +294,7 @@ export function createOOS(env) {
     },
 
     // ── Mental health crisis ──────────────────────────────────────────────
-    // Upgraded from the original self_harm — broader and more compassionate
+    // Upgraded from the original self_harm - broader and more compassionate
     {
       name: "mental_health_crisis",
       patterns: [
@@ -304,7 +304,7 @@ export function createOOS(env) {
       ],
       replies: [
         () => "I hear you, and what you're feeling right now matters so much 🩷 You deserve real, caring support.",
-        () => "Please reach out — in Jamaica, you can call the Crisis Hotline at 888-NEW-LIFE (888-639-5433) or go to your nearest hospital.",
+        () => "Please reach out - in Jamaica, you can call the Crisis Hotline at 888-NEW-LIFE (888-639-5433) or go to your nearest hospital.",
         () => "You don't have to carry this alone.",
       ],
       forceNext: "CRISIS_SUPPORT",
@@ -320,7 +320,7 @@ export function createOOS(env) {
       ],
       replies: [
         () => "That's a really important question and you deserve a clear answer 🩷",
-        () => "Bloom takes your privacy seriously — your health data is yours.",
+        () => "Bloom takes your privacy seriously - your health data is yours.",
       ],
       forceNext: "PRIVACY_INFO",
     },
@@ -330,7 +330,7 @@ export function createOOS(env) {
       name: "self_harm",
       patterns: [/\b(suicide|kill myself|end my life|self harm|self-harm|cut myself|want to die|don't want to be here)\b/],
       replies: [
-        () => "I hear you 🩷 Please reach out for support — in Jamaica call 888-639-5433 or go to your nearest hospital.",
+        () => "I hear you 🩷 Please reach out for support - in Jamaica call 888-639-5433 or go to your nearest hospital.",
       ],
       forceNext: "CRISIS_SUPPORT",
     },
@@ -340,7 +340,7 @@ export function createOOS(env) {
       name: "sexual_content",
       patterns: [/\b(nudes|send pic|porn|sex video|send me|show me)\b/],
       replies: [
-        () => "That's not something I can help with here. If you have a reproductive health question — periods, cramps, spotting, or cycle concerns — I'm happy to help with those 🩷",
+        () => "That's not something I can help with here. If you have a reproductive health question - periods, cramps, spotting, or cycle concerns - I'm happy to help with those 🩷",
       ],
     },
 
@@ -352,9 +352,9 @@ export function createOOS(env) {
         () => pick([
           "I'm here to help, not argue 🩷 Tell me what's going on with your cycle and I'll do my best.",
           "Still here for you 🩷 If something's bothering you health-wise, let me know.",
-          "I don't take it personally 🩷 If something's stressing you out — especially anything cycle-related — I'm all ears.",
+          "I don't take it personally 🩷 If something's stressing you out - especially anything cycle-related - I'm all ears.",
           "Not gonna argue 😌 but if your body's giving you grief, I can actually help with that.",
-          "It's okay — I know this stuff can be frustrating 🩷 What's actually going on?",
+          "It's okay - I know this stuff can be frustrating 🩷 What's actually going on?",
           "No hard feelings 🩷 If you want to tell me what's really going on with your health, I'm listening.",
         ]),
       ],
@@ -404,11 +404,11 @@ export function createOOS(env) {
       patterns: [/\b(bf|girlfriend|boyfriend|my man|my girl|cheat|cheating|break up|breakup|situationship|talking stage|he left|she left)\b/],
       replies: [
         () => pick([
-          "Relationship stress is real — and honestly it can throw off your whole cycle 🩷 If you've noticed anything shifting (late period, mood changes, spotting), I can help with that.",
+          "Relationship stress is real - and honestly it can throw off your whole cycle 🩷 If you've noticed anything shifting (late period, mood changes, spotting), I can help with that.",
           "I'm a cycle assistant, not a relationship coach 😅 but if the stress is messing with your period, tell me what you've noticed and I'll help.",
           "Sounds like a rough time 🩷 I can't weigh in on the relationship drama, but if the stress has your cycle acting up, that's something I can actually help with.",
-          "Emotional stress — whether it's a breakup, a situationship, or just life — can genuinely delay or shift your period 🩷 Noticed anything different lately?",
-          "Not really a love advice gyal 😄 but cycle disruption from relationship stress is real — if your period's been off, I'm here.",
+          "Emotional stress - whether it's a breakup, a situationship, or just life - can genuinely delay or shift your period 🩷 Noticed anything different lately?",
+          "Not really a love advice gyal 😄 but cycle disruption from relationship stress is real - if your period's been off, I'm here.",
           "That sounds hard 🩷 If anything's shifted with your cycle since things got stressful, tell me what you've noticed.",
         ]),
       ],
@@ -423,11 +423,11 @@ export function createOOS(env) {
       ],
       replies: [
         () => pick([
-          "Financial stress is no joke — and it can genuinely affect your cycle 🩷 If you've noticed changes (late period, mood shifts), I can help with those.",
+          "Financial stress is no joke - and it can genuinely affect your cycle 🩷 If you've noticed changes (late period, mood shifts), I can help with those.",
           "I can't help with finances, but if money stress has your body acting up, tell me what you've been noticing.",
           "Money stress is one of those things the body feels for real 🩷 If your cycle has been off lately, that connection is worth looking at.",
           "Can't sort out the bills unfortunately 😅 but financial stress affecting your period or mood is genuinely something I can help with.",
-          "Broke season hits different 😩 and your hormones feel it too — if your period's been late or your mood has shifted, tell me what's going on.",
+          "Broke season hits different 😩 and your hormones feel it too - if your period's been late or your mood has shifted, tell me what's going on.",
           "I'm no financial advisor 😄 but if stress over money has your cycle acting up, that's exactly what I'm here for.",
         ]),
       ],
@@ -451,38 +451,38 @@ export function createOOS(env) {
 
           if (phase === "luteal") {
             return pick([
-              "Those cravings are so real right now 🩷 In the luteal phase your progesterone is higher and your body is actually burning more calories — sweet and salty cravings are your hormones talking, not weakness. Magnesium-rich foods like dark chocolate, nuts, and leafy greens can genuinely help take the edge off.",
+              "Those cravings are so real right now 🩷 In the luteal phase your progesterone is higher and your body is actually burning more calories - sweet and salty cravings are your hormones talking, not weakness. Magnesium-rich foods like dark chocolate, nuts, and leafy greens can genuinely help take the edge off.",
               "Luteal phase cravings hit different for a reason 🩷 Your body is working harder (burning more calories!) and progesterone has a sedating, hunger-driving effect. Magnesium from dark chocolate, nuts, and leafy greens can actually take the edge off.",
-              "It makes complete sense that you're craving things right now 🩷 In your luteal phase your metabolism is running a little faster and progesterone pushes hunger up — that craving isn't weakness, it's hormones. Reaching for magnesium-rich options like dark chocolate or nuts can genuinely help.",
+              "It makes complete sense that you're craving things right now 🩷 In your luteal phase your metabolism is running a little faster and progesterone pushes hunger up - that craving isn't weakness, it's hormones. Reaching for magnesium-rich options like dark chocolate or nuts can genuinely help.",
             ]);
           }
           if (phase === "menstrual") {
             return pick([
-              "Your body is working hard right now and iron and energy needs go up during your period — cravings for comfort food make complete sense. Try to get some iron-rich foods in alongside the treats 🩷",
-              "During your period your body is losing iron through bleeding and needs more energy to keep going — craving comfort food is your body asking for support. Pair the treats with something iron-rich when you can 🩷",
-              "Comfort food cravings during your period are completely real — your body is physically working hard and iron needs go up during bleeding. Don't guilt-trip yourself; just try to sneak in some iron-rich foods too 🩷",
+              "Your body is working hard right now and iron and energy needs go up during your period - cravings for comfort food make complete sense. Try to get some iron-rich foods in alongside the treats 🩷",
+              "During your period your body is losing iron through bleeding and needs more energy to keep going - craving comfort food is your body asking for support. Pair the treats with something iron-rich when you can 🩷",
+              "Comfort food cravings during your period are completely real - your body is physically working hard and iron needs go up during bleeding. Don't guilt-trip yourself; just try to sneak in some iron-rich foods too 🩷",
             ]);
           }
           if (phase === "follicular") {
             return pick([
-              "Interestingly your appetite is usually lower in the follicular phase — if you're craving more than usual it might be worth noticing whether stress or sleep is playing a role.",
-              "In the follicular phase most people's appetite naturally dips as estrogen rises — if strong cravings are showing up, it's worth checking in on your sleep and stress levels, since both can drive hunger.",
-              "Your appetite is typically lower during the follicular phase, so strong cravings right now are worth paying attention to — stress, poor sleep, or not eating enough earlier in the day can all be behind it.",
+              "Interestingly your appetite is usually lower in the follicular phase - if you're craving more than usual it might be worth noticing whether stress or sleep is playing a role.",
+              "In the follicular phase most people's appetite naturally dips as estrogen rises - if strong cravings are showing up, it's worth checking in on your sleep and stress levels, since both can drive hunger.",
+              "Your appetite is typically lower during the follicular phase, so strong cravings right now are worth paying attention to - stress, poor sleep, or not eating enough earlier in the day can all be behind it.",
             ]);
           }
           if (phase === "ovulation") {
             return pick([
-              "Around ovulation your energy is usually higher and appetite often dips naturally — strong cravings at this point sometimes signal your body needs something specific, like more protein or iron.",
-              "Ovulation tends to bring higher energy and a naturally lower appetite for most people — if you're experiencing strong cravings, it might be your body asking for more protein or iron specifically.",
-              "Your body is at peak energy around ovulation and hunger often drops — intense cravings at this stage can be a sign your body wants something specific like protein, iron, or complex carbs.",
+              "Around ovulation your energy is usually higher and appetite often dips naturally - strong cravings at this point sometimes signal your body needs something specific, like more protein or iron.",
+              "Ovulation tends to bring higher energy and a naturally lower appetite for most people - if you're experiencing strong cravings, it might be your body asking for more protein or iron specifically.",
+              "Your body is at peak energy around ovulation and hunger often drops - intense cravings at this stage can be a sign your body wants something specific like protein, iron, or complex carbs.",
             ]);
           }
 
-          // Phase unknown — warm deflect + one-time nudge to log period date
+          // Phase unknown - warm deflect + one-time nudge to log period date
           const base = pick([
             "I can't help with food orders 😄 but if you're getting strong cravings before your period, that's actually a hormonal thing I can talk through with you 🩷",
-            "Cravings are real — especially the pre-period chocolate ones 🍫 If they're cycle-related, tap **Hormones / mood changes** and let's dig in.",
-            "Not a food delivery service unfortunately 😄 but pre-period cravings? That's fully in my lane — hormones are wild.",
+            "Cravings are real - especially the pre-period chocolate ones 🍫 If they're cycle-related, tap **Hormones / mood changes** and let's dig in.",
+            "Not a food delivery service unfortunately 😄 but pre-period cravings? That's fully in my lane - hormones are wild.",
           ]);
           if (!ctx.adviceGiven.has("phase_nudge")) {
             ctx.adviceGiven.add("phase_nudge");
@@ -502,8 +502,8 @@ export function createOOS(env) {
           "I can't check the forecast, but I can help with cycle and health concerns 🩷 What's going on?",
           "Not a weather app unfortunately 😅 but if something health-related is on your mind, I'm here.",
           "Can't predict the rain, but I can help you understand your cycle patterns 😄 What's up?",
-          "Jamaica sun or Jamaica rain — either way I can't help with the forecast 😄 But if your health is on your mind, I'm here.",
-          "Wish I could tell you, but weather's not my area 🩷 Anything cycle or health related, though — you're in the right place.",
+          "Jamaica sun or Jamaica rain - either way I can't help with the forecast 😄 But if your health is on your mind, I'm here.",
+          "Wish I could tell you, but weather's not my area 🩷 Anything cycle or health related, though - you're in the right place.",
           "Not Accuweather 😄 but cycle and symptom support? That I can do. What's going on?",
         ]),
       ],
@@ -514,7 +514,7 @@ export function createOOS(env) {
       name: "travel",
       patterns: [/\b(travel|flight|airport|hotel|trip|vacation|visa|overseas|abroad)\b/],
       replies: [
-        () => "Travel can actually delay your period — timezone changes and disrupted routines affect hormones more than people realize 🩷",
+        () => "Travel can actually delay your period - timezone changes and disrupted routines affect hormones more than people realize 🩷",
         () => "If your period has been off since a trip or big change in routine, tap **Late or missed period** and let's look at it.",
       ],
     },
@@ -550,11 +550,11 @@ export function createOOS(env) {
       replies: [
         () => pick([
           "I can't help with school or work stuff, but deadline stress is a known cycle disruptor 🩷 If your period's been off lately, let me know.",
-          "Not a study buddy, but stress from school or work can genuinely affect your cycle — if you've noticed changes, I can help.",
+          "Not a study buddy, but stress from school or work can genuinely affect your cycle - if you've noticed changes, I can help.",
           "Exams and assignments aren't quite my area 😄 but study stress affecting your period or mood? That I can talk about.",
           "Can't write the assignment for you 😅 but if the pressure has your cycle going haywire, tell me what you've noticed.",
-          "School stress is no joke — and it's one of the most common reasons periods go late or moods go sideways 🩷 Is anything shifting for you?",
-          "Not a tutor unfortunately 😄 but chronic stress from work or studies can genuinely disrupt your hormones — if that's happening, let's talk.",
+          "School stress is no joke - and it's one of the most common reasons periods go late or moods go sideways 🩷 Is anything shifting for you?",
+          "Not a tutor unfortunately 😄 but chronic stress from work or studies can genuinely disrupt your hormones - if that's happening, let's talk.",
         ]),
       ],
     },
@@ -564,7 +564,7 @@ export function createOOS(env) {
       name: "tech_general",
       patterns: [/\b(error|bug|crash|not working|broken|glitch|loading|frozen)\b/, /\b(app|button|page|screen)\b/],
       replies: [
-        () => "If something in the Bloom app isn't working, that's worth reporting — you can use the feedback option in the menu 🩷",
+        () => "If something in the Bloom app isn't working, that's worth reporting - you can use the feedback option in the menu 🩷",
         () => "If you were actually trying to ask a health question, just type it out and I'll do my best to help.",
       ],
     },
@@ -575,7 +575,7 @@ export function createOOS(env) {
       patterns: [/\b(cough|flu|cold|headache|sore throat|stomach bug|rash|allergy|infection|virus|covid)\b/],
       replies: [
         () => "I focus on reproductive and cycle health, so general illness is a bit outside my lane 🩷",
-        () => "That said — if you've been sick and your period changed, I can help connect those dots. What's been going on with your cycle?",
+        () => "That said - if you've been sick and your period changed, I can help connect those dots. What's been going on with your cycle?",
       ],
     },
 
@@ -584,7 +584,7 @@ export function createOOS(env) {
       name: "sleep",
       patterns: [/\b(can't sleep|cant sleep|insomnia|sleep|tired all day|exhausted all day|awake all night)\b/],
       replies: [
-        () => "Sleep struggles are real — and they can genuinely affect your hormones and cycle 🩷",
+        () => "Sleep struggles are real - and they can genuinely affect your hormones and cycle 🩷",
         (t) => {
           const base = "If poor sleep is showing up alongside mood changes or cycle shifts, tap **Hormones / mood changes** and let's look at the full picture.";
           const phaseInfo = getCurrentPhase();
@@ -606,7 +606,7 @@ export function createOOS(env) {
           const base = "If you've noticed weight shifts, bloating, or body changes around your period, tap **Hormones / mood changes** or **Something else** and I'll help.";
           const phaseInfo = getCurrentPhase();
           const phase = phaseInfo?.phase;
-          // bloating ranks above skin in CONCERN_PRIORITY — use pickPriorityConcern
+          // bloating ranks above skin in CONCERN_PRIORITY - use pickPriorityConcern
           const concern = pickPriorityConcern(phase, ["bloating", "skin"]);
           const insight = concern ? insightFor(phase, concern, t) : null;
           if (insight) return `${base} ${insight}`;
@@ -625,7 +625,7 @@ export function createOOS(env) {
           "That means a lot 🩷 Is there anything else I can help with today?",
           "So glad I could help 🩷 Anything else on your mind?",
           "You're so welcome 🩷 Take care of yourself!",
-          "Aww, that warms my heart 🩷 You deserve good care — anything else I can help with?",
+          "Aww, that warms my heart 🩷 You deserve good care - anything else I can help with?",
           "Glad I could be helpful today 🩷 Don't hesitate to come back if anything comes up.",
           "That genuinely means a lot 🩷 You're doing great just by paying attention to your body.",
           "Big up to you for looking out for your health 🩷 Come back anytime.",
@@ -639,10 +639,10 @@ export function createOOS(env) {
       patterns: [/\b(you don't understand|you're not helping|this isn't working|useless bot|not what i asked|wrong answer|bad answer)\b/],
       replies: [
         () => pick([
-          "I'm sorry I didn't catch that right 🩷 I'm still learning and I know I have limits — try tapping one of the buttons below.",
-          "My bad — I missed what you were getting at 🩷 The buttons below are more reliable than my text understanding right now.",
+          "I'm sorry I didn't catch that right 🩷 I'm still learning and I know I have limits - try tapping one of the buttons below.",
+          "My bad - I missed what you were getting at 🩷 The buttons below are more reliable than my text understanding right now.",
           "I hear your frustration and I'm sorry 🩷 Try rephrasing what's going on with your body and I'll do my best.",
-          "Not always perfect, I know 😕 If you can describe it simply — like 'late period' or 'bad cramps' — I'll follow better.",
+          "Not always perfect, I know 😕 If you can describe it simply - like 'late period' or 'bad cramps' - I'll follow better.",
           "Sorry I didn't get that right 🩷 Sometimes typing something short like 'my period is late' or 'I have cramps' works better than a longer message.",
           "I'm doing my best but I know I don't always get it right 🩷 Try a button below or rephrase and I'll try again.",
         ]),
@@ -655,7 +655,7 @@ export function createOOS(env) {
       patterns: [/\b(std|sti|hiv|herpes|chlamydia|gonorrhea|syphilis|infection down there|burning when i pee|discharge that smells)\b/],
       replies: [
         () => "STI symptoms can sometimes overlap with cycle symptoms, so I want to be careful here 🩷",
-        () => "I'm not equipped to help with STI diagnosis or treatment — but if you're noticing unusual discharge, pain, or changes, a healthcare provider can check properly.",
+        () => "I'm not equipped to help with STI diagnosis or treatment - but if you're noticing unusual discharge, pain, or changes, a healthcare provider can check properly.",
         () => "You can use the care map to find a clinic near you.",
       ],
     },
@@ -665,7 +665,7 @@ export function createOOS(env) {
       name: "contraception",
       patterns: [/\b(birth control|contraception|pill|depo|iud|implant|condom|plan b|morning after|emergency contraception)\b/],
       replies: [
-        () => "Contraception can definitely affect your cycle — especially spotting, period timing, and mood 🩷",
+        () => "Contraception can definitely affect your cycle - especially spotting, period timing, and mood 🩷",
         () => "I can help with the cycle side of things. If your period changed after starting or stopping birth control, tap **Spotting** or **Late or missed period** and let's look at it.",
       ],
     },
@@ -700,7 +700,7 @@ export function createOOS(env) {
         /\b(wifi|internet|signal|network|router|data)\b/,
       ],
       replies: [
-        () => "That sounds like a phone or service question — not quite my area 🩷",
+        () => "That sounds like a phone or service question - not quite my area 🩷",
         () => "If you were trying to ask a health question, just type it and I'll do my best.",
       ],
     },
@@ -715,8 +715,8 @@ export function createOOS(env) {
           "Ha 😄 Okay okay, I'll stay in my lane. What's going on health-wise?",
           "Comedians out here and I'm just a cycle assistant 😄 What's actually on your mind?",
           "I can't compete with the group chat jokes 😂 but if something health-related is going on, I've got you.",
-          "Laughter is good medicine 😄 — but if you've got an actual question about your cycle, I'm here for that too.",
-          "The bored season is real 😄 If you want something to actually think about — how's your cycle been lately?",
+          "Laughter is good medicine 😄 - but if you've got an actual question about your cycle, I'm here for that too.",
+          "The bored season is real 😄 If you want something to actually think about - how's your cycle been lately?",
         ]),
       ],
     },
@@ -728,7 +728,7 @@ export function createOOS(env) {
     /\b(bleed|bleeding|blood|period|cramp|pain|spot|spotting|late|missed|discharge|pregnant|pregnancy|nausea|dizzy|faint|heavy|clot|pelvic|mood|tired|fatigue|cycle|ovulat)\b/,
   ];
 
-  // Cycle question patterns — checked FIRST before health override
+  // Cycle question patterns - checked FIRST before health override
   // because they contain words like "period" that health override would swallow
   const CYCLE_QUESTION_PATTERNS = [
     /\b(what phase|which phase|am i ovulating|where am i in my cycle|what day of my cycle)\b/,
@@ -960,7 +960,7 @@ export function createOOS(env) {
     // Late check with cycle data
     if (has("late_check", 2)) return { next: "LATE_PERIOD_CHECK", payload: { reason: "late_check" } };
 
-    // Red flag / should I see a doctor — needs context from lastIntent
+    // Red flag / should I see a doctor - needs context from lastIntent
     if (has("red_flag", 2)) return { next: "SEE_DOCTOR_GUIDE", payload: { reason: "see_doctor" } };
 
     return { next: "START_MENU" };

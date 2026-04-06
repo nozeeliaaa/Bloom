@@ -20,7 +20,7 @@ const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
 const MEMORY_KEY = "bloom_bloomie_memory";
 
-// Set in firebaseConfig.js: window.BLOOM_API_BASE = "http://localhost:4000";
+// Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → localhost:4000)
 const API_BASE = window.BLOOM_API_BASE || "";
 
 // --------------------
@@ -43,7 +43,7 @@ function setCloudSyncedBanner() {
   localStorage.setItem(MODE_BANNER_ONCE_KEY, "1");
 }
 
-// In-memory cache for getAllLogs — avoids repeated API calls within the same page session
+// In-memory cache for getAllLogs - avoids repeated API calls within the same page session
 let _logsCache = null;
 let _logsCacheMode = null;
 
@@ -52,7 +52,7 @@ export function invalidateLogsCache() {
 }
 
 function showSyncWarning() {
-  // Show a toast warning that cloud save failed — data is local only
+  // Show a toast warning that cloud save failed - data is local only
   if (document.getElementById("db-sync-warn")) return; // already showing
   const el = document.createElement("div");
   el.id = "db-sync-warn";
@@ -62,7 +62,7 @@ function showSyncWarning() {
     padding:0.6rem 1.1rem; border-radius:999px; z-index:9999;
     box-shadow:0 4px 16px rgba(0,0,0,0.18); max-width:90vw; text-align:center;
   `;
-  el.textContent = "⚠️ Could not save to cloud — your data may be lost on logout. Check the backend is running.";
+  el.textContent = "⚠️ Could not save to cloud - your data may be lost on logout. Check the backend is running.";
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 8000);
 }

@@ -169,7 +169,7 @@ export function mountSurvey() {
     btnNext.textContent = stepIndex === total - 1 ? (isAnonMode() ? "Finish" : "Continue") : "Next";
   }
 
-  function finish() {
+  async function finish() {
     // Coerce YOB to number before persisting
     if (answers.yob) answers.yob = Number(answers.yob);
 
@@ -189,13 +189,15 @@ export function mountSurvey() {
 
     if (answers.yob) {
       localStorage.setItem("bloom_yob_locked", "true");
-      if (!isAnonMode()) writeYobToBackend(answers.yob).catch(() => {});
     }
+
+    // Sync all profile data to backend (account mode only) - await so it completes before navigation
+    if (!isAnonMode()) await writeProfileToBackend(answers).catch(() => {});
 
     window.location.href = "/pages/dashboard.html";
   }
 
-  function goNext() {
+  async function goNext() {
     readCurrentStepInputs();
     const current = steps[stepIndex];
     if (typeof current?.onNext === "function") current.onNext();
@@ -210,7 +212,7 @@ export function mountSurvey() {
     }
 
     if (stepIndex >= steps.length - 1) {
-      finish();
+      await finish();
       return;
     }
     stepIndex++;
@@ -275,7 +277,7 @@ function buildSteps(answers) {
       render: () => yobSelectBlock(answers.yob),
     },
     {
-      // Single step — directly picks the dashboard goal
+      // Single step - directly picks the dashboard goal
       key: "focusGoal",
       title: "What would you like Bloom to focus on?",
       note: "This sets up your dashboard. You can change it anytime.",
@@ -360,7 +362,7 @@ function buildSteps(answers) {
     {
       key: "bodyBasics",
       title: "A few optional details",
-      note: "Helps personalise insights. All fields are optional — you can fill these in later from your profile.",
+      note: "Helps personalise insights. All fields are optional - you can fill these in later from your profile.",
       hint: "All optional",
       autoAdvance: false,
       render: () => bodyBasicsBlock(answers),
@@ -407,6 +409,29 @@ function yobSelectBlock(selectedYear) {
       <div class="tiny-note" style="margin-top:8px;opacity:0.8;">Optional - you can skip this. Once set, it can only be changed by contacting support.</div>
     </div>
   `;
+}
+
+async function writeProfileToBackend(answers) {
+  try {
+    const token = await getIdToken();
+    if (!token) return;
+    const apiBase = window.BLOOM_API_BASE || "";
+    const payload = {};
+    if (answers.focusGoal)     payload.goal           = answers.focusGoal;
+    if (answers.yob)           payload.yearOfBirth    = Number(answers.yob);
+    if (answers.nickname)      payload.nickname       = answers.nickname;
+    if (answers.avgCycleLength) payload.avgCycleLength = Number(answers.avgCycleLength);
+    if (answers.periodDuration) payload.periodDuration = Number(answers.periodDuration);
+    if (answers.weightKg)      payload.weightKg       = Number(answers.weightKg);
+    if (answers.heightCm)      payload.heightCm       = Number(answers.heightCm);
+    await fetch(`${apiBase}/api/user/profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // silently fail - localStorage is the source of truth on this device
+  }
 }
 
 async function writeYobToBackend(yearOfBirth) {

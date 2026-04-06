@@ -2,27 +2,27 @@
  * backend/src/routes/bloomieAnalytics.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Bloomie analytics event ingestion endpoint.
- * Modelled on bloomieSafetyLog.js — same structure, auth optional.
+ * Modelled on bloomieSafetyLog.js - same structure, auth optional.
  *
  * POST /api/bloomie/analytics
  *   Writes one event to the bloomie_analytics Firestore collection.
  *   Auth is optional: uid defaults to "anonymous" for unauthenticated users.
- *   Returns 200 even on Firestore failure — logging must never block the chat.
+ *   Returns 200 even on Firestore failure - logging must never block the chat.
  *
  * Rate limit: 60 requests / minute per IP (using express-rate-limit).
  *
  * Collection: bloomie_analytics
  * Valid event types:
- *   route_matched        — HIGH confidence route selected
- *   route_clarification  — MEDIUM confidence soft confirmation shown
- *   route_fallback       — CONFIDENCE_FALLBACK triggered (repeat low-conf)
- *   route_no_match       — LOW confidence, NARROWING shown
- *   urgency_escalation   — any _URGENT node reached
- *   oos_event            — OOS handler fired
- *   oos_repair           — NARROWING triggered by OOS streak repair
- *   emotion_classified   — tone resolved for a message
- *   session_end          — beforeunload fired
- *   memory_recall_used   — backgroundContext or entityHistory seeded
+ *   route_matched        - HIGH confidence route selected
+ *   route_clarification  - MEDIUM confidence soft confirmation shown
+ *   route_fallback       - CONFIDENCE_FALLBACK triggered (repeat low-conf)
+ *   route_no_match       - LOW confidence, NARROWING shown
+ *   urgency_escalation   - any _URGENT node reached
+ *   oos_event            - OOS handler fired
+ *   oos_repair           - NARROWING triggered by OOS streak repair
+ *   emotion_classified   - tone resolved for a message
+ *   session_end          - beforeunload fired
+ *   memory_recall_used   - backgroundContext or entityHistory seeded
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -75,7 +75,7 @@ async function resolveUid(req) {
 
 // POST /api/bloomie/analytics
 router.post("/", analyticsLimiter, async (req, res) => {
-  // Always return 200 — logging must never interrupt the chat
+  // Always return 200 - logging must never interrupt the chat
   try {
     const { eventType, payload = {}, meta = {}, ts } = req.body ?? {};
 
@@ -117,14 +117,14 @@ router.post("/", analyticsLimiter, async (req, res) => {
     try {
       await db.collection("bloomie_analytics").add(doc);
     } catch (firestoreErr) {
-      // Log server-side but never surface to client — return 200 anyway
+      // Log server-side but never surface to client - return 200 anyway
       console.error("bloomieAnalytics: Firestore write failed:", firestoreErr.message);
     }
 
     res.json({ ok: true });
   } catch (e) {
     console.error("bloomieAnalytics POST error:", e);
-    // Never 500 — logging must not interrupt the chat
+    // Never 500 - logging must not interrupt the chat
     res.json({ ok: true });
   }
 });

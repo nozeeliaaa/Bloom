@@ -6,7 +6,7 @@ import { requireConsent } from "../middleware/requireConsent.js";
 
 const router = express.Router();
 
-// All known entity symptom keys — used to whitelist incoming data
+// All known entity symptom keys - used to whitelist incoming data
 const VALID_SYMPTOM_KEYS = new Set([
   "late","heavy","spotting","pelvic","mood","discharge","nausea","dizziness",
   "large_clots","ovulation_pain","headache","joint_pain","breast_tender",
@@ -23,7 +23,7 @@ const VALID_SYMPTOM_KEYS = new Set([
 
 const VALID_SEVERITIES = new Set(["mild", "moderate", "severe"]);
 
-// GET /api/bloomie-memory — load last session snapshot
+// GET /api/bloomie-memory - load last session snapshot
 router.get("/", requireAuth, requireConsent, async (req, res) => {
   try {
     const doc = await db.collection("bloomieMemory").doc(req.user.uid).get();
@@ -35,7 +35,7 @@ router.get("/", requireAuth, requireConsent, async (req, res) => {
   }
 });
 
-// PUT /api/bloomie-memory — save compact session snapshot
+// PUT /api/bloomie-memory - save compact session snapshot
 router.put("/", requireAuth, requireConsent, async (req, res) => {
   try {
     const { lastSymptoms, lastIntent, lastSeverity, lastDuration, lastPregnancyChance, recentTopics } = req.body;

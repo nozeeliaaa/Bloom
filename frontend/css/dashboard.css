@@ -129,11 +129,49 @@
   font-size: 0.95rem;
   margin-bottom: 0.5rem;
 }
-.phase-menstrual { background: #FDEAEA; color: #D94F4F; }
-.phase-follicular { background: #E8F5E9; color: #388E3C; }
-.phase-ovulation { background: #FFF3E0; color: #E8A838; }
-.phase-luteal { background: #F3E5F5; color: #8E24AA; }
-.phase-unknown { background: #F4EEF0; color: var(--color-text-muted); }
+/* Phase badge colours = must match the calendar legend exactly:
+   Period=pink  Follicular=blue  Ovulation=teal  Luteal=amber       */
+.phase-menstrual  { background: #fce7f3; color: #be185d; }   /* pink  */
+.phase-follicular { background: #eff6ff; color: #3b82f6; }   /* blue  */
+.phase-ovulation  { background: #f0fdfa; color: #0d9488; }   /* teal  */
+.phase-luteal     { background: #fffbeb; color: #d97706; }   /* amber */
+.phase-unknown    { background: #F4EEF0; color: var(--color-text-muted); }
+
+/* ── Phase pills (calendar below-grid phase row) ───────────────────────────── */
+/* Same color tokens as .phase-badge so calendar and dashboard match exactly.  */
+.phase-pills-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.phase-pill {
+  display: inline-block;
+  padding: 0.3rem 0.85rem;
+  border-radius: var(--radius-full, 999px);
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--color-bg-soft, #f5f0f3);
+  color: var(--color-text-muted);
+  border: 1.5px solid transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+/* Active pill uses the same tokens as .phase-badge above */
+.phase-pill--active.phase-menstrual  { background: #fce7f3; color: #be185d; border-color: #be185d; }
+.phase-pill--active.phase-follicular { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
+.phase-pill--active.phase-ovulation  { background: #f0fdfa; color: #0d9488; border-color: #0d9488; }
+.phase-pill--active.phase-luteal     { background: #fffbeb; color: #d97706; border-color: #d97706; }
+
+.phase-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
 
 .phase-icon {
   background: var(--color-primary-lightest);

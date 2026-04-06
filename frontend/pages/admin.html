@@ -32,6 +32,7 @@
       <button class="admin-tab" data-tab="users" role="tab" aria-selected="false" type="button">Users</button>
       <button class="admin-tab" data-tab="pamphlets" role="tab" aria-selected="false" type="button">Pamphlets</button>
       <button class="admin-tab" data-tab="clinics" role="tab" aria-selected="false" type="button">Clinics</button>
+      <button class="admin-tab" data-tab="support" role="tab" aria-selected="false" type="button">Support</button>
     </nav>
 
     <!-- Overview tab -->
@@ -191,6 +192,25 @@
         <p class="text-muted">Select the Clinics tab to load.</p>
       </div>
     </div>
+
+    <!-- Support tab -->
+    <div class="admin-tab-panel" id="tab-support" role="tabpanel" hidden>
+      <div class="admin-row admin-tab-header">
+        <h2 class="no-margin">Support Requests</h2>
+        <div class="admin-tab-header-actions">
+          <select id="support-status-filter" class="admin-select">
+            <option value="">All statuses</option>
+            <option value="new">New</option>
+            <option value="open">Open</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <button class="btn btn-outline btn-sm" id="support-refresh-btn" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="admin-list" id="support-list">
+        <p class="text-muted">Select the Support tab to load.</p>
+      </div>
+    </div>
   </main>
 
   <!-- Pamphlet modal -->
@@ -224,6 +244,15 @@
               <input type="checkbox" id="pamphlet-sensitive" />
               Mark as sensitive content
             </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pamphlet-pdf-file">PDF file (optional = upload replaces current)</label>
+            <input class="form-input" id="pamphlet-pdf-file" type="file" accept="application/pdf" />
+            <p class="pamphlet-pdf-status" id="pamphlet-pdf-status"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pamphlet-pdf-url">PDF URL (auto-filled after upload, or paste an external link)</label>
+            <input class="form-input" id="pamphlet-pdf-url" type="url" placeholder="https://…" />
           </div>
           <div class="form-group">
             <label class="form-label" for="pamphlet-content">Content (HTML) <span class="req">*</span></label>

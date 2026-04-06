@@ -278,6 +278,10 @@ function renderFeedbackTable(docs) {
     const flow    = esc(d.flowName || "-");
     const msgText = esc(truncate(d.messageText, 120));
     const comment = esc(d.comment || "-");
+    const isThumbsUp = d.feedbackType === "thumbs_up";
+    const ratingBadge = d.feedbackType
+      ? `<span class="admin-badge ${isThumbsUp ? "admin-badge--primary" : "admin-badge--danger"}">${isThumbsUp ? "👍 Up" : "👎 Down"}</span>`
+      : "-";
 
     // Render conversation slice as compact turn list
     const slice = Array.isArray(d.conversationSlice)
@@ -289,6 +293,7 @@ function renderFeedbackTable(docs) {
     return `
       <tr>
         <td class="col-ts">${esc(ts)}</td>
+        <td>${ratingBadge}</td>
         <td><code>${nodeId}</code></td>
         <td>${flow}</td>
         <td class="col-input" title="${esc(d.messageText || "")}">${msgText}</td>

@@ -116,6 +116,29 @@ export function renderNav(activePage = "") {
     a.addEventListener("click", () => linkContainer.classList.remove("open"));
   });
 
+  // ── Back button (inject for non-primary pages) ───────────────────────────
+  const PRIMARY_PAGES = new Set(["dashboard", "calendar", "assistant", "pamphlets", "clinics", ""]);
+  if (!PRIMARY_PAGES.has(activePage)) {
+    const back = document.createElement("div");
+    back.className = "back-btn-wrap";
+    back.innerHTML = `
+      <button class="back-btn" type="button" aria-label="Go back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>`;
+    back.querySelector(".back-btn").addEventListener("click", () => {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = "/pages/dashboard.html";
+      }
+    });
+    // Insert at top of <main> if present, else after <nav>
+    const main = document.querySelector("main");
+    if (main) main.prepend(back);
+    else nav.insertAdjacentElement("afterend", back);
+  }
+
   // ── Notification bell logic ──────────────────────────────────────────────
   const INBOX_KEY = "bloom_notification_inbox";
 
@@ -223,6 +246,8 @@ export function renderFooter() {
       <a href="/pages/accessibility.html">Accessibility</a>
       <span class="footer-legal-sep" aria-hidden="true">·</span>
       <a href="/pages/cookie-policy.html">Cookie Policy</a>
+      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <a href="/pages/about-us.html">About Us</a>
     </nav>
   `;
   document.body.appendChild(footer);

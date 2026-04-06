@@ -267,11 +267,33 @@
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
     import { getAllLogs } from '/js/db.js';
-    import { computeCyclePhase } from '/js/phase.js';
     import { getUserGoal } from '/js/goals.js';
     import { onAuthChange, getIdToken } from '/js/auth.js';
     import { mountChat } from '/js/assistant.js';
     import { isAnonMode } from '/js/mode.js';
+
+    function computeCycleBase(logs) {
+      const periodDays = Object.keys(logs)
+        .filter(k => logs[k]?.flow && logs[k].flow !== 'none')
+        .sort();
+      const starts = [];
+      let prev = null;
+      for (const d of periodDays) {
+        if (!prev || (new Date(d) - new Date(prev)) / 86400000 > 3) starts.push(d);
+        prev = d;
+      }
+      const lengths = [];
+      for (let i = 1; i < starts.length; i++)
+        lengths.push((new Date(starts[i]) - new Date(starts[i-1])) / 86400000);
+      const avg = lengths.length
+        ? Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length)
+        : 28;
+      const last = starts.length ? starts[starts.length - 1] : null;
+      const next = last
+        ? new Date(new Date(last).getTime() + avg * 86400000).toISOString().slice(0, 10)
+        : null;
+      return { cycleStarts: starts, avgCycleLength: avg, nextPeriodDate: next };
+    }
 
     renderNav('assistant');
     renderFooter();
@@ -292,7 +314,7 @@
 
     async function init(user) {
       const logsByDate = await getAllLogs();
-      const cycle = computeCyclePhase(logsByDate);
+      const cycle = computeCycleBase(logsByDate);
       const goal = getUserGoal();
 
       const lastLmp = cycle.cycleStarts?.length
@@ -326,7 +348,7 @@
       if (user) {
         try {
           const token = await getIdToken();
-          const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+          const apiBase = window.BLOOM_API_BASE ?? '';
           const res = await fetch(`${apiBase}/api/user/profile`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });

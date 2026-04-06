@@ -213,7 +213,7 @@ function buildNarrative(d) {
     }
   }
 
-  if (d.currentPhase && d.currentPhase !== "unknown" && d.confidence !== "low") {
+  if (d.currentPhase && d.currentPhase !== "unknown" && d.confidenceLevel?.toLowerCase() !== "low") {
     const phaseDesc = {
       menstrual:  "You are currently in your menstrual phase.",
       follicular: "You are currently in your follicular phase, when energy often starts to rise.",
@@ -410,24 +410,26 @@ export function formatDateMed(isoDate) {
 // ── Main builder ──────────────────────────────────────────────────────────────
 
 /**
- * buildReportData(logsByDate, cyclePhase, userName?)
+ * buildReportData(logsByDate, cycleState, userName?)
  *
- * Assembles all sections of the report from raw log data and the cycle-phase
- * computation result. Returns a single plain object - the PDF renderer and
- * the HTML preview both read from this same structure.
+ * Assembles all sections of the report from raw log data and the cycle state
+ * returned by fetchCycleState() (cycle-state.js). Returns a single plain
+ * object - the PDF renderer and the HTML preview both read from this.
  *
- * Data model inconsistency fixed here:
- *   The cloud API stores flow as `flowLevel` while localStorage uses `flow`.
- *   db.js normalises both into `flow` before returning from getAllLogs(), so
- *   by the time data reaches this builder everything uses `flow`. No special
- *   casing required here.
+ * cycleState shape (from fetchCycleState):
+ *   ready, phase, phaseLabel, dayInCycle, avgCycleLength, predictedCycleLength,
+ *   confidence {level, windowDays, message}, nextPeriodDate, ovulationDate,
+ *   fertileStart, fertileEnd, cyclesLogged, source ("backend"|"local")
  *
  * @param {Object}  logsByDate  - { "YYYY-MM-DD": { date, flow, notes, symptoms[], symptomSeverity } }
- * @param {Object}  cyclePhase  - result of computeCyclePhase(logs)
+ * @param {Object}  cycleState  - result of fetchCycleState(logs) from cycle-state.js
  * @param {string}  [userName]  - optional display name
  * @returns {Object}
  */
-export function buildReportData(logsByDate, cyclePhase, userName = null) {
+export function buildReportData(logsByDate, cycleState, userName = null) {
+  // Normalise: cycleState.confidence may be an object {level,windowDays,message}
+  // or a legacy string. Always expose a flat confidenceLevel string.
+  const cyclePhase = cycleState; // alias for readability below
   const today        = todayKey();
   const periodStarts = getPeriodStarts(logsByDate);
 
@@ -490,15 +492,23 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
   // ── Symptom frequency: descending by count ────────────────────────────────
   const topSymptoms = sortByFrequencyDesc(buildSymptomFrequency(logsByDate));
 
-  // ── Phase & prediction values from computeCyclePhase ────────────────────
-  const currentPhase   = cyclePhase?.phase       ?? "unknown";
-  const phaseLabel     = cyclePhase?.phaseLabel  ?? null;
-  const confidence     = cyclePhase?.confidence  ?? "low";
-  const dayInCycle     = cyclePhase?.dayInCycle  ?? null;
-  const nextPeriodDate = cyclePhase?.nextPeriodDate ?? null;
-  const ovulationDate  = cyclePhase?.ovulationDate  ?? null;
-  const fertileStart   = cyclePhase?.fertileStart   ?? null;
-  const fertileEnd     = cyclePhase?.fertileEnd     ?? null;
+  // ── Phase & prediction values from cycleState ────────────────────────────
+  const currentPhase        = cyclePhase?.phase              ?? "unknown";
+  const phaseLabel          = cyclePhase?.phaseLabel         ?? null;
+  const dayInCycle          = cyclePhase?.dayInCycle         ?? null;
+  const nextPeriodDate      = cyclePhase?.nextPeriodDate     ?? null;
+  const ovulationDate       = cyclePhase?.ovulationDate      ?? null;
+  const fertileStart        = cyclePhase?.fertileStart       ?? null;
+  const fertileEnd          = cyclePhase?.fertileEnd         ?? null;
+  const predictedCycleLength= cyclePhase?.predictedCycleLength ?? null;
+  const source              = cyclePhase?.source             ?? "local";
+
+  // confidence may be an object {level, windowDays, message} or a legacy string
+  const rawConf        = cyclePhase?.confidence ?? "low";
+  const confidenceLevel   = (typeof rawConf === "object" ? rawConf.level  : rawConf) ?? "Low";
+  const confidenceMessage = (typeof rawConf === "object" ? rawConf.message : null);
+  // Keep the full object for the PDF generator
+  const confidence = rawConf;
 
   const lastPeriodStart = periodStarts.length
     ? periodStarts[periodStarts.length - 1]
@@ -510,7 +520,7 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
   const narrativePayload = {
     cyclesTracked, avgCycleLength, avgPeriodLength, regularity,
     lastPeriodStart, nextPeriodDate, currentPhase, phaseLabel,
-    confidence, dayInCycle,
+    confidence, confidenceLevel, dayInCycle,
   };
 
   const narrativeSummary = buildNarrative(narrativePayload);
@@ -533,6 +543,7 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
     // Summary stats
     avgCycleLength,
     avgPeriodLength,
+    predictedCycleLength,
     cyclesTracked,
     lastPeriodStart,
     nextPeriodDate,
@@ -543,7 +554,10 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
     currentPhase,
     phaseLabel,
     confidence,
+    confidenceLevel,
+    confidenceMessage,
     dayInCycle,
+    source,           // "backend" (ML) or "local" (rule-based)
 
     // Pre-sorted tables (renderer must NOT re-sort these)
     cyclesNewestFirst,   // history table  - most recent first

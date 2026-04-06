@@ -99,7 +99,7 @@ function runDiag(raw) {
 
 const GROUPS = [
   {
-    name: "IMPLICIT SYMPTOMS — should route to a health flow",
+    name: "IMPLICIT SYMPTOMS - should route to a health flow",
     expected: "health route (not null, not OOS)",
     cases: [
       "it still hasnt come",
@@ -121,7 +121,7 @@ const GROUPS = [
     ],
   },
   {
-    name: "PATOIS — should route same as English equivalents",
+    name: "PATOIS - should route same as English equivalents",
     expected: "health route matching English equivalent",
     cases: [
       "mi period nuh come yet",
@@ -132,7 +132,7 @@ const GROUPS = [
     ],
   },
   {
-    name: "FRUSTRATION / DISMISSAL — should NOT loop OOS",
+    name: "FRUSTRATION / DISMISSAL - should NOT loop OOS",
     expected: "dismissal/insults OOS or null route, NOT a health route",
     cases: [
       "you cant help",
@@ -146,7 +146,7 @@ const GROUPS = [
     ],
   },
   {
-    name: "OFF-TOPIC — should NOT produce health guidance",
+    name: "OFF-TOPIC - should NOT produce health guidance",
     expected: "OOS category, null route, no health guidance",
     cases: [
       "i want food",
@@ -165,7 +165,7 @@ const GROUPS = [
   },
   {
     name: "EDGE CASES",
-    expected: "various — see notes",
+    expected: "various - see notes",
     cases: [
       "",
       "a",
@@ -214,13 +214,13 @@ for (const group of GROUPS) {
 
     const r = result;
     const routeStr    = r.route ?? "null";
-    const oosStr      = r.oosCategory ?? "—";
+    const oosStr      = r.oosCategory ?? "-";
     const toneStr     = `${r.tone}(${r.toneConfidence})`;
     const confStr     = `${r.confidence}(${r.confidenceScore})`;
-    const patoisStr   = r.isPatois ? "PATOIS" : "—";
-    const gibStr      = r.gibberish ? "GIBBERISH" : "—";
+    const patoisStr   = r.isPatois ? "PATOIS" : "-";
+    const gibStr      = r.gibberish ? "GIBBERISH" : "-";
     const symStr      = r.activeSymptoms.length ? r.activeSymptoms.join(",") : "none";
-    const previewStr  = r.preview ? `"${String(r.preview).slice(0, 60)}"` : "—";
+    const previewStr  = r.preview ? `"${String(r.preview).slice(0, 60)}"` : "-";
 
     console.log(`   IN:  "${input || "(empty)"}"`);
     console.log(`        route=${routeStr} | oos=${oosStr} | conf=${confStr} | tone=${toneStr}`);
@@ -233,7 +233,7 @@ for (const group of GROUPS) {
     // IMPLICIT SYMPTOMS group: must have a route
     if (group.name.startsWith("IMPLICIT")) {
       if (!r.route) {
-        bugs.oos_false_positive.push({ input, note: "no route — fell through without health route", ...r });
+        bugs.oos_false_positive.push({ input, note: "no route - fell through without health route", ...r });
       }
       // Frustration inputs inside this group that produce a health route are OK
     }
@@ -245,12 +245,12 @@ for (const group of GROUPS) {
       }
     }
 
-    // FRUSTRATION group: route should be null (no health route — just OOS/deflect)
+    // FRUSTRATION group: route should be null (no health route - just OOS/deflect)
     if (group.name.startsWith("FRUSTRATION")) {
       if (r.route && !["CRISIS_SUPPORT","SAFETY_SUPPORT"].includes(r.route)) {
         bugs.wrong_route.push({ input, note: `frustration/dismissal routed to health flow: ${r.route}`, ...r });
       }
-      // Tone should be "frustrated" or "distressed" — if "neutral" on clearly frustrated inputs, flag
+      // Tone should be "frustrated" or "distressed" - if "neutral" on clearly frustrated inputs, flag
       const frustrationInputs = ["you cant help","this is useless","forget it","whatever","you dont understand","you r dumb","this app is trash"];
       if (frustrationInputs.includes(input.toLowerCase()) && r.tone === "neutral") {
         bugs.tone_miss.push({ input, note: `tone=neutral on obvious frustration/dismissal`, tone: r.tone, ...r });

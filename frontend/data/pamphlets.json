@@ -18,7 +18,7 @@
   {
     "id": "pcos-overview",
     "title": "PCOS Overview: What You Should Know",
-    "category": "PCOS overview",
+    "category": "PCOS",
     "summary": "A beginner-friendly overview of Polycystic Ovary Syndrome, common symptoms, and how it may affect your cycle.",
     "content": "<h2>What is PCOS?</h2><p>Polycystic Ovary Syndrome (PCOS) is a common hormonal condition that affects people with ovaries. It occurs in about 1 in 10 women of reproductive age.</p><h2>Common Signs</h2><ul><li>Irregular periods or missed periods</li><li>Excess hair growth on face or body</li><li>Acne or oily skin</li><li>Weight changes</li><li>Thinning hair on the scalp</li><li>Difficulty getting pregnant</li></ul><h2>How It May Affect Your Cycle</h2><p>PCOS can cause irregular ovulation, which means your periods may be unpredictable. Some people with PCOS have very long cycles (over 35 days), while others may skip periods entirely.</p><h2>What You Can Do</h2><ul><li>Track your cycle to identify patterns</li><li>Maintain a balanced diet and regular exercise</li><li>Speak with a healthcare provider for proper evaluation</li><li>Consider seeing a specialist (endocrinologist or gynecologist)</li></ul><p><strong>Important:</strong> PCOS is manageable with proper support. If you suspect you may have PCOS, please consult with a healthcare professional for proper diagnosis and treatment options.</p>",
     "readTime": "4 min"
@@ -26,7 +26,7 @@
   {
     "id": "endometriosis",
     "title": "Endometriosis: Understanding the Basics",
-    "category": "Endometriosis overview",
+    "category": "Endometriosis",
     "summary": "Learn about endometriosis, its common symptoms, and why early awareness matters.",
     "content": "<h2>What is Endometriosis?</h2><p>Endometriosis is a condition where tissue similar to the lining of the uterus grows outside the uterus. It affects roughly 10% of reproductive-age women worldwide.</p><h2>Common Symptoms</h2><ul><li>Painful periods (dysmenorrhea) that may worsen over time</li><li>Pain during or after intercourse</li><li>Pain with bowel movements or urination during periods</li><li>Heavy bleeding or bleeding between periods</li><li>Fatigue, especially during periods</li><li>Digestive issues during menstruation</li></ul><h2>Why Awareness Matters</h2><p>Endometriosis often takes years to diagnose because its symptoms can be mistaken for normal period pain. Being aware of the signs can help you seek care sooner.</p><h2>Seeking Help</h2><p>If you experience severe menstrual pain that limits your activities, consider speaking with a healthcare provider. Keeping a detailed log of your symptoms, their severity, and when they occur can be very helpful for your provider.</p><p><em>This information is educational. Diagnosis requires medical evaluation by a qualified healthcare professional.</em></p>",
     "readTime": "3 min"
@@ -50,7 +50,7 @@
   {
     "id": "sexual-health-basics",
     "title": "Sexual Health & Birth Control Basics",
-    "category": "Sexual health & birth control basics",
+    "category": "Sexual health & birth control",
     "summary": "An overview of sexual health essentials and common birth control methods available in Jamaica.",
     "content": "<h2>Understanding Your Options</h2><p>There are many birth control methods available, each with different effectiveness rates and considerations. Here's a brief overview:</p><h3>Barrier Methods</h3><ul><li><strong>Condoms (external/internal):</strong> Also protect against STIs. 85-98% effective with proper use.</li><li><strong>Diaphragm:</strong> Used with spermicide. Requires fitting by a provider.</li></ul><h3>Hormonal Methods</h3><ul><li><strong>Birth control pills:</strong> Taken daily. 91-99% effective.</li><li><strong>Injectable (Depo-Provera):</strong> Every 3 months. 94-99% effective.</li><li><strong>Implant:</strong> Placed under the skin. Lasts up to 3 years. 99%+ effective.</li><li><strong>Hormonal IUD:</strong> Placed in the uterus. Lasts 3-7 years. 99%+ effective.</li></ul><h3>Non-Hormonal Methods</h3><ul><li><strong>Copper IUD:</strong> Lasts up to 10 years. 99%+ effective.</li><li><strong>Fertility awareness methods:</strong> Tracking your cycle to identify fertile days. Requires careful tracking.</li></ul><h2>STI Prevention</h2><p>Condoms are the only method that protect against both pregnancy and sexually transmitted infections. Regular STI screening is recommended for sexually active individuals.</p><h2>Making a Choice</h2><p>The best method is one that fits your lifestyle and health needs. Discuss options with a healthcare provider to find what works for you.</p><p><em>Note: This content is part of Bloom's sensitive module and can be toggled in Settings.</em></p>",
     "readTime": "5 min",
@@ -79,5 +79,270 @@
     "summary": "Understanding menopause in the Jamaican context, including cultural perspectives, local resources, and practical support.",
     "readTime": "4 min",
     "pdf": "/assets/Menopause In JA.pdf"
+  },
+  {
+    "id": "period-blood-colour",
+    "title": "What Period Blood Colour & Flow Can Tell You",
+    "category": "Period basics",
+    "summary": "What different colours and consistencies of menstrual blood mean for your health.",
+    "readTime": "4 min",
+    "pdf": "/assets/WHAT PERIOD BLOOD COLOUR & FLOW CAN TELL YOU.pdf"
+  },
+  {
+    "id": "cycle-phases-meaning",
+    "title": "What the Phases of Your Cycle Mean",
+    "category": "Period basics",
+    "summary": "A breakdown of each phase of your menstrual cycle and how they affect your body and mood.",
+    "readTime": "5 min",
+    "pdf": "/assets/WHAT THE PHASES OF YOUR CYCLE MEAN.pdf"
+  },
+  {
+    "id": "cycle-length-changes",
+    "title": "Why Your Cycle Length Can Change",
+    "category": "What's normal vs unusual",
+    "summary": "Explore the common reasons your cycle length shifts from month to month.",
+    "readTime": "4 min",
+    "pdf": "/assets/WHY YOUR CYCLE LENGTH CAN CHANGE.pdf"
+  },
+  {
+    "id": "period-insomnia",
+    "title": "Period Insomnia",
+    "category": "Period basics",
+    "summary": "Why your period can disrupt your sleep and what you can do about it.",
+    "readTime": "4 min",
+    "pdf": "/assets/PERIOD INSOMNIA.pdf"
+  },
+  {
+    "id": "menstrual-pads-101",
+    "title": "Menstrual Pads 101",
+    "category": "Period basics",
+    "summary": "Everything you need to know about choosing and using menstrual pads.",
+    "readTime": "3 min",
+    "pdf": "/assets/MENSTRUAL PADS 101.pdf"
+  },
+  {
+    "id": "feminine-hygiene-products",
+    "title": "Choosing the Right Feminine Hygiene Products",
+    "category": "Period basics",
+    "summary": "A guide to the different period products available and how to choose what works best for you.",
+    "readTime": "4 min",
+    "pdf": "/assets/CHOOSING THE RIGHT FEMININE HYGIENE PRODUCTS.pdf"
+  },
+  {
+    "id": "menstrual-hygiene",
+    "title": "Healthy Habits: Menstrual Hygiene",
+    "category": "Period basics",
+    "summary": "Best practices for staying clean, comfortable, and healthy during your period.",
+    "readTime": "4 min",
+    "pdf": "/assets/HEALTHY HABITS MENSTRUAL HYGIENE.pdf"
+  },
+  {
+    "id": "trying-to-get-pregnant",
+    "title": "Trying to Get Pregnant",
+    "category": "Fertility & TTC",
+    "summary": "Key information on timing, fertile windows, and lifestyle factors when trying to conceive.",
+    "readTime": "5 min",
+    "pdf": "/assets/TRYING TO GET PREGNANT.pdf"
+  },
+  {
+    "id": "pregnancy-tests",
+    "title": "Pregnancy Tests",
+    "category": "Fertility & TTC",
+    "summary": "How pregnancy tests work, when to take one, and how to read the results.",
+    "readTime": "3 min",
+    "pdf": "/assets/PREGNANCY TESTS.pdf"
+  },
+  {
+    "id": "pregnant-during-perimenopause",
+    "title": "Can You Get Pregnant During Perimenopause?",
+    "category": "Menopause & perimenopause",
+    "summary": "Understanding fertility during perimenopause and what birth control still means at this stage.",
+    "readTime": "4 min",
+    "pdf": "/assets/Can You Get Pregnant During Perimenopause .pdf"
+  },
+  {
+    "id": "mood-changes-perimenopause",
+    "title": "Mood Changes During Perimenopause",
+    "category": "Menopause & perimenopause",
+    "summary": "Why perimenopause affects your mood and how to manage emotional changes during this transition.",
+    "readTime": "4 min",
+    "pdf": "/assets/MOOD CHANGES DURING PERIMENOPAUSE.pdf"
+  },
+  {
+    "id": "pms-what-it-is",
+    "title": "PMS: What It Is",
+    "category": "PMS & PMDD",
+    "summary": "Understanding premenstrual syndrome = what causes it and which symptoms are common.",
+    "readTime": "3 min",
+    "pdf": "/assets/PMS WHAT IT IS.pdf"
+  },
+  {
+    "id": "understanding-pms",
+    "title": "Understanding Premenstrual Syndrome (PMS)",
+    "category": "PMS & PMDD",
+    "summary": "A deeper look at PMS symptoms, triggers, and how the hormonal cycle drives them.",
+    "readTime": "4 min",
+    "pdf": "/assets/UNDERSTANDING PREMENSTRUAL SYNDROME (PMS).pdf"
+  },
+  {
+    "id": "managing-pms",
+    "title": "Managing Premenstrual Syndrome (PMS)",
+    "category": "PMS & PMDD",
+    "summary": "Practical strategies for reducing PMS symptoms through lifestyle, diet, and self-care.",
+    "readTime": "5 min",
+    "pdf": "/assets/MANAGING PREMENSTRUAL SYNDROME (PMS).pdf"
+  },
+  {
+    "id": "pmdd",
+    "title": "PMDD",
+    "category": "PMS & PMDD",
+    "summary": "What premenstrual dysphoric disorder is, how it differs from PMS, and when to seek support.",
+    "readTime": "4 min",
+    "pdf": "/assets/PMDD.pdf"
+  },
+  {
+    "id": "follicular-phase",
+    "title": "The Follicular Phase",
+    "category": "Period basics",
+    "summary": "What happens during the follicular phase and how it sets the stage for ovulation.",
+    "readTime": "3 min",
+    "pdf": "/assets/THE FOLLICULAR PHASE.pdf"
+  },
+  {
+    "id": "luteal-phase",
+    "title": "The Luteal Phase",
+    "category": "Period basics",
+    "summary": "Understanding the luteal phase = what happens after ovulation and why you may feel different.",
+    "readTime": "3 min",
+    "pdf": "/assets/THE LUTEAL PHASE.pdf"
+  },
+  {
+    "id": "contraceptive-use-ja",
+    "title": "Contraceptive Use in Jamaica",
+    "category": "Sexual health & birth control",
+    "summary": "An overview of contraceptive options available in Jamaica and how to access them.",
+    "readTime": "4 min",
+    "sensitive": true,
+    "pdf": "/assets/CONTRACEPTIVE USE IN JAMAICA.pdf"
+  },
+  {
+    "id": "moon-and-cycle",
+    "title": "What the Moon & Your Cycle May Tell You",
+    "category": "Period basics",
+    "summary": "Exploring the cultural and anecdotal connections between lunar cycles and menstruation.",
+    "readTime": "3 min",
+    "pdf": "/assets/WHAT THE MOON & YOUR CYCLE MAY TELL YOU.pdf"
+  },
+  {
+    "id": "pcos-101",
+    "title": "PCOS 101: What It Is and Why It Matters",
+    "category": "PCOS",
+    "summary": "An introduction to polycystic ovary syndrome = causes, prevalence, and why early awareness matters.",
+    "readTime": "4 min",
+    "pdf": "/assets/PCOS 101 What It Is and Why It Matters.pdf"
+  },
+  {
+    "id": "pcos-signs",
+    "title": "PCOS Signs to Watch For",
+    "category": "PCOS",
+    "summary": "The key warning signs of PCOS and how to recognise them early.",
+    "readTime": "3 min",
+    "pdf": "/assets/PCOS SIGNS TO WATCH FOR.pdf"
+  },
+  {
+    "id": "pcos-diagnosed",
+    "title": "How PCOS Is Diagnosed",
+    "category": "PCOS",
+    "summary": "What to expect from the diagnostic process for PCOS, including tests and criteria used by doctors.",
+    "readTime": "4 min",
+    "pdf": "/assets/HOW PCOS IS DIAGNOSED.pdf"
+  },
+  {
+    "id": "pcos-insulin",
+    "title": "PCOS, Insulin Resistance & Metabolic Health",
+    "category": "PCOS",
+    "summary": "How PCOS is linked to insulin resistance and what this means for your metabolic health.",
+    "readTime": "5 min",
+    "pdf": "/assets/PCOS, INSULIN RESISTANCE & METABOLIC HEALTH.pdf"
+  },
+  {
+    "id": "living-with-pcos",
+    "title": "Living With PCOS",
+    "category": "PCOS",
+    "summary": "Practical advice for managing PCOS day-to-day through diet, exercise, and medical support.",
+    "readTime": "5 min",
+    "pdf": "/assets/LIVING WITH PCOS.pdf"
+  },
+  {
+    "id": "pcos-fertility",
+    "title": "PCOS and Fertility",
+    "category": "PCOS",
+    "summary": "Understanding how PCOS affects fertility and what options exist for those trying to conceive.",
+    "readTime": "5 min",
+    "pdf": "/assets/PCOS AND FERTILITY.pdf"
+  },
+  {
+    "id": "pcos-teens",
+    "title": "PCOS in Teens & Young Adults",
+    "category": "PCOS",
+    "summary": "How PCOS presents in younger people and why early recognition makes a difference.",
+    "readTime": "4 min",
+    "pdf": "/assets/PCOS IN TEENS & YOUNG ADULTS.pdf"
+  },
+  {
+    "id": "pcos-when-to-seek-care",
+    "title": "When to Seek Care for Possible PCOS",
+    "category": "PCOS",
+    "summary": "Signs that it's time to speak with a healthcare provider about a possible PCOS diagnosis.",
+    "readTime": "3 min",
+    "pdf": "/assets/WHEN TO SEEK CARE FOR POSSIBLE PCOS.pdf"
+  },
+  {
+    "id": "painful-periods",
+    "title": "Painful Periods & Cramps",
+    "category": "What's normal vs unusual",
+    "summary": "What causes period pain, what's normal, and when cramps are a sign of something more.",
+    "readTime": "4 min",
+    "pdf": "/assets/PAINFUL PERIODS & CRAMPS.pdf"
+  },
+  {
+    "id": "heavy-periods",
+    "title": "Heavy Periods",
+    "category": "What's normal vs unusual",
+    "summary": "Understanding heavy menstrual bleeding = causes, when it's a concern, and available treatments.",
+    "readTime": "4 min",
+    "pdf": "/assets/HEAVY PERIODS.pdf"
+  },
+  {
+    "id": "irregular-periods",
+    "title": "Irregular Periods",
+    "category": "What's normal vs unusual",
+    "summary": "What makes a period irregular, common causes, and when to seek medical evaluation.",
+    "readTime": "4 min",
+    "pdf": "/assets/IRREGULAR PERIODS.pdf"
+  },
+  {
+    "id": "missed-periods-amenorrhea",
+    "title": "Missed Periods & Amenorrhea",
+    "category": "What's normal vs unusual",
+    "summary": "Why periods go missing, the difference between primary and secondary amenorrhea, and next steps.",
+    "readTime": "4 min",
+    "pdf": "/assets/MISSED PERIODS & AMENORRHEA.pdf"
+  },
+  {
+    "id": "endometriosis-warning-signs",
+    "title": "Endometriosis Warning Signs",
+    "category": "Endometriosis",
+    "summary": "The key warning signs of endometriosis and why recognising them early matters.",
+    "readTime": "3 min",
+    "pdf": "/assets/ENDOMETRIOSIS WARNING SIGNS.pdf"
+  },
+  {
+    "id": "fatigue-nausea-headaches",
+    "title": "Fatigue, Nausea & Headaches",
+    "category": "What's normal vs unusual",
+    "summary": "How your cycle can cause fatigue, nausea, and headaches = and what you can do about it.",
+    "readTime": "4 min",
+    "pdf": "/assets/FATIGUE, NAUSEA & HEADACHES.pdf"
   }
 ]

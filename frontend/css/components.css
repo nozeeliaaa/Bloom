@@ -1181,3 +1181,48 @@
   font-weight: 700;
 }
 .list-link:last-child{ border-bottom:none; }
+
+/* ── Contact form ── */
+.contact-success-body {
+  margin: 0.4rem 0 0;
+}
+.contact-request-id {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-family: monospace;
+}
+.contact-send-another {
+  margin-top: 1rem;
+}
+.contact-error {
+  background: #fff0f0;
+  border: 1px solid #f5a0a0;
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: #c0392b;
+}
+
+/* ── Back button ── */
+.back-btn-wrap {
+  margin-bottom: 0.5rem;
+}
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  padding: 0.3rem 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.back-btn:hover {
+  color: var(--color-primary);
+}

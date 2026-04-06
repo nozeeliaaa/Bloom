@@ -450,11 +450,21 @@
       <div class="help-panel" id="tab-contact" role="tabpanel">
         <p class="section-intro">Have a question, report an issue, or send us feedback. We read every message.</p>
 
-        <div id="contact-success" class="contact-success">
-          Your message has been sent. Thank you for reaching out - we will be in touch if a reply is needed.
+        <div id="contact-success" class="contact-success hidden">
+          <strong>Message sent successfully.</strong>
+          <p class="contact-success-body">We have received your message and will get back to you if a reply is needed.</p>
+          <p id="contact-request-id" class="contact-request-id"></p>
+          <button type="button" id="contact-send-another" class="btn btn-outline btn-sm contact-send-another">Send another message</button>
         </div>
 
+        <div id="contact-error" class="contact-error hidden"></div>
+
         <form class="contact-form" id="contact-form" novalidate>
+          <div>
+            <label for="contact-name">Your name <span class="contact-email-hint">(optional)</span></label>
+            <input type="text" id="contact-name" name="name" placeholder="e.g. Jane" autocomplete="given-name" maxlength="100" />
+          </div>
+
           <div>
             <label for="contact-subject">Subject</label>
             <select id="contact-subject" name="subject" required>
@@ -475,12 +485,12 @@
           </div>
 
           <div>
-            <label for="contact-email">Your email <span class="contact-email-hint">(optional - only if you want a reply)</span></label>
+            <label for="contact-email">Your email <span class="contact-email-hint">(optional = only if you want a reply)</span></label>
             <input type="email" id="contact-email" name="email" placeholder="you@example.com" autocomplete="email" />
           </div>
 
           <div>
-            <button type="submit" class="btn btn-primary">Send message</button>
+            <button type="submit" class="btn btn-primary" id="contact-submit">Send message</button>
           </div>
         </form>
       </div>
@@ -522,42 +532,71 @@
     });
 
     // ── Contact form ─────────────────────────────────────────────────
-    const form    = document.getElementById("contact-form");
-    const success = document.getElementById("contact-success");
+    import { getIdToken, getCurrentUser } from "/js/auth.js";
 
-    form.addEventListener("submit", e => {
+    const form      = document.getElementById("contact-form");
+    const successEl = document.getElementById("contact-success");
+    const errorEl   = document.getElementById("contact-error");
+    const submitBtn = document.getElementById("contact-submit");
+    const requestIdEl = document.getElementById("contact-request-id");
+
+    document.getElementById("contact-send-another").addEventListener("click", () => {
+      successEl.classList.add("hidden");
+      form.classList.remove("hidden");
+      form.reset();
+    });
+
+    form.addEventListener("submit", async e => {
       e.preventDefault();
+      errorEl.classList.add("hidden");
 
       const subject = document.getElementById("contact-subject").value;
       const message = document.getElementById("contact-message").value.trim();
       const email   = document.getElementById("contact-email").value.trim();
+      const name    = document.getElementById("contact-name").value.trim();
 
-      if (!subject) { alert("Please select a subject."); return; }
-      if (!message)  { alert("Please enter a message."); return; }
+      if (!subject) { showError("Please select a subject."); return; }
+      if (!message) { showError("Please enter a message."); return; }
 
-      // Try backend first; fall back to mailto
-      const body = { subject, message, ...(email && { email }) };
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Sending…";
 
-      fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-        .then(res => {
-          if (!res.ok) throw new Error("non-ok");
-          showSuccess();
-        })
-        .catch(() => {
-          // Backend unavailable - open mailto as fallback
-          const mailto = `mailto:bloomhelpdesk@outlook.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-          window.location.href = mailto;
-          showSuccess();
+      try {
+        const token  = await getIdToken().catch(() => null);
+        const userId = getCurrentUser()?.uid ?? null;
+
+        const payload = { subject, message, ...(email && { email }), ...(name && { name }), ...(userId && { userId }) };
+
+        const res  = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
+
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          showError(json.error || "We couldn't send your message right now. Please try again.");
+          return;
+        }
+
+        if (json.requestId) {
+          requestIdEl.textContent = `Reference ID: ${json.requestId}`;
+        }
+        form.classList.add("hidden");
+        successEl.classList.remove("hidden");
+
+      } catch (_) {
+        showError("We couldn't send your message right now. Please try again.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Send message";
+      }
     });
 
-    function showSuccess() {
-      form.style.display = "none";
-      success.style.display = "block";
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove("hidden");
     }
   </script>
 </body>

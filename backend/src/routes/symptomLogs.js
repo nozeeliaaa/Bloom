@@ -20,7 +20,7 @@ function sanitizeText(s, max = 300) {
 }
 
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
-// Each doc holds an items[] array — multiple symptoms per day
+// Each doc holds an items[] array - multiple symptoms per day
 
 // Create/Update symptoms for a day
 router.put("/:dateKey", requireAuth, async (req, res) => {
@@ -166,7 +166,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/symptoms — bulk delete all symptom logs for user
+// DELETE /api/symptoms - bulk delete all symptom logs for user
 router.delete("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;

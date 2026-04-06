@@ -59,7 +59,7 @@
       line-height: 1.45;
     }
 
-    .right-panel section + section { margin-top: 1rem; }
+    .right-panel section + section { margin-top: 2.5rem; }
 
     .section-title-row {
       display: flex;
@@ -70,12 +70,14 @@
       margin-bottom: 0.75rem;
     }
 
+    .cycle-trends-title { margin-bottom: 0.75rem; }
     .chart-frame {
       border: 1px solid var(--color-border);
       border-radius: var(--radius);
-      padding: 1rem 0.75rem 0.5rem;
+      padding: 1.25rem 1rem 0.5rem;
       background: var(--color-bg-card);
     }
+    .cycle-trends-title { margin: 0 0 0.75rem; }
 
     /* Cycle history dot cards */
     .cycle-legend {
@@ -126,7 +128,8 @@
     .dot-follicular { background: #A8C8E8; }
     .dot-luteal     { background: #E8B86D; }
     .dot-other      { background: #DDD4E8; }
-    .cycle-chart-container { width: 100%; height: 360px; }
+    .cycle-chart-container { width: 100%; height: 420px; }
+    .card-estimate-note { font-size: 0.72rem; color: var(--color-text-muted); margin-top: 0.75rem; opacity: 0.75; }
     .goal-change-btn { margin-left: auto; }
 
     .goal-strip{
@@ -155,10 +158,10 @@
     .phase-badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 4px 12px;
+      gap: 0.5rem;
+      padding: 6px 16px;
       border-radius: 999px;
-      font-size: 0.82rem;
+      font-size: 1.05rem;
       font-weight: 800;
     }
     .phase-menstrual  { background: var(--phase-menstrual-bg);  color: var(--phase-menstrual); }
@@ -166,7 +169,7 @@
     .phase-ovulation  { background: var(--phase-ovulation-bg);  color: var(--phase-ovulation); }
     .phase-luteal     { background: var(--phase-luteal-bg);     color: var(--phase-luteal); }
     .phase-unknown    { background: var(--phase-unknown-bg);    color: var(--phase-unknown); }
-    .phase-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; display: inline-block; }
+    .phase-dot { width: 11px; height: 11px; border-radius: 50%; background: currentColor; display: inline-block; }
 
     /* Goal sections - hidden by default, shown by JS */
     .goal-section { margin-top: 1rem; display: none; }
@@ -383,7 +386,7 @@
           </div>
           <div>
             <div class="card-title">Cycle Phase</div>
-            <div class="card-subtitle">Estimated from logged data</div>
+            <div class="card-subtitle">Based on your cycle logs</div>
           </div>
         </div>
         <div class="card-body" id="cycle-phase">
@@ -500,25 +503,6 @@
           </div>
         </div>
 
-        <!-- Myth or Fact quiz card -->
-        <div class="card myth-card" id="myth-card">
-          <div class="card-header">
-            <div class="card-icon">💡</div>
-            <div>
-              <div class="card-title">Myth or Fact?</div>
-            </div>
-            <div class="myth-header-nav" id="myth-header-meta"></div>
-          </div>
-          <div class="card-body">
-            <div class="myth-quiz-meta" id="myth-quiz-meta"></div>
-            <p class="myth-statement" id="myth-statement"></p>
-            <div class="myth-answer-row" id="myth-answer-row"></div>
-            <div class="myth-feedback" id="myth-feedback"></div>
-            <div class="myth-fact-box" id="myth-fact-box"></div>
-            <button type="button" class="myth-next-btn" id="myth-next-btn">Next →</button>
-            <div class="myth-progress"><div class="myth-progress-bar" id="myth-progress-bar"></div></div>
-          </div>
-        </div>
       </div>
 
       <div class="card right-panel">
@@ -531,8 +515,8 @@
         </section>
 
         <section>
-          <h2 class="cycle-trends-title">Cycle Trends</h2>
           <div class="chart-frame">
+            <h2 class="cycle-trends-title">Cycle Trends</h2>
             <div id="cycleChart" class="cycle-chart-container"></div>
           </div>
         </section>
@@ -542,5 +526,9 @@
 
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script type="module" src="/js/dashboard.js"></script>
+  <script type="module">
+    import { renderMythFab } from "/js/mythFab.js";
+    renderMythFab();
+  </script>
 </body>
 </html>

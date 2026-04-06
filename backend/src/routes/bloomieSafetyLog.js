@@ -10,17 +10,17 @@
  * Collection: bloomieSafetyLogs
  * Document ID: auto-generated
  * Fields:
- *   type        — "urgent_trigger" | "oos_fallback" | "escalation"
- *   uid         — Firebase UID of the user (from auth token)
- *   ts          — server timestamp
- *   input       — truncated normalised user text (max 300 chars)
- *   route       — the resolved route node (urgent_trigger / escalation)
- *   reason      — inferred reason string from inferRoute() payload
- *   category    — OOS category name (oos_fallback only)
- *   fromNode    — dialogue node active before escalation (escalation only)
- *   urgencyFlag — extractEntities().urgent was true (urgent_trigger)
- *   symptoms    — array of detected symptom keys
- *   reviewed    — false (admin sets to true after manual review)
+ *   type        - "urgent_trigger" | "oos_fallback" | "escalation"
+ *   uid         - Firebase UID of the user (from auth token)
+ *   ts          - server timestamp
+ *   input       - truncated normalised user text (max 300 chars)
+ *   route       - the resolved route node (urgent_trigger / escalation)
+ *   reason      - inferred reason string from inferRoute() payload
+ *   category    - OOS category name (oos_fallback only)
+ *   fromNode    - dialogue node active before escalation (escalation only)
+ *   urgencyFlag - extractEntities().urgent was true (urgent_trigger)
+ *   symptoms    - array of detected symptom keys
+ *   reviewed    - false (admin sets to true after manual review)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -62,7 +62,7 @@ router.post("/", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid event type" });
     }
 
-    // Build the log document — whitelist every field
+    // Build the log document - whitelist every field
     const doc = {
       type,
       uid:         req.user.uid,

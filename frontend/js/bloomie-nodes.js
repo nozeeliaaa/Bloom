@@ -72,7 +72,7 @@ export function createNodes(env) {
       const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
       return r([
         base,
-        `I can see you're in pregnancy tracking mode${weeksAlong > 0 ? ` — you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along` : ""} 🩷`,
+        `I can see you're in pregnancy tracking mode${weeksAlong > 0 ? ` - you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along` : ""} 🩷`,
         "I can help with symptoms, test timing, due dates, or anything else on your mind. What's going on?",
       ]);
     }
@@ -88,7 +88,7 @@ export function createNodes(env) {
     if (userMode.isPostpartum) {
       return r([
         base,
-        "I can see you're in postpartum mode 🩷 Your cycle may behave differently for a while — that's completely normal.",
+        "I can see you're in postpartum mode 🩷 Your cycle may behave differently for a while - that's completely normal.",
         "What's on your mind today?",
       ]);
     }
@@ -147,11 +147,11 @@ export function createNodes(env) {
       ],
     },
 
-    // Silent menu — no intro replay, just shows the choices again
+    // Silent menu - no intro replay, just shows the choices again
     START_MENU: {
       choices() {
         const base = (() => {
-          // Pregnancy mode — swap in pregnancy-relevant buttons
+          // Pregnancy mode - swap in pregnancy-relevant buttons
           if (userMode.isPregnancy) {
             return [
               { id: "edd",    label: "My due date / how far along",     next: "CYCLE_EDD_ANSWER",    primary: true },
@@ -163,7 +163,7 @@ export function createNodes(env) {
               { id: "else",   label: "Something else",                  next: "ELSE_INTRO" },
             ];
           }
-          // TTC mode — ovulation-first layout
+          // TTC mode - ovulation-first layout
           if (userMode.isTTC) {
             return [
               { id: "ovul",     label: "My ovulation window",              next: "TTC_INTRO",          primary: true },
@@ -187,7 +187,7 @@ export function createNodes(env) {
               { id: "else",   label: "Something else",                 next: "ELSE_INTRO" },
             ];
           }
-          // Default — cycle tracking or browsing
+          // Default - cycle tracking or browsing
           return [
             { id: "period",   label: "My period",                        next: "PERIOD_TRIAGE",         primary: true },
             { id: "pain",     label: "Pain or cramps",                   next: "PELVIC_INTRO" },
@@ -203,7 +203,7 @@ export function createNodes(env) {
       },
     },
 
-    // ── Period triage — consolidates all period-related entry points ────────
+    // ── Period triage - consolidates all period-related entry points ────────
     PERIOD_TRIAGE: {
       say: ["Of course 🩷 What's going on with it?"],
       question: "Period concern type",
@@ -215,7 +215,7 @@ export function createNodes(env) {
       ],
     },
 
-    // ── Hormones and skin triage — PCOS, perimenopause, body changes ────────
+    // ── Hormones and skin triage - PCOS, perimenopause, body changes ────────
     HORMONES_SKIN_TRIAGE: {
       say: ["Happy to help with this 🩷 What feels most like what you're experiencing?"],
       question: "Hormones / skin concern type",
@@ -261,7 +261,7 @@ export function createNodes(env) {
         if (unresolved.length) {
           lines.push(
             "You also mentioned " + unresolved.map(t => TOPIC_LABELS[t] || t).join(" and ") +
-            " — we can look at that if you’d like 💗"
+            " - we can look at that if you’d like 💗"
           );
         }
         if (lines.length === 1) {
@@ -305,7 +305,7 @@ export function createNodes(env) {
         return null;
       },
       say: [
-        "That sounds really uncomfortable — let's figure out what's going on 🩷",
+        "That sounds really uncomfortable - let's figure out what's going on 🩷",
         "During your heaviest moments, are you soaking through a pad or tampon every hour for two or more hours in a row?",
       ],
       choices: [
@@ -341,7 +341,7 @@ export function createNodes(env) {
         return null;
       },
       say: [
-        "I hear you — bleeding that just won't stop is exhausting 🩷",
+        "I hear you - bleeding that just won't stop is exhausting 🩷",
         "How many days has the bleeding been going on?",
       ],
       choices: [
@@ -395,7 +395,7 @@ export function createNodes(env) {
       },
     },
     HEAVY_C_SOAK: {
-      say: ["Okay — are you soaking through a pad or tampon about every hour?"],
+      say: ["Okay - are you soaking through a pad or tampon about every hour?"],
       choices: [
         { id: "yes", label: "Yes, soaking about every hour", next: "HEAVY_C_SOAK_YES", primary: true },
         { id: "no",  label: "No, not that quickly",          next: "HEAVY_SHARED_CORE" },
@@ -443,7 +443,7 @@ export function createNodes(env) {
       },
     },
 
-    // Step 3: symptom check — skipped if Route C already captured symptoms
+    // Step 3: symptom check - skipped if Route C already captured symptoms
     HEAVY_CORE_SYMP_GATE: {
       autoNext(ctx) {
         return (ctx.heavyFlags || {}).symptomatic ? "HEAVY_DECIDE" : "HEAVY_CORE_SYMPTOMS";
@@ -463,7 +463,7 @@ export function createNodes(env) {
       },
     },
 
-    // Decision routing — evaluates all collected flags
+    // Decision routing - evaluates all collected flags
     HEAVY_DECIDE: {
       autoNext(ctx) {
         const f = ctx.heavyFlags || {};
@@ -483,7 +483,7 @@ export function createNodes(env) {
       say(ctx) {
         const f = ctx.heavyFlags || {};
         const lines = [
-          "What you're describing needs medical attention today — please don't wait 🩷",
+          "What you're describing needs medical attention today - please don't wait 🩷",
         ];
         if (f.possiblePregnancy) {
           lines.push(
@@ -495,7 +495,7 @@ export function createNodes(env) {
           );
         }
         lines.push(
-          "If you feel faint, collapse, or bleeding gets worse on the way — call for help immediately."
+          "If you feel faint, collapse, or bleeding gets worse on the way - call for help immediately."
         );
         return lines;
       },
@@ -507,10 +507,10 @@ export function createNodes(env) {
     },
     HEAVY_SOON: {
       say: [
-        "Based on what you've shared, this isn't an emergency right now — but it does need a proper look in the next few days 🩷",
-        "Bleeding that's heavier than usual or lasting longer than a week can sometimes point to things worth checking — like fibroids, hormonal shifts, or low iron.",
+        "Based on what you've shared, this isn't an emergency right now - but it does need a proper look in the next few days 🩷",
+        "Bleeding that's heavier than usual or lasting longer than a week can sometimes point to things worth checking - like fibroids, hormonal shifts, or low iron.",
         "Book a visit with a healthcare provider or gynaecologist as soon as you can, ideally within the next 2–3 days.",
-        "If anything changes — you start feeling faint, bleeding gets suddenly heavier, or you develop severe pain — treat that as urgent and seek care the same day.",
+        "If anything changes - you start feeling faint, bleeding gets suddenly heavier, or you develop severe pain - treat that as urgent and seek care the same day.",
       ],
       choices: [
         { id: "map",  label: "Find care near me",  next: "HEAVY_AFTER_CARE", action: "OPEN_MAP",    primary: true },
@@ -521,7 +521,7 @@ export function createNodes(env) {
     HEAVY_MONITOR: {
       say: [
         "Based on what you shared, this sounds like it may be a heavier day rather than something immediately alarming 🩷",
-        "Some people naturally have heavier flow — especially in the first 1–2 days of their period. That said, your experience is always worth tracking.",
+        "Some people naturally have heavier flow - especially in the first 1–2 days of their period. That said, your experience is always worth tracking.",
         "Keep monitoring over the next 24 hours. If the flow picks up, you start feeling weak or dizzy, or you notice large clots, come back and let me know.",
       ],
       choices: [
@@ -593,13 +593,13 @@ export function createNodes(env) {
         if (plan.isPrimaryInPast) {
           const retestDate = addDays(new Date(), 3);
           const lines = [
-            `${ack()} That recommended test date has already passed — so you can test **today** 🩷`,
+            `${ack()} That recommended test date has already passed - so you can test **today** 🩷`,
             "First morning urine gives the clearest result.",
             `If it comes back negative but your period still hasn't arrived, retest again around **${fmtDate(retestDate)}** (48–72 hours from now).`,
           ];
           if (plan.bothDatesAvailable && plan._fromPeriod && plan._fromSex) {
             lines.splice(1, 0,
-              `Based on your missed period you could test from **${fmtDate(plan._fromPeriod)}**. Based on the sex date the most reliable result would be from **${fmtDate(plan._fromSex)}** — both are already past, so test today.`
+              `Based on your missed period you could test from **${fmtDate(plan._fromPeriod)}**. Based on the sex date the most reliable result would be from **${fmtDate(plan._fromSex)}** - both are already past, so test today.`
             );
           }
           return lines;
@@ -609,7 +609,7 @@ export function createNodes(env) {
         if (plan.canTestEarly && plan.basis === "sex-date") {
           return [
             `${ack()} 🩷`,
-            `✅ You're in the early detection window — you can test from **${fmtDate(plan.primary)}** onward.`,
+            `✅ You're in the early detection window - you can test from **${fmtDate(plan.primary)}** onward.`,
             "Early detection tests can pick up pregnancy from about 10 days after sex, but the result is less reliable at this stage.",
             "Testing too early can give a false negative because pregnancy hormone levels may not be high enough yet.",
             `For the most reliable result, wait until **${fmtDate(plan._fromSex)}** (21 days after sex).`,
@@ -623,12 +623,12 @@ export function createNodes(env) {
         if (plan.bothDatesAvailable && plan._fromPeriod && plan._fromSex) {
           lines.push(
             `Based on your missed period you can test from **${fmtDate(plan._fromPeriod)}**. Based on the sex date the most reliable result would be from **${fmtDate(plan._fromSex)}**.`,
-            `✅ Best time to test: **${fmtDate(plan.primary)}** — using the later of both dates for the most reliable result.`
+            `✅ Best time to test: **${fmtDate(plan.primary)}** - using the later of both dates for the most reliable result.`
           );
         } else {
           const primaryLine = plan.basis === "missed-period"
-            ? `✅ Best time to test: **${fmtDate(plan.primary)}** — the day after your expected period.`
-            : `✅ Best time to test: **${fmtDate(plan.primary)}** — 21 days after unprotected sex.`;
+            ? `✅ Best time to test: **${fmtDate(plan.primary)}** - the day after your expected period.`
+            : `✅ Best time to test: **${fmtDate(plan.primary)}** - 21 days after unprotected sex.`;
           lines.push(primaryLine);
         }
 
@@ -646,19 +646,19 @@ export function createNodes(env) {
       choices: [
         { id: "late",    label: "My period is late too",   next: "LATE_INTRO", primary: true },
         { id: "log",     label: "Log that I tested today", next: "TEST_SHOW_PLAN_LOGGED",
-          action: "LOG_SYMPTOM", logData: { type: "pregnancy_test", note: "Test taken — result pending" } },
+          action: "LOG_SYMPTOM", logData: { type: "pregnancy_test", note: "Test taken - result pending" } },
         { id: "menu",    label: "Main options",            next: "START_MENU" },
         { id: "done",    label: "I'm done for now",       next: "CLOSE" },
       ],
     },
 
-    // After logging a test — detect retest timing
+    // After logging a test - detect retest timing
     TEST_SHOW_PLAN_LOGGED: {
       say() {
         const retestDate = addDays(new Date(), 3);
         return [
           "Logged 🩷",
-          `If today's test was negative, the best time to retest is around **${fmtDate(retestDate)}** — 48–72 hours from now, ideally first morning urine.`,
+          `If today's test was negative, the best time to retest is around **${fmtDate(retestDate)}** - 48–72 hours from now, ideally first morning urine.`,
           "A second negative at that point is more reliable.",
         ];
       },
@@ -668,7 +668,7 @@ export function createNodes(env) {
       ],
     },
 
-    // ── Urgent symptoms checkpoint — sits before TEST_SHOW_PLAN ──────────────
+    // ── Urgent symptoms checkpoint - sits before TEST_SHOW_PLAN ──────────────
     TEST_URGENT_CHECK: {
       say: [
         "One quick check before we look at your test plan 🩷",
@@ -683,7 +683,7 @@ export function createNodes(env) {
     // ── Irregular cycle entry route ───────────────────────────────────────────
     TEST_IRREGULAR_INTRO: {
       say: [
-        "No problem 🩷 Irregular cycles are really common — PCOS, recently stopping birth control, postpartum, breastfeeding, and other hormonal changes can all affect when your period comes.",
+        "No problem 🩷 Irregular cycles are really common - PCOS, recently stopping birth control, postpartum, breastfeeding, and other hormonal changes can all affect when your period comes.",
         "When you don't know your expected period date, the most reliable way to time a test is to work from your unprotected sex date.",
         "If your cycles are irregular, you've recently stopped birth control, or you have PCOS, the 21-day rule after sex is generally the most reliable guide.",
         "Type the date of your last unprotected sex like: 2026-02-08 (YYYY-MM-DD).",
@@ -697,8 +697,8 @@ export function createNodes(env) {
     // ── Already tested negative ───────────────────────────────────────────────
     TEST_NEGATIVE_INTRO: {
       say: [
-        "Okay 🩷 A negative result isn't always final — it depends on when you tested and how.",
-        "Quick check first — are you having any of these right now: severe one-sided pain, feeling faint, heavy bleeding, or shoulder tip pain?",
+        "Okay 🩷 A negative result isn't always final - it depends on when you tested and how.",
+        "Quick check first - are you having any of these right now: severe one-sided pain, feeling faint, heavy bleeding, or shoulder tip pain?",
       ],
       choices: [
         { id: "yes_urgent",  label: "Yes, I have some of those",    next: "HEAVY_URGENT", primary: true },
@@ -720,7 +720,7 @@ export function createNodes(env) {
 
     TEST_NEGATIVE_TIMING: {
       say: [
-        "Was it first morning urine — the very first time you went to the bathroom that day?",
+        "Was it first morning urine - the very first time you went to the bathroom that day?",
       ],
       choices: [
         { id: "yes_fmu", label: "Yes, first morning urine", next: "TEST_SHOW_PLAN", primary: true },
@@ -728,14 +728,14 @@ export function createNodes(env) {
       ],
     },
 
-    // ── Retest now — for users who tested recently or not first morning ───────
+    // ── Retest now - for users who tested recently or not first morning ───────
     TEST_RETEST_NOW: {
       say: [
-        "A negative result tested too early — or not with first morning urine — may not be reliable 🩷",
+        "A negative result tested too early - or not with first morning urine - may not be reliable 🩷",
         "First morning urine is the most concentrated, which means the pregnancy hormone is easiest to detect.",
-        "**Retest now** if you haven't already today — use first morning urine tomorrow if you've already used the bathroom.",
+        "**Retest now** if you haven't already today - use first morning urine tomorrow if you've already used the bathroom.",
         "If that also comes back negative but your period still hasn't come, let me know and we can look at next steps.",
-        "_If you develop severe one-sided pain, feel faint, or have heavy bleeding — please seek medical care straight away._",
+        "_If you develop severe one-sided pain, feel faint, or have heavy bleeding - please seek medical care straight away._",
       ],
       choices: [
         { id: "plan",  label: "Show me when to test next", next: "TEST_SHOW_PLAN", primary: true },
@@ -756,7 +756,7 @@ export function createNodes(env) {
       },
     },
 
-    // Routing node — checks days since sex and redirects
+    // Routing node - checks days since sex and redirects
     TEST_RECENT_SEX_ROUTE: {
       autoNext(ctx) {
         const sexDate = ctx.captureData?.sexDate ? new Date(ctx.captureData.sexDate) : null;
@@ -776,7 +776,7 @@ export function createNodes(env) {
         return [
           "It's a little too early for a reliable result right now 🩷",
           "Pregnancy tests work by detecting a hormone (hCG) that builds up in your body after implantation. In the first 10 days it often isn't detectable yet.",
-          `The **earliest** you could try an early detection test is around **${earlyDate}** — but even then, a negative result could be a false negative.`,
+          `The **earliest** you could try an early detection test is around **${earlyDate}** - but even then, a negative result could be a false negative.`,
           `For the most reliable result, wait until **${reliableDate}** (21 days after sex).`,
           "If your cycles are irregular, you've recently stopped birth control, or you have PCOS, the 21-day rule after sex is generally the most reliable guide.",
           "Would you like me to remind you when it's the right time to test?",
@@ -797,14 +797,14 @@ export function createNodes(env) {
 
     ABORTION_OPTIONS: {
       say: [
-        "I hear you 🩷 This is a space where you can talk, without judgment — none.",
+        "I hear you 🩷 This is a space where you can talk, without judgment - none.",
         "Whatever has happened or is happening, you don't need to explain yourself to me. Your safety is what matters most.",
         "If you've already taken something or had any kind of procedure, watch for these warning signs and go to emergency care if any appear:",
-        "🚨 Fever (38°C / 100.4°F or higher) or chills — especially lasting more than a few hours",
-        "🚨 Heavy bleeding — soaking more than 2 pads per hour for 2 hours in a row",
+        "🚨 Fever (38°C / 100.4°F or higher) or chills - especially lasting more than a few hours",
+        "🚨 Heavy bleeding - soaking more than 2 pads per hour for 2 hours in a row",
         "🚨 Severe or worsening pain in your abdomen that isn't easing",
         "🚨 Foul-smelling discharge, or discharge that looks unusual",
-        "You can get care at a hospital without having to explain why. Confidential support also exists — you don't have to go through this alone.",
+        "You can get care at a hospital without having to explain why. Confidential support also exists - you don't have to go through this alone.",
         "What kind of support are you looking for right now?",
       ],
       choices: [
@@ -817,7 +817,7 @@ export function createNodes(env) {
       ],
     },
 
-    // Honest legal context — doesn't shame, doesn't lie, doesn't advise
+    // Honest legal context - doesn't shame, doesn't lie, doesn't advise
     ABORTION_HONEST_CONTEXT: {
       say: [
         "I want to be honest with you because you deserve honesty 🩷",
@@ -830,18 +830,18 @@ export function createNodes(env) {
         { id: "options",   label: "Talk through my options",              next: "ABORTION_DECISION_SUPPORT", primary: true },
         { id: "safe",      label: "What do I need to know to stay safe?", next: "ABORTION_SAFETY_INFO" },
         { id: "counsel",   label: "I want someone to talk to",            next: "ABORTION_RESOURCES" },
-        { id: "privacy",   label: "Privacy — how to protect myself",      next: "ABORTION_PRIVACY" },
+        { id: "privacy",   label: "Privacy - how to protect myself",      next: "ABORTION_PRIVACY" },
       ],
     },
 
-    // Non-directive decision support — presents all options without steering
+    // Non-directive decision support - presents all options without steering
     ABORTION_DECISION_SUPPORT: {
       say: [
-        "You're not alone in this, and there's no right answer — only what's right for you 🩷",
+        "You're not alone in this, and there's no right answer - only what's right for you 🩷",
         "People in this situation generally face three paths: continuing the pregnancy (with support or adoption), or ending it.",
         "Because of Jamaica's laws, ending a pregnancy carries serious legal and medical risk. There are no safe, legal clinical services in-country.",
         "Some people travel to access services in countries where it is legal. Others seek confidential counselling to help make a decision.",
-        "Non-directive pregnancy counselling, where someone listens without pushing an agenda — exists and is confidential. Would you like help finding it?",
+        "Non-directive pregnancy counselling, where someone listens without pushing an agenda - exists and is confidential. Would you like help finding it?",
       ],
       choices: [
         { id: "counsel",  label: "Yes, find me confidential support",   next: "ABORTION_RESOURCES", primary: true },
@@ -852,7 +852,7 @@ export function createNodes(env) {
       ],
     },
 
-    // Safety information — harm reduction without method instruction
+    // Safety information - harm reduction without method instruction
     ABORTION_SAFETY_INFO: {
       say: [
         "Your safety matters most 🩷 I can share what signs to watch for, not instructions.",
@@ -873,14 +873,14 @@ export function createNodes(env) {
       ],
     },
 
-    // Aftercare safety check — for those who've already acted
+    // Aftercare safety check - for those who've already acted
     ABORTION_AFTERCARE_CHECK: {
       say: [
         `${ack()} Your safety is the priority right now 🩷`,
         "Are you having any of these right now? Select any that apply.",
       ],
       multi: {
-        question: "Warning signs — select any:",
+        question: "Warning signs - select any:",
         options: [
           "Heavy bleeding (soaking 2+ pads/hour for 2+ hours)",
           "Severe belly or pelvic pain",
@@ -905,7 +905,7 @@ export function createNodes(env) {
       say: [
         "Please get to an emergency room as soon as possible 🩷",
         "These symptoms can mean your body needs immediate medical support.",
-        "When you arrive, you can say you are having a miscarriage — this is medically accurate and emergency rooms are required to treat you without asking for the cause.",
+        "When you arrive, you can say you are having a miscarriage - this is medically accurate and emergency rooms are required to treat you without asking for the cause.",
         "You do not have to explain anything beyond your symptoms.",
       ],
       choices: [
@@ -916,9 +916,9 @@ export function createNodes(env) {
 
     ABORTION_MONITORING: {
       say: [
-        "Okay — none of the urgent warning signs right now 🩷",
+        "Okay - none of the urgent warning signs right now 🩷",
         "Keep monitoring yourself over the next few days. Watch for: increasing pain, fever, heavy bleeding that starts or worsens, or anything that feels wrong.",
-        "If any of those things start — treat it as urgent and go to emergency care.",
+        "If any of those things start - treat it as urgent and go to emergency care.",
         "Would you like to connect with confidential support?",
         ...urgentFooter(),
       ],
@@ -929,15 +929,15 @@ export function createNodes(env) {
       ],
     },
 
-    // Privacy — practical screen/data protection guidance
+    // Privacy - practical screen/data protection guidance
     ABORTION_PRIVACY: {
       say: [
-        "Privacy is real and valid — here's what you can do 🩷",
+        "Privacy is real and valid - here's what you can do 🩷",
         "• Clear your chat: use the reset option in Bloomie settings if available, or close the browser tab",
         "• If someone shares your device: use an incognito/private browser window",
         "• When contacting organisations: use a number they don't know, or a messaging app with disappearing messages",
         "• What to say: 'I need confidential pregnancy options support. How do you handle privacy?'",
-        "• Ask any service before sharing: 'Is this fully confidential?' — you have the right to ask.",
+        "• Ask any service before sharing: 'Is this fully confidential?' - you have the right to ask.",
       ],
       choices: [
         { id: "counsel",  label: "Show confidential support options",  next: "ABORTION_RESOURCES", primary: true },
@@ -946,15 +946,15 @@ export function createNodes(env) {
       ],
     },
 
-    // Resources — confidential orgs operating in Jamaica
+    // Resources - confidential orgs operating in Jamaica
     ABORTION_RESOURCES: {
       say: [
         "Here are organisations that provide confidential, non-judgmental support 🩷",
-        "• **FAMPLAN (Jamaica Family Planning Association)** — sexual & reproductive health counselling, islandwide. famplanjamaica.org",
-        "• **Jamaica Pregnancy Resource Centre (Montego Bay)** — counselling and options support.",
-        "• **Caribbean Family Planning Affiliation (CFPA)** — regional, provides referrals and telehealth options.",
-        "• **International Planned Parenthood Federation (IPPF)** — can help with information about accessing services in other countries confidentially. ippf.org",
-        "When you contact them, you don't have to share any details upfront — just say you need confidential pregnancy support.",
+        "• **FAMPLAN (Jamaica Family Planning Association)** - sexual & reproductive health counselling, islandwide. famplanjamaica.org",
+        "• **Jamaica Pregnancy Resource Centre (Montego Bay)** - counselling and options support.",
+        "• **Caribbean Family Planning Affiliation (CFPA)** - regional, provides referrals and telehealth options.",
+        "• **International Planned Parenthood Federation (IPPF)** - can help with information about accessing services in other countries confidentially. ippf.org",
+        "When you contact them, you don't have to share any details upfront - just say you need confidential pregnancy support.",
       ],
       choices: [
         { id: "script", label: "Help me write what to say",    next: "ABORTION_CALL_SCRIPT", primary: true },
@@ -966,9 +966,9 @@ export function createNodes(env) {
 
     ABORTION_CALL_SCRIPT: {
       say: [
-        "Here's what you can say — keep it simple until you know they're trustworthy 🩷",
+        "Here's what you can say - keep it simple until you know they're trustworthy 🩷",
         "📞 *'Hi, I need confidential pregnancy options support. Can you tell me how your privacy policy works before I share anything?'*",
-        "If they ask for details before answering that — hang up and try somewhere else.",
+        "If they ask for details before answering that - hang up and try somewhere else.",
         "You're allowed to ask questions first. You're allowed to say no. You're in charge of this.",
       ],
       choices: [
@@ -983,10 +983,10 @@ export function createNodes(env) {
       say() {
         return [
           pick([
-            `${ack()} A late or missed period can be really stressful — especially when your body usually feels predictable 🩷`,
-            "Okay — a late period. Let's look at this properly 🩷",
+            `${ack()} A late or missed period can be really stressful - especially when your body usually feels predictable 🩷`,
+            "Okay - a late period. Let's look at this properly 🩷",
             "Waiting on your period is genuinely one of the more stressful things. Let's break it down 🩷",
-            "That uncertainty is real — not knowing what's going on with your own body is hard 🩷",
+            "That uncertainty is real - not knowing what's going on with your own body is hard 🩷",
             "Late periods happen for so many reasons. Let's figure out what might be going on for you 🩷",
           ]),
           "Cycles shift for all kinds of reasons: stress, travel, illness, weight changes, or just natural variation.",
@@ -1004,7 +1004,7 @@ export function createNodes(env) {
     },
     LATE_NO_GUIDANCE: {
       say: [
-        "Okay 🩷 A few days of variation can be completely normal — even in people who are usually very regular.",
+        "Okay 🩷 A few days of variation can be completely normal - even in people who are usually very regular.",
         "Sometimes ovulation happens a little later than usual, and the period follows after.",
         "For now, it can help to:\n• Keep tracking your cycle\n• Watch for signs like cramps, spotting, or breast tenderness\n• Check back in if it continues to be later than what's normal for you",
         "Next important question: is there any chance of pregnancy this cycle?",
@@ -1018,14 +1018,14 @@ export function createNodes(env) {
     },
     LATE_IRREGULAR_GUIDANCE: {
       say: [
-        "Totally valid — irregular cycles make it genuinely hard to know what 'late' even means 🩷",
+        "Totally valid - irregular cycles make it genuinely hard to know what 'late' even means 🩷",
         "Irregular cycles are common and can happen for lots of reasons: stress, hormonal imbalances, conditions like PCOS, weight changes, or just how your body works.",
         "A few things that can help: tracking even rough dates over a few months starts to reveal your personal pattern.",
         "Is there any chance of pregnancy this cycle?",
       ],
       question: "Chance of pregnancy this cycle?",
       choices: [
-        { id: "yes",  label: "Yes — could be", next: "LATE_TEST_Q", primary: true },
+        { id: "yes",  label: "Yes - could be", next: "LATE_TEST_Q", primary: true },
         { id: "no",   label: "No", next: "LATE_CHANGES_Q" },
         { id: "ns",   label: "Not sure", next: "LATE_TEST_Q" },
         { id: "pcos", label: "I think I might have PCOS or a hormonal issue", next: "ELSE_INTRO" },
@@ -1033,7 +1033,7 @@ export function createNodes(env) {
     },
     LATE_YES_PREG: {
       say() {
-        // TTC mode — reframe as potentially good news
+        // TTC mode - reframe as potentially good news
         if (userMode.isTTC) {
           return [
             "Thanks for letting me know 🩷",
@@ -1041,7 +1041,7 @@ export function createNodes(env) {
             "Is there any chance this could be a positive result?",
           ];
         }
-        // Pregnancy tracking — they're already pregnant, late period doesn't apply
+        // Pregnancy tracking - they're already pregnant, late period doesn't apply
         if (userMode.isPregnancy) {
           return [
             "Since you're already in pregnancy tracking mode, a missed period is expected 🩷",
@@ -1049,7 +1049,7 @@ export function createNodes(env) {
           ];
         }
         return [
-          `${ack()} Pregnancy is one of the most common reasons for a late period — worth checking rather than worrying in silence 🩷`,
+          `${ack()} Pregnancy is one of the most common reasons for a late period - worth checking rather than worrying in silence 🩷`,
           "Is there any chance of pregnancy this cycle?",
         ];
       },
@@ -1094,7 +1094,7 @@ export function createNodes(env) {
     },
     PREG_CLARIFY_ROUTE: {
       say: [
-        "That's okay — pregnancy worries can feel overwhelming even when you're not sure what you're actually worried about 🩷",
+        "That's okay - pregnancy worries can feel overwhelming even when you're not sure what you're actually worried about 🩷",
         "Are you feeling physically unwell right now, or is this more anxiety about the possibility?",
       ],
       question: "Physically unwell or anxious?",
@@ -1105,7 +1105,7 @@ export function createNodes(env) {
     },
     PREG_CLARIFY_RESELECT: {
       say: [
-        "That makes sense — anxiety about pregnancy is completely valid, even when nothing has 'happened' yet 🩷",
+        "That makes sense - anxiety about pregnancy is completely valid, even when nothing has 'happened' yet 🩷",
         "Take a breath. Let's figure out what would help you most right now.",
       ],
       question: "Pregnancy concern type",
@@ -1145,7 +1145,7 @@ export function createNodes(env) {
       say: [
         "That's okay 🩷",
         "A late or missed period can sometimes be an early sign of pregnancy, even before other symptoms show up.",
-        "If there's any chance, taking a pregnancy test can help reduce uncertainty — especially if your period doesn't arrive in the next few days.",
+        "If there's any chance, taking a pregnancy test can help reduce uncertainty - especially if your period doesn't arrive in the next few days.",
       ],
       choices: [
         { id: "sym",  label: "Tell me about other symptoms", next: "LATE_SYMPTOMS_Q", primary: true },
@@ -1201,7 +1201,7 @@ export function createNodes(env) {
     LATE_CHANGES_EXPLAIN: {
       say: [
         "Thanks for sharing 🩷",
-        "Changes like stress, illness, or shifts in routine can affect hormone levels and delay ovulation — which can push your period later than usual.",
+        "Changes like stress, illness, or shifts in routine can affect hormone levels and delay ovulation - which can push your period later than usual.",
         "Are you noticing any of the following right now?",
       ],
       question: "Symptoms with late period",
@@ -1236,8 +1236,8 @@ export function createNodes(env) {
         "Thanks for walking through this with me 🩷",
         "Based on what you've shared, your late period could be related to recent changes, hormonal shifts, or possible pregnancy.",
         "I can't diagnose conditions, but noticing patterns over time is really important.",
-        "If late or missed periods happen often — especially along with symptoms like acne, increased facial/body hair, weight changes, or ongoing mood shifts — some people choose to ask a healthcare provider about possible hormonal imbalances.",
-        "That doesn't mean anything is 'wrong' — just that your hormones may need a closer look.",
+        "If late or missed periods happen often - especially along with symptoms like acne, increased facial/body hair, weight changes, or ongoing mood shifts - some people choose to ask a healthcare provider about possible hormonal imbalances.",
+        "That doesn't mean anything is 'wrong' - just that your hormones may need a closer look.",
         "You might consider:\n• Continuing to track your cycle\n• Noting other symptoms over time\n• Reaching out to a healthcare provider if delays keep happening",
         "You're doing the right thing by checking in and listening to your body 🩷",
         "Would you like help with anything else today?",
@@ -1253,10 +1253,10 @@ export function createNodes(env) {
       say() {
         return [
           pick([
-            `${ack()} Spotting can feel confusing — especially when it shows up out of nowhere 🩷`,
-            "Unexpected spotting is unsettling — let's work out what's going on 🩷",
+            `${ack()} Spotting can feel confusing - especially when it shows up out of nowhere 🩷`,
+            "Unexpected spotting is unsettling - let's work out what's going on 🩷",
             "Spotting outside your period can mean a few different things. Let's narrow it down 🩷",
-            "Okay, spotting. This is worth looking at properly — you were right to bring it up 🩷",
+            "Okay, spotting. This is worth looking at properly - you were right to bring it up 🩷",
             "Random bleeding between periods is something your body is trying to tell you something with. Let's listen 🩷",
           ]),
           "A lot of the time it's harmless (hormonal shifts, ovulation, or early pregnancy), but sometimes it's your body asking for a closer look.",
@@ -1273,7 +1273,7 @@ export function createNodes(env) {
     SPOT_NO_NORMAL: {
       say: [
         "Okay 👍🏽",
-        "Light spotting at the very start or end of a period can be normal for many people — sometimes it's just your uterus finishing up.",
+        "Light spotting at the very start or end of a period can be normal for many people - sometimes it's just your uterus finishing up.",
         "If it stays light, doesn't come with strong pain, and doesn't drag on for days and days, it's usually not a big concern.",
         "If you ever notice it getting heavier, lasting longer than usual, or coming with dizziness or severe cramps, that's a reason to check in with a provider.",
         "Want to go back to the main options, or talk about something else you noticed?",
@@ -1287,7 +1287,7 @@ export function createNodes(env) {
     SPOT_NOTSURE_TIMING: {
       say: [
         "That's totally okay 🩷",
-        "Sometimes spotting is so light that it's hard to place in the cycle — especially if your period isn't super regular.",
+        "Sometimes spotting is so light that it's hard to place in the cycle - especially if your period isn't super regular.",
         "About how many days after your last period did the spotting start?",
       ],
       question: "Timing of spotting after last period",
@@ -1302,7 +1302,7 @@ export function createNodes(env) {
       say: [
         "Got you 🩷",
         "Spotting around the middle of the cycle can happen for some people around ovulation (a small hormone dip can cause light bleeding).",
-        "It's usually light and short — but we'll still check a few details to be safe.",
+        "It's usually light and short - but we'll still check a few details to be safe.",
       ],
       autoNext: () => "SPOT_YES_DURATION",
     },
@@ -1331,7 +1331,7 @@ export function createNodes(env) {
     SPOT_SYMPTOMS_MULTI: {
       say: [
         "Thanks for sharing 🩷",
-        "Spotting that lasts more than a couple days — or feels heavier than expected — is worth paying attention to.",
+        "Spotting that lasts more than a couple days - or feels heavier than expected - is worth paying attention to.",
         "Let's check for anything that would make this more urgent.",
       ],
       multi: {
@@ -1363,7 +1363,7 @@ export function createNodes(env) {
       ],
     },
     SPOT_PATTERN_CHECK: {
-      say: ["Okay 👍🏽", "Even without other symptoms, spotting can be useful information — especially if it becomes a pattern.", "Has this type of spotting happened more than once in recent cycles?"],
+      say: ["Okay 👍🏽", "Even without other symptoms, spotting can be useful information - especially if it becomes a pattern.", "Has this type of spotting happened more than once in recent cycles?"],
       question: "Spotting more than once recently?",
       choices: [
         { id: "yes", label: "Yes", next: "SPOT_TRACK_WRAP", primary: true },
@@ -1383,7 +1383,7 @@ export function createNodes(env) {
     SPOT_PREG_INFO: {
       say: [
         "Thanks for sharing 🩷",
-        "If there's any chance of pregnancy, a test can help give clarity — especially if your period is late or your symptoms feel different than usual.",
+        "If there's any chance of pregnancy, a test can help give clarity - especially if your period is late or your symptoms feel different than usual.",
         "Have you started, stopped, or changed birth control in the past few months?",
       ],
       question: "Birth control change recently?",
@@ -1405,7 +1405,7 @@ export function createNodes(env) {
     SPOT_BC_YES: {
       say: [
         "That makes sense 🩷",
-        "Hormonal birth control changes can cause spotting while your body recalibrates — especially in the first 1–3 months.",
+        "Hormonal birth control changes can cause spotting while your body recalibrates - especially in the first 1–3 months.",
         "It often improves over time, but tracking it helps you know if it's settling down or getting more frequent.",
         "If spotting becomes heavy, persistent, or comes with pain or unusual discharge, it's worth checking in with a provider.",
         "Want to go back to the main options?",
@@ -1419,7 +1419,7 @@ export function createNodes(env) {
       say: [
         "Thanks for walking through that with me 🩷",
         "Based on what you've shared, this spotting may be related to normal cycle changes (like ovulation), hormone fluctuations, birth control adjustments, or other non-emergency causes.",
-        "Tracking helps you catch patterns early — and it also makes it easier to explain if you ever decide to see a provider.",
+        "Tracking helps you catch patterns early - and it also makes it easier to explain if you ever decide to see a provider.",
         "If you want a simple tracking checklist:",
         "• Color (pink/red/brown)\n• Amount (wipe-only vs light flow)\n• Days it lasted\n• Cycle day / timing\n• Any pain, odor, dizziness, or fever",
         "If spotting becomes frequent, lasts longer, becomes heavier, or comes with pain/unusual discharge/dizziness, it may be a good idea to talk with a healthcare provider.",
@@ -1440,12 +1440,12 @@ export function createNodes(env) {
     },
 
     /* ---------------- MOOD / HORMONES ---------------- */
-    // Backward-compat redirect — all existing menu buttons still reach MOOD_SAFETY_CHECK
+    // Backward-compat redirect - all existing menu buttons still reach MOOD_SAFETY_CHECK
     MOOD_INTRO: {
       autoNext: () => "MOOD_SAFETY_CHECK",
     },
 
-    // ── Step 1: Safety check — always first ──────────────────────────────────
+    // ── Step 1: Safety check - always first ──────────────────────────────────
     MOOD_SAFETY_CHECK: {
       say: [
         "Before we go further, I want to check on you 🩷",
@@ -1459,14 +1459,14 @@ export function createNodes(env) {
       ],
     },
 
-    // ── Safety route — crisis support, do not continue mood assessment ───────
+    // ── Safety route - crisis support, do not continue mood assessment ───────
     MOOD_SAFETY_ROUTE: {
       say() {
-        const base = ["Thank you for telling me — that takes courage 🩷"];
+        const base = ["Thank you for telling me - that takes courage 🩷"];
         if (userMode.isPostpartum) {
           return [
             ...base,
-            "What you're describing can be a sign of postpartum depression or postpartum anxiety — both are common, both are treatable, and both deserve real support, not just time.",
+            "What you're describing can be a sign of postpartum depression or postpartum anxiety - both are common, both are treatable, and both deserve real support, not just time.",
             "In Jamaica, you can reach the crisis line at 888-NEW-LIFE (888-639-5433) any time.",
             "Please also consider speaking with your midwife, doctor, or a mental health professional as soon as you can.",
             "You don't have to figure this out alone.",
@@ -1492,13 +1492,13 @@ export function createNodes(env) {
         if (userMode.isPostpartum) {
           return [
             "Postpartum mood shifts deserve to be taken seriously, not brushed off 🩷",
-            "If you're experiencing crying spells that won't stop, feeling disconnected from your baby, intrusive thoughts, or trouble sleeping even when your baby sleeps — please tell me.",
+            "If you're experiencing crying spells that won't stop, feeling disconnected from your baby, intrusive thoughts, or trouble sleeping even when your baby sleeps - please tell me.",
             "What feels most true for you lately?",
           ];
         }
         if (userMode.isPregnancy) {
           return [
-            "Mood changes in pregnancy are real — anxiety about the pregnancy, feeling overwhelmed, or sudden intense emotions are all worth talking about 🩷",
+            "Mood changes in pregnancy are real - anxiety about the pregnancy, feeling overwhelmed, or sudden intense emotions are all worth talking about 🩷",
             "What feels most true for you lately?",
           ];
         }
@@ -1553,7 +1553,7 @@ export function createNodes(env) {
     },
     MOOD_ANXIETY_Q: {
       say: [
-        "Anxiety can show up in so many ways — racing thoughts, dread, restlessness, chest tightness, or just a feeling you can't shake 🩷",
+        "Anxiety can show up in so many ways - racing thoughts, dread, restlessness, chest tightness, or just a feeling you can't shake 🩷",
         "Does it feel more like overthinking and spiraling, or more like sudden panic and dread?",
       ],
       question: "Anxiety subtype",
@@ -1589,13 +1589,13 @@ export function createNodes(env) {
     },
     MOOD_IRRITABLE_Q: {
       say: [
-        "Irritability is one of the most dismissed cycle symptoms — but it is real and it can be exhausting to manage 🩷",
+        "Irritability is one of the most dismissed cycle symptoms - but it is real and it can be exhausting to manage 🩷",
         "Does it feel more like a short temper and snapping, or more like overstimulation and everything being too much?",
       ],
       question: "Irritability subtype",
       choices: [
         { id: "temper",   label: "Short temper or snapping",                next: "MOOD_TIMING_SPLIT", primary: true },
-        { id: "overstim", label: "Overstimulation — everything is too much", next: "MOOD_TIMING_SPLIT" },
+        { id: "overstim", label: "Overstimulation - everything is too much", next: "MOOD_TIMING_SPLIT" },
         { id: "both",     label: "Both",                                     next: "MOOD_TIMING_SPLIT" },
       ],
     },
@@ -1606,7 +1606,7 @@ export function createNodes(env) {
     },
     MOOD_FATIGUE_Q: {
       say: [
-        "That kind of drained, heavy-body exhaustion is different from just being tired — and it deserves more than 'get more sleep' 🩷",
+        "That kind of drained, heavy-body exhaustion is different from just being tired - and it deserves more than 'get more sleep' 🩷",
         "Does it feel more like physical exhaustion, or more like mental fog and low motivation?",
       ],
       question: "Fatigue subtype",
@@ -1627,7 +1627,7 @@ export function createNodes(env) {
         "That makes sense 🩷 Mood shifts are often messy, not neat.",
         "Would you say this mix feels more tied to your cycle, or does it happen throughout the month?",
       ],
-      question: "Mixed mood — cycle link",
+      question: "Mixed mood - cycle link",
       choices: [
         { id: "cycle", label: "Mostly around my cycle",  next: "MOOD_CYCLE_ROUTE",   primary: true },
         { id: "month", label: "Throughout the month",    next: "MOOD_NONCYCLE_ROUTE" },
@@ -1635,7 +1635,7 @@ export function createNodes(env) {
       ],
     },
 
-    // ── Step 4: Timing split — after feeling type is established ─────────────
+    // ── Step 4: Timing split - after feeling type is established ─────────────
     MOOD_TIMING_SPLIT: {
       say: [
         "Does this tend to show up around a specific time in your cycle, or does it feel more random?",
@@ -1652,7 +1652,7 @@ export function createNodes(env) {
 
     MOOD_CYCLE_ROUTE: {
       say: [
-        "Cycle-linked mood shifts are real and hormonal — you're not imagining it 🩷",
+        "Cycle-linked mood shifts are real and hormonal - you're not imagining it 🩷",
         "Progesterone rises then drops sharply in the luteal phase, and that drop can affect serotonin, energy, and emotional regulation.",
       ],
       autoNext(ctx) { ctx.moodCycleLinked = true; return "MOOD_SEVERITY"; },
@@ -1662,7 +1662,7 @@ export function createNodes(env) {
       say: [
         "Mood shifts that happen most of the month or without a clear cycle pattern are worth taking seriously 🩷",
         "They can still be hormonal, but they may also point to something worth discussing with a mental health professional or GP.",
-        "That's not a scary thing — it's just a different kind of support.",
+        "That's not a scary thing - it's just a different kind of support.",
       ],
       autoNext(ctx) { ctx.moodCycleLinked = false; return "MOOD_SEVERITY"; },
     },
@@ -1744,23 +1744,23 @@ export function createNodes(env) {
         const insight = insightFor(phaseInfo?.phase, "mood");
         const nudge = !insight ? phaseNudge() : null;
         const contextLine = insight
-          ? `Based on what you've shared, hormone-linked mood shifts may be playing a role — and you're not imagining it. ${insight}`
-          : "Based on what you've shared, hormone-linked mood shifts may be playing a role — and you're not imagining it.";
+          ? `Based on what you've shared, hormone-linked mood shifts may be playing a role - and you're not imagining it. ${insight}`
+          : "Based on what you've shared, hormone-linked mood shifts may be playing a role - and you're not imagining it.";
 
         const moodRoute   = ctx.moodRoute;
         const cycleLinked = ctx.moodCycleLinked;
 
         let routeGuidance;
         if (moodRoute === "anxiety") {
-          routeGuidance = "For anxiety — especially the cycle-linked kind — consistent sleep timing, reducing stimulation in the days before your period, and noticing your triggers before they spiral all help. If panic attacks are happening, that's worth bringing to a provider.";
+          routeGuidance = "For anxiety - especially the cycle-linked kind - consistent sleep timing, reducing stimulation in the days before your period, and noticing your triggers before they spiral all help. If panic attacks are happening, that's worth bringing to a provider.";
         } else if (moodRoute === "low") {
-          routeGuidance = "For low mood, gentle anchors help more than big efforts — a bit of sunlight, movement, and routine on the hard days. If the low mood lifts once your period starts, that's a strong hormonal signal. If it stays most of the month, please consider talking to someone.";
+          routeGuidance = "For low mood, gentle anchors help more than big efforts - a bit of sunlight, movement, and routine on the hard days. If the low mood lifts once your period starts, that's a strong hormonal signal. If it stays most of the month, please consider talking to someone.";
         } else if (moodRoute === "irritable") {
           routeGuidance = "Irritability often spikes with lack of sleep, skipped meals, and overstimulation, especially in the luteal phase. Protecting your sleep and eating consistently can make a real difference. Tracking when it peaks in your cycle gives you power over it.";
         } else if (moodRoute === "fatigue") {
-          routeGuidance = "Cycle-linked fatigue is physical, not a character flaw. In the luteal phase, progesterone has a sedating effect and your body temperature rises slightly — that combination is genuinely draining. Iron levels are also worth checking if fatigue is severe, especially if your periods are heavy.";
+          routeGuidance = "Cycle-linked fatigue is physical, not a character flaw. In the luteal phase, progesterone has a sedating effect and your body temperature rises slightly - that combination is genuinely draining. Iron levels are also worth checking if fatigue is severe, especially if your periods are heavy.";
         } else if (cycleLinked === false) {
-          routeGuidance = "When mood shifts don't follow a clear cycle pattern, it often means the body needs a different kind of support — whether that's a mental health conversation, thyroid check, or just consistent lifestyle anchors. You deserve more than just tracking and waiting.";
+          routeGuidance = "When mood shifts don't follow a clear cycle pattern, it often means the body needs a different kind of support - whether that's a mental health conversation, thyroid check, or just consistent lifestyle anchors. You deserve more than just tracking and waiting.";
         } else {
           routeGuidance = "Mood shifts around your cycle are real. They can affect your emotions, energy, focus, patience, and even how social you feel. You're not being dramatic or too sensitive. Hormones really can change how your body and brain respond to stress.";
         }
@@ -1776,7 +1776,7 @@ export function createNodes(env) {
           ...(nudge ? [nudge] : []),
           routeGuidance,
           "",
-          "If these feelings feel severe, last most of the month, or are affecting your relationships or work consistently, speaking with a healthcare provider or mental health professional is a real option — not because you can't handle it, but because you deserve support.",
+          "If these feelings feel severe, last most of the month, or are affecting your relationships or work consistently, speaking with a healthcare provider or mental health professional is a real option - not because you can't handle it, but because you deserve support.",
           ...safeFooter(),
         ];
       },
@@ -1795,7 +1795,7 @@ export function createNodes(env) {
     MOOD_TRIGGERS: {
       say: [
         "Some of the most common cycle-linked mood triggers: sleep disruption in the luteal phase, skipping meals or eating too late, overstimulation (noise, social pressure, screen time), and unresolved social stress that gets louder when your defenses are lower.",
-        "Tracking these alongside your cycle day makes the pattern visible — and once you see it, you can plan around it.",
+        "Tracking these alongside your cycle day makes the pattern visible - and once you see it, you can plan around it.",
         "Would you like to log how you're feeling today?",
       ],
       choices: [
@@ -1808,7 +1808,7 @@ export function createNodes(env) {
 
     MOOD_COPING: {
       say: [
-        "On the hard days, lowering the bar is not giving up — it's strategy. One small anchor (a walk, a meal, a shower) is enough.",
+        "On the hard days, lowering the bar is not giving up - it's strategy. One small anchor (a walk, a meal, a shower) is enough.",
         "Rest without guilt counts. Your body is doing something real during these phases and it needs more from you, not less.",
         "You don't have to feel better to take the next small step. You just have to take it.",
       ],
@@ -1833,7 +1833,7 @@ export function createNodes(env) {
     MOOD_WHEN_HELP: {
       say: [
         "Consider reaching out to a healthcare provider or mental health professional if: it's affecting your work or relationships consistently, it's happening most of the month rather than just around your cycle, you're having thoughts of self-harm, or it feels completely unmanageable.",
-        "These are not signs of weakness — they're signals that your body needs a different level of support than tracking and self-care can provide.",
+        "These are not signs of weakness - they're signals that your body needs a different level of support than tracking and self-care can provide.",
         "You deserve real help, not just coping strategies.",
       ],
       choices: [
@@ -1849,7 +1849,7 @@ export function createNodes(env) {
       autoNext() { return "PELVIC_SAFETY_CHECK"; },
     },
 
-    // ── Step 1: Safety check — always first ──────────────────────────────────
+    // ── Step 1: Safety check - always first ──────────────────────────────────
     PELVIC_SAFETY_CHECK: {
       say: [
         "Before we go further, I want to check something important 🩷",
@@ -1912,7 +1912,7 @@ export function createNodes(env) {
     },
     PELVIC_OVULATION_ROUTE: {
       say: [
-        "Mid-cycle pain around ovulation is actually quite common — it's sometimes called mittelschmerz 🩷",
+        "Mid-cycle pain around ovulation is actually quite common - it's sometimes called mittelschmerz 🩷",
         "It's usually one-sided, short-lived, and mild. But we'll check your pattern to make sure.",
       ],
       autoNext(ctx) {
@@ -1932,7 +1932,7 @@ export function createNodes(env) {
     },
     PELVIC_GENERAL_ROUTE: {
       say: [
-        "That's okay — pelvic pain can be hard to place 🩷",
+        "That's okay - pelvic pain can be hard to place 🩷",
         "Let's check a few things.",
       ],
       autoNext(ctx) {
@@ -1959,7 +1959,7 @@ export function createNodes(env) {
     },
     PELVIC_SEX_ENTRY_PAIN: {
       say: [
-        "Entry pain or tightness during sex can have a few causes — dryness, tension, vaginismus, or sometimes an infection 🩷",
+        "Entry pain or tightness during sex can have a few causes - dryness, tension, vaginismus, or sometimes an infection 🩷",
         "It's very treatable once the cause is identified.",
         "Have you noticed any dryness, unusual discharge, or does it happen every time?",
       ],
@@ -1973,7 +1973,7 @@ export function createNodes(env) {
     PELVIC_SEX_DEEP_PAIN: {
       say: [
         "Deep pain during sex is something worth taking seriously 🩷",
-        "It can be connected to conditions like endometriosis, fibroids, ovarian cysts, or pelvic inflammatory disease — all diagnosable and manageable.",
+        "It can be connected to conditions like endometriosis, fibroids, ovarian cysts, or pelvic inflammatory disease - all diagnosable and manageable.",
         "You deserve a proper assessment for this, not just painkillers.",
       ],
       autoNext(ctx) {
@@ -1998,7 +1998,7 @@ export function createNodes(env) {
       say() {
         return [
           `${ack()} How intense does the pain usually feel?`,
-          "Go with what actually matches your experience — not what you think you should tolerate.",
+          "Go with what actually matches your experience - not what you think you should tolerate.",
         ];
       },
       question: "Pelvic pain severity",
@@ -2009,7 +2009,7 @@ export function createNodes(env) {
       ],
     },
     PELVIC_IMPACT: {
-      say: ["Thanks for being honest 🩷", "Is this pelvic pain interfering with your daily life — like school/work, sleep, movement, or relationships?"],
+      say: ["Thanks for being honest 🩷", "Is this pelvic pain interfering with your daily life - like school/work, sleep, movement, or relationships?"],
       question: "Pelvic pain interfering with life?",
       choices: [
         { id: "yes", label: "Yes", next: "PELVIC_PATTERN", primary: true },
@@ -2061,7 +2061,7 @@ export function createNodes(env) {
         const r = ctx?.pelvicRoute;
         const routeNote = (() => {
           if (r === "period") {
-            return "If your period pain is this intense regularly, it may be worth asking a provider about conditions like endometriosis — not to alarm you, but because that level of pain is not something you should have to manage alone, and there are real treatment options.";
+            return "If your period pain is this intense regularly, it may be worth asking a provider about conditions like endometriosis - not to alarm you, but because that level of pain is not something you should have to manage alone, and there are real treatment options.";
           }
           if (r === "ovulation") {
             return "Mid-cycle pain that's this persistent or intense is worth mentioning to a provider. It may still be ovulation-related, but ruling out other causes is the right move.";
@@ -2070,7 +2070,7 @@ export function createNodes(env) {
             return "Pain that shows up without a clear pattern is worth monitoring. If it keeps happening or changes in intensity, a provider can help figure out what's behind it.";
           }
           if (r === "sex_deep" || r === "sex_entry" || r === "sex_after") {
-            return "Pain during sex is very treatable — the first step is identifying the cause, which a gynaecologist or sexual health provider can do properly. You don't have to live with this.";
+            return "Pain during sex is very treatable - the first step is identifying the cause, which a gynaecologist or sexual health provider can do properly. You don't have to live with this.";
           }
           return "Some people with ongoing pelvic pain later learn it's related to underlying causes (such as endometriosis), which only a healthcare provider can properly evaluate.";
         })();
@@ -2078,7 +2078,7 @@ export function createNodes(env) {
           "Thanks for sharing that 🩷",
           "Pelvic pain that is persistent, severe, or doesn't respond well to relief deserves attention. Not because something is 'wrong', but because pain shouldn't be dismissed.",
           routeNote,
-          "I can't diagnose anything — but noticing these patterns is an important step toward getting the right support.",
+          "I can't diagnose anything - but noticing these patterns is an important step toward getting the right support.",
           ...safeFooter(),
         ];
       },
@@ -2108,7 +2108,7 @@ export function createNodes(env) {
         return [
           `${ack()} 🩷`,
           note,
-          "It may be worth checking in with a healthcare provider in the next few weeks — not urgently, but soon.",
+          "It may be worth checking in with a healthcare provider in the next few weeks - not urgently, but soon.",
           ...safeFooter(),
         ];
       },
@@ -2120,7 +2120,7 @@ export function createNodes(env) {
       ],
     },
 
-    // ── Existing sex-specific path (kept — reached via PELVIC_SEX_ENTRY "not sure") ──
+    // ── Existing sex-specific path (kept - reached via PELVIC_SEX_ENTRY "not sure") ──
     PELVIC_SEX_INTRO: {
       say: [
         "Thanks for trusting me with this 🩷",
@@ -2202,7 +2202,7 @@ export function createNodes(env) {
     },
     ELSE_NOT_SURE: {
       say: [
-        "That's completely okay — sometimes it's hard to name it 🩷",
+        "That's completely okay - sometimes it's hard to name it 🩷",
         "Let me ask a couple of quick things.",
         "Is there anything that feels different from your normal cycle? For example: your timing, your flow, your pain level, or your mood?",
       ],
@@ -2227,7 +2227,7 @@ export function createNodes(env) {
     ELSE_PAIN_MILD: {
       say: [
         "Okay, thanks for telling me 🩷",
-        "Mild to moderate cramps can happen around your period (and even around ovulation) — but you still deserve support, not just a shrug.",
+        "Mild to moderate cramps can happen around your period (and even around ovulation) - but you still deserve support, not just a shrug.",
         "Quick check: is the pain improving with rest, heat (warm bottle/shower), or pain relief?",
       ],
       question: "Pain improving with rest/heat/relief?",
@@ -2270,7 +2270,7 @@ export function createNodes(env) {
     ELSE_PAIN_IMPROVING_NO: {
       say: [
         "Thanks for being honest 🩷",
-        "If cramps aren't improving with rest/heat/relief — or they're stopping you from doing normal things — that's worth paying attention to.",
+        "If cramps aren't improving with rest/heat/relief - or they're stopping you from doing normal things - that's worth paying attention to.",
         "I can't diagnose, but I can help you sort what's 'monitor' vs 'get checked'.",
         "Are you also having any of these right now?",
       ],
@@ -2301,7 +2301,7 @@ export function createNodes(env) {
     },
     ELSE_PAIN_NEW_WRAP: {
       say: [
-        "Thanks — 'new or different' is an important detail 🩷",
+        "Thanks - 'new or different' is an important detail 🩷",
         "Sometimes cramps shift with stress, sleep, diet changes, a delayed cycle, or hormonal changes.",
         "But if this repeats or keeps escalating, it's worth mentioning to a healthcare provider.",
         "If you want, I can help you summarize what changed so it's easy to explain.",
@@ -2315,7 +2315,7 @@ export function createNodes(env) {
     ELSE_PAIN_WORSENING: {
       say: [
         "Mm. If it's getting worse over multiple cycles, that's a good reason to take it seriously 🩷",
-        "Not because it automatically means something scary — but because you deserve support and answers.",
+        "Not because it automatically means something scary - but because you deserve support and answers.",
         "If you can, consider talking with a healthcare provider, especially if it affects school/work/sleep.",
         "Want to use the care map, or go back to the main menu?",
       ],
@@ -2329,7 +2329,7 @@ export function createNodes(env) {
       say: [
         "Got you 🩷",
         "If it's stable and not escalating, tracking + comfort strategies can be enough for many people.",
-        "If you'd like, I can help you track: day of cycle, intensity, and what improves it — that pattern can be really useful later.",
+        "If you'd like, I can help you track: day of cycle, intensity, and what improves it - that pattern can be really useful later.",
         "Want to go back to the main options?",
       ],
       choices: [
@@ -2341,7 +2341,7 @@ export function createNodes(env) {
     ELSE_PAIN_PROVIDER_SOON: {
       say: [
         "Thanks for sharing that 🩷",
-        "Because you selected symptoms that can sometimes signal something more than routine cramps, it would be a good idea to get medical advice soon — especially if symptoms worsen.",
+        "Because you selected symptoms that can sometimes signal something more than routine cramps, it would be a good idea to get medical advice soon - especially if symptoms worsen.",
         "If you feel faint, have severe one-sided pain, or very heavy bleeding, please treat it as urgent.",
         "Want to use the care map?",
       ],
@@ -2598,7 +2598,7 @@ export function createNodes(env) {
     ELSE_TALK_THROUGH: {
       say: [
         "Of course 🩷 Sometimes you just need to get it out before figuring out what it is.",
-        "Tell me what's been going on — in your own words, no right or wrong way to say it.",
+        "Tell me what's been going on - in your own words, no right or wrong way to say it.",
       ],
       choices: [],
     },
@@ -2640,12 +2640,12 @@ export function createNodes(env) {
 
     /* ---------------- CYCLE-AWARE SMART NODES ---------------- */
     // All nodes below use userMode.* and cd.* for context-aware responses.
-    // They never guess pregnancy — they check pregnancyConfirmed and mode explicitly.
+    // They never guess pregnancy - they check pregnancyConfirmed and mode explicitly.
 
     // Gate node: silently redirect to SESSION_MODE_CONFIRM if mode is unknown/browsing,
     // or go straight to CYCLE_EDD_ANSWER if already confirmed.
     CYCLE_EDD_GATE: {
-      say: [],   // no message — just a routing node
+      say: [],   // no message - just a routing node
       onEnter() {
         const mode = effectiveMode();
         if (mode === "pregnancy_tracking" || cd.pregnancyConfirmed) {
@@ -2659,7 +2659,7 @@ export function createNodes(env) {
 
     CYCLE_PHASE_ANSWER: {
       say() {
-        // Postpartum — cycle may not have returned
+        // Postpartum - cycle may not have returned
         if (userMode.isPostpartum) {
           return [
             "Since you're in postpartum mode, your cycle may still be returning 🩷",
@@ -2667,7 +2667,7 @@ export function createNodes(env) {
             "If you've had your first postpartum period and want to start tracking again, log it on the dashboard.",
           ];
         }
-        // Pregnancy — phase questions don't apply
+        // Pregnancy - phase questions don't apply
         if (userMode.isPregnancy) {
           return [
             "You're currently in pregnancy tracking mode, so cycle phases don't apply right now 🩷",
@@ -2678,7 +2678,7 @@ export function createNodes(env) {
           ctx.captureReturnTo = "CYCLE_PHASE_ANSWER";
           return [
             "I'd love to tell you what phase you're in 🩷",
-            "I need the date your last period started — you can enter it here or log it on your dashboard.",
+            "I need the date your last period started - you can enter it here or log it on your dashboard.",
           ];
         }
         const p = getCurrentPhase();
@@ -2688,15 +2688,15 @@ export function createNodes(env) {
         const daysLeft = daysBetween(new Date(), next);
         const periodNote = daysLeft > 0
           ? `Your next period is expected in about ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`
-          : "Your period may be due around now — if it hasn't come, keep an eye on it.";
+          : "Your period may be due around now - if it hasn't come, keep an eye on it.";
         const ttcNote = userMode.isTTC && p.phase === "ovulation"
-          ? "You're in your fertile window right now — best time if you're trying to conceive 🌟"
+          ? "You're in your fertile window right now - best time if you're trying to conceive 🌟"
           : userMode.isTTC && p.phase === "follicular"
-          ? "Ovulation is coming up soon — good time to prepare if you're TTC."
+          ? "Ovulation is coming up soon - good time to prepare if you're TTC."
           : null;
         return [
           ...quickSummary(
-            `You're in ${p.label} — day ${p.days + 1} of your cycle.`,
+            `You're in ${p.label} - day ${p.days + 1} of your cycle.`,
             `${qualifier()}: last period ${fmtDate(lmp)}, ${effectiveCycleLength()}-day cycle.`,
             periodNote
           ),
@@ -2735,26 +2735,26 @@ export function createNodes(env) {
           ctx.captureReturnTo = "CYCLE_NEXT_PERIOD";
           return [
             "To tell you when your next period is expected, I need your last period start date 🩷",
-            "You can type it here and I'll estimate right now — or log it on the dashboard.",
+            "You can type it here and I'll estimate right now - or log it on the dashboard.",
           ];
         }
         const next = cd.nextPeriodDate || addDays(cd.lmp, cd.cycleLength);
         const daysLeft = daysBetween(new Date(), next);
         const nextStr = fmtDate(next);
         const ttcNote = userMode.isTTC
-          ? `In TTC mode, ovulation likely falls around ${fmtDate(addDays(cd.lmp, Math.round(cd.cycleLength / 2)))} — about ${Math.round(cd.cycleLength / 2)} days into your cycle.`
+          ? `In TTC mode, ovulation likely falls around ${fmtDate(addDays(cd.lmp, Math.round(cd.cycleLength / 2)))} - about ${Math.round(cd.cycleLength / 2)} days into your cycle.`
           : null;
         if (daysLeft < 0) {
           const daysOver = Math.abs(daysLeft);
           return [
             `Based on your last period and your average ${cd.cycleLength}-day cycle, your period was expected around ${nextStr} 🩷`,
-            `That's ${daysOver} day${daysOver === 1 ? "" : "s"} ago — if it hasn't come yet, it may be worth checking in.`,
+            `That's ${daysOver} day${daysOver === 1 ? "" : "s"} ago - if it hasn't come yet, it may be worth checking in.`,
             "Is there any chance of pregnancy this cycle?",
           ].filter(Boolean);
         }
         if (daysLeft === 0) return [`Your period is expected today based on your logged cycle 🩷`, "If you're getting cramps or spotting, that's likely your body gearing up."];
-        if (daysLeft <= 3) return [`Your period is expected very soon — around ${nextStr}, in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`, "If you're already feeling crampy or moody, that's normal this close.", ttcNote].filter(Boolean);
-        if (daysLeft <= 7) return [`Your next period is expected around ${nextStr} — about ${daysLeft} days from now 🩷`, "You're in the late luteal phase, which is when PMS symptoms tend to show up.", ttcNote].filter(Boolean);
+        if (daysLeft <= 3) return [`Your period is expected very soon - around ${nextStr}, in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`, "If you're already feeling crampy or moody, that's normal this close.", ttcNote].filter(Boolean);
+        if (daysLeft <= 7) return [`Your next period is expected around ${nextStr} - about ${daysLeft} days from now 🩷`, "You're in the late luteal phase, which is when PMS symptoms tend to show up.", ttcNote].filter(Boolean);
         return [`Your next period is expected around ${nextStr}, about ${daysLeft} days away 🩷`, `Based on your last period date and your average ${cd.cycleLength}-day cycle.`, ttcNote].filter(Boolean);
       },
       choices() {
@@ -2776,7 +2776,7 @@ export function createNodes(env) {
         if (userMode.isPregnancy && cd.lmp) {
           const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
           return [
-            `Your last menstrual period was ${fmtDate(cd.lmp)} — that's how your pregnancy dates are calculated 🩷`,
+            `Your last menstrual period was ${fmtDate(cd.lmp)} - that's how your pregnancy dates are calculated 🩷`,
             `You're approximately ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along based on that date.`,
           ];
         }
@@ -2790,10 +2790,10 @@ export function createNodes(env) {
         const lmp = effectiveLmp();
         const daysAgo = daysBetween(lmp, new Date());
         const nextNote = daysAgo > effectiveCycleLength()
-          ? `Your next period may already be due — if it hasn't come, tap below.`
+          ? `Your next period may already be due - if it hasn't come, tap below.`
           : `You're on day ${daysAgo + 1} of your current cycle.`;
         return quickSummary(
-          `Your last period started ${fmtDate(lmp)} — ${daysAgo} day${daysAgo === 1 ? "" : "s"} ago.`,
+          `Your last period started ${fmtDate(lmp)} - ${daysAgo} day${daysAgo === 1 ? "" : "s"} ago.`,
           `${qualifier()}, ${effectiveCycleLength()}-day average cycle.`,
           nextNote
         );
@@ -2817,7 +2817,7 @@ export function createNodes(env) {
         if (userMode.isPregnancy) {
           return [
             "It looks like you've already confirmed your pregnancy on the dashboard 🩷",
-            "No need to test again — you're in pregnancy tracking mode.",
+            "No need to test again - you're in pregnancy tracking mode.",
             "Would you like to know your due date or how far along you are?",
           ];
         }
@@ -2832,15 +2832,15 @@ export function createNodes(env) {
         }
         if (timing.canTestNow) {
           return quickSummary(
-            `Your period was expected around ${fmtDate(timing.expectedPeriod)} — you can take a test now 🩷`,
+            `Your period was expected around ${fmtDate(timing.expectedPeriod)} - you can take a test now 🩷`,
             `${qualifier()}, ${effectiveCycleLength()}-day cycle.`,
             "Use first morning urine for the clearest result. Negative but period still missing? Retest in 48–72 hours."
           );
         }
         return quickSummary(
-          `Best time to test is from ${fmtDate(timing.testDate)} — about ${timing.daysToTest} day${timing.daysToTest === 1 ? "" : "s"} away.`,
+          `Best time to test is from ${fmtDate(timing.testDate)} - about ${timing.daysToTest} day${timing.daysToTest === 1 ? "" : "s"} away.`,
           `${qualifier()}: next period expected ${fmtDate(timing.expectedPeriod)}.`,
-          "Testing too early can give a false negative — hormone levels need time to build up."
+          "Testing too early can give a false negative - hormone levels need time to build up."
         );
       },
       choices: [
@@ -2853,7 +2853,7 @@ export function createNodes(env) {
 
     // ── EDD confirm gate ─────────────────────────────────────────────────
     // Quick 2-option confirm so we never give due-date math to someone
-    // who was just curious — shown once per session.
+    // who was just curious - shown once per session.
     EDD_CONFIRM: {
       onEnter() {
         // If already confirmed pregnancy this session, skip straight to EDD answer
@@ -2871,14 +2871,14 @@ export function createNodes(env) {
       ],
     },
 
-    // EDD in explore / planning mode — helpful, no false confirmation
+    // EDD in explore / planning mode - helpful, no false confirmation
     EDD_EXPLORE: {
       say() {
         const lmp = effectiveLmp();
         if (!lmp) {
           ctx.captureReturnTo = "EDD_EXPLORE";
           return [
-            "No problem — to estimate a hypothetical due date I just need a period start date to work from 🩷",
+            "No problem - to estimate a hypothetical due date I just need a period start date to work from 🩷",
             "Enter it below and I'll show you how the calculation works.",
           ];
         }
@@ -2906,9 +2906,9 @@ export function createNodes(env) {
           const weeksLeft  = Math.round(daysToEdd / 7);
           const timeNote   = daysToEdd > 0
             ? `About ${weeksLeft} week${weeksLeft === 1 ? "" : "s"} to go.`
-            : "Your due date has passed — make sure your provider has current information.";
+            : "Your due date has passed - make sure your provider has current information.";
           return quickSummary(
-            `Your estimated due date is ${fmtDate(cd.edd)}${weeksAlong !== null ? ` — you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along` : ""} 🩷`,
+            `Your estimated due date is ${fmtDate(cd.edd)}${weeksAlong !== null ? ` - you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along` : ""} 🩷`,
             `${qualifier()}, confirmed EDD from your dashboard.`,
             timeNote
           );
@@ -2926,7 +2926,7 @@ export function createNodes(env) {
           ].filter(Boolean);
         }
 
-        // ── NOT in pregnancy mode — the key safety check ─────────────────
+        // ── NOT in pregnancy mode - the key safety check ─────────────────
         // Never assume pregnancy. Ask first.
         if (!userMode.isPregnancy) {
           // Can calculate provisional EDD but must contextualise it
@@ -2934,15 +2934,15 @@ export function createNodes(env) {
           if (!hasLmpData()) {
             ctx.captureReturnTo = "CYCLE_EDD_ANSWER";
             return [
-              "Just checking — are you currently tracking a pregnancy, or just exploring due date info? 🩷",
+              "Just checking - are you currently tracking a pregnancy, or just exploring due date info? 🩷",
               "Either way, I need your last period start date to estimate. You can type it here.",
             ];
           }
           return [
-            "Just checking — are you currently tracking a pregnancy, or exploring due date info? 🩷",
+            "Just checking - are you currently tracking a pregnancy, or exploring due date info? 🩷",
             `I can see your last period was ${fmtDate(cd.lmp)}.`,
             provisionalEdd
-              ? `If a pregnancy started this cycle, a rough due date estimate would be around ${fmtDate(provisionalEdd)} — but this is not confirmed.`
+              ? `If a pregnancy started this cycle, a rough due date estimate would be around ${fmtDate(provisionalEdd)} - but this is not confirmed.`
               : null,
             "If you've had a positive test, switching to pregnancy tracking mode on the dashboard unlocks your full confirmed timeline.",
           ].filter(Boolean);
@@ -2997,7 +2997,7 @@ export function createNodes(env) {
           "If you're breastfeeding, your period may be delayed, sometimes for months.",
           "Your first postpartum period may be heavier, more painful, or irregular compared to before.",
           "Once you have your first period, log it on the dashboard so we can start tracking your cycle again.",
-          "If you're having heavy bleeding, severe pain, fever, or unusual discharge in the early postpartum weeks — that's worth checking with a provider urgently.",
+          "If you're having heavy bleeding, severe pain, fever, or unusual discharge in the early postpartum weeks - that's worth checking with a provider urgently.",
         ];
       },
       choices: [
@@ -3009,7 +3009,7 @@ export function createNodes(env) {
 
     /* ---------------- MODE-SPECIFIC ENTRY NODES ---------------- */
 
-    // Postpartum — dedicated pathway for users in postpartum mode
+    // Postpartum - dedicated pathway for users in postpartum mode
     POSTPARTUM_INTRO: {
       onEnter() { applySessionMode("postpartum"); },
       say() {
@@ -3030,7 +3030,7 @@ export function createNodes(env) {
       ],
     },
 
-    // TTC — dedicated pathway for users trying to conceive
+    // TTC - dedicated pathway for users trying to conceive
     TTC_INTRO: {
       onEnter() { applySessionMode("trying_to_conceive"); },
       say() {
@@ -3062,7 +3062,7 @@ export function createNodes(env) {
       ],
     },
 
-    // Session mode confirmation — fires when user action conflicts with logged mode
+    // Session mode confirmation - fires when user action conflicts with logged mode
     // e.g. asks for EDD but not in pregnancy mode
     MODE_CONFIRM: {
       onEnter() { /* no-op; mode applied when user picks a choice */ },
@@ -3115,7 +3115,7 @@ export function createNodes(env) {
         const provisionalEdd = cd.lmp ? addDays(cd.lmp, 280) : null;
         const weeksAlong     = cd.lmp ? Math.floor(daysBetween(cd.lmp, new Date()) / 7) : null;
         return [
-          "Got it — I'll treat this conversation as pregnancy tracking mode 🩷",
+          "Got it - I'll treat this conversation as pregnancy tracking mode 🩷",
           provisionalEdd && weeksAlong !== null
             ? `Based on your last period of ${fmtDate(cd.lmp)}, you're approximately ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along and your estimated due date is around ${fmtDate(provisionalEdd)}.`
             : "Once your last period date is logged on the dashboard I can calculate your due date and weeks along.",
@@ -3161,7 +3161,7 @@ export function createNodes(env) {
 
     /* ─────────────── SAFETY & CRITICAL REDIRECT NODES ─────────────── */
 
-    // Emergency — always urgent, never watered down
+    // Emergency - always urgent, never watered down
     EMERGENCY_REDIRECT: {
       say: [
         "Please stop and seek emergency care right now 🩷",
@@ -3175,7 +3175,7 @@ export function createNodes(env) {
       ],
     },
 
-    // Diagnosis redirect — validates concern without pretending to diagnose
+    // Diagnosis redirect - validates concern without pretending to diagnose
     DIAGNOSIS_REDIRECT: {
       say: [
         "I can hear that you're trying to make sense of what's happening 🩷",
@@ -3192,10 +3192,10 @@ export function createNodes(env) {
       ],
     },
 
-    // Medication redirect — warm caring redirect, never a hard refusal
+    // Medication redirect - warm caring redirect, never a hard refusal
     MEDICATION_REDIRECT: {
       say: [
-        "Dosage and medication safety depends on your full health picture — weight, other medications, any underlying conditions — and getting it wrong can cause real harm, so I can't advise on specifics 🩷",
+        "Dosage and medication safety depends on your full health picture - weight, other medications, any underlying conditions - and getting it wrong can cause real harm, so I can't advise on specifics 🩷",
         "That's not me brushing you off. A pharmacist genuinely has the full picture to help you properly, and in Jamaica you can walk in without a referral or appointment.",
         "If the pain is severe or not responding to anything, that's worth getting properly checked 🩷",
         "I can help you describe what you're feeling so you know exactly what to tell a pharmacist or provider when you go.",
@@ -3207,7 +3207,7 @@ export function createNodes(env) {
       ],
     },
 
-    // Safety support — sexual violence / coercion
+    // Safety support - sexual violence / coercion
     SAFETY_SUPPORT: {
       say: [
         "What you've shared takes courage 🩷 You deserve care, safety, and support, none of this is your fault.",
@@ -3223,13 +3223,13 @@ export function createNodes(env) {
       ],
     },
 
-    // Crisis support — mental health / suicidal ideation / self-harm
+    // Crisis support - mental health / suicidal ideation / self-harm
     CRISIS_SUPPORT: {
       say: [
-        "What you're feeling right now matters 🩷 I'm not able to give you the support you deserve — but real, caring help is available.",
-        "Jamaica Crisis Hotline: 888-NEW-LIFE (888-639-5433) — confidential, 24/7.",
+        "What you're feeling right now matters 🩷 I'm not able to give you the support you deserve - but real, caring help is available.",
+        "Jamaica Crisis Hotline: 888-NEW-LIFE (888-639-5433) - confidential, 24/7.",
         "You can also go to your nearest hospital emergency department and tell them how you're feeling.",
-        "You're not alone in this, and reaching out — even here — took strength.",
+        "You're not alone in this, and reaching out - even here - took strength.",
       ],
       choices: [
         { id: "ok",   label: "I'll reach out", next: "CLOSE", primary: true },
@@ -3241,10 +3241,10 @@ export function createNodes(env) {
     PRIVACY_INFO: {
       say: [
         "Really glad you asked 🩷 Your privacy matters and you deserve a straight answer.",
-        "Your data — period logs, symptoms, notes — is stored securely. It is never sold to third parties, ever.",
+        "Your data - period logs, symptoms, notes - is stored securely. It is never sold to third parties, ever.",
         "You are in control of your own logs. You can edit or delete entries any time from your dashboard.",
         "If you want to delete your account and all your data, go to Settings → Account → Delete Account. Everything goes.",
-        "This chat session isn't saved permanently — when you close Bloomie, the conversation is gone.",
+        "This chat session isn't saved permanently - when you close Bloomie, the conversation is gone.",
         "Bloom is also designed to comply with the Jamaica Data Protection Act 2020, which gives you the right to access, correct, and delete your personal data.",
         "You're not a product here. You're a person who deserves care and privacy.",
       ],
@@ -3275,7 +3275,7 @@ export function createNodes(env) {
 
     /* ─────────────── NEW BRANCH NODES ─────────────── */
 
-    // "Is my period late?" — smart lateness check
+    // "Is my period late?" - smart lateness check
     LATE_PERIOD_CHECK: {
       say() {
         if (!hasLmpData()) {
@@ -3293,7 +3293,7 @@ export function createNodes(env) {
         if (daysLate < 0) {
           const daysLeft = Math.abs(daysLate);
           return quickSummary(
-            `Your period isn't late — it's expected in about ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`,
+            `Your period isn't late - it's expected in about ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`,
             `${qualifier()}: last period ${fmtDate(lmp)}, ${cycleLen}-day cycle.`,
             daysLeft <= 5
               ? "You might start feeling PMS symptoms around now, that's normal."
@@ -3345,7 +3345,7 @@ export function createNodes(env) {
       },
     },
 
-    // "What does this symptom mean?" — education without diagnosis
+    // "What does this symptom mean?" - education without diagnosis
     SYMPTOM_EDUCATION: {
       say: [
         "I can give you general education on period and cycle symptoms 🩷",
@@ -3381,9 +3381,9 @@ export function createNodes(env) {
     EDUC_CRAMPS: {
       say: [
         "Period cramps (dysmenorrhoea) happen because your uterus contracts to shed its lining 🩷",
-        "Mild cramps are common and normal for the first 1–2 days. But cramps that stop you from daily life, don't respond to pain relief, or happen outside your period — that's a different story.",
+        "Mild cramps are common and normal for the first 1–2 days. But cramps that stop you from daily life, don't respond to pain relief, or happen outside your period - that's a different story.",
         "Conditions like endometriosis and adenomyosis can cause severe cramping and are often under-diagnosed.",
-        `${consent()} — how bad does it get for you?`,
+        `${consent()} - how bad does it get for you?`,
       ],
       choices: [
         { id: "mild",    label: "Manageable but annoying",  next: "MOOD_GUIDE", primary: true },
@@ -3439,7 +3439,7 @@ export function createNodes(env) {
       ],
     },
 
-    // "Should I see a doctor?" — rule-based red flag guidance
+    // "Should I see a doctor?" - rule-based red flag guidance
     SEE_DOCTOR_GUIDE: {
       say() {
         const lastIntent = ctx.lastIntent || null;
@@ -3570,11 +3570,11 @@ export function createNodes(env) {
     PERIMENOPAUSE_INTRO: {
       say: [
         pick([
-          "Perimenopause is one of the most under-discussed transitions in women's health — and you're right to want to understand it 🩷",
+          "Perimenopause is one of the most under-discussed transitions in women's health - and you're right to want to understand it 🩷",
           "The fact that you're paying attention to these changes already puts you ahead 🩷",
-          "Perimenopause can start earlier than most people expect — sometimes in the mid-30s — and it deserves real conversation 🩷",
+          "Perimenopause can start earlier than most people expect - sometimes in the mid-30s - and it deserves real conversation 🩷",
         ]),
-        "It's the transition period leading up to menopause — your hormones are shifting, and that shift can cause real, sometimes confusing symptoms.",
+        "It's the transition period leading up to menopause - your hormones are shifting, and that shift can cause real, sometimes confusing symptoms.",
         "What's been going on for you?",
       ],
       choices: [
@@ -3591,7 +3591,7 @@ export function createNodes(env) {
     PERI_VASOMOTOR_ROUTE: {
       say: [
         "Hot flashes and night sweats are some of the most well-known perimenopause symptoms 🩷",
-        "They happen because estrogen fluctuations affect your body's temperature regulation — your brain gets a false signal that you're overheating.",
+        "They happen because estrogen fluctuations affect your body's temperature regulation - your brain gets a false signal that you're overheating.",
         "How often are they happening, and are they affecting your sleep or daily life?",
       ],
       choices: [
@@ -3605,7 +3605,7 @@ export function createNodes(env) {
     PERI_CYCLE_ROUTE: {
       say: [
         "Irregular periods are often one of the first signs of perimenopause 🩷",
-        "Cycles can get shorter, longer, heavier, lighter, or just unpredictable — because estrogen and progesterone are no longer following their usual rhythm.",
+        "Cycles can get shorter, longer, heavier, lighter, or just unpredictable - because estrogen and progesterone are no longer following their usual rhythm.",
         "Has the change been gradual, or did it seem to shift suddenly?",
       ],
       choices: [
@@ -3619,7 +3619,7 @@ export function createNodes(env) {
     PERI_ABSENCE_CHECK: {
       say: [
         "If your periods have stopped for 12 months in a row, that's the clinical definition of menopause 🩷",
-        "Before that point, pregnancy is still possible — so if there's any chance of pregnancy, a test would help clarify things.",
+        "Before that point, pregnancy is still possible - so if there's any chance of pregnancy, a test would help clarify things.",
         "Has it been less than 12 months, or more?",
       ],
       choices: [
@@ -3631,7 +3631,7 @@ export function createNodes(env) {
 
     PERI_MOOD_ROUTE: {
       say: [
-        "Mood changes, brain fog, and emotional intensity during perimenopause are real — not imagined, not dramatic 🩷",
+        "Mood changes, brain fog, and emotional intensity during perimenopause are real - not imagined, not dramatic 🩷",
         "Estrogen affects serotonin and other brain chemicals, so as levels fluctuate, mood stability can too.",
         "Is it more like anxiety and irritability, or more like low mood and exhaustion?",
       ],
@@ -3645,7 +3645,7 @@ export function createNodes(env) {
 
     PERI_COGNITIVE_NOTE: {
       say: [
-        "Brain fog and memory changes during perimenopause are incredibly common — and incredibly frustrating 🩷",
+        "Brain fog and memory changes during perimenopause are incredibly common - and incredibly frustrating 🩷",
         "Estrogen plays a role in cognitive function, so when it fluctuates, concentration and recall can be affected.",
         "This usually improves as hormones stabilise, but if it's significantly affecting your daily life, it's worth mentioning to a provider.",
       ],
@@ -3658,7 +3658,7 @@ export function createNodes(env) {
     PERI_SLEEP_ROUTE: {
       say: [
         "Sleep disruption is one of the most exhausting parts of perimenopause 🩷",
-        "It can come from night sweats waking you up, or from progesterone changes that affect sleep quality directly — sometimes both.",
+        "It can come from night sweats waking you up, or from progesterone changes that affect sleep quality directly - sometimes both.",
         "Are you waking up from heat and sweating, or is it more that you just can't stay asleep?",
       ],
       choices: [
@@ -3670,9 +3670,9 @@ export function createNodes(env) {
 
     PERI_VAGINAL_ROUTE: {
       say: [
-        "Vaginal dryness and discomfort during sex are common in perimenopause and menopause — and they're very treatable 🩷",
+        "Vaginal dryness and discomfort during sex are common in perimenopause and menopause - and they're very treatable 🩷",
         "As estrogen drops, vaginal tissue can become thinner and less lubricated. This is called genitourinary syndrome of menopause and it does not have to be something you just live with.",
-        "There are options — from over-the-counter lubricants and moisturisers to treatments a provider can discuss with you.",
+        "There are options - from over-the-counter lubricants and moisturisers to treatments a provider can discuss with you.",
       ],
       choices: [
         { id: "map",    label: "Find care near me",              next: "START_MENU", action: "OPEN_MAP", primary: true },
@@ -3683,8 +3683,8 @@ export function createNodes(env) {
 
     PERI_MIXED_ROUTE: {
       say: [
-        "A mix of symptoms is actually very typical for perimenopause — it's rarely just one thing 🩷",
-        "The most helpful thing you can do right now is track what you're experiencing — when symptoms happen, how intense they are, and whether they're getting worse.",
+        "A mix of symptoms is actually very typical for perimenopause - it's rarely just one thing 🩷",
+        "The most helpful thing you can do right now is track what you're experiencing - when symptoms happen, how intense they are, and whether they're getting worse.",
         "That information is gold when you talk to a provider.",
       ],
       choices: [
@@ -3694,7 +3694,7 @@ export function createNodes(env) {
 
     PERI_UNSURE_ROUTE: {
       say: [
-        "That uncertainty is really common — perimenopause can start earlier than most people expect and the symptoms overlap with a lot of other things 🩷",
+        "That uncertainty is really common - perimenopause can start earlier than most people expect and the symptoms overlap with a lot of other things 🩷",
         "Some things that can help you figure it out: tracking your cycle changes, noting which symptoms cluster together, and thinking about your age and family history.",
         "You don't need a definitive answer to start paying attention.",
       ],
@@ -3709,7 +3709,7 @@ export function createNodes(env) {
     PERI_MONITOR_WRAP: {
       say: [
         "Based on what you've shared, this sounds like it may be part of the perimenopause transition 🩷",
-        "The most useful thing right now is consistent tracking — cycle dates, symptom types, intensity, and duration. Patterns over time tell a much clearer story than any single day.",
+        "The most useful thing right now is consistent tracking - cycle dates, symptom types, intensity, and duration. Patterns over time tell a much clearer story than any single day.",
         "If symptoms become more intense, start affecting your daily life significantly, or you have very heavy bleeding, that's when to move from tracking to seeking care.",
       ],
       choices: [
@@ -3721,7 +3721,7 @@ export function createNodes(env) {
 
     PERI_PROVIDER_SOON: {
       say: [
-        "What you're describing is worth discussing with a healthcare provider — not because it's an emergency, but because you deserve proper support for this transition 🩷",
+        "What you're describing is worth discussing with a healthcare provider - not because it's an emergency, but because you deserve proper support for this transition 🩷",
         "A provider can confirm whether this is perimenopause, rule out other causes, and talk through options that might help.",
         "In Jamaica, a gynaecologist or your GP is a good starting point. The care map can help you find someone nearby.",
       ],
@@ -3733,9 +3733,9 @@ export function createNodes(env) {
 
     MENOPAUSE_INFO_NODE: {
       say: [
-        "Twelve months without a period is the clinical marker for menopause — your body has completed that transition 🩷",
+        "Twelve months without a period is the clinical marker for menopause - your body has completed that transition 🩷",
         "What comes after is called postmenopause. Some symptoms like hot flashes and sleep disruption may continue for a while, but for many people they ease over time.",
-        "Vaginal dryness, bone health, and cardiovascular changes are things worth discussing with a provider now that you're postmenopausal — not to alarm you, but because this is a new chapter your body deserves support for.",
+        "Vaginal dryness, bone health, and cardiovascular changes are things worth discussing with a provider now that you're postmenopausal - not to alarm you, but because this is a new chapter your body deserves support for.",
       ],
       choices: [
         { id: "vaginal", label: "Vaginal dryness or discomfort", next: "PERI_VAGINAL_ROUTE" },
@@ -3748,7 +3748,7 @@ export function createNodes(env) {
     /* ---------------- EDUCATION: MENOPAUSE ---------------- */
     EDUC_MENOPAUSE: {
       say: [
-        "Menopause is defined as 12 consecutive months without a period — that 12-month mark is the official transition point 🩷 The average age is around 51, but it's completely normal to reach it earlier or later.",
+        "Menopause is defined as 12 consecutive months without a period - that 12-month mark is the official transition point 🩷 The average age is around 51, but it's completely normal to reach it earlier or later.",
         "It's important to name this clearly: menopause is a natural life transition, not an illness. That said, the hormonal shifts involved are real, and so are the symptoms, you don't have to just push through them.",
         "After menopause, some symptoms from the perimenopause years continue: hot flashes, sleep disruption, mood changes, vaginal dryness, joint discomfort, and changes in bone density are all things providers take seriously and can help with.",
         "Support options range from lifestyle approaches (movement, sleep hygiene, nutrition) to menopausal hormone therapy (MHT/HRT), non-hormonal medications, and talking therapies, the right fit depends on your health history and your preferences. A provider or menopause specialist can walk you through what's available 🩷",
@@ -3763,7 +3763,7 @@ export function createNodes(env) {
     EDUC_CONTRACEPTION: {
       say: [
         "Contraception is something Bloomie can give you a general overview of, but I want to be upfront: I can't recommend a specific method for you, because what works best really depends on your health history, your cycle, and your own goals 🩷",
-        "That said, here's a quick lay of the land: barrier methods (like condoms or diaphragms) work in the moment and don't affect your hormones. Hormonal methods (the pill, patch, ring, shot) use synthetic hormones to prevent pregnancy and can also help with cycle symptoms. Long-acting options (IUDs — hormonal or copper — and implants) are set-and-forget for years at a time.",
+        "That said, here's a quick lay of the land: barrier methods (like condoms or diaphragms) work in the moment and don't affect your hormones. Hormonal methods (the pill, patch, ring, shot) use synthetic hormones to prevent pregnancy and can also help with cycle symptoms. Long-acting options (IUDs - hormonal or copper - and implants) are set-and-forget for years at a time.",
         "Each category has real trade-offs, side effects, how easy they are to use, how quickly fertility returns and a provider or pharmacist can walk you through what fits your situation, your body, and your life.",
         "If you don't have a regular provider, a sexual health clinic or a pharmacist are both great first steps 🩷",
       ],
@@ -3776,7 +3776,7 @@ export function createNodes(env) {
     /* ---------------- EDUCATION: PCOS ---------------- */
     EDUC_PCOS: {
       say: [
-        "PCOS — polycystic ovary syndrome, is one of the most common hormonal conditions people with periods deal with, and it's way more manageable than it sounds 🩷",
+        "PCOS - polycystic ovary syndrome, is one of the most common hormonal conditions people with periods deal with, and it's way more manageable than it sounds 🩷",
         "It basically means your hormones are running a little out of balance, which can cause things like irregular or skipped periods, acne that flares around your cycle, extra hair growth (chin, chest, belly), weight changes, or difficulty conceiving.",
         "The frustrating part is that PCOS looks different for everyone, some people have most of those symptoms, some have just one or two. That's why getting an actual diagnosis (usually an ultrasound plus a blood panel) matters so much.",
         "If your periods are consistently irregular, or you've been noticing acne or hair changes alongside cycle issues, it's worth bringing up with a provider, not because it's an emergency, but because the right support makes a real difference 🩷",

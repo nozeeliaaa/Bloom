@@ -65,12 +65,8 @@ async function loadFromBackend() {
   try {
     const headers = await authHeaders();
     if (!headers) return null;
-<<<<<<< HEAD
 
     const res = await fetch(`${API_BASE}/api/preferences`, { headers });
-=======
-    const res = await fetch(`${API_BASE}/preferences`, { headers });
->>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
     if (!res.ok) return null;
     const data = await res.json();
     return data?.preferences || null;
@@ -97,20 +93,22 @@ async function saveToBackend(prefs) {
         ],
       },
     };
-<<<<<<< HEAD
 
     const res = await fetch(`${API_BASE}/api/preferences`, {
-=======
- 
-    const res = await fetch(`${API_BASE}/preferences`, {
->>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
       method:  "PUT",
       headers,
       body:    JSON.stringify(payload),
     });
- 
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("[Bloom] preferences save failed:", res.status, err);
+    } else {
+      console.log("[Bloom] preferences saved to backend ✓");
+    }
     return res.ok;
-  } catch {
+  } catch (e) {
+    console.error("[Bloom] preferences save error:", e);
     return false;
   }
 }
@@ -144,18 +142,11 @@ function applyPrefsToUI(prefs) {
   const theme = prefs.theme || getTheme();
   updateThemeButtons(theme);
   setTheme(theme);
-<<<<<<< HEAD
 
   if (els.hideSensitive)  els.hideSensitive.checked  = !!prefs.hideSensitive;
   if (els.compact)        els.compact.checked        = !!prefs.compact;
 
   // Reminders - flatten from backend shape or local shape
-=======
- 
-  if (els.hideSensitive) els.hideSensitive.checked = !!prefs.hideSensitive;
-  if (els.compact)       els.compact.checked       = !!prefs.compact;
- 
->>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
   const remindersEnabled = prefs.reminders?.enabled ?? !!prefs.reminders;
   if (els.reminders) els.reminders.checked = remindersEnabled;
  
@@ -184,10 +175,7 @@ async function init() {
   if (isAccountMode()) {
     const cloudPrefs = await loadFromBackend();
     if (cloudPrefs) {
-<<<<<<< HEAD
       // Cloud is source of truth - merge into local cache
-=======
->>>>>>> 3807b7c7aabc473c7d09e8ef5777964fdefd33df
       prefs = { ...prefs, ...cloudPrefs };
       setLocalPrefs(prefs);
     }
@@ -206,7 +194,7 @@ Object.entries(els.themeBtns).forEach(([key, btn]) => {
   });
 });
  
-// ─── Notification toggle changes — sync FCM immediately ───────────────────────
+// ─── Notification toggle changes - sync FCM immediately ───────────────────────
 [els.reminders, els.periodReminder, els.fertileAlert].forEach((toggle) => {
   toggle?.addEventListener("change", () => syncFCMToken());
 });
@@ -253,7 +241,7 @@ els.save?.addEventListener("click", async () => {
 els.reset?.addEventListener("click", async () => {
   localStorage.removeItem(LOCAL_KEY);
   applyPrefsToUI({});
-  // All toggles now off — unregister FCM
+  // All toggles now off - unregister FCM
   if (isAccountMode()) await unregisterFCMToken();
   showStatus("Reset to defaults.");
   showToast("Preferences reset.", "info");

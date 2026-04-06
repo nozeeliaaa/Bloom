@@ -37,7 +37,7 @@ service cloud.firestore {
 
     // ─── users/{uid} ────────────────────────────────────────────────────────
     // Users read/write their own doc only
-    // Admins can read (but not write) for support purposes — logged separately
+    // Admins can read (but not write) for support purposes - logged separately
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid);
@@ -103,7 +103,7 @@ service cloud.firestore {
     }
 
     // ─── auditLogs/{logId} ──────────────────────────────────────────────────
-    // No client writes ever — backend only
+    // No client writes ever - backend only
     // Admins can read all, users can read their own actions only
     match /auditLogs/{logId} {
       allow read: if isAdmin() ||
@@ -113,7 +113,7 @@ service cloud.firestore {
 
     // ─── adminUsers/{uid} ───────────────────────────────────────────────────
     // Only admins can read their own entry
-    // No client writes — managed manually or via super-admin only
+    // No client writes - managed manually or via super-admin only
     match /adminUsers/{uid} {
       allow read: if isAdmin() && request.auth.uid == uid;
       allow write: if false;
@@ -150,13 +150,13 @@ service cloud.firestore {
     }
 
     // ─── notificationsQueue/{notifId} ───────────────────────────────────────
-    // No client access — backend/Cloud Functions only
+    // No client access - backend/Cloud Functions only
     match /notificationsQueue/{notifId} {
       allow read, write: if false;
     }
 
     // ─── reports/{reportId} ─────────────────────────────────────────────────
-    // Admin read only — aggregated data, no private logs
+    // Admin read only - aggregated data, no private logs
     match /reports/{reportId} {
       allow read: if isAdmin();
       allow write: if false;

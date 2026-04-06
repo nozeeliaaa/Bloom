@@ -407,7 +407,7 @@
       let isFallback = false;
 
       try {
-        const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+        const apiBase = window.BLOOM_API_BASE ?? '';
         const res = await fetch(
           `${apiBase}/catalog/route?fromLat=${userLocation.lat}&fromLng=${userLocation.lng}` +
           `&toLat=${clinic.lat}&toLng=${clinic.lng}&mode=driving-car`
@@ -707,7 +707,7 @@
       initMap(); // always init the map first so it renders regardless of data
 
       try {
-        const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+        const apiBase = window.BLOOM_API_BASE ?? '';
         const res = await fetch(`${apiBase}/catalog/clinics`);
 
         if (!res.ok) throw new Error(`Backend error: ${res.status}`);
