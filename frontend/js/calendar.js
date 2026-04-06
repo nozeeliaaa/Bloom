@@ -279,6 +279,52 @@ async function recomputeCycleData() {
     return;
   }
 
+  // Always rebuild predictedPeriodDays from futureCycles using the locally-computed
+  // period duration. The backend caches by period START date, so logging additional
+  // days to an in-progress period doesn't bust its cache — it returns the duration
+  // from when only 1 day was logged. allLogs is always up-to-date, so we recompute
+  // the duration here and fill the correct number of days per future cycle.
+  if (state.futureCycles?.length) {
+    const todayKey = toDateKey(new Date());
+
+    // Cluster period days from allLogs to get average period duration
+    const pDays = Object.keys(allLogs)
+      .filter(k => allLogs[k]?.flow && allLogs[k].flow !== "none").sort();
+
+    let periodDuration = 5; // safe default if no logs
+    if (pDays.length) {
+      const cls = [];
+      let cs = pDays[0], ce = pDays[0];
+      for (let i = 1; i < pDays.length; i++) {
+        if (_daysBetween(pDays[i - 1], pDays[i]) > 3) { cls.push({ s: cs, e: ce }); cs = pDays[i]; }
+        ce = pDays[i];
+      }
+      cls.push({ s: cs, e: ce });
+      const durations = cls.map(c => Math.max(1, _daysBetween(c.s, c.e) + 1));
+      periodDuration  = Math.max(4, Math.round(durations.reduce((a, b) => a + b, 0) / durations.length));
+    }
+
+    const rebuilt = [];
+    // Also fix periodEnd inside each futureCycle so the prediction panel shows
+    // the correct date range (e.g. "May 21 – May 26") not "May 21 – May 21".
+    state.futureCycles = state.futureCycles.map(c => {
+      const pStart = typeof c.periodStart === "string" ? c.periodStart : null;
+      if (!pStart) return c;
+      const pEnd = _addDays(pStart, periodDuration - 1);
+      return { ...c, periodEnd: pEnd };
+    });
+    for (const c of state.futureCycles) {
+      const pStart = typeof c.periodStart === "string" ? c.periodStart : null;
+      if (!pStart || pStart <= todayKey) continue;
+      for (let i = 0; i < periodDuration; i++) rebuilt.push(_addDays(pStart, i));
+    }
+    console.log(
+      `[calendar] predictedPeriodDays rebuilt from futureCycles:` +
+      ` ${state.predictedPeriodDays?.length ?? 0} → ${rebuilt.length} (${periodDuration}d/cycle)`
+    );
+    state.predictedPeriodDays = rebuilt;
+  }
+
   // Convert ISO date strings → Date objects for renderPredictionPanel
   const futureCycles = (state.futureCycles || []).map(c => ({
     ...c,
