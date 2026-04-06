@@ -20,6 +20,31 @@ function sanitizeText(s, max = 300) {
   return s.trim().slice(0, max);
 }
 
+async function ensureParentDoc(collectionName, uid) {
+  const ref = db.collection(collectionName).doc(uid);
+  const snap = await ref.get();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  if (!snap.exists) {
+    await ref.set(
+      {
+        uid,
+        createdAt: now,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+    return;
+  }
+
+  await ref.set(
+    {
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+}
+
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
 // Each doc holds an items[] array — multiple symptoms per day
 
@@ -93,21 +118,16 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
     const payload = {
       dateKey,
       items: cleaned,
-      updatedAt: new Date(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     const snap = await docRef.get();
-    if (!snap.exists) payload.createdAt = new Date();
+    if (!snap.exists) payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
 
     await docRef.set(payload, { merge: true });
 
     // Ensure parent doc exists
-    const parentRef = db.collection("symptomLogs").doc(uid);
-    await parentRef.set({
-      uid,
-      updatedAt: new Date(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    await ensureParentDoc("symptomLogs", uid);
 
     return res.json({ ok: true, entry: payload });
   } catch (err) {
@@ -193,6 +213,8 @@ router.delete("/", requireAuth, async (req, res) => {
       const batch = db.batch();
       docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
       await batch.commit();
+      
+    await ensureParentDoc("symptomLogs", uid);
     }
 
     return res.json({ ok: true, deleted: docs.length });
@@ -218,6 +240,8 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey)
       .delete();
+    
+    await ensureParentDoc("symptomLogs", uid);
 
     return res.json({ ok: true });
   } catch (err) {

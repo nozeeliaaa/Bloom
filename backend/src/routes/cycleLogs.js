@@ -12,6 +12,31 @@ function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 }
 
+async function ensureParentDoc(collectionName, uid) {
+  const ref = db.collection(collectionName).doc(uid);
+  const snap = await ref.get();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  if (!snap.exists) {
+    await ref.set(
+      {
+        uid,
+        createdAt: now,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+    return;
+  }
+
+  await ref.set(
+    {
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+}
+
 // Collection path: cycleLogs/{uid}/entries/{dateKey}
 
 // Create/Update one day's cycle log
@@ -43,21 +68,16 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       hadSex: req.body.hadSex ?? false,
       contraceptionUsed: req.body.contraceptionUsed ?? false,
       notes: typeof req.body.notes === "string" ? req.body.notes.trim() : "",
-      updatedAt: new Date(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     const snap = await docRef.get();
-    if (!snap.exists) payload.createdAt = new Date();
+    if (!snap.exists) payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
 
     await docRef.set(payload, { merge: true });
 
     // Ensure parent doc exists
-    const parentRef = db.collection("cycleLogs").doc(uid);
-    await parentRef.set({
-      uid,
-      updatedAt: new Date(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    await ensureParentDoc("cycleLogs", uid);
 
     return res.json({ ok: true, entry: payload });
   } catch (err) {
@@ -146,6 +166,7 @@ router.delete("/", requireAuth, async (req, res) => {
       docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
       await batch.commit();
     }
+    await ensureParentDoc("cycleLogs", uid);
 
     return res.json({ ok: true, deleted: docs.length });
   } catch (err) {
@@ -170,6 +191,8 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey)
       .delete();
+
+    await ensureParentDoc("cycleLogs", uid);
 
     return res.json({ ok: true });
   } catch (err) {
