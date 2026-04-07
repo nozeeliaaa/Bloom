@@ -237,7 +237,7 @@
     }
 
     // Save personal details
-    saveBtn.addEventListener("click", () => {
+    saveBtn.addEventListener("click", async () => {
       const nickname = nicknameEl.value.trim();
       const yob      = yobEl.value.trim();
       if (yob) {
@@ -249,6 +249,27 @@
       }
       const profile = { ...loadProfile(), nickname, yob: yob ? Number(yob) : "" };
       localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+
+      // Sync nickname to backend so Bloomie can read it server-side.
+      // Failure is non-blocking — localStorage save already succeeded.
+      try {
+        const currentUser = getFirebaseAuth()?.currentUser;
+        if (currentUser) {
+          const token   = await currentUser.getIdToken();
+          const apiBase = window.BLOOM_API_BASE || "";
+          await fetch(`${apiBase}/api/user/profile`, {
+            method:  "POST",
+            headers: {
+              "Content-Type":  "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ nickname: nickname || null }),
+          });
+        }
+      } catch (e) {
+        console.warn("[profile] backend nickname sync failed:", e);
+      }
+
       showStatus("Profile saved ✓");
     });
 

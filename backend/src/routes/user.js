@@ -8,6 +8,22 @@ import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
 const router = express.Router();
 
+// Sanitize a nickname string: strip HTML, control chars, truncate to 30 chars.
+// Returns a non-empty string or null.
+function sanitizeNickname(raw) {
+  if (typeof raw !== "string") return null;
+  let s = raw
+    .replace(/\0/g, "")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .replace(/<script\b[^>]*>.*?<\/script>/gis, "")
+    .replace(/<style\b[^>]*>.*?<\/style>/gis, "")
+    .replace(/<[^>]*>/g, "")
+    .trim()
+    .slice(0, 30)
+    .trim();
+  return s.length > 0 ? s : null;
+}
+
 /* Create or update user profile */
 router.post("/profile", requireAuth, async (req, res) => {
   try {
@@ -38,6 +54,10 @@ router.post("/profile", requireAuth, async (req, res) => {
       consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
       remindersEnabled: req.body.remindersEnabled ?? existingProfile?.remindersEnabled ?? false,
       reminderTime: req.body.reminderTime ?? existingProfile?.reminderTime ?? "09:00",
+      nickname:
+        req.body.nickname !== undefined
+          ? sanitizeNickname(req.body.nickname)
+          : (existingProfile?.nickname ?? null),
     };
 
     await userRef.set(
@@ -85,13 +105,15 @@ router.post("/profile", requireAuth, async (req, res) => {
   }
 });
 
-/* Get user profile */
+/* Get user profile — returns { nickname: string | null } */
 router.get("/profile", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const doc = await db.collection("users").doc(uid).get();
-    if (!doc.exists) return res.json(null);
-    return res.json(doc.data());
+    if (!doc.exists) return res.json({ nickname: null });
+    const raw = doc.data()?.profile?.nickname;
+    const nickname = sanitizeNickname(raw) ?? null;
+    return res.json({ nickname });
   } catch (err) {
     console.error("GET /profile error:", err);
     return res.status(500).json({ error: "Failed to fetch profile" });

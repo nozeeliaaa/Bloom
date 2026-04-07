@@ -97,6 +97,9 @@ export function createCtx() {
     userNickname:             null,
     lastNicknameUsedAtDepth:  null,
     preEndChatState:          null,   // state to restore if user cancels END_CHAT_CONFIRM
+    resolutionStatus:         null,   // "resolved" | "unresolved" | "skipped" — set by RESOLUTION_CHECK
+    closeIntentDetected:      false,  // true when user typed a goodbye phrase (END_CHAT_PATTERN fired)
+    closeConfirmationPending: false,  // true while END_CHAT_CONFIRM node is visible
     pendingContradictionContext: null,     // stored when contradiction was detected
     pendingContextProbe:      null,        // stored when missing-context probe was asked
     pendingQuestion:          null,        // { type: "yes_no"|"severity"|"timing"|"duration"|"test_result"|"choice", nodeState: string }
@@ -128,5 +131,19 @@ export function createCtx() {
     oosStreakCount:        0,              // consecutive OOS responses (for conversational repair)
     isRetryAttempt:       false,          // true when user has sent same message twice (second repeat handling)
     loggingGapPending:    false,          // true when a symptom-logging-gap nudge is queued for next response
+    bloomieAnomalyCtx:    null,           // computed at mount: { cycleAnomaly, severitySpike, level }
+    moodMentions:         [],             // [{ depth, tone, intent }] — appended each time mood is detected
+
+    // ── Reported (user-confirmed) conditions ──────────────────────────────
+    reportedConditions:    [],     // condition keys stated as existing diagnoses this session,
+                                   // e.g. ["pcos", "anemia"]; seeded from bloomieMemory at mount
+    activeReportedCondition: null, // conditionKey from the most-recent detectReportedCondition hit;
+                                   // read by REPORTED_CONDITION_ACK.say()
+
+    // ── Anti-repetition ────────────────────────────────────────────────────
+    nodeHistory:           [],            // ordered list of visited node keys (capped at NODE_HISTORY_MAX)
+    contentSuggestionsShown: new Set(),   // content IDs shown this session; seeded from bloomieMemory at mount
+    declinedSuggestions:   new Set(),     // content IDs the user declined; seeded from bloomieMemory at mount
+    lastUsedGreeting:      null,          // first line of buildIntro() used this session; flushed to memory on save
   };
 }

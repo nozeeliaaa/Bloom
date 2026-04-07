@@ -3,14 +3,25 @@ import { extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloom
 import { getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 
 export function createOOS(env) {
-  const { ctx, consent, getCurrentPhase, phaseNudge, insightFor, pickPriorityConcern } = env;
+  const { ctx, consent, getCurrentPhase, phaseNudge, insightFor, pickPriorityConcern, bloomieMemory } = env;
 
   const OOS_DEFAULT = [
-    () => pick([
-      "I'm not sure I caught that 🩷 I focus on period and cycle concerns — tap a button below or tell me what's going on.",
-      "Hmm, I'm not sure how to help with that one 🩷 I'm best with period, cycle, spotting, cramps, or mood changes.",
-      "That one's a bit outside my lane 🩷 What's going on with your cycle?",
-    ]),
+    () => {
+      // Returning users with 5+ prior OOS interactions get a shorter, more
+      // direct redirect instead of the full explanatory reply.
+      const oosCount = (bloomieMemory?.oosCount ?? 0) + (ctx.oosStreakCount ?? 0);
+      if (oosCount >= 5) {
+        return pick([
+          "I can only help with period and cycle health 🩷 Try: \"late period\", \"spotting\", \"cramps\", or \"mood changes\".",
+          "I'm focused on reproductive health — what's going on with your cycle? 🩷",
+        ]);
+      }
+      return pick([
+        "I'm not sure I caught that 🩷 I focus on period and cycle concerns — tap a button below or tell me what's going on.",
+        "Hmm, I'm not sure how to help with that one 🩷 I'm best with period, cycle, spotting, cramps, or mood changes.",
+        "That one's a bit outside my lane 🩷 What's going on with your cycle?",
+      ]);
+    },
   ];
 
   // looksLikeGibberish → imported from bloomie-routing.js

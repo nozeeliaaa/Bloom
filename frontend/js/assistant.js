@@ -3,15 +3,88 @@ import { resolveTone, applyToneToLines, applyToneToChoices } from "./bloomie-ton
 import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory, loadLocalBloomieMemory, saveLocalBloomieMemory, loadUserProfile } from "./db.js";
-import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion } from "./bloomie-routing.js";
+import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion, detectReportedCondition, detectConditionManagementQuestion, detectConditionSymptomQuestion, CONDITION_META, CONDITION_ALIASES, extractConditionKey } from "./bloomie-routing.js";
 import { resolveIntentAssist } from "./bloomie-intent.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent, logAnalyticsEvent, bloomieDebug } from "./bloomie-logger.js";
 import { getIdToken, getUser } from "./auth.js";
 import { generateIntegratedSignals, getBloomieSymptomContext } from "./algorithms/bloom-symptom-engine.js";
+import { generateAnomalySignals } from "./algorithms/bloom-anomaly-engine.js";
 import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhaseConfidence } from "./algorithms/bloom-date-utils.js";
 import { createOOS } from "./bloomie-oos.js";
 import { createNodes } from "./bloomie-nodes.js";
+import { sanitizeInput, classifyInputSafety, sanitizeBotLine, authorizeHtmlPayload, isHtmlPayloadAuthorized } from "./bloomie-safety.js";
+
+// ── Mood anomaly context ────────────────────────────────────────────────────
+// Combines cycle-timing anomaly (from bloom-anomaly-engine) with a
+// symptom-severity deviation check (computed from symptomHistory).
+// Returns { cycleAnomaly: Signal|null, severitySpike: boolean, level: "none"|"medium"|"high" }
+// Called once at mount; result stored on ctx.bloomieAnomalyCtx.
+const MOOD_CATALOG_CODES = new Set([
+  "MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS", "FATIGUE",
+]);
+const SEVERITY_SPIKE_THRESHOLD = 1.2; // must exceed historical avg by this many points (1–5 scale)
+const SEVERITY_MIN_ENTRIES = 3;       // need at least this many history entries to baseline
+
+function computeMoodAnomalyCtx(cycleLengths = [], symptomHistory = []) {
+  // 1. Cycle-timing anomaly from the anomaly engine
+  let cycleAnomaly = null;
+  if (cycleLengths.length >= 4) {
+    try {
+      const result = generateAnomalySignals({ actualCycleLengths: cycleLengths });
+      const top = result?.topSignal;
+      if (top?.show && (top.level === "medium" || top.level === "high")) {
+        cycleAnomaly = top;
+      }
+    } catch {
+      // anomaly engine errors should never surface to the user
+    }
+  }
+
+  // 2. Symptom severity deviation for mood-related codes
+  // Partition history: baseline = all but most recent entry, recent = last entry
+  let severitySpike = false;
+  if (Array.isArray(symptomHistory) && symptomHistory.length >= SEVERITY_MIN_ENTRIES) {
+    const sorted = [...symptomHistory].sort((a, b) =>
+      a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0
+    );
+    const baseline = sorted.slice(0, -1);
+    const recent   = sorted[sorted.length - 1];
+
+    // Average severity of mood codes across baseline entries
+    const baselineSeverities = [];
+    for (const entry of baseline) {
+      for (const item of entry.items ?? []) {
+        if (MOOD_CATALOG_CODES.has(item.code) && typeof item.severity === "number") {
+          baselineSeverities.push(item.severity);
+        }
+      }
+    }
+
+    // Recent entry mood severities
+    const recentSeverities = (recent.items ?? [])
+      .filter(item => MOOD_CATALOG_CODES.has(item.code) && typeof item.severity === "number")
+      .map(item => item.severity);
+
+    if (baselineSeverities.length >= 2 && recentSeverities.length > 0) {
+      const avgBaseline = baselineSeverities.reduce((a, b) => a + b, 0) / baselineSeverities.length;
+      const avgRecent   = recentSeverities.reduce((a, b) => a + b, 0) / recentSeverities.length;
+      if (avgRecent - avgBaseline >= SEVERITY_SPIKE_THRESHOLD) {
+        severitySpike = true;
+      }
+    }
+  }
+
+  // 3. Derive overall level for gating in nodes
+  const cycleLevel = cycleAnomaly?.level ?? "none";
+  const level = cycleLevel === "high" || (cycleLevel === "medium" && severitySpike)
+    ? "high"
+    : cycleLevel === "medium" || severitySpike
+    ? "medium"
+    : "none";
+
+  return { cycleAnomaly, severitySpike, level };
+}
 
 /* ------------------ PAGE UI ------------------ */
 export function Chat() {
@@ -489,13 +562,51 @@ export function initBloomieChat({
       .map(([k]) => k);
     if (!activeSymptoms.length) return;
     const partialUpdate = {
-      lastSymptoms:        activeSymptoms,
-      lastIntent:          reason || null,
-      lastSeverity:        entities.severity,
-      lastDuration:        entities.duration,
-      lastPregnancyChance: entities.pregnancy?.chance || false,
-      recentTopics:        activeSymptoms.slice(0, 5),
-      lastSessionDate:     new Date().toISOString(),
+      lastSymptoms:            activeSymptoms,
+      lastIntent:              reason || null,
+      lastSeverity:            entities.severity,
+      lastDuration:            entities.duration,
+      lastPregnancyChance:     entities.pregnancy?.chance || false,
+      recentTopics:            activeSymptoms.slice(0, 5),
+      lastSessionDate:         new Date().toISOString(),
+      lastResolutionStatus:    ctx.resolutionStatus  ?? null,
+      closeIntentDetected:     ctx.closeIntentDetected ?? false,
+      // Anti-repetition fields — both shown AND declined must be persisted so
+      // content cards are not re-surfaced or re-offered in future sessions.
+      contentSuggestionsShown: [...ctx.contentSuggestionsShown].slice(0, 50),
+      declinedSuggestions:     [...ctx.declinedSuggestions].slice(0, 50),
+      lastGreetingUsed:        ctx.lastUsedGreeting ?? null,
+      // Reported conditions persist across sessions.
+      // Memory policy (req 10): only lightweight, non-sensitive identifiers
+      // are stored — condition keys ("pcos", "anemia") not clinical details.
+      // If the product's medical-data storage policy changes, revisit this.
+      reportedConditions:  ctx.reportedConditions.slice(0, 20),
+      // activeTopicCluster: the most recently active condition key this session,
+      // stored so the next session can resume context without re-stating it.
+      // Session-only when no reported condition exists; persisted only when the
+      // user has explicitly stated a diagnosis (user_reported source only).
+      activeTopicCluster:  ctx.reportedConditions.length > 0
+        ? ctx.reportedConditions[ctx.reportedConditions.length - 1]
+        : null,
+      // Cross-session concern continuity
+      lastConcernsResolved:   ctx.conversationProfile.concernsResolved.slice(0, 5),
+      lastConcernsUnresolved: ctx.conversationProfile.concernsUnresolved.slice(0, 5),
+      // Cross-session advice dedup — only clinically meaningful codes persisted
+      lastAdviceGiven: (() => {
+        const PERSIST_PREFIXES = ["told_to_test", "told_to_seek_care", "told_to_monitor", "logging_nudge"];
+        return [...ctx.adviceGiven]
+          .filter(k => PERSIST_PREFIXES.some(pfx => k === pfx || k.startsWith(pfx + "_")))
+          .slice(0, 10);
+      })(),
+      // Safety / OOS state — persisted so cross-session logic (e.g. shorter OOS
+      // redirect after 5+ prior OOS interactions) has an accurate running count.
+      urgentFlag:    ctx.urgency ?? false,
+      // oosCount: prior total (from loaded memory) + any new OOS turns this session.
+      // ctx.oosStreakCount resets within-session; we accumulate the historical sum here.
+      oosCount: Math.min(
+        ((bloomieMemory?.oosCount ?? 0) + (ctx.oosStreakCount ?? 0)),
+        9999
+      ),
     };
     saveLocalBloomieMemory(partialUpdate);
     if (onSaveMemory) onSaveMemory(partialUpdate);
@@ -599,6 +710,59 @@ export function initBloomieChat({
     }
   }
 
+  // ── Seed reported conditions from prior-session memory ───────────────────
+  // Conditions the user stated in a previous session persist so Bloomie keeps
+  // that context without making them re-state it every visit.
+  if (Array.isArray(bloomieMemory?.reportedConditions)) {
+    const VALID_KEYS = new Set(Object.keys(CONDITION_META));
+    for (const key of bloomieMemory.reportedConditions) {
+      if (typeof key === "string" && VALID_KEYS.has(key) && !ctx.reportedConditions.includes(key)) {
+        ctx.reportedConditions.push(key);
+      }
+    }
+  }
+
+  // ── Seed content suggestion dedup sets from prior-session memory ─────────
+  // contentSuggestionsShown and declinedSuggestions are accumulated across
+  // sessions so the same card is never surfaced twice. Seeded here; updated
+  // live by markContentShown() / markContentDeclined() during the session.
+  if (Array.isArray(bloomieMemory?.contentSuggestionsShown)) {
+    for (const id of bloomieMemory.contentSuggestionsShown) {
+      if (typeof id === "string" && id.length > 0) ctx.contentSuggestionsShown.add(id);
+    }
+  }
+  if (Array.isArray(bloomieMemory?.declinedSuggestions)) {
+    for (const id of bloomieMemory.declinedSuggestions) {
+      if (typeof id === "string" && id.length > 0) ctx.declinedSuggestions.add(id);
+    }
+  }
+
+  // ── Seed concern continuity from prior-session memory ────────────────────
+  // Resolved and unresolved topics carry over so Bloomie can proactively
+  // revisit an unresolved concern or avoid re-opening a resolved one.
+  if (Array.isArray(bloomieMemory?.lastConcernsResolved)) {
+    for (const t of bloomieMemory.lastConcernsResolved) {
+      if (typeof t === "string" && !ctx.conversationProfile.concernsResolved.includes(t)) {
+        ctx.conversationProfile.concernsResolved.push(t);
+      }
+    }
+  }
+  if (Array.isArray(bloomieMemory?.lastConcernsUnresolved)) {
+    for (const t of bloomieMemory.lastConcernsUnresolved) {
+      if (typeof t === "string" && !ctx.conversationProfile.concernsUnresolved.includes(t)) {
+        ctx.conversationProfile.concernsUnresolved.push(t);
+      }
+    }
+  }
+
+  // ── Seed clinically meaningful advice codes from prior-session memory ─────
+  // Prevents repeating advice like "take a pregnancy test" across sessions.
+  if (Array.isArray(bloomieMemory?.lastAdviceGiven)) {
+    for (const code of bloomieMemory.lastAdviceGiven) {
+      if (typeof code === "string") ctx.adviceGiven.add(code);
+    }
+  }
+
   // ── Pre-compute symptom signals from historical log data ──────────────────
   // Runs once on mount when symptomHistory is available. The result is stored
   // on ctx.symptomSignals and checked during message processing for safety
@@ -643,6 +807,9 @@ export function initBloomieChat({
     // Keep backward-compatible reference
     ctx.symptomSignals = ctx.integratedSignals.symptomSignals;
 
+    // Mood anomaly context — cycle-timing anomaly + severity deviation baseline
+    ctx.bloomieAnomalyCtx = computeMoodAnomalyCtx(cycleLengths, symptomHistory);
+
     // Logging gap proactive surfacing — flag for START node to show once
     const loggingGapSignal = ctx.integratedSignals.symptomSignals?.find(s => s.code === "SYMPTOM_LOGGING_GAP");
     if (loggingGapSignal?.level === "high" && !ctx.adviceGiven.has("logging_gap_surfaced")) {
@@ -654,6 +821,23 @@ export function initBloomieChat({
     $input.disabled = false;
     $input.placeholder = "Type here or use the buttons…";
     $input.setAttribute("maxlength", "240");
+  }
+
+  // ── Low-information / gibberish detector ─────────────────────────────────────
+  // Returns true for inputs like "feeeee", "aaaa", "lollllll", "...." that carry
+  // no useful health signal and should not trigger normal fallback logic.
+  function isLowInformationInput(text) {
+    if (!text) return true;
+    const cleaned = text.trim().toLowerCase();
+    if (cleaned.length <= 2) return true;
+    // Single repeated character: "aaaaa", "fffff"
+    if (/^([a-z])\1{2,}$/.test(cleaned)) return true;
+    // Mostly same characters: "feeeeeee"
+    const uniqueChars = new Set(cleaned.replace(/\s/g, ""));
+    if (uniqueChars.size <= 2 && cleaned.length > 4) return true;
+    // No vowels and long enough to be intentional gibberish
+    if (!/[aeiou]/.test(cleaned) && cleaned.length > 3) return true;
+    return false;
   }
 
   // ── Input quality analyzer — runs before normalization or routing ────────────
@@ -692,8 +876,40 @@ export function initBloomieChat({
       e.preventDefault();
       if (ctx.locked) return;
 
-      const text = ($input.value || "").trim();
+      const text = sanitizeInput(($input.value || "").trim());
       $input.value = "";
+
+      // ── Safety classification — runs before any routing or quality checks ─
+      // Blocks prompt-injection attempts, diagnosis demands, and unsafe
+      // instructions before they can influence entity extraction or routing.
+      const inputSafety = classifyInputSafety(text);
+      if (inputSafety.blocked) {
+        pushMsg("user", text);
+        say(inputSafety.response);
+        render();
+        return;
+      }
+
+      // ── Low-information / gibberish guard — runs BEFORE quality check ────
+      if (isLowInformationInput(text)) {
+        pushMsg("user", text);
+        if (ctx.lastWasLowInfo) {
+          say(pick([
+            "Still not catching it 😭 try a short sentence like 'my period is late' 🩷",
+            "I got you 🩷 just type what you're feeling like 'cramps' or 'late period'"
+          ]));
+        } else {
+          say(pick([
+            "Hmm I didn't quite catch that 🩷 You can tell me something like 'my period is late' or 'I have cramps'",
+            "I think that message got a little lost 😭 Try telling me what's going on in a few words 🩷",
+            "I'm here to help 🩷 Try typing something like 'my cycle is off' or 'I'm spotting'"
+          ]));
+        }
+        ctx.lastWasLowInfo = true;
+        render();
+        return;
+      }
+      ctx.lastWasLowInfo = false;
 
       // ── Input quality check — runs BEFORE normalization or routing ────────
       const inputQuality = analyzeInputQuality(text);
@@ -1063,7 +1279,9 @@ export function initBloomieChat({
         const _endChatRaw = text.trim().toLowerCase().replace(/[🩷💗.!]+$/, "").trim();
         const END_CHAT_PATTERN = /^(bye|bye bye|goodbye|good\s*bye|ok\s+bye|okay\s+bye|alright\s+bye|that'?s\s+all|thanks?,?\s+i'?m\s+done|i'?m\s+done|all\s+done|done\s+for\s+now|thanks\s+bye|thank\s+you\s+bye|take\s+care|that'?s\s+it|i'?m\s+finished|i'?m\s+good\s+thanks)$/i;
         if (END_CHAT_PATTERN.test(_endChatRaw)) {
-          ctx.preEndChatState = ctx.state;
+          ctx.preEndChatState           = ctx.state;
+          ctx.closeIntentDetected       = true;
+          ctx.closeConfirmationPending  = true;
           transition("END_CHAT_CONFIRM");
           return;
         }
@@ -1342,6 +1560,17 @@ export function initBloomieChat({
           if (val === true) ctx.sessionSymptoms.add(key);
         }
 
+        // Track mood mentions for continuity detection
+        // Appended whenever mood entity fires so MOOD_SAFETY_CHECK can detect
+        // persistence (same mood 2–3 turns in a row) or escalation (tone worsening).
+        if (sym.mood) {
+          ctx.moodMentions = [...(ctx.moodMentions || []), {
+            depth:  prof.sessionDepth,
+            tone:   ctx.currentTone ?? "neutral",
+            intent: ctx.lastIntent  ?? null,
+          }];
+        }
+
         // Update verbosity based on engagement level
         if (prof.sessionDepth >= 5) {
           prof.userEngagementLevel = "high";
@@ -1464,6 +1693,73 @@ export function initBloomieChat({
             transition(medCat.forceNext || "START_MENU", {});
           }, delay);
           ctx.timers.add(tid);
+          return;
+        }
+      }
+
+      // ── Reported-condition pre-checks ────────────────────────────────────
+      // Runs BEFORE OOS detection to prevent "I have PCOS" from being
+      // misrouted to the diagnosis_request refusal path.
+      //
+      // KEY DISTINCTION — three types of condition language:
+      //
+      //   REPORTED diagnosis  → user states a confirmed existing diagnosis
+      //     e.g. "I have PCOS", "diagnosed with endometriosis"
+      //     handled here → REPORTED_CONDITION_ACK
+      //     stored in ctx.reportedConditions + bloomieMemory (lightweight key only)
+      //
+      //   SUSPECTED diagnosis → user believes they may have something
+      //     e.g. "I think I might have PCOS", "I'm scared I have fibroids"
+      //     detectReportedCondition() returns null (SEEKING_PATTERNS bail early)
+      //     falls through to diagnosis_request OOS → DIAGNOSIS_REDIRECT
+      //     NOT stored in memory
+      //
+      //   DIAGNOSIS-SEEKING   → user asks Bloomie to diagnose them
+      //     e.g. "Do I have PCOS?", "Could this be endo?"
+      //     same OOS path as suspected → DIAGNOSIS_REDIRECT
+      //     NOT stored in memory
+      //
+      // Urgency is never suppressed — the PERSISTENT SAFETY RE-CHECK above
+      // already ran and returned early if extractUrgency() fired.
+      //
+      // Branch priority:
+      //   1. New reported diagnosis        → REPORTED_CONDITION_ACK
+      //   2. Management question (needs existing ctx.reportedConditions)
+      //                                   → CONDITION_MANAGEMENT_INFO
+      //   3. Symptom + condition keyword  → CONDITION_SYMPTOM_CONTEXT
+      {
+        // Branch 1: new reported diagnosis
+        const _reported = detectReportedCondition(normalizedText);
+        if (_reported) {
+          if (!ctx.reportedConditions.includes(_reported.conditionKey)) {
+            ctx.reportedConditions.push(_reported.conditionKey);
+          }
+          ctx.activeReportedCondition = _reported.conditionKey;
+          transition("REPORTED_CONDITION_ACK");
+          return;
+        }
+
+        // Branch 2: management/treatment question tied to an existing diagnosis
+        if (detectConditionManagementQuestion(normalizedText, ctx.reportedConditions)) {
+          // Set active condition to the one mentioned in this message, or
+          // fall back to the most recently reported if none is named inline.
+          const _inlineKey = extractConditionKey(normalizeText(normalizedText));
+          ctx.activeReportedCondition =
+            (_inlineKey && ctx.reportedConditions.includes(_inlineKey))
+              ? _inlineKey
+              : ctx.reportedConditions[ctx.reportedConditions.length - 1] ?? null;
+          transition("CONDITION_MANAGEMENT_INFO");
+          return;
+        }
+
+        // Branch 3: symptom question with a condition keyword + known diagnosis
+        if (detectConditionSymptomQuestion(normalizedText, ctx.reportedConditions)) {
+          const _inlineKey = extractConditionKey(normalizeText(normalizedText));
+          ctx.activeReportedCondition =
+            (_inlineKey && ctx.reportedConditions.includes(_inlineKey))
+              ? _inlineKey
+              : ctx.reportedConditions[ctx.reportedConditions.length - 1] ?? null;
+          transition("CONDITION_SYMPTOM_CONTEXT");
           return;
         }
       }
@@ -2182,6 +2478,62 @@ export function initBloomieChat({
   }
 
 
+  // ── Anti-repetition helpers ───────────────────────────────────────────────
+
+  /**
+   * pickAvoiding(pool, exclude) → string
+   * Picks a random item from pool, skipping exclude when a viable alternative
+   * exists. Falls back to the full pool if every item matches exclude.
+   */
+  function pickAvoiding(pool, exclude) {
+    if (!pool || pool.length === 0) return "";
+    const filtered = pool.filter(item => item !== exclude);
+    const source = filtered.length > 0 ? filtered : pool;
+    return source[Math.floor(Math.random() * source.length)];
+  }
+
+  /**
+   * wasNodeRecentlySeen(nodeKey, withinLast = 3) → boolean
+   * Returns true when nodeKey appears in the last `withinLast` entries of
+   * ctx.nodeHistory. Used to prevent tight node loops and repeated guidance.
+   */
+  function wasNodeRecentlySeen(nodeKey, withinLast = 3) {
+    const recent = ctx.nodeHistory.slice(-withinLast);
+    return recent.includes(nodeKey);
+  }
+
+  /**
+   * hasContentBeenShown(id) → boolean
+   * True when a content card with this id was shown in the current session
+   * or was recorded in bloomieMemory from a prior session.
+   */
+  function hasContentBeenShown(id) {
+    return ctx.contentSuggestionsShown.has(id);
+  }
+
+  /**
+   * markContentShown(id) — record that a content card was shown.
+   * Idempotent; safe to call multiple times for the same id.
+   */
+  function markContentShown(id) {
+    if (typeof id === "string" && id.length > 0) ctx.contentSuggestionsShown.add(id);
+  }
+
+  /**
+   * hasContentBeenDeclined(id) → boolean
+   * True when the user previously dismissed or declined this content card.
+   */
+  function hasContentBeenDeclined(id) {
+    return ctx.declinedSuggestions.has(id);
+  }
+
+  /**
+   * markContentDeclined(id) — record that the user dismissed a content card.
+   */
+  function markContentDeclined(id) {
+    if (typeof id === "string" && id.length > 0) ctx.declinedSuggestions.add(id);
+  }
+
   // ---------------- HELPERS ----------------
   function addDays(date, days) {
     const d = new Date(date);
@@ -2198,6 +2550,9 @@ export function initBloomieChat({
   const nowIso = () => new Date().toISOString();
 
   // ── Timing configuration ────────────────────────────────────────────────
+  // Maximum entries kept in ctx.nodeHistory — oldest are dropped via shift().
+  const NODE_HISTORY_MAX = 30;
+
   // Tune all Bloomie message pacing from one place.
   // calcDelay() and estimateSayTime() read these values — never hardcode ms.
   const BLOOMIE_TIMING = {
@@ -2285,7 +2640,7 @@ export function initBloomieChat({
       acc += step;
       const id = setTimeout(() => {
         ctx.isTyping = false;  // hide indicator before each bubble appears
-        pushMsg("bot", t);
+        pushMsg("bot", sanitizeBotLine(t));
         // Show indicator again between bubbles (not after the last one)
         if (idx < arr.length - 1) {
           ctx.isTyping = true;
@@ -2342,12 +2697,16 @@ export function initBloomieChat({
     // ── END_CHAT sentinels ────────────────────────────────────────────────
     if (nextState === "_END_CHAT_CANCEL") {
       const returnTo = ctx.preEndChatState || "START_MENU";
-      ctx.preEndChatState = null;
+      ctx.preEndChatState          = null;
+      ctx.closeConfirmationPending = false;
+      // closeIntentDetected stays true — user expressed intent to leave even if they cancelled
       transition(returnTo);
       return;
     }
     if (nextState === "_END_CHAT_RESET") {
       clearTimers();
+      // Capture resolution status before wiping ctx, so persistMemory can include it
+      const _finalResolution = ctx.resolutionStatus ?? "skipped";
       // Reset session context — mirrors the public reset() method
       ctx.history                   = [];
       ctx.answers                   = [];
@@ -2367,6 +2726,26 @@ export function initBloomieChat({
       ctx.pendingContextProbe       = null;
       ctx.recentInputs              = [];
       ctx.preEndChatState           = null;
+      ctx.closeConfirmationPending  = false;
+      ctx.closeIntentDetected       = false;
+      ctx.resolutionStatus          = null;
+      // Persist close-time fields before full reset
+      const _closeMemory = loadLocalBloomieMemory() || {};
+      const _closeUpdate = {
+        ..._closeMemory,
+        lastResolutionStatus:    _finalResolution,
+        closeIntentDetected:     true,
+        lastSessionDate:         new Date().toISOString(),
+        contentSuggestionsShown: [...ctx.contentSuggestionsShown].slice(0, 50),
+        declinedSuggestions:     [...ctx.declinedSuggestions].slice(0, 50),
+        lastGreetingUsed:        ctx.lastUsedGreeting ?? null,
+        reportedConditions:      ctx.reportedConditions.slice(0, 20),
+        activeTopicCluster:      ctx.reportedConditions.length > 0
+          ? ctx.reportedConditions[ctx.reportedConditions.length - 1]
+          : null,
+      };
+      saveLocalBloomieMemory(_closeUpdate);
+      if (onSaveMemory) onSaveMemory(_closeUpdate);
       ctx.state                     = "START";
       // Polite goodbye before restarting
       say("Thanks for chatting with me 🩷 I'm always here if you need support.");
@@ -2385,6 +2764,14 @@ export function initBloomieChat({
         topic:     ctx.topic,
         riskLevel: ctx.riskLevel,
       });
+    }
+
+    // ── nodeHistory: record outgoing state before overwriting ─────────────
+    // Only record when moving to a different node — self-transitions (e.g.
+    // a re-render) do not create a new history entry.
+    if (ctx.state !== nextState) {
+      ctx.nodeHistory.push(ctx.state);
+      if (ctx.nodeHistory.length > NODE_HISTORY_MAX) ctx.nodeHistory.shift();
     }
 
     ctx.state = nextState;
@@ -2673,7 +3060,7 @@ export function initBloomieChat({
           const showReactions = isBot && i === lastBotIndex && !ctx.isTyping;
           return `
             <div class="msg ${m.from}">
-              <div class="bubble${m.meta?.html ? " bubble--html" : ""}">${m.meta?.html ? m.text : escapeHtml(m.text).replaceAll("\n", "<br>")}</div>
+              <div class="bubble${m.meta?.html && isHtmlPayloadAuthorized(m.meta) ? " bubble--html" : ""}">${m.meta?.html && isHtmlPayloadAuthorized(m.meta) ? m.text : escapeHtml(m.text).replaceAll("\n", "<br>")}</div>
               ${showReactions ? (
                 m.meta?.feedbackSubmitted
                   ? `<div class="bubble-actions bubble-actions--thanks" aria-live="polite">Thanks for the feedback 🩷</div>`
@@ -2883,6 +3270,84 @@ export function initBloomieChat({
     ]);
   }
 
+  // Returns one user-facing symptom intelligence line, or null.
+  // Priority: bloomieInsight → more intense → persisting longer → new symptom → frequency increasing → logging nudge.
+  // Guards: anon, urgency, no symptom signals, per-line adviceGiven keys.
+  function buildSymptomInsightLine() {
+    if (ctx.isAnon) return null;
+    if (ctx.urgency) return null;
+    const symptomSignals = ctx.integratedSignals?.symptomSignals;
+    if (!Array.isArray(symptomSignals) || !symptomSignals.length) return null;
+
+    // ── bloomieInsight from primarySignal ──────────────────────────────────
+    if (!ctx.adviceGiven.has("symptom_insight")) {
+      const sCtx = getBloomieSymptomContext(symptomSignals);
+      if (sCtx.bloomieInsight && !sCtx.safetyEscalationNeeded && !sCtx.hasUrgentSignal) {
+        ctx.adviceGiven.add("symptom_insight");
+        return sCtx.bloomieInsight;
+      }
+    }
+
+    // ── Baseline deviation signals (one at a time) ─────────────────────────
+    if (!ctx.adviceGiven.has("symptom_baseline_intense")) {
+      const sig = symptomSignals.find(s => s.code === "SYMPTOMS_MORE_INTENSE_THAN_USUAL" && s.show);
+      if (sig) {
+        ctx.adviceGiven.add("symptom_baseline_intense");
+        return pick([
+          "Looking at your logs, some of what you're feeling seems more intense than usual for you — worth keeping an eye on 🩷",
+          "Your history suggests these symptoms are running a bit stronger than your typical pattern 🩷",
+        ]);
+      }
+    }
+
+    if (!ctx.adviceGiven.has("symptom_baseline_persisting")) {
+      const sig = symptomSignals.find(s => s.code === "SYMPTOMS_PERSISTING_LONGER_THAN_USUAL" && s.show);
+      if (sig) {
+        ctx.adviceGiven.add("symptom_baseline_persisting");
+        return pick([
+          "Your logs suggest this has been going on a bit longer than is usual for you — that's worth noting 🩷",
+          "Based on your history, this is lasting longer than your typical pattern — good to keep track of 🩷",
+        ]);
+      }
+    }
+
+    if (!ctx.adviceGiven.has("symptom_baseline_new")) {
+      const sig = symptomSignals.find(s => s.code === "NEW_SYMPTOM_DETECTED" && s.show);
+      if (sig) {
+        ctx.adviceGiven.add("symptom_baseline_new");
+        return pick([
+          "I noticed something a little new in your recent logs — it may be nothing, but it's worth logging again if it comes back 🩷",
+          "This doesn't appear often in your history — if it keeps showing up, it's worth mentioning to a provider 🩷",
+        ]);
+      }
+    }
+
+    if (!ctx.adviceGiven.has("symptom_baseline_trending")) {
+      const sig = symptomSignals.find(s => s.code === "SYMPTOM_FREQUENCY_INCREASING" && s.show);
+      if (sig) {
+        ctx.adviceGiven.add("symptom_baseline_trending");
+        return pick([
+          "Looking at your recent history, the intensity of some symptoms seems to be increasing across cycles — that pattern is worth discussing with a provider 🩷",
+          "Your logs suggest things have been gradually getting stronger across recent cycles — worth keeping track of 🩷",
+        ]);
+      }
+    }
+
+    // ── Logging nudge — lowest priority ────────────────────────────────────
+    if (!ctx.adviceGiven.has("symptom_logging_nudge")) {
+      const sCtx = getBloomieSymptomContext(symptomSignals);
+      if (sCtx.shouldNudgeLogging) {
+        ctx.adviceGiven.add("symptom_logging_nudge");
+        return pick([
+          "One thing that would really help me give you better insight: logging your symptoms a little more regularly — even a quick check-in every few days 🩷",
+          "More regular symptom logs help me spot patterns for you much more accurately — even rough entries count 🩷",
+        ]);
+      }
+    }
+
+    return null;
+  }
+
   // Returns one personalised cycle-context line, or null.
   // Guards: urgency, no signals, already shown this session.
   function buildCyclePersonalisationLine(context) {
@@ -2932,12 +3397,61 @@ export function initBloomieChat({
     return null;
   }
 
+  // Returns one natural-language line for a dead/disconnected cycle signal, or null.
+  // Handles: LOGGING_GAP, PREDICTION_DRIFT, SUDDEN_CYCLE_SHIFT.
+  // Guards: urgency active, no cycle signals, already shown this session.
+  // context: "general" | "late" (currently unused but reserved for future filtering)
+  function buildCycleSignalLine(context = "general") {  // eslint-disable-line no-unused-vars
+    if (ctx.urgency) return null;
+    const cycleSignals = ctx.integratedSignals?.cycleSignals;
+    if (!Array.isArray(cycleSignals) || !cycleSignals.length) return null;
+
+    // LOGGING_GAP — gently nudge logging; only once per session
+    if (
+      !ctx.adviceGiven.has("cycle_logging_gap") &&
+      cycleSignals.some(s => s.code === "LOGGING_GAP" && s.show)
+    ) {
+      ctx.adviceGiven.add("cycle_logging_gap");
+      return pick([
+        "One thing that would help me give you better insight: keeping your cycle log a little more up to date — even rough dates make a difference 🩷",
+        "Just a gentle note: it looks like there may be a gap in your recent cycle logs. Even approximate dates help me spot patterns for you 🩷",
+        "Your cycle log looks like it may have a gap recently — logging when you can really helps me personalise what I share with you 🩷",
+      ]);
+    }
+
+    // PREDICTION_DRIFT — cautious uncertainty line for late/irregular contexts
+    if (
+      !ctx.adviceGiven.has("cycle_prediction_drift") &&
+      cycleSignals.some(s => s.code === "PREDICTION_DRIFT" && s.show)
+    ) {
+      ctx.adviceGiven.add("cycle_prediction_drift");
+      return pick([
+        "I should mention: your recent cycle data suggests the timing of your period has been shifting a bit, so the expected date I'm working with may not be perfectly accurate 🩷",
+        "Worth knowing: the pattern in your recent cycles suggests your period timing has been a little unpredictable lately, so take any estimated dates as a rough guide 🩷",
+      ]);
+    }
+
+    // SUDDEN_CYCLE_SHIFT — pattern-change acknowledgment for late/irregular contexts
+    if (
+      !ctx.adviceGiven.has("cycle_sudden_shift") &&
+      cycleSignals.some(s => s.code === "SUDDEN_CYCLE_SHIFT" && s.show)
+    ) {
+      ctx.adviceGiven.add("cycle_sudden_shift");
+      return pick([
+        "I noticed your recent cycle pattern looks a little different from your usual — that can happen for lots of reasons and doesn't necessarily mean anything is wrong 🩷",
+        "Your cycle logs show a bit of a shift in your recent pattern compared to your usual rhythm — worth keeping an eye on 🩷",
+      ]);
+    }
+
+    return null;
+  }
+
   const env = {
     ctx, cd, userMode, say, transition, pick, ack, qualifier, consent, estimate,
     quickSummary, safeFooter, urgentFooter, minorSafeFooter, effectiveLmp, effectiveCycleLength,
     effectiveMode, hasLmpData, getCurrentPhase, phaseNudge, insightFor, addDays, fmtDate,
-    buildSummaryCard, applySessionMode, canGiveAdvice, filterDedup,
-    daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildSymptomPatternLine, greet, buildCycleCtx,
+    buildSummaryCard, authorizeHtmlPayload, applySessionMode, canGiveAdvice, filterDedup,
+    daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildCycleSignalLine, buildSymptomPatternLine, buildSymptomInsightLine, greet, buildCycleCtx,
     withNickname, canUseNickname, getNickname,
     pickPriorityConcern, getPhaseInsight, getToneOpener, buildGuidanceResponse,
     getStructuredSummary, computePhaseConfidence, logSafetyEvent,
@@ -2947,6 +3461,12 @@ export function initBloomieChat({
     SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS,
     CONCERN_PRIORITY,
     bloomieMemory,
+    // Anti-repetition helpers
+    pickAvoiding, wasNodeRecentlySeen,
+    hasContentBeenShown, markContentShown,
+    hasContentBeenDeclined, markContentDeclined,
+    // Reported-condition support
+    CONDITION_META, CONDITION_ALIASES, extractConditionKey,
   };
   const NODES = createNodes(env);
   const { OOS, OOS_DEFAULT, HEALTH_OVERRIDE_PATTERNS, CYCLE_QUESTION_PATTERNS, routeUserText } = createOOS(env);

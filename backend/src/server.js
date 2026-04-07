@@ -16,6 +16,9 @@ import bloomieMemoryRoutes    from "./routes/bloomieMemory.js";
 import bloomieSafetyLogRoutes from "./routes/bloomieSafetyLog.js";
 import bloomieAnalyticsRoutes from "./routes/bloomieAnalytics.js";
 import feedbackRoutes         from "./routes/feedback.js";
+import bloomieContextRoutes      from "./routes/bloomieContext.js";
+import bloomieContentMatchRoutes from "./routes/bloomieContentMatch.js";
+import preferencesRoutes         from "./routes/preferences.js";
 
 const app = express();
 
@@ -74,6 +77,9 @@ app.use("/api/bloomie-memory",    bloomieMemoryRoutes);
 app.use("/api/bloomie-safety-log", bloomieSafetyLogRoutes);
 app.use("/api/bloomie/analytics",  bloomieAnalyticsRoutes);
 app.use("/api/feedback",           feedbackRoutes);
+app.use("/api/bloomie-context",       bloomieContextRoutes);
+app.use("/api/bloomie-content-match", bloomieContentMatchRoutes);
+app.use("/api/preferences",           preferencesRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ ok: true, message: "Backend is running 🚀" });

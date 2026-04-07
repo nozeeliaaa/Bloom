@@ -18,7 +18,11 @@ import { MODE_BANNER_ONCE_KEY } from "./utils.js";
 
 const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
-const MEMORY_KEY = "bloom_bloomie_memory";
+// Single canonical key for all Bloomie memory read/write paths.
+// Previously "bloom_bloomie_memory" (cloud-sync path) and "bloomieMemory"
+// (local path) were different keys — data written by one was invisible to
+// the other. Both are now unified under this one key.
+const MEMORY_KEY = "bloomieMemory";
 
 // Set in firebaseConfig.js: window.BLOOM_API_BASE = "http://localhost:4000";
 const API_BASE = window.BLOOM_API_BASE || "";
@@ -323,18 +327,51 @@ export async function getAssistantSession() {
 // Bloomie local memory defaults
 // --------------------
 
-const BLOOMIE_MEMORY_KEY = "bloomieMemory";
-
+/**
+ * BLOOMIE_MEMORY_DEFAULTS
+ *
+ * Mirrors the bloomieMemory/{uid} Firestore schema defined in
+ * backend/src/routes/bloomieMemory.js.
+ *
+ * Used to seed localStorage on first load (anon mode) and as a safe
+ * fallback when the Firestore document does not yet exist.
+ *
+ * DO NOT store raw cycle dates or raw symptom histories here — those live
+ * in cycleLogs/{uid} and symptomLogs/{uid} respectively.
+ */
 export const BLOOMIE_MEMORY_DEFAULTS = {
-  lastSymptoms:           [],
-  recentTopics:           [],
+  // Identity / lifecycle (populated by backend on first PUT)
+  uid:                    null,
+  sessionCount:           0,
+  lastSessionDate:        null,
+  // Conversational state
   lastIntent:             null,
+  lastPatternSummary:     null,
   lastSeverity:           null,
+  lastUrgencyLevel:       null,
+  lastRedFlagRoute:       null,
   lastDuration:           null,
   lastPregnancyChance:    false,
-  lastUrgencyLevel:       null,
+  // Symptom / topic memory (compact — codes only, no raw logs)
+  lastSymptoms:           [],
+  recentTopics:           [],
   recentConcernCategory:  null,
-  lastSessionDate:        null,
+  // Safety / OOS state
+  urgentFlag:             false,
+  redFlagNoticeShown:     false,
+  lastOosCategory:        null,
+  oosCount:               0,
+  lastSafeRedirect:       null,
+  // Interaction state
+  lastResolutionStatus:   null,
+  closeIntentDetected:    false,
+  lastGreetingUsed:       null,
+  // Content tracking
+  contentSuggestionsShown: [],
+  declinedSuggestions:    [],
+  // Condition memory
+  reportedConditions:     [],
+  activeTopicCluster:     null,
 };
 
 /**
@@ -343,9 +380,9 @@ export const BLOOMIE_MEMORY_DEFAULTS = {
  * Seeds and returns BLOOMIE_MEMORY_DEFAULTS when the key is absent or corrupt.
  */
 export function getOrInitBloomieMemory() {
-  const stored = readJSON(BLOOMIE_MEMORY_KEY, null);
+  const stored = readJSON(MEMORY_KEY, null);
   if (stored) return stored;
-  writeJSON(BLOOMIE_MEMORY_KEY, BLOOMIE_MEMORY_DEFAULTS);
+  writeJSON(MEMORY_KEY, BLOOMIE_MEMORY_DEFAULTS);
   return { ...BLOOMIE_MEMORY_DEFAULTS };
 }
 
@@ -356,13 +393,13 @@ export function getOrInitBloomieMemory() {
 export function updateBloomieLocalMemory(patch) {
   const current = getOrInitBloomieMemory();
   const updated  = { ...current, ...patch };
-  writeJSON(BLOOMIE_MEMORY_KEY, updated);
+  writeJSON(MEMORY_KEY, updated);
   return updated;
 }
 
 export function loadLocalBloomieMemory() {
   try {
-    const data = localStorage.getItem("bloomieMemory");
+    const data = localStorage.getItem(MEMORY_KEY);
     if (!data) return {};
     return JSON.parse(data);
   } catch {
@@ -374,7 +411,7 @@ export function saveLocalBloomieMemory(update) {
   try {
     const existing = loadLocalBloomieMemory();
     const merged = { ...existing, ...update };
-    localStorage.setItem("bloomieMemory", JSON.stringify(merged));
+    localStorage.setItem(MEMORY_KEY, JSON.stringify(merged));
   } catch {}
 }
 
@@ -402,9 +439,12 @@ export async function loadBloomieMemory() {
 
 // Save a compact memory snapshot. Always writes to localStorage,
 // and syncs to Firestore in account mode.
+// Uses merge semantics for localStorage so a partial update from
+// persistMemory() does not overwrite fields it did not touch.
 export async function saveBloomieMemory(memoryData) {
   if (!memoryData) return;
-  writeJSON(MEMORY_KEY, memoryData);
+  const existing = loadLocalBloomieMemory();
+  writeJSON(MEMORY_KEY, { ...existing, ...memoryData });
   if (!isAccountMode()) return;
   try {
     const headers = await authHeaders();

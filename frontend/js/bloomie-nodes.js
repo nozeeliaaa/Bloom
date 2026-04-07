@@ -3,10 +3,14 @@ export function createNodes(env) {
     ctx, cd, userMode, say, transition, pick, ack, qualifier, consent, estimate,
     quickSummary, safeFooter, urgentFooter, minorSafeFooter, effectiveLmp, effectiveCycleLength,
     effectiveMode, hasLmpData, getCurrentPhase, phaseNudge, insightFor, addDays, fmtDate,
-    buildSummaryCard, applySessionMode, canGiveAdvice, filterDedup,
-    daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildSymptomPatternLine, greet, buildCycleCtx,
+    buildSummaryCard, authorizeHtmlPayload, applySessionMode, canGiveAdvice, filterDedup,
+    daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildCycleSignalLine, buildSymptomPatternLine, buildSymptomInsightLine, greet, buildCycleCtx,
     withNickname, canUseNickname, getNickname,
     bloomieMemory,
+    pickAvoiding, wasNodeRecentlySeen,
+    hasContentBeenShown, markContentShown,
+    hasContentBeenDeclined, markContentDeclined,
+    CONDITION_META, CONDITION_ALIASES, extractConditionKey,
     pickPriorityConcern, getPhaseInsight, getToneOpener, buildGuidanceResponse,
     getStructuredSummary, computePhaseConfidence, logSafetyEvent,
     parseNaturalDate, validateCycleDate, validateCalendarDate,
@@ -64,11 +68,119 @@ export function createNodes(env) {
     };
   }
 
+  // ── Mood continuity helper ────────────────────────────────────────────────
+  // Reads ctx.moodMentions (recorded in assistant.js on every mood entity hit)
+  // and returns one of three signals:
+  //   { type: "none" }
+  //   { type: "persistent", count }   — same mood 2–3 turns in a row
+  //   { type: "escalated",  count }   — tone has worsened across mentions
+  //
+  // Returns null when: urgency is active, fewer than 2 mentions exist, or the
+  // continuity was already surfaced this session (adviceGiven guard).
+  //
+  // buildMoodContinuityLine() converts that signal into a pick()d sentence.
+  // Must be called BEFORE consumeGuard so callers can decide whether to surface.
+  function getMoodContinuitySignal() {
+    if (ctx.urgency) return null;
+    if (ctx.adviceGiven.has("mood_continuity_surfaced")) return null;
+    const mentions = ctx.moodMentions ?? [];
+    if (mentions.length < 2) return null;
+
+    // Use last 3 mentions only — older history decays
+    const recent = mentions.slice(-3);
+
+    // Escalation: tone has moved toward a more distressed/serious value
+    const TONE_WEIGHT = { neutral: 0, casual: 0, exhausted: 1, frustrated: 1,
+                          anxious: 2, angry: 2, distressed: 3 };
+    const weights = recent.map(m => TONE_WEIGHT[m.tone] ?? 0);
+    const isEscalating = weights.length >= 2 && weights[weights.length - 1] > weights[0];
+
+    if (isEscalating) return { type: "escalated", count: recent.length };
+    if (recent.length >= 2) return { type: "persistent", count: recent.length };
+    return null;
+  }
+
+  function buildMoodContinuityLine() {
+    const signal = getMoodContinuitySignal();
+    if (!signal) return null;
+
+    // Mark as surfaced — only show once per session
+    ctx.adviceGiven.add("mood_continuity_surfaced");
+
+    if (signal.type === "escalated") {
+      return pick([
+        "It sounds like this has been getting heavier as we've been talking — I want to make sure I'm giving you what you actually need right now 🩷",
+        "I'm noticing this feels like it's intensifying — that's worth paying attention to, not pushing through 🩷",
+        "The more you share, the clearer it is that this isn't a small thing — I hear you 🩷",
+      ]);
+    }
+
+    // persistent
+    return pick([
+      "It sounds like this hasn't really eased up since you first mentioned it — and that matters 🩷",
+      "You're still feeling this, and the fact that it keeps coming back tells me it deserves more than just sitting with it 🩷",
+      "I've been noticing this has come up more than once — that kind of persistence is worth taking seriously 🩷",
+    ]);
+  }
+
+  // Build a soft recall line from stale background context (>24h, <7d).
+  // Uses the same symptom → label mapping as buildRecallLine, but with
+  // softer language since the data is older.
+  function buildBackgroundRecallLine() {
+    if (ctx.isAnon) return null;
+    if (!ctx.backgroundContext?.symptoms) return null;
+    const labels = [...new Set(
+      Object.entries(ctx.backgroundContext.symptoms)
+        .filter(([, v]) => v)
+        .flatMap(([k]) => SYMPTOM_TO_CATALOG_KEYS[k] || [])
+        .map(code => CATALOG_LABELS[code])
+        .filter(Boolean)
+        .slice(0, 3)
+    )];
+    if (!labels.length) return null;
+    const list = labels.length === 1
+      ? labels[0]
+      : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+    return pick([
+      `It's been a few days — last time you mentioned **${list}**. How are you feeling now?`,
+      `We last talked about **${list}** — is that still going on, or is something new coming up? 🩷`,
+    ]);
+  }
+
+  // Build a fallback line from the last known intent when no symptom recall is available.
+  function buildIntentFallbackLine() {
+    if (ctx.isAnon) return null;
+    const INTENT_LABELS = {
+      LATE_INTRO:           "a late or missed period",
+      HEAVY_INTRO:          "heavy bleeding",
+      SPOT_INTRO:           "spotting",
+      MOOD_SAFETY_CHECK:    "mood or energy changes",
+      PELVIC_INTRO:         "pelvic pain or cramps",
+      PREGNANCY_ENTRY:      "pregnancy concerns",
+      ELSE_DISCHARGE_ENTRY: "discharge changes",
+    };
+    const label = INTENT_LABELS[bloomieMemory?.lastIntent];
+    if (!label) return null;
+    return pick([
+      `Last time you were looking into **${label}** — feel free to pick up where we left off, or start fresh 🩷`,
+      `It looks like **${label}** was on your mind last time — still relevant, or is something new coming up? 🩷`,
+    ]);
+  }
+
   function buildIntro() {
     const name        = getNickname();                                    // Firestore nickname or null
     const isReturning = !ctx.isAnon && !!bloomieMemory?.lastSessionDate;  // has at least one prior session
-    const recall      = buildRecallLine();                                 // symptom recall line, or null
-    const r = (lines) => recall ? [...lines, recall] : lines;
+    const recall      = buildRecallLine();                                 // recent symptom recall (<7d), or null
+    const bgRecall    = !recall ? buildBackgroundRecallLine() : null;     // stale recall (>24h <7d), or null
+    const intentLine  = !recall && !bgRecall ? buildIntentFallbackLine() : null; // last-resort intent hint
+    const appendLine  = recall ?? bgRecall ?? intentLine;
+    const r = (lines) => appendLine ? [...lines, appendLine] : lines;
+
+    // openingPick wraps pickAvoiding so the same opening line is never
+    // repeated from the previous session. Non-returning paths (new / minor /
+    // anon) have fixed first-time strings, so they bypass this helper.
+    const lastGreeting = bloomieMemory?.lastGreetingUsed ?? null;
+    const openingPick  = (pool) => pickAvoiding(pool, lastGreeting);
 
     // ── Minor ─────────────────────────────────────────────────────────────
     if (ctx.isMinor) {
@@ -92,7 +204,7 @@ export function createNodes(env) {
     if (userMode.isPregnancy && cd.lmp) {
       const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
       const opening = isReturning
-        ? pick([
+        ? openingPick([
             name ? `Hey ${name} 🩷` : greet(),
             name ? `Good to see you, ${name} 💗` : "Good to see you 💗",
             greet(),
@@ -108,7 +220,7 @@ export function createNodes(env) {
     // ── TTC ───────────────────────────────────────────────────────────────
     if (userMode.isTTC) {
       const opening = isReturning
-        ? pick([
+        ? openingPick([
             name ? `Hey ${name} 🩷` : greet(),
             name ? `Welcome back, ${name} 🌸` : "Welcome back 🌸",
             greet(),
@@ -124,7 +236,7 @@ export function createNodes(env) {
     // ── Postpartum ────────────────────────────────────────────────────────
     if (userMode.isPostpartum) {
       const opening = isReturning
-        ? pick([
+        ? openingPick([
             name ? `Hey ${name} 🩷` : greet(),
             name ? `Good to see you, ${name} 💗` : "Good to see you 💗",
             greet(),
@@ -146,7 +258,7 @@ export function createNodes(env) {
       if (overdue) {
         const lateDays = Math.abs(daysLeft);
         const opening = isReturning
-          ? pick([
+          ? openingPick([
               name ? `Hey ${name} 🩷` : greet(),
               name ? `Hey ${name} 💗` : "Hey there 💗",
               greet(),
@@ -162,7 +274,7 @@ export function createNodes(env) {
 
       if (dueSoon) {
         const opening = isReturning
-          ? pick([
+          ? openingPick([
               name ? `Hey ${name} 🌸` : "Hey 🌸",
               name ? `Hey ${name} 🩷` : greet(),
               greet(),
@@ -192,12 +304,12 @@ export function createNodes(env) {
           // Neutral variant — avoids leading with phase context every single session
           name ? `Hey ${name} 🩷` : greet(),
         ];
-        return r([pick(phaseGreetings), "What can I help you with today?"]);
+        return r([openingPick(phaseGreetings), "What can I help you with today?"]);
       }
 
       if (isReturning) {
         return r([
-          pick([
+          openingPick([
             name ? `Hey ${name} 🩷` : greet(),
             name ? `Good to see you, ${name} 💗` : "Good to see you 💗",
             "Hey there 🌸",
@@ -218,7 +330,7 @@ export function createNodes(env) {
     if (isReturning) {
       const phaseInfo = getCurrentPhase();
       const opening = phaseInfo
-        ? pick([
+        ? openingPick([
             ...(name
               ? [
                   `Hey ${name} 💗 Based on your cycle, you might be in ${phaseInfo.label}.`,
@@ -229,7 +341,7 @@ export function createNodes(env) {
                   greet(),
                 ]),
           ])
-        : pick([
+        : openingPick([
             name ? `Hey ${name} 🩷` : greet(),
             name ? `Good to see you, ${name} 💗` : "Good to see you 💗",
             "Hey there 🌸",
@@ -250,6 +362,8 @@ export function createNodes(env) {
   }
 
   const INTRO = buildIntro();
+  // Record the opening line for dedup on the next session.
+  ctx.lastUsedGreeting = Array.isArray(INTRO) ? (INTRO[0] ?? null) : null;
 
   const pickCloseLabel = () => pick(["I'm done for now", "That's all for now", "Thanks, I'm good", "All done 🩷"]);
   const pickMainLabel  = () => pick(["Main options", "Back to start", "Something else", "Other questions"]);
@@ -262,6 +376,7 @@ export function createNodes(env) {
       say() {
         if (ctx.loggingGapPending && !ctx.urgency) {
           ctx.adviceGiven.add("logging_gap_surfaced");
+          ctx.adviceGiven.add("cycle_logging_gap"); // prevent duplicate cycle gap note
           ctx.loggingGapPending = false;
           const gapNote = pick([
             "One small thing before we start 🩷 Bloom works best when symptoms are logged regularly — even a quick entry every few days helps me spot patterns for you.",
@@ -270,7 +385,8 @@ export function createNodes(env) {
           ]);
           return [...INTRO, gapNote];
         }
-        return INTRO;
+        const cycleSignalLine = buildCycleSignalLine("general");
+        return cycleSignalLine ? [...INTRO, cycleSignalLine] : INTRO;
       },
       delayMs: 1300,
       choices: [
@@ -722,12 +838,16 @@ export function createNodes(env) {
       ],
     },
     HEAVY_SOON: {
-      say: [
-        "Based on what you've shared, this isn't an emergency right now, but it does need a proper look in the next few days 🩷",
-        "Bleeding that's heavier than usual or lasting longer than a week can sometimes point to things worth checking, like fibroids, hormonal shifts, or low iron.",
-        "Book a visit with a healthcare provider or gynaecologist as soon as you can, ideally within the next 2–3 days.",
-        "If anything changes, you start feeling faint, bleeding gets suddenly heavier, or you develop severe pain, treat that as urgent and seek care the same day.",
-      ],
+      say() {
+        const insightLine = buildSymptomInsightLine();
+        return [
+          "Based on what you've shared, this isn't an emergency right now, but it does need a proper look in the next few days 🩷",
+          "Bleeding that's heavier than usual or lasting longer than a week can sometimes point to things worth checking, like fibroids, hormonal shifts, or low iron.",
+          ...(insightLine ? [insightLine] : []),
+          "Book a visit with a healthcare provider or gynaecologist as soon as you can, ideally within the next 2–3 days.",
+          "If anything changes, you start feeling faint, bleeding gets suddenly heavier, or you develop severe pain, treat that as urgent and seek care the same day.",
+        ];
+      },
       choices: [
         { id: "map",  label: "Find care near me",  next: "HEAVY_AFTER_CARE", action: "OPEN_MAP",    primary: true },
         { id: "log",  label: "Log this concern",   next: "HEAVY_AFTER_CARE", action: "LOG_SYMPTOM" },
@@ -735,11 +855,18 @@ export function createNodes(env) {
       ],
     },
     HEAVY_MONITOR: {
-      say: [
-        "Based on what you shared, this sounds like it may be a heavier day rather than something immediately alarming 🩷",
-        "Some people naturally have heavier flow, especially in the first 1–2 days of their period. That said, your experience is always worth tracking.",
-        "Keep monitoring over the next 24 hours. If the flow picks up, you start feeling weak or dizzy, or you notice large clots, come back and let me know.",
-      ],
+      say() {
+        const insightLine = buildSymptomInsightLine();
+        const patternLine = !insightLine
+          ? buildSymptomPatternLine(["HEAVY_FLOW", "LARGE_CLOTS", "VAGINAL_BLEEDING", "CRAMPS"])
+          : null;
+        return [
+          "Based on what you shared, this sounds like it may be a heavier day rather than something immediately alarming 🩷",
+          "Some people naturally have heavier flow, especially in the first 1–2 days of their period. That said, your experience is always worth tracking.",
+          ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
+          "Keep monitoring over the next 24 hours. If the flow picks up, you start feeling weak or dizzy, or you notice large clots, come back and let me know.",
+        ];
+      },
       choices: [
         { id: "log",   label: "Log this concern",        next: "HEAVY_AFTER_CARE", action: "LOG_SYMPTOM", primary: true },
         { id: "learn", label: "Learn about heavy periods", next: "EDUC_HEAVY" },
@@ -1223,6 +1350,7 @@ export function createNodes(env) {
       },
       say() {
         const cycleLine = buildCyclePersonalisationLine("late");
+        const signalLine = buildCycleSignalLine("late");
         return [
           pick([
             `${ack()} A late or missed period can be really stressful, especially when your body usually feels predictable 🩷`,
@@ -1232,6 +1360,7 @@ export function createNodes(env) {
             "Late periods happen for so many reasons. Let's figure out what might be going on for you 🩷",
           ]),
           ...(cycleLine ? [cycleLine] : []),
+          ...(signalLine ? [signalLine] : []),
           "Cycles shift for all kinds of reasons: stress, travel, illness, weight changes, or just natural variation.",
           "Let's take it step by step.",
           "Is your period more than 7 days later than you usually expect it to be?",
@@ -1274,12 +1403,16 @@ export function createNodes(env) {
       ],
     },
     LATE_IRREGULAR_GUIDANCE: {
-      say: [
-        "Totally valid! irregular cycles make it genuinely hard to know what 'late' even means 🩷",
-        "Irregular cycles are common and can happen for lots of reasons: stress, hormonal imbalances, conditions like PCOS, weight changes, or just how your body works.",
-        "A few things that can help: tracking even rough dates over a few months starts to reveal your personal pattern.",
-        "Is there any chance of pregnancy this cycle?",
-      ],
+      say() {
+        const signalLine = buildCycleSignalLine("late");
+        return [
+          "Totally valid! irregular cycles make it genuinely hard to know what 'late' even means 🩷",
+          "Irregular cycles are common and can happen for lots of reasons: stress, hormonal imbalances, conditions like PCOS, weight changes, or just how your body works.",
+          ...(signalLine ? [signalLine] : []),
+          "A few things that can help: tracking even rough dates over a few months starts to reveal your personal pattern.",
+          "Is there any chance of pregnancy this cycle?",
+        ];
+      },
       question: "Chance of pregnancy this cycle?",
       choices: [
         { id: "yes",  label: "Yes, could be", next: "LATE_TEST_Q", primary: true },
@@ -1484,11 +1617,19 @@ export function createNodes(env) {
       ],
     },
     LATE_CHANGES_EXPLAIN: {
-      say: [
-        "Thanks for sharing 🩷",
-        "Changes like stress, illness, or shifts in routine can affect hormone levels and delay ovulation, which can push your period later than usual.",
-        "Are you noticing any of the following right now?",
-      ],
+      say() {
+        const pelvicKnown = ctx.entityHistory?.some(e => e.symptoms?.pelvic);
+        return [
+          "Thanks for sharing 🩷",
+          "Changes like stress, illness, or shifts in routine can affect hormone levels and delay ovulation, which can push your period later than usual.",
+          pelvicKnown
+            ? pick([
+                "I've already noted you mentioned cramps or pelvic discomfort 🩷 Are you also experiencing any of the following?",
+                "I've got that you mentioned pelvic pain 🩷 Are any of these also happening?",
+              ])
+            : "Are you noticing any of the following right now?",
+        ];
+      },
       question: "Symptoms with late period",
       choices: [
         { id: "cr", label: "Cramps or pelvic discomfort", next: "LATE_PATTERN_Q", primary: true },
@@ -1498,7 +1639,19 @@ export function createNodes(env) {
       ],
     },
     LATE_SYMPTOMS_Q: {
-      say: [pick(["Okay 🩷", "Got it 🩷", "Sure 🩷"]), "Are you noticing any of these symptoms right now?"],
+      say() {
+        const pelvicKnown = ctx.entityHistory?.some(e => e.symptoms?.pelvic);
+        if (pelvicKnown) {
+          return [
+            pick(["Okay 🩷", "Got it 🩷", "Sure 🩷"]),
+            pick([
+              "I've noted you mentioned pelvic pain or cramps 🩷 Are you also noticing any of these?",
+              "I remember you mentioned cramping — keeping that in mind 🩷 Anything else going on?",
+            ]),
+          ];
+        }
+        return [pick(["Okay 🩷", "Got it 🩷", "Sure 🩷"]), "Are you noticing any of these symptoms right now?"];
+      },
       question: "Symptoms with late period",
       choices: [
         { id: "cr", label: "Cramps or pelvic discomfort", next: "LATE_PATTERN_Q", primary: true },
@@ -1614,11 +1767,20 @@ export function createNodes(env) {
       ],
     },
     SPOT_SYMPTOMS_MULTI: {
-      say: [
-        "Thanks for sharing 🩷",
-        "Spotting that lasts more than a couple days, or feels heavier than expected, is worth paying attention to.",
-        "Let's check for anything that would make this more urgent.",
-      ],
+      say() {
+        const pelvicKnown   = ctx.entityHistory?.some(e => e.symptoms?.pelvic);
+        const dizzyKnown    = ctx.entityHistory?.some(e => e.symptoms?.dizziness);
+        const acks = [
+          ...(pelvicKnown ? [pick(["I've noted you mentioned pelvic pain or cramps 🩷", "I've got that you mentioned cramping 🩷"])] : []),
+          ...(dizzyKnown  ? [pick(["I've noted you mentioned dizziness 🩷", "I remember you mentioned feeling dizzy, keeping that in mind 🩷"])] : []),
+        ];
+        return [
+          "Thanks for sharing 🩷",
+          "Spotting that lasts more than a couple days, or feels heavier than expected, is worth paying attention to.",
+          ...acks,
+          "Let's check for anything that would make this more urgent.",
+        ];
+      },
       multi: {
         question: "Are you experiencing any of the following along with the spotting? (select any)",
         options: ["Pelvic pain or cramps", "Unusual discharge or odor", "Dizziness or weakness", "Fever or chills", "Pain during sex", "None of these"],
@@ -1729,76 +1891,249 @@ export function createNodes(env) {
     MOOD_INTRO: {
       say: [],
       onEnter() {
-        const phaseInfo = getCurrentPhase();
-        const phaseLine = !ctx.urgency && phaseInfo ? insightFor(phaseInfo.phase, "mood") : null;
-        const patternLine = !ctx.urgency
-          ? buildSymptomPatternLine(["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS"])
-          : null;
-        if (phaseLine) say([phaseLine]);
-        if (patternLine) say([patternLine]);
-        if (phaseLine || patternLine) {
-          const tid = setTimeout(() => transition("MOOD_SAFETY_CHECK"), 1300);
-          ctx.timers.add(tid);
-        } else {
-          transition("MOOD_SAFETY_CHECK");
-        }
+        // MOOD_INTRO is a silent gate — personalisation is woven into MOOD_SAFETY_CHECK.
+        // We transition immediately so the safety question renders with full context.
+        transition("MOOD_SAFETY_CHECK");
       },
       choices: [],
     },
 
     // ── Step 1: Safety check always first ──────────────────────────────────
-MOOD_SAFETY_CHECK: {
-  say() {
-    const phaseInfo = getCurrentPhase();
-    const phaseLine = !ctx.urgency && phaseInfo ? insightFor(phaseInfo.phase, "mood") : null;
-    const patternLine = !ctx.urgency
-      ? buildSymptomPatternLine(["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS"])
-      : null;
+    MOOD_SAFETY_CHECK: {
+      say() {
+        // ── 0. Safety guard — no personalisation when urgency is active ────
+        if (ctx.urgency) {
+          return [
+            "I want to make sure you’re okay 🩷",
+            "Are these feelings ever making you feel unsafe, completely unable to cope, or like you might hurt yourself?",
+          ];
+        }
 
-    const userText = String(
-      ctx?.lastUserMessage ||
-      ctx?.lastUserInput ||
-      ctx?.lastFreeText ||
-      ctx?.rawInput ||
-      ""
-    ).toLowerCase();
+        // ── Signals ──────────────────────────────────────────────────────────
+        const userText = String(
+          ctx?.lastUserMessage || ctx?.lastUserInput || ctx?.lastFreeText || ctx?.rawInput || ""
+        ).toLowerCase();
 
-    const isPositiveMood = /\b(happy|good|excited|calm|lighter|better|in a good mood)\b/.test(userText);
-    const isAngryMood = /\b(angry|mad|vex|frustrated|annoyed|snappy|irritable)\b/.test(userText);
-    const isLowMood = /\b(sad|down|low|empty|numb|cry|crying|emotional|overwhelmed|tired|exhausted)\b/.test(userText);
+        // Tone detection — ctx.currentTone is the primary source (set by detectUserTone
+        // before routing). Regex-based flags are fallbacks for when tone is neutral.
+        const detectedTone   = ctx.currentTone ?? "neutral";
+        const isPositiveMood = detectedTone === "casual"
+          || /\b(happy|good|excited|calm|lighter|better|in a good mood)\b/.test(userText);
+        const isAngryMood    = (detectedTone === "angry" || detectedTone === "frustrated" || detectedTone === "irritable")
+          || /\b(angry|mad|vex|frustrated|annoyed|snappy|irritable)\b/.test(userText);
+        const isLowMood      = (detectedTone === "distressed" || detectedTone === "exhausted" || detectedTone === "anxious")
+          || /\b(sad|down|low|empty|numb|cry|crying|emotional|overwhelmed|tired|exhausted)\b/.test(userText);
 
-    let ackLine = "Thanks for telling me 🩷";
-    let supportLine = "Big feelings can be a lot to carry.";
+        // Continuity signal — highest priority; consumes adviceGiven guard on first call
+        const continuityLine = buildMoodContinuityLine();
 
-    if (isPositiveMood) {
-      ackLine = "I’m glad you told me 🩷";
-      supportLine = "It’s good to notice when your mood feels lighter or better too.";
-    } else if (isAngryMood) {
-      ackLine = withNickname("I hear you") + " 🩷";
-      supportLine = "Anger or irritability can feel really intense in the moment.";
-    } else if (isLowMood) {
-      ackLine = "I’m really glad you told me 🩷";
-      supportLine = "Feeling low or emotionally heavy can be hard.";
-    }
+        const moodMentionedBefore = !continuityLine && (ctx.entityHistory?.length > 1 &&
+          ctx.entityHistory.slice(0, -1).some(e => e.symptoms?.mood));
 
-    return [
-      ackLine,
-      supportLine,
-      ...(phaseLine ? [phaseLine] : []),
-      ...(patternLine ? [patternLine] : []),
-      "Before we go further, quick check-in 🩷",
-      "Are these feelings ever making you feel unsafe, completely unable to cope, or like you might hurt yourself?",
-    ];
-  },
+        const MOOD_CODES  = ["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS", "FATIGUE"];
+        const hasPattern  = !!buildSymptomPatternLine(MOOD_CODES); // consume the guard
+        const phaseInfo   = getCurrentPhase();
+        const phaseLabel  = phaseInfo?.label ?? null;
+        const cycleLine   = buildCyclePersonalisationLine("general");
+        const recallLine  = buildRecallLine();
 
-  question: "Safety check before mood questions",
+        // ── Anomaly layer — bloom-anomaly-engine + severity baseline ─────────
+        // Only fires when: not urgency, not already surfaced, level medium/high.
+        // ctx.bloomieAnomalyCtx is computed at mount by computeMoodAnomalyCtx().
+        const anomalyCtx    = ctx.bloomieAnomalyCtx;
+        const hasMoodAnomaly = !ctx.adviceGiven.has("mood_anomaly_surfaced") &&
+          (anomalyCtx?.level === "medium" || anomalyCtx?.level === "high");
+        if (hasMoodAnomaly) ctx.adviceGiven.add("mood_anomaly_surfaced");
 
-  choices: [
-    { id: "yes", label: "Yes",          next: "MOOD_SAFETY_ROUTE", primary: true },
-    { id: "no",  label: "No",           next: "MOOD_ENTRY" },
-    { id: "ns",  label: "I'm not sure", next: "MOOD_SAFETY_ROUTE" },
-  ],
-},
+        // ── Tone-aware opener prefix ─────────────────────────────────────────
+        // When tone is non-neutral, prepend a tone-specific opener from the pool.
+        // getToneOpener tracks used openers on ctx to prevent repetition.
+        // This opener fuses WITH the context sentence below (concatenated, not stacked).
+        const toneOpener = (detectedTone && detectedTone !== "neutral" && !isPositiveMood)
+          ? getToneOpener(detectedTone, ctx)
+          : "";
+
+        // ── Fused opening — tone opener + context in ONE sentence ─────────────
+        // Each branch builds ONE fused sentence. toneOpener prepends where set.
+        // Structure: [toneOpener] + [context-aware ack/observation]
+        const fuse = (contextSentence) =>
+          toneOpener ? `${toneOpener} ${contextSentence}` : contextSentence;
+
+        let fusedOpening;
+
+        if (continuityLine) {
+          // Continuity/escalation takes priority — fuse with tone opener if present
+          fusedOpening = fuse(continuityLine);
+
+        } else if (isPositiveMood) {
+          // Positive mood — affirming but not dismissive; no tone opener needed
+          fusedOpening = pick([
+            "It’s really good to notice when things feel lighter — that shift matters 🩷",
+            "I’m glad you told me, noticing a change in either direction is worth paying attention to 🩷",
+            "Good to hear — tracking how you feel on the better days is just as useful as the hard ones 🩷",
+          ]);
+
+        } else if (moodMentionedBefore && (isLowMood || isAngryMood)) {
+          // Continuity — they’ve mentioned this already this session
+          const continuityPool = isLowMood
+            ? [
+                "you mentioned feeling low earlier too — it sounds like this has really been sitting with you, and that’s worth taking seriously 🩷",
+                "the fact that this keeps coming up tells me it isn’t a small thing 🩷",
+                "this is the second time this has come up in our conversation — when it sticks around like that, it deserves more than just sitting with it alone 🩷",
+              ]
+            : [
+                "you brought this up earlier too — it sounds like the irritability hasn’t let up, which makes sense if your body is in a pattern right now 🩷",
+                "when it keeps surfacing like this, it’s worth looking at what’s actually driving it 🩷",
+                "the fact that you’ve come back to this tells me it’s been sitting heavier than you might be letting on 🩷",
+              ];
+          fusedOpening = fuse(pick(continuityPool));
+
+        } else if (hasPattern && phaseLabel) {
+          // Richest signal: pattern + phase — fuse into one sentence
+          if (isLowMood) {
+            fusedOpening = fuse(pick([
+              `that heavy, flat feeling makes sense right now — you’re in ${phaseLabel} and this is something your body tends to go through around this point in your cycle 🩷`,
+              `feeling low at this point tracks — you’re in ${phaseLabel}, and your logs show your mood tends to dip here 🩷`,
+              `what you’re feeling isn’t random — you’re in ${phaseLabel} and this is a pattern your body repeats, even if it doesn’t feel that way in the moment 🩷`,
+            ]));
+          } else if (isAngryMood) {
+            fusedOpening = fuse(pick([
+              `that irritability makes a lot of sense right now — you’re in ${phaseLabel} and your logs show this is something your body does around this time 🩷`,
+              `feeling that edge is real — you’re in ${phaseLabel}, and this kind of intensity shows up in your cycle at this point 🩷`,
+              `what you’re experiencing isn’t out of nowhere — you’re in ${phaseLabel} and this is a pattern your body tends to follow 🩷`,
+            ]));
+          } else {
+            fusedOpening = fuse(pick([
+              `that feeling makes sense given where you are right now — you’re in ${phaseLabel} and this tends to be when your mood shifts 🩷`,
+              `you’re in ${phaseLabel} right now, and your logs show this is something your body goes through around this point 🩷`,
+              `this isn’t coming from nowhere — you’re in ${phaseLabel} and your history shows mood shifts around this time in your cycle 🩷`,
+            ]));
+          }
+
+        } else if (hasPattern) {
+          // Pattern without confirmed phase
+          if (isLowMood) {
+            fusedOpening = fuse(pick([
+              "that emotional heaviness is real — and looking at your logs, this isn’t the first time your body has flagged this around now 🩷",
+              "I can see from what you’ve logged that this kind of low feeling tends to come up for you, so you’re not imagining it 🩷",
+              "your history shows your body tends to go through this — even if it feels isolating in the moment, it’s worth taking seriously 🩷",
+            ]));
+          } else if (isAngryMood) {
+            fusedOpening = fuse(pick([
+              "that frustration is real — and from your logs, this isn’t a one-off, this is something your body cycles through 🩷",
+              "I can see from your history that this kind of irritability tends to surface for you, which means it’s worth paying attention to 🩷",
+              "your logs back this up — this kind of mood shift is part of a pattern your body follows, not just a bad day 🩷",
+            ]));
+          } else {
+            fusedOpening = fuse(pick([
+              "this makes sense — looking at your logs, your body tends to flag these kinds of feelings around this time 🩷",
+              "from what you’ve logged, this is part of a pattern your body follows, which means it’s worth understanding rather than just pushing through 🩷",
+              "your history backs this up — mood shifts like this tend to come up for you, and that’s useful information 🩷",
+            ]));
+          }
+
+        } else if (phaseLabel) {
+          // Phase only — no pattern data
+          if (isLowMood) {
+            fusedOpening = fuse(pick([
+              `that heavy feeling makes sense — you’re in ${phaseLabel} right now, which is when emotional sensitivity often peaks 🩷`,
+              `feeling low right now tracks with where you are in your cycle — you’re in ${phaseLabel} and that phase can really affect your mood 🩷`,
+              `you’re in ${phaseLabel} right now and that’s genuinely one of the harder points emotionally for a lot of people — what you’re feeling is real 🩷`,
+            ]));
+          } else if (isAngryMood) {
+            fusedOpening = fuse(pick([
+              `that irritability makes sense — you’re in ${phaseLabel} right now, when progesterone shifts tend to make everything feel more intense 🩷`,
+              `feeling that edge is real, and it tracks — you’re in ${phaseLabel}, which is often when irritability peaks 🩷`,
+              `you’re in ${phaseLabel} right now, and that phase can make everything feel sharper and harder to shake 🩷`,
+            ]));
+          } else {
+            fusedOpening = fuse(pick([
+              `what you’re feeling makes sense given where you are right now — you’re in ${phaseLabel}, which is often when mood shifts show up 🩷`,
+              `you’re in ${phaseLabel} right now, and that’s genuinely one of the more emotionally complex points in the cycle 🩷`,
+              `mood shifts in ${phaseLabel} are real — your hormones are doing something specific right now and your feelings are tracking with that 🩷`,
+            ]));
+          }
+
+        } else if (cycleLine) {
+          fusedOpening = fuse(cycleLine);
+
+        } else if (recallLine) {
+          fusedOpening = fuse(recallLine);
+
+        } else {
+          // No context — tone-driven generic; toneOpener already carries the ack
+          if (isLowMood) {
+            fusedOpening = fuse(pick([
+              "that kind of emotional heaviness is real, and it takes something to name it and reach out about it 🩷",
+              "feeling low isn’t always easy to admit — I’m glad you brought it here 🩷",
+              "that weight you’re carrying is real, and it deserves to be taken seriously 🩷",
+            ]));
+          } else if (isAngryMood) {
+            fusedOpening = fuse(pick([
+              "anger and frustration that feel out of proportion can be one of the most exhausting things to carry — and they’re worth understanding, not dismissing 🩷",
+              "that kind of irritability is draining to live with, especially when it feels like it’s coming from nowhere 🩷",
+              "feeling that edge is real — and it’s worth figuring out what’s underneath it 🩷",
+            ]));
+          } else {
+            fusedOpening = fuse(pick([
+              "mood shifts can feel really disorienting, especially when they seem to come from nowhere 🩷",
+              "what you’re feeling is real and worth paying attention to 🩷",
+              "I’m glad you brought this up — mood changes deserve more than just being pushed through 🩷",
+            ]));
+          }
+        }
+
+        // Anomaly add-on — one short clause appended to fusedOpening.
+        // Wording is specific to which signal fired: cycle timing vs. severity spike.
+        let anomalyAddOn = "";
+        if (hasMoodAnomaly) {
+          const hasCycleAnomaly   = !!anomalyCtx?.cycleAnomaly;
+          const hasSeveritySpike  = !!anomalyCtx?.severitySpike;
+          if (hasCycleAnomaly && hasSeveritySpike) {
+            anomalyAddOn = pick([
+              " I'm also noticing your cycle has been a bit different lately, and the intensity here feels higher than your usual pattern.",
+              " Your cycle timing has shifted recently too, which can be part of why this feels more intense than usual.",
+            ]);
+          } else if (hasCycleAnomaly) {
+            anomalyAddOn = pick([
+              " I'm noticing your cycle has been behaving a bit differently than usual lately — that kind of shift can affect how you feel emotionally.",
+              " Your cycle timing looks a little different from your personal pattern right now, which could be part of what's going on.",
+            ]);
+          } else {
+            // severity spike only
+            anomalyAddOn = pick([
+              " This feels a bit more intense than how things usually show up for you — I want to make sure you're okay.",
+              " I'm noticing this isn't how things typically come across in your history — worth paying attention to.",
+            ]);
+          }
+        }
+
+        // ── First mood mention — 2-sentence response, no filler bridge ─────────
+        // moodMentions is appended in assistant.js before routing, so length === 1
+        // means this is the very first time mood has come up this session.
+        const isFirstMoodMention = (ctx.moodMentions?.length ?? 0) === 1;
+        if (isFirstMoodMention) {
+          return [
+            fusedOpening + anomalyAddOn,
+            "I do want to ask — are these feelings ever making you feel unsafe, completely unable to cope, or like you might hurt yourself?",
+          ];
+        }
+
+        return [
+          fusedOpening + anomalyAddOn,
+          "Before we go further, quick check-in 🩷",
+          "Are these feelings ever making you feel unsafe, completely unable to cope, or like you might hurt yourself?",
+        ];
+      },
+
+      question: "Safety check before mood questions",
+
+      choices: [
+        { id: "yes", label: "Yes",          next: "MOOD_SAFETY_ROUTE", primary: true },
+        { id: "no",  label: "No",           next: "MOOD_ENTRY" },
+        { id: "ns",  label: "I’m not sure", next: "MOOD_SAFETY_ROUTE" },
+      ],
+    },
 
     // ── Safety route crisis support, do not continue mood assessment ───────
     MOOD_SAFETY_ROUTE: {
@@ -1830,22 +2165,55 @@ MOOD_SAFETY_CHECK: {
     // ── Step 2: Feeling-type-first entry ─────────────────────────────────────
     MOOD_ENTRY: {
       say() {
+        // ── Postpartum: high stakes — keep focused, surface serious signals ─
         if (userMode.isPostpartum) {
           return [
             "Postpartum mood shifts deserve to be taken seriously, not brushed off 🩷",
-            "If you're experiencing crying spells that won't stop, feeling disconnected from your baby, intrusive thoughts, or trouble sleeping even when your baby sleeps please tell me.",
+            "If you're experiencing crying spells that won't stop, feeling disconnected from your baby, intrusive thoughts, or trouble sleeping even when your baby sleeps — please tell me.",
             "What feels most true for you lately?",
           ];
         }
+
+        // ── Pregnancy: validate the emotional reality of pregnancy ─────────
         if (userMode.isPregnancy) {
+          const cycleLine = buildCyclePersonalisationLine("general");
           return [
-            "Mood changes in pregnancy are real, anxiety about the pregnancy, feeling overwhelmed, or sudden intense emotions are all worth talking about 🩷",
+            "Mood changes in pregnancy are real — anxiety about the pregnancy, feeling overwhelmed, or sudden intense emotions are all worth talking about 🩷",
+            ...(cycleLine ? [cycleLine] : []),
             "What feels most true for you lately?",
           ];
         }
+
+        // ── TTC: acknowledge the specific emotional weight ─────────────────
         if (userMode.isTTC) {
           return [
-            "Mood shifts are real in any cycle, and the emotional weight of TTC can make them feel even more intense 🩷",
+            "Mood shifts are real at any point in a cycle, and the emotional weight of TTC can make them feel even more intense 🩷",
+            "The uncertainty, the waiting, the hope — it all sits somewhere in the body.",
+            "What feels most true for you lately?",
+          ];
+        }
+
+        // ── General: personalise using phase + recall if available ────────
+        const phaseInfo  = getCurrentPhase();
+        const phaseLine  = !ctx.adviceGiven.has("mood_phase_entry") && phaseInfo
+          ? (() => {
+              ctx.adviceGiven.add("mood_phase_entry");
+              return insightFor(phaseInfo.phase, "mood");
+            })()
+          : null;
+        const recallLine = !ctx.isAnon ? buildRecallLine() : null;
+
+        // If we have phase context, open with it
+        if (phaseLine) {
+          return [
+            phaseLine,
+            "Mood shifts can feel really overwhelming, especially when you're trying to function through them 🩷",
+            "What feels most true for you lately?",
+          ];
+        }
+        if (recallLine) {
+          return [
+            recallLine,
             "What feels most true for you lately?",
           ];
         }
@@ -1893,10 +2261,24 @@ MOOD_SAFETY_CHECK: {
       autoNext(ctx) { ctx.moodRoute = "anxiety"; return "MOOD_ANXIETY_Q"; },
     },
     MOOD_ANXIETY_Q: {
-      say: [
-        "Anxiety can show up in so many ways, racing thoughts, dread, restlessness, chest tightness, or just a feeling you can't shake 🩷",
-        "Does it feel more like overthinking and spiraling, or more like sudden panic and dread?",
-      ],
+      say() {
+        const patternLine = buildSymptomPatternLine(["ANXIETY", "MOOD_SWINGS"]);
+        const phaseInfo   = getCurrentPhase();
+        const phaseLine   = phaseInfo ? insightFor(phaseInfo.phase, "mood") : null;
+        // Blend context into the opening naturally — don't append separately
+        const contextIntro = patternLine
+          ? pick([
+              "Anxiety has a way of feeling bigger when it's part of a pattern — I can see this tends to come up around this time for you 🩷",
+              "Looking at what you've logged, anxiety seems to be something your body tends to signal around now 🩷",
+            ])
+          : phaseLine
+          ? phaseLine
+          : "Anxiety can show up in so many ways — racing thoughts, dread, restlessness, chest tightness, or just a feeling you can't shake 🩷";
+        return [
+          contextIntro,
+          "Does it feel more like overthinking and spiraling, or more like sudden panic and dread?",
+        ];
+      },
       question: "Anxiety subtype",
       choices: [
         { id: "over",  label: "Overthinking and spiraling", next: "MOOD_TIMING_SPLIT", primary: true },
@@ -1911,10 +2293,19 @@ MOOD_SAFETY_CHECK: {
       autoNext(ctx) { ctx.moodRoute = "low"; return "MOOD_LOW_Q"; },
     },
     MOOD_LOW_Q: {
-      say: [
-        "Low mood can look like sadness, but also numbness, withdrawal, or just feeling flat and disconnected 🩷",
-        "Which feels more like you?",
-      ],
+      say() {
+        const patternLine = buildSymptomPatternLine(["DEPRESSION", "CRYING_SPELLS", "MOOD_SWINGS"]);
+        const contextIntro = patternLine
+          ? pick([
+              "Low mood can be one of the most invisible things to carry — and I can see from your logs this isn't new for you 🩷",
+              "I can see this tends to come up around this point in your cycle — you're not imagining it 🩷",
+            ])
+          : "Low mood can look like sadness, but also numbness, withdrawal, or just feeling flat and disconnected 🩷";
+        return [
+          contextIntro,
+          "Which feels more like you?",
+        ];
+      },
       question: "Low mood subtype",
       choices: [
         { id: "sad",  label: "Sadness or crying",                            next: "MOOD_TIMING_SPLIT", primary: true },
@@ -1929,10 +2320,23 @@ MOOD_SAFETY_CHECK: {
       autoNext(ctx) { ctx.moodRoute = "irritable"; return "MOOD_IRRITABLE_Q"; },
     },
     MOOD_IRRITABLE_Q: {
-      say: [
-        "Irritability is one of the most dismissed cycle symptoms, but it is real and it can be exhausting to manage 🩷",
-        "Does it feel more like a short temper and snapping, or more like overstimulation and everything being too much?",
-      ],
+      say() {
+        const patternLine  = buildSymptomPatternLine(["IRRITABILITY", "MOOD_SWINGS"]);
+        const phaseInfo    = getCurrentPhase();
+        const isLuteal     = phaseInfo?.phase === "luteal";
+        const contextIntro = patternLine
+          ? pick([
+              "Irritability is one of the most dismissed cycle symptoms — and looking at your logs, I can see this is something your body flags around now 🩷",
+              "You're not just being difficult. I can see from your history this tends to come up at this point in your cycle 🩷",
+            ])
+          : isLuteal
+          ? "Irritability is one of the most dismissed cycle symptoms — and the luteal phase is when it peaks for most people. It is real and it can be exhausting to manage 🩷"
+          : "Irritability is one of the most dismissed cycle symptoms, but it is real and it can be exhausting to manage 🩷";
+        return [
+          contextIntro,
+          "Does it feel more like a short temper and snapping, or more like overstimulation and everything being too much?",
+        ];
+      },
       question: "Irritability subtype",
       choices: [
         { id: "temper",   label: "Short temper or snapping",                next: "MOOD_TIMING_SPLIT", primary: true },
@@ -1982,9 +2386,31 @@ MOOD_SAFETY_CHECK: {
 
     // ── Step 4: Timing split after feeling type is established ─────────────
     MOOD_TIMING_SPLIT: {
-      say: [
-        "Does this tend to show up around a specific time in your cycle, or does it feel more random?",
-      ],
+      say() {
+        const phaseInfo = getCurrentPhase();
+        const cycleLine = !ctx.isAnon && !ctx.adviceGiven.has("mood_timing_cycle_hint")
+          ? buildCyclePersonalisationLine("general")
+          : null;
+
+        // If we have a live phase, offer a gentle hypothesis rather than blank question
+        if (phaseInfo && cycleLine) {
+          ctx.adviceGiven.add("mood_timing_cycle_hint");
+          return [
+            cycleLine,
+            "Does this tend to show up around a specific time in your cycle, or does it feel more random?",
+          ];
+        }
+        if (phaseInfo) {
+          return [
+            pick([
+              `Based on your cycle, you're currently in ${phaseInfo.label} — a phase when mood shifts are really common 🩷`,
+              `You're around ${phaseInfo.label} right now — this is often when these feelings peak for a lot of people 🩷`,
+            ]),
+            "Does this tend to show up around a specific time in your cycle, or does it feel more random?",
+          ];
+        }
+        return ["Does this tend to show up around a specific time in your cycle, or does it feel more random?"];
+      },
       question: "Cycle timing of mood",
       choices: [
         { id: "before", label: "Before my period",         next: "MOOD_CYCLE_ROUTE",   primary: true },
@@ -1996,10 +2422,28 @@ MOOD_SAFETY_CHECK: {
     },
 
     MOOD_CYCLE_ROUTE: {
-      say: [
-        "Cycle-linked mood shifts are real and hormonal, you're not imagining it 🩷",
-        "Progesterone rises then drops sharply in the luteal phase, and that drop can affect serotonin, energy, and emotional regulation.",
-      ],
+      say() {
+        const phaseInfo = getCurrentPhase();
+        const cycleLine = buildCyclePersonalisationLine("general");
+        // Weave hormone explanation into context naturally
+        const hormoneExplainer = "Progesterone rises then drops sharply in the luteal phase, and that drop can affect serotonin, energy, and emotional regulation.";
+        if (cycleLine) {
+          return [cycleLine, "Cycle-linked mood shifts are real and hormonal — you're not imagining it 🩷", hormoneExplainer];
+        }
+        if (phaseInfo?.phase === "luteal") {
+          return [
+            pick([
+              "Being in the luteal phase right now makes complete sense of what you're describing 🩷",
+              "The luteal phase is exactly when these kinds of mood shifts tend to peak — you're right on time 🩷",
+            ]),
+            hormoneExplainer,
+          ];
+        }
+        return [
+          "Cycle-linked mood shifts are real and hormonal — you're not imagining it 🩷",
+          hormoneExplainer,
+        ];
+      },
       autoNext(ctx) { ctx.moodCycleLinked = true; return "MOOD_SEVERITY"; },
     },
 
@@ -2085,11 +2529,21 @@ MOOD_SAFETY_CHECK: {
     // ── Step 6: Route-aware final guide ──────────────────────────────────────
     MOOD_GUIDE: {
       say() {
-        const phaseInfo = getCurrentPhase();
-        const insight = insightFor(phaseInfo?.phase, "mood");
-        const nudge = !insight ? phaseNudge() : null;
+        const phaseInfo    = getCurrentPhase();
+        const insight      = insightFor(phaseInfo?.phase, "mood");
+        const nudge        = !insight ? phaseNudge() : null;
+        const recallLine   = !ctx.isAnon && !ctx.adviceGiven.has("mood_guide_recall")
+          ? (() => { ctx.adviceGiven.add("mood_guide_recall"); return buildRecallLine(); })()
+          : null;
+        const patternLine  = buildSymptomPatternLine(
+          ["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS", "FATIGUE"]
+        );
+
+        // Context line — blend insight into emotional validation, not as a clinical tag
         const contextLine = insight
           ? `Based on what you've shared, hormone-linked mood shifts may be playing a role and you're not imagining it. ${insight}`
+          : patternLine
+          ? `Based on what you've shared, hormone-linked mood shifts may be playing a role — and your own history backs that up.`
           : "Based on what you've shared, hormone-linked mood shifts may be playing a role and you're not imagining it.";
 
         const moodRoute   = ctx.moodRoute;
@@ -2110,14 +2564,30 @@ MOOD_SAFETY_CHECK: {
           routeGuidance = "Mood shifts around your cycle are real. They can affect your emotions, energy, focus, patience, and even how social you feel. You're not being dramatic or too sensitive. Hormones really can change how your body and brain respond to stress.";
         }
 
+        // Continuity acknowledgement — if mood has been persistent across turns,
+        // surface it once in MOOD_GUIDE (guard ensures it only fires if not already
+        // shown in MOOD_SAFETY_CHECK, since both share the adviceGiven key).
+        const guideContinuityLine = buildMoodContinuityLine();
+
+        // Opening — escalation gets heavier weight, otherwise warm standard
+        const openingPool = guideContinuityLine
+          ? [
+              "I want to make sure I'm giving you what you actually need right now 🩷",
+              "Thank you for staying with this — I can hear it's been weighing on you 🩷",
+              "I appreciate you keeping this conversation going — that takes something 🩷",
+            ]
+          : [
+              "Thank you for being open with me 🩷",
+              "I appreciate you sharing all of that 🩷",
+              "That took honesty. Thank you for trusting me with it 🩷",
+              "Everything you shared makes sense. Let me give you what I can 🩷",
+            ];
+
         return [
-          pick([
-            "Thank you for being open with me 🩷",
-            "I appreciate you sharing all of that 🩷",
-            "That took honesty. Thank you for trusting me with it 🩷",
-            "Everything you shared makes sense. Let me give you what I can 🩷",
-          ]),
+          pick(openingPool),
+          ...(guideContinuityLine ? [guideContinuityLine] : []),
           contextLine,
+          ...(recallLine ? [recallLine] : []),
           ...(nudge ? [nudge] : []),
           routeGuidance,
           "",
@@ -2435,10 +2905,15 @@ MOOD_SAFETY_CHECK: {
           }
           return "Some people with ongoing pelvic pain later learn it's related to underlying causes (such as endometriosis), which only a healthcare provider can properly evaluate.";
         })();
+        const insightLine = buildSymptomInsightLine();
+        const patternLine = !insightLine
+          ? buildSymptomPatternLine(["CRAMPS", "PELVIC_PAIN", "BLOATING", "FATIGUE"])
+          : null;
         return [
           "Thanks for sharing that 🩷",
           "Pelvic pain that is persistent, severe, or doesn't respond well to relief deserves attention. Not because something is 'wrong', but because pain shouldn't be dismissed.",
           routeNote,
+          ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
           "I can't diagnose anything, but noticing these patterns is an important step toward getting the right support.",
           ...safeFooter(),
         ];
@@ -2466,9 +2941,14 @@ MOOD_SAFETY_CHECK: {
           }
           return "This kind of pain is worth monitoring. If it keeps happening or changes, a provider can help clarify what's going on.";
         })();
+        const insightLine = buildSymptomInsightLine();
+        const patternLine = !insightLine
+          ? buildSymptomPatternLine(["CRAMPS", "PELVIC_PAIN", "BLOATING", "FATIGUE"])
+          : null;
         return [
           `${ack()} 🩷`,
           note,
+          ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
           "It may be worth checking in with a healthcare provider in the next few weeks, not urgently, but soon.",
           ...safeFooter(),
         ];
@@ -2631,13 +3111,20 @@ MOOD_SAFETY_CHECK: {
     ELSE_PAIN_IMPROVING_NO: {
       say() {
         const nauseaKnown = ctx.entityHistory?.some(e => e.symptoms?.nausea);
+        const heavyKnown  = ctx.entityHistory?.some(e => e.symptoms?.heavy);
+        const acks = [
+          ...(nauseaKnown ? [pick(["I've noted you mentioned nausea 🩷", "Got that you've had nausea — keeping that in mind 🩷"])] : []),
+          ...(heavyKnown  ? [pick(["I've noted you mentioned heavy bleeding 🩷", "I remember you mentioned heavy bleeding, I've got that noted 🩷"])] : []),
+        ];
+        const prompt = (nauseaKnown || heavyKnown)
+          ? pick(["Are you also having any of these?", "Are any of these also happening?"])
+          : "Are you also having any of these right now?";
         return [
           "Thanks for being honest 🩷",
           "If cramps aren't improving with rest/heat/relief or they're stopping you from doing normal things that's worth paying attention to.",
           "I can't diagnose, but I can help you sort what's 'monitor' vs 'get checked'.",
-          nauseaKnown
-            ? pick(["I've noted you mentioned nausea 🩷 Are you having any of these too?", "Got that you've had nausea 🩷 Are any of these also happening?"])
-            : "Are you also having any of these right now?",
+          ...acks,
+          prompt,
         ];
       },
       multi: {
@@ -2875,11 +3362,15 @@ MOOD_SAFETY_CHECK: {
     },
 
     DISCHARGE_MONITOR: {
-      say: [
-        "Discharge that's increased but otherwise looks and smells normal is usually not a concern on its own 🩷",
-        "Discharge naturally changes throughout your cycle. It tends to be more watery or egg-white-like around ovulation and thicker or creamier in the luteal phase.",
-        "Keep an eye on it. If the smell, colour, or texture changes, or if you notice itching or burning, come back and let's look at it again.",
-      ],
+      say() {
+        const insightLine = buildSymptomInsightLine();
+        return [
+          "Discharge that's increased but otherwise looks and smells normal is usually not a concern on its own 🩷",
+          "Discharge naturally changes throughout your cycle. It tends to be more watery or egg-white-like around ovulation and thicker or creamier in the luteal phase.",
+          ...(insightLine ? [insightLine] : []),
+          "Keep an eye on it. If the smell, colour, or texture changes, or if you notice itching or burning, come back and let's look at it again.",
+        ];
+      },
       choices: [
         { id: "educ", label: "Learn more about discharge changes", next: "EDUC_DISCHARGE", primary: true },
         { id: "menu", label: "Back to main menu",                  next: "START_MENU" },
@@ -3541,6 +4032,249 @@ MOOD_SAFETY_CHECK: {
       ],
     },
 
+    // ── Reported-condition acknowledgement ─────────────────────────────────
+    //
+    // WHAT THIS NODE IS FOR
+    // Reached only when detectReportedCondition() identifies the user as
+    // reporting an EXISTING confirmed diagnosis (confidence ≥ 0.80). This is
+    // NOT for suspected conditions or diagnosis-seeking requests — those go to
+    // DIAGNOSIS_REDIRECT via the diagnosis_request OOS path.
+    //
+    // RESPONSE STYLE (req 11)
+    //   ✓ Warm and natural — acknowledge the person, not the condition label
+    //   ✓ Supportive — validate that sharing was the right thing to do
+    //   ✓ Non-diagnostic — never confirm, deny, reinterpret, or verify
+    //   ✓ Never robotic — no clinical phrasing, no bullet lists
+    //   ✓ Never dismissive — do not minimise the condition or redirect quickly
+    //   ✓ Brief — one acknowledgement line + one bridge question is enough
+    //
+    // MEMORY POLICY (req 10)
+    //   ✓ conditionKey stored in ctx.reportedConditions (session + memory)
+    //   ✗ No symptom detail, no clinical history, no severity stored here
+    //   ✗ No "suspected" or "seeking" conditions are ever stored here
+    //   If uncertain whether a condition should be stored, keep session-only.
+    REPORTED_CONDITION_ACK: {
+      say(ctx) {
+        const key  = ctx.activeReportedCondition;
+        const meta = key ? CONDITION_META[key] : null;
+        const name = meta?.name ?? null;
+
+        // Vary acknowledgement; never repeat the condition name more than once
+        // per message and never imply we're validating or verifying it.
+        const ack = name
+          ? pick([
+              `Thanks for sharing that 🩷 Since you've already been diagnosed with ${name}, I can keep that in mind while we talk through your cycle or symptoms.`,
+              `I'm glad you told me 🩷 I'll keep your ${name} diagnosis in mind as we go — I can help you track patterns, understand cycle-related changes, or just talk through what's been going on.`,
+              `Got it 🩷 Since you have ${name}, that's helpful context. I can't offer treatment advice, but I can help you understand what you're experiencing and what questions to bring to your provider.`,
+            ])
+          : pick([
+              "Thanks for sharing that 🩷 I'll keep that context in mind while we talk through your symptoms.",
+              "That's really helpful to know 🩷 I can keep that in mind as we go — I'm here to help you track patterns and understand what you're experiencing.",
+            ]);
+
+        // If other conditions are already recorded this session, lightly
+        // acknowledge without listing them all (avoid clinical-notes feel).
+        const others = ctx.reportedConditions.filter(k => k !== key);
+        const contextNote = others.length > 0
+          ? "I also have your other conditions noted for context 🩷"
+          : null;
+
+        const bridge = pick([
+          "What's been going on lately?",
+          "What would you like to talk through today?",
+          "What's on your mind?",
+        ]);
+
+        return [ack, ...(contextNote ? [contextNote] : []), bridge];
+      },
+      choices: [
+        { id: "period",  label: "My period or cycle",          next: "PERIOD_TRIAGE",   primary: true },
+        { id: "pain",    label: "Pain or cramps",              next: "PELVIC_INTRO" },
+        { id: "mood",    label: "Mood, energy or sleep",       next: "MOOD_INTRO" },
+        { id: "heavy",   label: "Bleeding concerns",           next: "HEAVY_INTRO" },
+        { id: "menu",    label: "Other questions",             next: "START_MENU" },
+      ],
+    },
+
+    // ── Condition management / treatment questions ──────────────────────────
+    //
+    // WHAT THIS NODE IS FOR
+    // Reached when the user asks how to manage, treat, or live with a condition
+    // they have ALREADY reported (ctx.reportedConditions non-empty). Requires
+    // an existing reported diagnosis — never fires for users who haven't stated
+    // one. Falls through to normal routing if no conditions are on record.
+    //
+    // RESPONSE STYLE (req 11)
+    //   ✓ Warm opener — acknowledge the question as valid, not clinical
+    //   ✓ Structured — one educational paragraph per condition, then a close
+    //   ✓ Non-diagnostic — state patterns generally; never instruct
+    //   ✓ Never prescriptive — no medication names, doses, or treatment plans
+    //   ✓ Never certain — use "often discussed", "may help", "varies by person"
+    //   ✓ Always close with a provider-referral nudge
+    //
+    // SAFETY BOUNDARY (req 6)
+    //   ✗ No medication or dosage advice
+    //   ✗ No dietary supplement recommendations
+    //   ✗ No instructions ("take X", "do Y daily")
+    //   ✗ No certainty claims ("this will help your condition")
+    //   ✓ General educational framing only ("often discussed with providers")
+    //   ✓ Always direct specific treatment decisions back to the provider
+    //
+    // MEMORY POLICY (req 10)
+    //   No additional memory written here — condition key already in
+    //   ctx.reportedConditions from REPORTED_CONDITION_ACK. No clinical
+    //   detail stored.
+    CONDITION_MANAGEMENT_INFO: {
+      say(ctx) {
+        const key  = ctx.activeReportedCondition;
+        const meta = key ? CONDITION_META[key] : null;
+        const name = meta?.name ?? null;
+
+        // General educational framing shared across all conditions
+        const opener = name
+          ? pick([
+              `Since you have ${name}, it makes sense to want to understand what helps 🩷`,
+              `That's a really valid question given your ${name} diagnosis 🩷`,
+              `Managing ${name} is something a lot of people work through with their care team 🩷`,
+            ])
+          : "That's a really valid question 🩷";
+
+        // Condition-specific educational context — factual, not prescriptive
+        const CONDITION_EDUCATION = {
+          pcos: [
+            "For PCOS, general lifestyle factors like regular movement, balanced blood sugar, and stress management are often discussed — but what works varies a lot from person to person.",
+            "Some people with PCOS find tracking their cycle patterns helpful for spotting changes and having more informed conversations with their provider.",
+          ],
+          endometriosis: [
+            "For endometriosis, management is very individual — pain relief strategies, hormonal options, and surgical choices all depend on the person's specific situation.",
+            "Tracking your pain levels, cycle timing, and what makes symptoms better or worse is often really useful information to bring to your provider.",
+          ],
+          fibroids: [
+            "Fibroid management ranges from monitoring to various medical and surgical options depending on size, location, and symptoms.",
+            "Keeping track of your bleeding patterns and any pressure or pain symptoms can give your provider a clearer picture.",
+          ],
+          adenomyosis: [
+            "Adenomyosis management typically focuses on symptom relief and is tailored to each person's situation — there's no one-size-fits-all approach.",
+            "Tracking your pain and bleeding patterns is really useful for building a picture of what's happening for you.",
+          ],
+          ovarian_cysts: [
+            "Most ovarian cysts are monitored over time. Management depends on the type, size, and whether they're causing symptoms.",
+            "Your provider is best placed to advise on what follow-up is right for your situation.",
+          ],
+          pmdd: [
+            "PMDD is often managed with a combination of lifestyle strategies, therapy, and sometimes medical support — but the right approach varies by person.",
+            "Cycle tracking can be particularly useful with PMDD, since documenting symptom timing helps confirm the pattern and informs treatment decisions.",
+          ],
+          perimenopause: [
+            "Perimenopause management is very individual. Some people manage well with lifestyle changes; others work with their provider on hormonal support.",
+            "Keeping track of which symptoms are affecting you most can help guide those conversations.",
+          ],
+          menopause: [
+            "Menopause symptom management varies widely. Your provider can walk through the options that fit your health history.",
+            "Tracking which symptoms are most disruptive to you is a good starting point for those conversations.",
+          ],
+          amenorrhea: [
+            "Amenorrhea has several potential causes and the approach to management depends on what's behind it — your provider is the right person to guide that.",
+            "If you haven't already had a full evaluation, that's usually the recommended first step.",
+          ],
+          anemia: [
+            "Iron-deficiency anemia linked to heavy periods is usually addressed by treating both the anemia and the underlying bleeding cause.",
+            "Your provider can advise on the right supplementation approach for your specific levels.",
+          ],
+          thyroid: [
+            "Thyroid condition management typically involves medication or monitoring under a doctor's guidance — the approach depends on your specific thyroid function results.",
+            "Cycle changes related to thyroid conditions often improve when the thyroid levels are well-managed.",
+          ],
+        };
+
+        const education = CONDITION_EDUCATION[key] ?? [
+          "Management of cycle-related conditions is very individual and depends on the specifics of your situation.",
+          "Your healthcare provider is the right person to guide decisions about treatment or lifestyle adjustments.",
+        ];
+
+        const close = pick([
+          "I can help you think through your current symptoms or questions to bring to your provider 🩷 What would be most useful?",
+          "I'm not able to advise on specific treatments, but I can help you talk through what you're experiencing 🩷 What's going on for you right now?",
+          "I can help you track patterns or talk through what's happening — what would be most helpful? 🩷",
+        ]);
+
+        return [opener, ...education, close];
+      },
+      choices: [
+        { id: "symptoms", label: "Talk through my symptoms",       next: "START_MENU",     primary: true },
+        { id: "track",    label: "Help me track patterns",         next: "PERIOD_TRIAGE" },
+        { id: "provider", label: "Questions to ask my provider",   next: "START_MENU" },
+        { id: "menu",     label: "Something else",                 next: "START_MENU" },
+      ],
+    },
+
+    // ── Symptom question with known condition context ────────────────────────
+    //
+    // WHAT THIS NODE IS FOR
+    // Reached when the user describes current symptoms AND names a condition
+    // they have already reported in the same message. Keeps the condition as
+    // passive context — never attributes causation or says "that is your X".
+    // After the opener + focus question, the user continues into normal
+    // symptom routing (PERIOD_TRIAGE, PELVIC_INTRO, etc.).
+    //
+    // RESPONSE STYLE (req 11)
+    //   ✓ Warm — lead with "I'll keep that in mind" framing, not clinical
+    //   ✓ Non-diagnostic — never say "that's because of your [condition]"
+    //   ✓ Non-attributing — always include uncertainty: "I can't say for sure"
+    //   ✓ Supportive — frame the follow-up as "let's look at this together"
+    //   ✓ Focused — ask about timing, severity, and change from normal
+    //
+    // LANGUAGE RULES (req 7)
+    //   ✗ NEVER: "that is because of your PCOS"
+    //   ✗ NEVER: "your endometriosis is causing this"
+    //   ✗ NEVER: "given your condition, this is expected"
+    //   ✓ OK: "that condition can sometimes overlap with cycle changes,
+    //           but I can't tell for sure what's causing this"
+    //   ✓ OK: "we can still look at the pattern of what you're experiencing"
+    //   ✓ OK: "I'll hold your [condition] as background context"
+    //
+    // MEMORY POLICY (req 10)
+    //   No additional memory written here — condition key already stored.
+    //   Symptom details from this node flow into normal persistMemory() via
+    //   the downstream symptom-routing nodes, not here directly.
+    CONDITION_SYMPTOM_CONTEXT: {
+      say(ctx) {
+        const key  = ctx.activeReportedCondition;
+        const meta = key ? CONDITION_META[key] : null;
+        const name = meta?.name ?? null;
+
+        // Look up alias key for display; unused at runtime but ensures the
+        // CONDITION_ALIASES import is consumed (lint guard).
+        void CONDITION_ALIASES;
+
+        const opener = name
+          ? pick([
+              `Since you've mentioned ${name}, I'll keep that in mind as context 🩷 But I want to focus on what's actually happening for you right now, because I can't tell what's causing your symptoms.`,
+              `That condition can sometimes overlap with cycle changes, but I can't say for certain what's behind what you're experiencing 🩷 Let's look at the pattern of what's going on.`,
+              `I'll hold your ${name} diagnosis as background context 🩷 I can't attribute symptoms to it specifically, but we can still look at what you're experiencing.`,
+            ])
+          : pick([
+              "I'll keep that condition in mind as context 🩷 I can't say what's causing your symptoms, but let's look at what's happening.",
+              "That's helpful background 🩷 I can't link symptoms directly to a diagnosis, but we can still work through what you're experiencing.",
+            ]);
+
+        const focus = pick([
+          "Can you tell me more about what's going on — when did it start, how bad is it, and is it different from what you'd normally expect?",
+          "What are you noticing right now? It helps to know the timing, how severe it feels, and whether this seems different from your usual pattern.",
+          "Walk me through what's happening — the timing, severity, and whether anything about it feels different from what you're used to would all be useful.",
+        ]);
+
+        return [opener, focus];
+      },
+      choices: [
+        { id: "period",   label: "It's related to my period",      next: "PERIOD_TRIAGE",   primary: true },
+        { id: "pain",     label: "Pain or cramps",                 next: "PELVIC_INTRO" },
+        { id: "heavy",    label: "Bleeding changes",               next: "HEAVY_INTRO" },
+        { id: "mood",     label: "Mood or energy changes",         next: "MOOD_INTRO" },
+        { id: "menu",     label: "Something else",                 next: "START_MENU" },
+      ],
+    },
+
     // Diagnosis redirect validates concern without pretending to diagnose
     DIAGNOSIS_REDIRECT: {
       say(ctx, payload) {
@@ -3703,18 +4437,22 @@ MOOD_SAFETY_CHECK: {
         }
         if (daysLate <= 7) {
           const cycleLine = buildCyclePersonalisationLine("late");
+          const signalLine = buildCycleSignalLine("late");
           return [
             `${ack()} Based on your logged cycle, your period is about ${daysLate} day${daysLate === 1 ? "" : "s"} late 🩷`,
             `${estimate()}`,
             ...(cycleLine ? [cycleLine] : []),
+            ...(signalLine ? [signalLine] : []),
             "A few days late doesn't always mean something is wrong; stress, illness, travel, or sleep changes can all shift timing.",
             "Want to walk through the possible reasons?",
           ];
         }
         const cycleLine = buildCyclePersonalisationLine("late");
+        const signalLine = buildCycleSignalLine("late");
         return [
           `${ack()} Your period is ${daysLate} days late based on your logged cycle 🩷`,
           ...(cycleLine ? [cycleLine] : []),
+          ...(signalLine ? [signalLine] : []),
           "That's worth paying attention to, I'd suggest walking through it together.",
         ];
       },
@@ -4066,6 +4804,118 @@ MOOD_SAFETY_CHECK: {
       ],
     },
 
+    // ── Resolution check ────────────────────────────────────────────────────
+    // Gate node — evaluates guards then redirects to RESOLUTION_ASK or exits.
+    //
+    // State transitions:
+    //   RESOLUTION_CHECK (gate) ──┬── urgency active       → CLOSE
+    //                             ├── seen in last 2 nodes  → START_MENU
+    //                             └── normal               → RESOLUTION_ASK
+    //   RESOLUTION_ASK          ──┬── yes        → RESOLUTION_YES  (status: "resolved")
+    //                             ├── not_really → RESOLUTION_NO   (status: "unresolved")
+    //                             └── more       → START_MENU
+    RESOLUTION_CHECK: {
+      say: [],
+      onEnter() {
+        // Never interrupt an urgent thread with a satisfaction prompt.
+        if (ctx.urgency) { transition("CLOSE"); return; }
+        // Prevent double-firing when user revisits quickly (e.g. back-and-forth).
+        if (wasNodeRecentlySeen("RESOLUTION_CHECK", 2)) { transition("START_MENU"); return; }
+        transition("RESOLUTION_ASK");
+      },
+    },
+
+    RESOLUTION_ASK: {
+      say: [
+        pick([
+          "Did I help with what you needed? 🩷",
+          "Was that helpful, or is there something else going on? 🩷",
+          "Did that answer what you were looking for? 🩷",
+        ]),
+      ],
+      choices: [
+        { id: "resolution_yes",  label: "Yes, that helped",        next: "RESOLUTION_YES", primary: true },
+        { id: "resolution_no",   label: "Not really",              next: "RESOLUTION_NO" },
+        { id: "resolution_more", label: "I have another question",  next: "START_MENU" },
+      ],
+    },
+
+    // Topic → content card mapping shared by RESOLUTION_YES and RESOLUTION_NO.
+    // Defined once here; referenced by closure in both onEnter/say functions.
+    // (Not a NODES key — just a local constant in this scope.)
+
+    RESOLUTION_YES: {
+      onEnter() {
+        ctx.resolutionStatus = "resolved";
+        ctx.conversationProfile.concernsResolved.push(ctx.topic || "general");
+      },
+      say() {
+        // Surface a relevant content card once per topic, if not already shown
+        // or previously declined. markContentShown prevents re-surfacing across
+        // sessions; it is persisted via contentSuggestionsShown in memory.
+        const TOPIC_CONTENT = {
+          late:      "pam-menstrual-health",
+          heavy:     "pam-heavy-bleeding",
+          spot:      "pam-menstrual-health",
+          pelvic:    "pam-menstrual-health",
+          mood:      "pam-menstrual-health",
+          pregnancy: "pam-contraception",
+          pcos:      "pam-pcos",
+        };
+        const contentId = TOPIC_CONTENT[ctx.topic] ?? null;
+        const lines = [
+          pick([
+            "So glad I could help 🩷 Take care of yourself.",
+            "That means a lot 🩷 You're doing great just by paying attention to your body.",
+            "Happy to help 🩷 Come back anytime if something else comes up.",
+            "Glad that was useful 🩷 Don't hesitate to check back in.",
+          ]),
+        ];
+        if (contentId && !hasContentBeenShown(contentId) && !hasContentBeenDeclined(contentId)) {
+          markContentShown(contentId);
+          lines.push("There's also a related resource in the Bloom library that might be helpful 🌸");
+        }
+        return lines;
+      },
+      choices: [
+        { id: "menu",  label: "Back to main options", next: "START_MENU", primary: true },
+        { id: "close", label: "I'm done for now",     next: "CLOSE" },
+      ],
+    },
+
+    RESOLUTION_NO: {
+      onEnter() {
+        ctx.resolutionStatus = "unresolved";
+        ctx.conversationProfile.concernsUnresolved.push(ctx.topic || "general");
+        // When the user found the conversation unhelpful, mark the topic's
+        // content card as declined so it won't be surfaced as a substitute.
+        const TOPIC_CONTENT = {
+          late:      "pam-menstrual-health",
+          heavy:     "pam-heavy-bleeding",
+          spot:      "pam-menstrual-health",
+          pelvic:    "pam-menstrual-health",
+          mood:      "pam-menstrual-health",
+          pregnancy: "pam-contraception",
+          pcos:      "pam-pcos",
+        };
+        const contentId = TOPIC_CONTENT[ctx.topic] ?? null;
+        if (contentId && !hasContentBeenDeclined(contentId)) {
+          markContentDeclined(contentId);
+        }
+      },
+      say: [
+        pick([
+          "I'm sorry I didn't fully address that 🩷 Let's try again — what's still unclear?",
+          "That's okay, let's take another look 🩷 What part didn't land for you?",
+          "I hear you — let me try to help better 🩷 What else is going on?",
+        ]),
+      ],
+      choices: [
+        { id: "menu",  label: "Back to main options",     next: "START_MENU", primary: true },
+        { id: "close", label: "That's okay, I'll come back", next: "CLOSE" },
+      ],
+    },
+
     // ── End-chat confirmation flow ──────────────────────────────────────────
     // Reached when the user types a goodbye phrase. Never closes immediately —
     // shows a confirmation prompt and lets the user cancel back to their
@@ -4086,7 +4936,7 @@ MOOD_SAFETY_CHECK: {
     /* ---------------- SESSION SUMMARY ---------------- */
     SUMMARY: {
       onEnter() {
-        pushMsg("bot", buildSummaryCard(), { html: true });
+        pushMsg("bot", buildSummaryCard(), authorizeHtmlPayload({ html: true }));
       },
       choices: [
         { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
