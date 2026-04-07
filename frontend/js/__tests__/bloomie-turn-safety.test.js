@@ -75,6 +75,15 @@ globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => ({}) });
 
 let chat;
 
+function initChat(options = {}) {
+  document.body.innerHTML = `
+    <div id="chat-box"></div>
+    <form id="chat-form"><input id="chat-input" /></form>
+  `;
+  chat = initBloomieChat(options);
+  vi.advanceTimersByTime(10_000);
+}
+
 function sendMessage(text) {
   const $input = document.getElementById("chat-input");
   const $form  = document.getElementById("chat-form");
@@ -86,12 +95,7 @@ function sendMessage(text) {
 beforeEach(() => {
   vi.useFakeTimers();
   toneDeferreds.length = 0;
-  document.body.innerHTML = `
-    <div id="chat-box"></div>
-    <form id="chat-form"><input id="chat-input" /></form>
-  `;
-  chat = initBloomieChat();
-  vi.advanceTimersByTime(10_000);
+  initChat();
 });
 
 afterEach(() => {
@@ -151,6 +155,45 @@ describe("late-flow follow-up continuity", () => {
   it("does not force unrelated follow-up text into late flow", () => {
     sendMessage("my period is late");
     sendMessage("let me test something");
+    const state = chat.getState();
+    expect(state.entityHistory.at(-1)?.symptoms?.late).toBe(false);
+  });
+});
+
+describe("late follow-up from overdue intro context", () => {
+  function initOverdueChat() {
+    const lmp = new Date(Date.now() - 44 * 24 * 60 * 60 * 1000); // ~16 days overdue on 28-day cycle
+    initChat({
+      cycleData: { lmp, cycleLength: 28, mode: "cycle_tracking" },
+    });
+  }
+
+  it("recognizes 'it nuh come' as late continuation", () => {
+    initOverdueChat();
+    sendMessage("it nuh come");
+    const state = chat.getState();
+    expect(state.entityHistory.at(-1)?.symptoms?.late).toBe(true);
+  });
+
+  it("recognizes 'it nuh come yet' and 'not yet' as late continuation", () => {
+    initOverdueChat();
+    sendMessage("it nuh come yet");
+    expect(chat.getState().entityHistory.at(-1)?.symptoms?.late).toBe(true);
+    sendMessage("not yet");
+    expect(chat.getState().entityHistory.at(-1)?.symptoms?.late).toBe(true);
+  });
+
+  it("recognizes 'still no period' and normalized variants as late continuation", () => {
+    initOverdueChat();
+    sendMessage("still no period");
+    expect(chat.getState().entityHistory.at(-1)?.symptoms?.late).toBe(true);
+    sendMessage("it hasn't come yet");
+    expect(chat.getState().entityHistory.at(-1)?.symptoms?.late).toBe(true);
+  });
+
+  it("does not force period interpretation in unrelated context", () => {
+    initChat();
+    sendMessage("it nuh come");
     const state = chat.getState();
     expect(state.entityHistory.at(-1)?.symptoms?.late).toBe(false);
   });

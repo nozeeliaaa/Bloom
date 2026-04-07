@@ -554,21 +554,45 @@ export function initBloomieChat({
     return merged;
   }
 
+  const WEAK_MEMORY_SYMPTOM_KEYS = new Set(["implicit_late"]);
+  const VALID_SYMPTOM_KEYS = new Set(Object.keys(extractEntities("").symptoms || {}));
+
+  function symptomKeyToTopic(symptomKey) {
+    if (!symptomKey) return null;
+    if (["late", "nausea", "pregnancy_symptoms", "test_timing", "pregnancy_mention"].includes(symptomKey)) return "late";
+    if (["heavy", "large_clots", "light", "flow_change", "bleeding_through"].includes(symptomKey)) return "heavy";
+    if (["spotting"].includes(symptomKey)) return "spot";
+    if (["pelvic", "ovulation_pain", "pain_during_sex", "one_sided_pain", "cramps"].includes(symptomKey)) return "pelvic";
+    if (["mood", "anxiety", "depression", "irritability", "night_sweats", "cold_flashes", "fatigue"].includes(symptomKey)) return "mood";
+    if (["discharge", "unusual_discharge", "discharge_eggwhite", "odor"].includes(symptomKey)) return "discharge";
+    if (["pregnant", "positive_test", "negative_test", "tested_today"].includes(symptomKey)) return "pregnancy";
+    return null;
+  }
+
+  function getExplicitSymptomKeys(sourceEntities) {
+    const symptoms = sourceEntities?.symptoms || {};
+    return Object.entries(symptoms)
+      .filter(([k, v]) => v && VALID_SYMPTOM_KEYS.has(k) && !WEAK_MEMORY_SYMPTOM_KEYS.has(k))
+      .map(([k]) => k);
+  }
+
   // Persist a compact memory snapshot after a meaningful exchange.
   // Safe to call fire-and-forget - saves to localStorage immediately,
   // Firestore sync happens in the background.
-  function persistMemory(entities, reason) {
-    const activeSymptoms = Object.entries(entities.symptoms)
-      .filter(([, v]) => v)
-      .map(([k]) => k);
+  function persistMemory(entities, reason, { sourceEntities = entities } = {}) {
+    const activeSymptoms = getExplicitSymptomKeys(sourceEntities);
     if (!activeSymptoms.length) return;
+    const activeTopics = [...new Set(activeSymptoms.map(symptomKeyToTopic).filter(Boolean))];
     const partialUpdate = {
       lastSymptoms:            activeSymptoms,
+      lastSymptomsAt:          new Date().toISOString(),
+      lastSymptomsSource:      "explicit_entity",
+      lastSymptomTopics:       activeTopics.slice(0, 5),
       lastIntent:              reason || null,
       lastSeverity:            entities.severity,
       lastDuration:            entities.duration,
       lastPregnancyChance:     entities.pregnancy?.chance || false,
-      recentTopics:            activeSymptoms.slice(0, 5),
+      recentTopics:            activeTopics.length ? activeTopics.slice(0, 5) : activeSymptoms.slice(0, 5),
       lastSessionDate:         new Date().toISOString(),
       lastResolutionStatus:    ctx.resolutionStatus  ?? null,
       closeIntentDetected:     ctx.closeIntentDetected ?? false,
@@ -1419,7 +1443,7 @@ export function initBloomieChat({
       // If we are already in a late-period thread and the user replies with a
       // short non-arrival paraphrase ("it still not here", "it nuh come yet"),
       // carry forward late context so routing stays consistent.
-      if (!entities.urgent && isLateContextActive() && isLateArrivalFollowUp(normalizedText)) {
+      if (!entities.urgent && isLateContextActive({ includePromptContext: true }) && isLateArrivalFollowUp(normalizedText)) {
         entities.symptoms.late = true;
         entities.symptoms.implicit_late = true;
       }
@@ -1861,7 +1885,7 @@ export function initBloomieChat({
         ctx.lastIntent = inferred?.payload?.reason?.split("+")[0] || inferred?.next
           || guidance.scenario?.split("_")[0] || null;
         ctx.lastCycleCtx = cycleCtx;
-        persistMemory(mergedEntities, ctx.lastInferredReason);
+        persistMemory(mergedEntities, ctx.lastInferredReason, { sourceEntities: entities });
         // Show the structured template response THEN transition.
         // keepLocked: true ensures the UI stays locked between the last
         // guidance bubble and the transition firing, so old node buttons
@@ -1897,7 +1921,7 @@ export function initBloomieChat({
 
       if (inferred) {
         ctx.lastIntent = inferred.payload?.reason?.split("+")[0] || null;
-        persistMemory(mergedEntities, inferred.payload?.reason || null);
+        persistMemory(mergedEntities, inferred.payload?.reason || null, { sourceEntities: entities });
         bloomieDebug("route", {
           route:    inferred.next,
           source:   "inferRoute",
@@ -2537,16 +2561,44 @@ export function initBloomieChat({
     "LATE_NEG_UNCLEAR", "LATE_CHANGES_Q", "LATE_CHANGES_EXPLAIN", "LATE_SYMPTOMS_Q",
     "LATE_PATTERN_Q", "LATE_WRAP", "PREG_LATE_ROUTE",
   ]);
-  function isLateContextActive() {
+
+  function getPreviousBotLine() {
+    for (let i = ctx.history.length - 1; i >= 0; i--) {
+      if (ctx.history[i]?.from === "bot") return String(ctx.history[i].text || "");
+    }
+    return "";
+  }
+
+  function hasOverdueCyclePromptContext() {
+    const overdueDays = daysUntilNextPeriod();
+    if (typeof overdueDays === "number" && overdueDays < -1) return true;
+    const lastBot = getPreviousBotLine().toLowerCase();
+    return (
+      /\b(period may be (a little )?late|might be a bit later than expected|period may not have arrived yet)\b/.test(lastBot) ||
+      /\b(overdue|hasn'?t come yet|has not come yet)\b/.test(lastBot)
+    );
+  }
+
+  function isLateContextActive({ includePromptContext = false } = {}) {
     if (ACTIVE_LATE_STATES.has(ctx.state)) return true;
     if (ctx.lastIntent === "late" || ctx.lastIntent === "LATE_INTRO" || ctx.lastIntent === "LATE_PERIOD_CHECK") return true;
-    return ctx.entityHistory.slice(-2).some(e => e?.symptoms?.late || e?.symptoms?.implicit_late);
+    if (ctx.entityHistory.slice(-2).some(e => e?.symptoms?.late || e?.symptoms?.implicit_late)) return true;
+    if (includePromptContext && hasOverdueCyclePromptContext()) return true;
+    return false;
   }
+
   function isLateArrivalFollowUp(text) {
-    const t = String(text || "").toLowerCase();
+    const t = String(text || "")
+      .toLowerCase()
+      .replace(/[^\w\s']/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     return (
       /\b(?:my\s+)?period\s+(?:still\s+)?(?:hasn'?t|has not|haven'?t|have not|didn'?t|did not|nuh|nah|not|no)\s+(?:come|arriv(?:e|ed)|reach(?:ed)?|show(?:ed|ing)?(?:\s+up)?)\s*(?:yet)?\b/.test(t) ||
       /\b(?:it|mine)\s+(?:still\s+)?(?:hasn'?t|has not|haven'?t|have not|didn'?t|did not|nuh|nah|not|no)\s+(?:come|arriv(?:e|ed)|reach(?:ed)?|show(?:ed|ing)?(?:\s+up)?)\s*(?:yet)?\b/.test(t) ||
+      /^(?:not yet|still no|still no period|no period yet|still hasn't come|still has not come)$/.test(t) ||
+      /^(?:it nuh come|it nuh come yet|it still no come|it still nuh come|it not here yet|period still nuh come|period still no come|no it still nuh come)$/.test(t) ||
+      /^(?:haven't seen it yet|have not seen it yet|haven't seen my period yet|have not seen my period yet)$/.test(t) ||
       /\bit\s+still\s+not\s+here\b/.test(t) ||
       /\bit\s+no\s+show(?:ing)?\s+up(?:\s+yet)?\b/.test(t) ||
       /\bstill\s+hasn'?t\s+come\b/.test(t)
@@ -3431,18 +3483,65 @@ export function initBloomieChat({
 
   // ---------- Conversation Nodes ----------
 
-  // Returns a recall sentence if memory is recent and has symptom data, else null.
-  // e.g. "Last time we talked, you mentioned a missed period and nausea -
-  //        is that still going on, or is something new coming up?"
-  function buildRecallLine() {
-    if (ctx.isAnon) return null;
-    if (!bloomieMemory?.lastSymptoms?.length) return null;
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const sessionDate  = bloomieMemory.lastSessionDate ? new Date(bloomieMemory.lastSessionDate) : null;
-    if (!sessionDate || sessionDate < sevenDaysAgo) return null;
+  const SYMPTOM_MEMORY_RECALL_MAX_AGE_MS = 72 * 60 * 60 * 1000; // conservative: only recall explicit symptoms from last 72h
+  const SYMPTOM_RECALL_BLOCKED_STATES = new Set([
+    "START", "START_MENU", "NARROWING", "CONFIDENCE_FALLBACK",
+    "ELSE_NOT_SURE_ROUTE", "END_CHAT_CONFIRM", "CLOSE",
+  ]);
 
+  function inferRecallTopicFromState(state = "") {
+    if (/^MOOD_/.test(state)) return "mood";
+    if (/^LATE_/.test(state)) return "late";
+    if (/^HEAVY_/.test(state)) return "heavy";
+    if (/^SPOT_/.test(state)) return "spot";
+    if (/^PELVIC_/.test(state)) return "pelvic";
+    if (/^PREG_|^TEST_/.test(state)) return "pregnancy";
+    if (/DISCHARGE/.test(state)) return "discharge";
+    return null;
+  }
+
+  function shouldRecallSymptomMemory({ topicHint = null } = {}) {
+    if (ctx.isAnon) return false;
+    if (SYMPTOM_RECALL_BLOCKED_STATES.has(ctx.state)) return false;
+    // Brand-new turn safety: do not surface symptom-memory callbacks out of nowhere.
+    // flowId increments on the first real user action (typed or choice click).
+    if ((ctx.flowId ?? 0) < 1) return false;
+
+    const source = String(bloomieMemory?.lastSymptomsSource || "");
+    if (!source.startsWith("explicit")) return false;
+
+    const lastSymptomsAtRaw = bloomieMemory?.lastSymptomsAt || null;
+    if (!lastSymptomsAtRaw) return false; // legacy objects without timestamp fail safe
+    const lastSymptomsAt = new Date(lastSymptomsAtRaw);
+    if (Number.isNaN(lastSymptomsAt.getTime())) return false;
+    if (Date.now() - lastSymptomsAt.getTime() > SYMPTOM_MEMORY_RECALL_MAX_AGE_MS) return false;
+
+    const symptoms = Array.isArray(bloomieMemory?.lastSymptoms)
+      ? bloomieMemory.lastSymptoms
+      : [];
+    const validSymptoms = symptoms
+      .filter(k => typeof k === "string" && VALID_SYMPTOM_KEYS.has(k) && !WEAK_MEMORY_SYMPTOM_KEYS.has(k))
+      .slice(0, 8);
+    if (!validSymptoms.length) return false;
+
+    const topic = topicHint || inferRecallTopicFromState(ctx.state);
+    if (!topic) return false;
+    const memoryTopics = new Set(validSymptoms.map(symptomKeyToTopic).filter(Boolean));
+    if (!memoryTopics.has(topic)) return false;
+
+    return true;
+  }
+
+  // Returns a recall sentence only when persisted symptom memory is explicit,
+  // recent, and relevant to the current topic context.
+  function buildRecallLine({ topicHint = null } = {}) {
+    if (!shouldRecallSymptomMemory({ topicHint })) return null;
+
+    const topic = topicHint || inferRecallTopicFromState(ctx.state);
     const labels = [...new Set(
-      bloomieMemory.lastSymptoms
+      (bloomieMemory?.lastSymptoms || [])
+        .filter(k => VALID_SYMPTOM_KEYS.has(k) && !WEAK_MEMORY_SYMPTOM_KEYS.has(k))
+        .filter(k => symptomKeyToTopic(k) === topic)
         .flatMap(key => SYMPTOM_TO_CATALOG_KEYS[key] || [])
         .map(code => CATALOG_LABELS[code])
         .filter(Boolean)
@@ -3454,7 +3553,10 @@ export function initBloomieChat({
       ? labels[0]
       : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
 
-    return `Last time we talked, you mentioned **${list}** - is that still going on, or is something new coming up?`;
+    return pick([
+      `You mentioned **${list}** recently. Is that still happening, or is this something different?`,
+      `You've mentioned **${list}** before. Is that still going on right now?`,
+    ]);
   }
 
 

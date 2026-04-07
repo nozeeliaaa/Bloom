@@ -122,6 +122,9 @@ export function buildNodeHelpers(env) {
   // softer language since the data is older.
   function buildBackgroundRecallLine() {
     if (ctx.isAnon) return null;
+    // Never surface stale symptom callbacks at chat open before the user has
+    // re-established context in this session.
+    if ((ctx.conversationProfile?.sessionDepth ?? 0) < 1) return null;
     if (!ctx.backgroundContext?.symptoms) return null;
     const labels = [...new Set(
       Object.entries(ctx.backgroundContext.symptoms)
@@ -164,7 +167,7 @@ export function buildNodeHelpers(env) {
   function buildIntro() {
     const name        = getNickname();                                    // Firestore nickname or null
     const isReturning = !ctx.isAnon && !!bloomieMemory?.lastSessionDate;  // has at least one prior session
-    const recall      = buildRecallLine();                                 // recent symptom recall (<7d), or null
+    const recall      = buildRecallLine();                                 // topic/recentness gated in assistant helper
     const bgRecall    = !recall ? buildBackgroundRecallLine() : null;     // stale recall (>24h <7d), or null
     const intentLine  = !recall && !bgRecall ? buildIntentFallbackLine() : null; // last-resort intent hint
     const appendLine  = recall ?? bgRecall ?? intentLine;

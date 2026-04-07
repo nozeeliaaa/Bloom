@@ -36,6 +36,9 @@ export const BLOOMIE_MEMORY_DEFAULTS = {
   lastDuration:           null,
   lastPregnancyChance:    false,
   lastSymptoms:           [],
+  lastSymptomsAt:         null,
+  lastSymptomsSource:     null, // "explicit_entity" when sourced from directly extracted symptoms
+  lastSymptomTopics:      [],
   recentTopics:           [],
   recentConcernCategory:  null,
   urgentFlag:             false,
@@ -88,6 +91,7 @@ export function normalizeBloomieMemory(raw) {
     next[key] = coerceByDefault(src[key], fallback);
   }
   next.lastSymptoms = next.lastSymptoms.filter(v => typeof v === "string").slice(0, 50);
+  next.lastSymptomTopics = next.lastSymptomTopics.filter(v => typeof v === "string").slice(0, 20);
   next.recentTopics = next.recentTopics.filter(v => typeof v === "string").slice(0, 50);
   next.contentSuggestionsShown = next.contentSuggestionsShown.filter(v => typeof v === "string").slice(0, 100);
   next.declinedSuggestions = next.declinedSuggestions.filter(v => typeof v === "string").slice(0, 100);
@@ -189,4 +193,3 @@ export function isBloomieDebugEnabled() {
   }
   return false;
 }
-
