@@ -832,8 +832,23 @@ export function createOOS(env) {
 
   // Health signals that should ALWAYS beat OOS pattern matches.
   // e.g. "me bleed thru me pants lol" has "lol" but the health signal wins.
+  //
+  // Pattern 1 — explicit clinical / menstrual keywords (original, unchanged).
+  // Patterns 2–4 — vague / indirect reproductive-health phrases that should
+  //   keep the user in-scope even when no clinical keyword is present.
+  //   These match the same phrasing added to HEALTH_GATE in bloomie-intent.js.
   const HEALTH_OVERRIDE_PATTERNS = [
+    // Explicit clinical / menstrual keywords
     /\b(bleed|bleeding|blood|period|cramp|pain|spot|spotting|late|missed|discharge|pregnant|pregnancy|nausea|dizzy|faint|heavy|clot|pelvic|mood|tired|fatigue|cycle|ovulat|sad|angry|mad|vex|frustrated|happy|excited|emotional|anxious|energy)\b/,
+    // Location anchors implying reproductive concern
+    /down there|down below|lady parts?|private parts?|feminine area|mi body/i,
+    // Wrongness / off signals that imply a body concern without clinical words
+    /something(?:'s)?\s+(?:wrong|off|not right|not normal|strange)|sumn\s+(?:wrong|off)/i,
+    /not feel(?:ing)?\s+right|feel(?:ing)?\s+(?:off|weird|strange)|nuh feel right|mi nuh feel|mi feel off/i,
+    /off lately|been off|not myself|not like myself|nuh feel like mi/i,
+    // Indirect cycle / timing hints
+    /hasn.?t come yet|not here yet|still waiting (?:for it|on it)/i,
+    /sumn wrong with (?:my|mi)\s+(?:cycle|body|period|flow)/i,
   ];
 
   // Cycle question patterns — checked FIRST before health override

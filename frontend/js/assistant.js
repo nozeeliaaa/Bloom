@@ -3,7 +3,7 @@ import { resolveTone, applyToneToLines, applyToneToChoices } from "./bloomie-ton
 import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory, loadLocalBloomieMemory, saveLocalBloomieMemory, loadUserProfile } from "./db.js";
-import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion, detectReportedCondition, detectConditionManagementQuestion, detectConditionSymptomQuestion, CONDITION_META, CONDITION_ALIASES, extractConditionKey } from "./bloomie-routing.js";
+import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion, detectReportedCondition, detectConditionManagementQuestion, detectConditionSymptomQuestion, CONDITION_META, CONDITION_ALIASES, extractConditionKey, scoreVagueHealth } from "./bloomie-routing.js";
 import { resolveIntentAssist } from "./bloomie-intent.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent, logAnalyticsEvent, bloomieDebug } from "./bloomie-logger.js";
@@ -1220,6 +1220,8 @@ export function initBloomieChat({
         if (isConfirm) {
           const route = ctx.pendingRoute;
           ctx.pendingRoute = null;
+          // User confirmed the pending route — treat as successful routing, reset streak.
+          ctx.confidenceFallbackCount = 0;
           transition(route.next, route.payload || {});
           return;
         } else if (isCorrection) {
@@ -1985,8 +1987,13 @@ export function initBloomieChat({
         if (isOOS && routed.next === "START_MENU") {
           // Zero-confidence narrowing: if the input has health-adjacent words,
           // ask a clarifying question with topic buttons instead of the generic OOS reply.
-          if (/\b(period|bleed|pain|cramp|discharge|pregnant|cycle|mood|tired|sick|hurt)\b/.test(normalizedText)) {
-            ctx.narrowingCandidates = null; // generic OOS -- no candidates
+          const _hasExplicitHealth = /\b(period|bleed|pain|cramp|discharge|pregnant|cycle|mood|tired|sick|hurt)\b/.test(normalizedText);
+          const _vagueScore        = scoreVagueHealth(normalizedText);
+          if (_hasExplicitHealth || _vagueScore > 0) {
+            ctx.narrowingCandidates = null;
+            // Flag vague entries so NARROWING uses a gentler, open-ended opener
+            // rather than the default "which area fits?" buttons-first phrasing.
+            ctx.narrowingVague = !_hasExplicitHealth && _vagueScore > 0;
             transition("NARROWING");
             return;
           }
@@ -2070,6 +2077,10 @@ export function initBloomieChat({
             const candidates = candidateIntents
               .map(i => INTENT_TO_CANDIDATE[i]).filter(Boolean);
             ctx.narrowingCandidates = candidates.length ? candidates : null;
+            // If the rule layer found no candidates but the input has vague
+            // reproductive-health phrasing, use a softer NARROWING opener so the
+            // user feels heard rather than redirected.
+            ctx.narrowingVague = !candidates.length && scoreVagueHealth(normalizedText) > 0;
             ctx.confidenceFallbackCount++;
             logAnalyticsEvent("route_no_match", { input: normalizedText, primaryIntent: conf.primaryIntent }, ctx);
             transition("NARROWING");
@@ -2098,8 +2109,9 @@ export function initBloomieChat({
               if (!aiCandidate || ctx.state !== "NARROWING") return;
 
               if (_aiIntent.confidence === "high") {
-                // Upgrade: cancel NARROWING and route directly.
+                // Upgrade: cancel NARROWING and route directly — reset streak.
                 clearTimers();
+                ctx.confidenceFallbackCount = 0;
                 ctx.lastIntent = _aiIntent.route;
                 logAnalyticsEvent("route_matched", {
                   route:  _aiIntent.route,
@@ -2121,7 +2133,8 @@ export function initBloomieChat({
           logAnalyticsEvent("route_clarification", { route: conf.route || routed.next }, ctx);
           transition("MEDIUM_CONFIRM");
         } else {
-          // HIGH (or no confidence data): route directly
+          // HIGH (or no confidence data): route directly — reset struggle streak.
+          ctx.confidenceFallbackCount = 0;
           ctx.lastIntent = routed.next;
           logAnalyticsEvent("route_matched", { route: routed.next, reason: routed.payload?.reason }, ctx);
           transition(routed.next, routed.payload || {});
@@ -2687,13 +2700,36 @@ export function initBloomieChat({
     if (nextState === "_MEDIUM_YES") {
       const route = ctx.pendingRoute;
       ctx.pendingRoute = null;
-      if (route) transition(route.next, route.payload || {});
+      // User confirmed — treat as successful routing and reset the struggle streak.
+      ctx.confidenceFallbackCount = 0;
+      if (route?.next) {
+        transition(route.next, route.payload || {});
+      } else {
+        // pendingRoute was null or malformed — recover gracefully rather than
+        // silently stranding the user. Use narrowingRepair so NARROWING shows
+        // the warmer repair message instead of the generic picker.
+        ctx.narrowingRepair = true;
+        ctx.narrowingCandidates = null;
+        transition("NARROWING");
+      }
       return;
     }
     if (nextState === "_MEDIUM_NO") {
       ctx.pendingRoute = null;
       transition("NARROWING");
       return;
+    }
+
+    // ── Reset struggle streak on successful exit from disambiguation ──────
+    // When the user navigates FROM a disambiguation node (NARROWING or
+    // CONFIDENCE_FALLBACK) TO any real content node, that is a recovery
+    // event — reset confidenceFallbackCount so a later LOW starts fresh.
+    {
+      const _STRUGGLE_STATES = new Set(["NARROWING", "CONFIDENCE_FALLBACK"]);
+      const _DISAMBIGUATION  = new Set(["NARROWING", "CONFIDENCE_FALLBACK", "MEDIUM_CONFIRM"]);
+      if (_STRUGGLE_STATES.has(ctx.state) && !_DISAMBIGUATION.has(nextState)) {
+        ctx.confidenceFallbackCount = 0;
+      }
     }
 
     // ── END_CHAT sentinels ────────────────────────────────────────────────
@@ -3174,6 +3210,11 @@ export function initBloomieChat({
           if (!choice) return;
           advanceFlow();
           pushMsg("user", choice.label);
+          // Refresh tone from the button label so downstream say/choices transforms
+          // are not stale from a previous typed message. Rule-only (no AI call needed
+          // for a button selection — the label itself carries the emotional signal).
+          ctx.currentTone = detectUserTone(choice.label) ?? ctx.currentTone;
+          ctx.toneResult  = { tone: ctx.currentTone, intensity: "medium", subtext: "none", source: "rule_only" };
           if (node.question) recordAnswer(node.question, choice.label);
           if (choice.action === "OPEN_MAP")      onOpenCareMap();
           if (choice.action === "REQUEST_PDF") {

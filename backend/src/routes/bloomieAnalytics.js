@@ -34,6 +34,7 @@ const FieldValue = admin.firestore.FieldValue;
 const router = express.Router();
 
 const VALID_EVENT_TYPES = new Set([
+  // ── Routing analytics ────────────────────────────────────────────────────
   "route_matched",
   "route_clarification",
   "route_fallback",
@@ -44,6 +45,24 @@ const VALID_EVENT_TYPES = new Set([
   "emotion_classified",
   "session_end",
   "memory_recall_used",
+  // ── Internal diagnostic events (silent fallbacks) ────────────────────────
+  // These are emitted by bloomieDiagnostic() in bloomie-logger.js and are
+  // stored here so failures are visible post-session without requiring the
+  // BLOOMIE_DEBUG localStorage flag.
+  "ai_timeout",
+  "ai_parse_error",
+  "ai_unavailable",
+  "ai_invalid_response",
+  "ai_override",
+  "fallback_to_rules",
+  "vague_input_no_ai_assist",
+  "routing_low_confidence",
+  "cache_read_failed",
+  "cache_write_failed",
+  "backend_unavailable",
+  "memory_load_failed",
+  "profile_sync_failed",
+  "settings_sync_failed",
 ]);
 
 // ── Rate limiter: 60 requests / minute per IP ─────────────────────────────────

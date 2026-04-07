@@ -15,6 +15,7 @@
 import { getIdToken } from "./auth.js";
 import { isAccountMode } from "./mode.js";
 import { MODE_BANNER_ONCE_KEY } from "./utils.js";
+import { bloomieDiagnostic } from "./bloomie-logger.js";
 
 const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
@@ -472,11 +473,25 @@ export async function loadBloomieMemory() {
     const headers = await authHeaders();
     if (!headers) return local;
     const res = await fetch(apiUrl("/api/bloomie-memory"), { headers });
-    if (!res.ok) return local;
+    if (!res.ok) {
+      bloomieDiagnostic("memory_load_failed", {
+        module: "db",
+        stage:  "loadBloomieMemory",
+        reason: `backend returned ${res.status}`,
+        fallbackTarget: "local_memory",
+      });
+      return local;
+    }
     const data = await res.json();
     if (data) writeJSON(MEMORY_KEY, data);
     return data;
-  } catch {
+  } catch (err) {
+    bloomieDiagnostic("memory_load_failed", {
+      module: "db",
+      stage:  "loadBloomieMemory",
+      reason: err?.message ?? "network error",
+      fallbackTarget: "local_memory",
+    });
     return local;
   }
 }
@@ -498,8 +513,12 @@ export async function saveBloomieMemory(memoryData) {
       headers,
       body: JSON.stringify(memoryData),
     });
-  } catch (e) {
-    console.warn("[Bloomie] memory cloud save failed:", e);
+  } catch (err) {
+    bloomieDiagnostic("cache_write_failed", {
+      module: "db",
+      stage:  "saveBloomieMemory",
+      reason: err?.message ?? "network error",
+    });
   }
 }
 
@@ -514,10 +533,22 @@ export async function loadUserProfile() {
     );
     const request = fetch(apiUrl("/api/user/profile"), { headers });
     const res = await Promise.race([request, timeout]);
-    if (!res.ok) return { nickname: null };
+    if (!res.ok) {
+      bloomieDiagnostic("profile_sync_failed", {
+        module: "db",
+        stage:  "loadUserProfile",
+        reason: `backend returned ${res.status}`,
+      });
+      return { nickname: null };
+    }
     const data = await res.json();
     return { nickname: data?.nickname ?? null };
-  } catch {
+  } catch (err) {
+    bloomieDiagnostic("profile_sync_failed", {
+      module: "db",
+      stage:  "loadUserProfile",
+      reason: err?.message ?? "network error or timeout",
+    });
     return { nickname: null };
   }
 }

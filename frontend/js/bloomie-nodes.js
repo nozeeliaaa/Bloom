@@ -566,6 +566,16 @@ export function createNodes(env) {
           ctx.narrowingRepair = false;
           return "I want to make sure I help you with the right thing 💗 Which area is closest to what you're dealing with?";
         }
+        // Vague-health entry: user indicated something feels off but didn't name
+        // a specific symptom.  Lead with acknowledgement before asking them to pick.
+        if (ctx.narrowingVague) {
+          ctx.narrowingVague = false;
+          return pick([
+            "It sounds like something might be off — I want to make sure I help with the right thing 💗 Which of these feels closest to what you're experiencing?",
+            "I hear you — let's figure this out together 💗 Which area feels closest to what's going on?",
+            withNickname("Something feeling off is worth looking at") + " 💗 Which of these is closest to what you're dealing with?",
+          ]);
+        }
         return pick([
           "I want to make sure I help you with the right thing 💗 Which area is closest to what you're dealing with?",
           withNickname("Let me point you in the right direction") + " 💗 Which of these is closest to what's going on?",
@@ -1670,16 +1680,20 @@ export function createNodes(env) {
       ],
     },
     LATE_WRAP: {
-      say: [
-        "Thanks for walking through this with me 🩷",
-        "Based on what you've shared, your late period could be related to recent changes, hormonal shifts, or possible pregnancy.",
-        "I can't diagnose conditions, but noticing patterns over time is really important.",
-        "If late or missed periods happen often, especially along with symptoms like acne, increased facial/body hair, weight changes, or ongoing mood shifts, some people choose to ask a healthcare provider about possible hormonal imbalances.",
-        "That doesn't mean anything is 'wrong', just that your hormones may need a closer look.",
-        "You might consider:\n• Continuing to track your cycle\n• Noting other symptoms over time\n• Reaching out to a healthcare provider if delays keep happening",
-        "You're doing the right thing by checking in and listening to your body 🩷",
-        "Would you like help with anything else today?",
-      ],
+      say() {
+        const insightLine = buildSymptomInsightLine();
+        return [
+          "Thanks for walking through this with me 🩷",
+          "Based on what you've shared, your late period could be related to recent changes, hormonal shifts, or possible pregnancy.",
+          "I can't diagnose conditions, but noticing patterns over time is really important.",
+          ...(insightLine ? [insightLine] : []),
+          "If late or missed periods happen often, especially along with symptoms like acne, increased facial/body hair, weight changes, or ongoing mood shifts, some people choose to ask a healthcare provider about possible hormonal imbalances.",
+          "That doesn't mean anything is 'wrong', just that your hormones may need a closer look.",
+          "You might consider:\n• Continuing to track your cycle\n• Noting other symptoms over time\n• Reaching out to a healthcare provider if delays keep happening",
+          "You're doing the right thing by checking in and listening to your body 🩷",
+          "Would you like help with anything else today?",
+        ];
+      },
       choices: [
         { id: "menu", label: pickMainLabel(), next: "START_MENU", primary: true },
         { id: "done", label: pickCloseLabel(), next: "CLOSE" },
@@ -1863,15 +1877,24 @@ export function createNodes(env) {
       ],
     },
     SPOT_TRACK_WRAP: {
-      say: [
-        "Thanks for walking through that with me 🩷",
-        "Based on what you've shared, this spotting may be related to normal cycle changes (like ovulation), hormone fluctuations, birth control adjustments, or other non-emergency causes.",
-        "Tracking helps you catch patterns early, and it also makes it easier to explain if you ever decide to see a provider.",
-        "If you want a simple tracking checklist:",
-        "• Color (pink/red/brown)\n• Amount (wipe-only vs light flow)\n• Days it lasted\n• Cycle day / timing\n• Any pain, odor, dizziness, or fever",
-        "If spotting becomes frequent, lasts longer, becomes heavier, or comes with pain/unusual discharge/dizziness, it may be a good idea to talk with a healthcare provider.",
-        "Would you like to go back to the main options, or check another symptom?",
-      ],
+      say() {
+        // Surface symptom/pattern intelligence on the spotting monitor path.
+        // insightLine takes priority; patternLine fills in when no insight fires.
+        const insightLine = buildSymptomInsightLine();
+        const patternLine = !insightLine
+          ? buildSymptomPatternLine(["VAGINAL_BLEEDING", "SPOTTING", "PELVIC_PAIN", "CRAMPS"])
+          : null;
+        return [
+          "Thanks for walking through that with me 🩷",
+          "Based on what you've shared, this spotting may be related to normal cycle changes (like ovulation), hormone fluctuations, birth control adjustments, or other non-emergency causes.",
+          ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
+          "Tracking helps you catch patterns early, and it also makes it easier to explain if you ever decide to see a provider.",
+          "If you want a simple tracking checklist:",
+          "• Color (pink/red/brown)\n• Amount (wipe-only vs light flow)\n• Days it lasted\n• Cycle day / timing\n• Any pain, odor, dizziness, or fever",
+          "If spotting becomes frequent, lasts longer, becomes heavier, or comes with pain/unusual discharge/dizziness, it may be a good idea to talk with a healthcare provider.",
+          "Would you like to go back to the main options, or check another symptom?",
+        ];
+      },
       choices: [
         { id: "menu", label: pickMainLabel(), next: "START_MENU", primary: true },
         { id: "else", label: "Something else", next: "ELSE_INTRO" },
@@ -2538,6 +2561,9 @@ export function createNodes(env) {
         const patternLine  = buildSymptomPatternLine(
           ["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS", "FATIGUE"]
         );
+        // Symptom intelligence line — baseline deviations, forecast, logging nudge.
+        // Only fires when no patternLine already personalises the response.
+        const insightLine  = !patternLine ? buildSymptomInsightLine() : null;
 
         // Context line — blend insight into emotional validation, not as a clinical tag
         const contextLine = insight
@@ -2590,6 +2616,7 @@ export function createNodes(env) {
           ...(recallLine ? [recallLine] : []),
           ...(nudge ? [nudge] : []),
           routeGuidance,
+          ...(insightLine ? [insightLine] : []),
           "",
           "If these feelings feel severe, last most of the month, or are affecting your relationships or work consistently, speaking with a healthcare provider or mental health professional is a real option, not because you can't handle it, but because you deserve support.",
           ...safeFooter(),
@@ -2873,12 +2900,19 @@ export function createNodes(env) {
       ],
     },
     PELVIC_MANAGEABLE: {
-      say: [
-        "That's helpful to know 🩷",
-        "Pain that responds to heat or rest is often manageable with tracking and support.",
-        "Still, if it becomes stronger, lasts longer, or starts interfering with your life, that's a reason to re-check.",
-        "Would you like to go back to the main options or talk about another symptom?",
-      ],
+      say() {
+        // Surface symptom intelligence on the manageable-pain path so users with
+        // relevant history still receive personalised context (e.g. intensity shift,
+        // symptom forecast) even when current pain is mild.
+        const insightLine = buildSymptomInsightLine();
+        return [
+          "That's helpful to know 🩷",
+          "Pain that responds to heat or rest is often manageable with tracking and support.",
+          ...(insightLine ? [insightLine] : []),
+          "Still, if it becomes stronger, lasts longer, or starts interfering with your life, that's a reason to re-check.",
+          "Would you like to go back to the main options or talk about another symptom?",
+        ];
+      },
       choices: [
         { id: "menu", label: pickMainLabel(),    next: "START_MENU", primary: true },
         { id: "else", label: "Something else",  next: "ELSE_INTRO" },

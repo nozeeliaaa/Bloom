@@ -457,6 +457,92 @@ export function detectConditionSymptomQuestion(rawText, reportedConditions) {
 }
 
 
+// ─── 2c. VAGUE HEALTH SCORING ────────────────────────────────────────────────
+//
+// scoreVagueHealth(text) → number (0–N)
+//
+// Detects indirect, colloquial, or non-keyword reproductive-health phrasing
+// that the explicit signal regexes in scoreSignals() would miss.
+//
+// Rules for what qualifies:
+//   - Must suggest the user is concerned about their own body, cycle, or a
+//     reproductive-health symptom in vague/indirect language.
+//   - Must NOT catch generic wellness phrases with no body/cycle anchor.
+//   - Includes common Jamaican Patois variants consistent with normalizePatois().
+//
+// Returns a raw integer score.  Callers decide what threshold to act on.
+// A score ≥ 1 is treated as "possibly in-scope" for routing purposes.
+
+const _VAGUE_HEALTH_PATTERNS = [
+  // "something wrong/off/not right/strange" — generic wrongness signal
+  /something(?:'s)?\s+(?:wrong|off|not right|not normal|strange|weird|different)\b/,
+  /sumn\s+(?:wrong|off|not right)/,              // Patois: sumn = something
+  /something feels?\s+(?:wrong|off|weird|strange|different|not right)/,
+
+  // Body / location anchors with implied concern
+  /\b(?:down there|down below|lady parts?|feminine area|private parts?|my parts?|my area|my lady)\b/,
+  /\b(?:womanly parts?|below my waist|my private|private place)\b/,
+
+  // "not feeling right" / "feeling off" with or without body reference
+  /not feel(?:ing)?\s+right\b/,
+  /feel(?:ing)?\s+(?:off|weird|strange|not right|different)\b/,
+  /nuh feel right\b/,                            // Patois
+  /mi (?:nuh feel|feel off|feel wrong|feel strange)/,  // Patois
+  /something(?:'s)?\s+off\b/,
+  /been\s+(?:off|weird|not normal|not right)\b/,
+  /off\s+lately\b/,
+
+  // "not myself" / "not like myself"
+  /not (?:feeling\s+)?(?:like\s+)?myself\b/,
+  /nuh feel like mi(?:self)?\b/,                 // Patois
+
+  // Body acting differently
+  /my body(?:\s+(?:has|have|been|is|feels?|acting|seems?))?\b/,
+  /mi body\b/,                                   // Patois
+  /body(?:\s+(?:been|feel(?:ing)?|acting))?\s+(?:off|wrong|weird|strange|different|not right|not normal)/,
+
+  // Indirect lateness / cycle irregularity without the explicit word "period"
+  /hasn.?t\s+come\s+(?:yet|down|at all)\b/,
+  /not\s+here\s+yet\b/,
+  /still\s+waiting\s+(?:for\s+it|on\s+it)\b/,
+  /it'?s?\s+(?:been\s+)?(?:late|not here|overdue)\b/,
+  /sumn wrong with (?:my|mi)\s+(?:cycle|body|period|flow|blood)/,
+
+  // Discomfort anchored near body parts without explicit clinical terms
+  /hurt(?:ing|s)?\s+(?:down|below|there|in\s+my)\b/,
+  /sore\s+(?:down|below|there)\b/,
+  /bothering\s+me\s+(?:down|below|there)\b/,
+
+  // Discharge / smell hinted indirectly
+  /smell(?:ing|s)?\s+(?:off|different|weird|bad|strange|unusual)\b/,
+  /(?:wet|moist|damp)\s+(?:down there|below|in my area)\b/,
+
+  // Worried + body concern without specifying the concern
+  /(?:worried|scared|concerned|not sure)\s+(?:about\s+)?(?:something|my body|what'?s|if)\b/,
+  /something(?:'s)?\s+(?:wrong|off|not right)\s+with\s+(?:me|my body|my cycle|my period|my flow)\b/,
+
+  // Change framing
+  /(?:things?|something|it|my (?:body|cycle|period|flow))\s+(?:has|have|been|is)\s+(?:changed?|different|not (?:the )?same)\b/,
+];
+
+/**
+ * scoreVagueHealth(text) → number
+ *
+ * Scores how likely a piece of text is an indirect reproductive-health concern.
+ * Input should already be lowercased (normalizedText or similar).
+ *
+ * Returns the count of distinct pattern matches (each pattern fires at most once).
+ * A score ≥ 1 means "possibly in scope, keep the user in a recoverable path".
+ * A score ≥ 2 means "likely health-related, strongly prefer NARROWING over OOS".
+ *
+ * @param  {string} text
+ * @returns {number}
+ */
+export function scoreVagueHealth(text) {
+  const t = String(text || "").toLowerCase();
+  return _VAGUE_HEALTH_PATTERNS.filter(rx => rx.test(t)).length;
+}
+
 // ─── 3. SIGNAL SCORING ────────────────────────────────────────────────────────
 
 /**

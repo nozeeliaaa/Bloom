@@ -158,6 +158,7 @@ const _CAT_STYLES = {
   ai:               "color:#8b5cf6;font-weight:bold",  // violet  — AI layer result
   fallback:         "color:#f59e0b;font-weight:bold",  // amber   — rule fallback / OOS
   unhandled_health: "color:#ef4444;font-weight:bold",  // red     — health msg dropped
+  diagnostic:       "color:#db2777;font-weight:bold",  // pink    — internal diagnostics
 };
 
 /**
@@ -180,6 +181,67 @@ export function bloomieDebug(category, fields = {}) {
     .map(([k, v]) => `${k}:${Array.isArray(v) ? `[${v.join(",")}]` : v}`)
     .join("  ");
   console.log(`%c[Bloomie:${category}]%c ${parts}`, style, "color:inherit");
+}
+
+// ─── Internal diagnostic logger ───────────────────────────────────────────────
+//
+// Structured events for silent fallback points inside Bloomie.
+// Never surfaces details to the user — purely internal observability.
+//
+// Console output is gated on the same BLOOMIE_DEBUG localStorage flag as
+// bloomieDebug().  Backend storage fires for every call so failures are
+// visible post-session even without the flag.
+//
+// Event schema (all fields optional except `event`):
+//   event          — one of the DIAGNOSTIC_EVENT_TYPES below
+//   ts             — Unix ms (auto-set)
+//   module         — source file (e.g. "bloomie-tone", "bloomie-intent", "db")
+//   stage          — function or step within the module
+//   confidence     — rule confidence tier if relevant
+//   fallbackTarget — what Bloomie fell back to (e.g. "rule_tone", "rule_routing")
+//   reason         — non-sensitive error description (≤120 chars, never raw user text)
+//
+// Diagnostic event catalogue:
+//   ai_timeout           — AI call exceeded the hard timeout
+//   ai_parse_error       — AI returned unparseable / malformed JSON
+//   ai_unavailable       — Backend AI endpoint returned non-2xx or is unconfigured
+//   ai_invalid_response  — AI returned valid JSON but invalid field values
+//   ai_override          — AI disagreed with rule result (AI took precedence)
+//   fallback_to_rules    — AI failed/null; rule-based path used instead
+//   vague_input_no_ai_assist — Low-confidence but no health keywords; AI skipped
+//   routing_low_confidence   — Rule layer returned low-confidence tier
+//   cache_read_failed    — localStorage or Firestore read silently failed
+//   cache_write_failed   — localStorage or Firestore write silently failed
+//   backend_unavailable  — A backend endpoint returned non-2xx unexpectedly
+//   memory_load_failed   — Bloomie memory could not be loaded for the session
+//   profile_sync_failed  — User profile could not be loaded or saved
+//   settings_sync_failed — User settings could not be synced
+
+/**
+ * bloomieDiagnostic(event, fields, ctx?)
+ *
+ * Emit a structured internal diagnostic event.
+ * - Console output gated on BLOOMIE_DEBUG (same as bloomieDebug).
+ * - Backend analytics call fires always so failures are visible post-session.
+ * - ctx is optional; pass it when available for richer session meta.
+ * - Never include raw user health content in fields.reason or any field.
+ *
+ * @param {string}           event  - Diagnostic event name (see catalogue above)
+ * @param {Record<string,*>} fields - Diagnostic context (non-sensitive)
+ * @param {object|null}      [ctx]  - Session context (optional)
+ */
+export function bloomieDiagnostic(event, fields = {}, ctx = null) {
+  // Structured console output (debug-gated)
+  bloomieDebug("diagnostic", { event, ...fields });
+
+  // Fire to analytics backend — fire-and-forget, never blocks
+  logAnalyticsEvent(event, {
+    source: typeof fields.module        === "string" ? fields.module.slice(0, 40)        : undefined,
+    type:   typeof fields.stage         === "string" ? fields.stage.slice(0, 40)         : undefined,
+    reason: typeof fields.reason        === "string" ? fields.reason.slice(0, 120)       : undefined,
+    route:  typeof fields.fallbackTarget === "string" ? fields.fallbackTarget.slice(0, 80) : undefined,
+    tone:   typeof fields.confidence    === "string" ? fields.confidence.slice(0, 40)    : undefined,
+  }, ctx);
 }
 
 async function _sendAnalytics(eventType, payload, ctx) {
