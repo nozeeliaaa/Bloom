@@ -359,6 +359,16 @@
 
     function fillFields() {
       const p = loadProfile();
+      const profile = data.profile || {};
+      const healthProfile = data.healthProfile || {};
+
+      nicknameInput.value = profile.nickname || "";
+      yobInput.value = profile.yearOfBirth || "";
+
+      avgCycleInput.value = healthProfile.avgCycleLength || "";
+      periodDurationInput.value = healthProfile.periodDuration || "";
+      weightInput.value = healthProfile.weightKg || "";
+      heightInput.value = healthProfile.heightCm || "";
       nicknameEl.value  = p.nickname       || "";
       yobEl.value       = p.yob            || "";
       avgCycleEl.value  = p.avgCycleLength || "";

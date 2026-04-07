@@ -25,7 +25,7 @@ router.post("/profile", requireAuth, async (req, res) => {
     const userRef = db.collection("users").doc(uid);
     const snap = await userRef.get();
     const existing = snap.exists ? snap.data() : null;
-    const existingProfile = existing?.profile || null;
+    const existingProfile = existing?.profile || {};
 
     // ---- Validate incoming body ----
     const validation = validateUserProfile(req.body, existingProfile);
@@ -36,9 +36,11 @@ router.post("/profile", requireAuth, async (req, res) => {
 
     // ---- Build profile object ----
     const profile = {
-      role: existingProfile?.role || "user",
       nickname: req.body.nickname !== undefined ? String(req.body.nickname).slice(0, 40) : (existingProfile?.nickname ?? null),
-      avatar:   req.body.avatar   !== undefined ? String(req.body.avatar).slice(0, 10)   : (existingProfile?.avatar   ?? null),
+      avatar:
+        req.body.avatar !== undefined
+          ? (typeof req.body.avatar === "string" ? req.body.avatar.slice(0, 10) : "👤")
+          : existingProfile?.avatar ?? "👤",
       goal: req.body.goal ?? (existingProfile?.goal === "track_cycle" ? "period" : (existingProfile?.goal ?? "period")),
       mode: req.body.mode ?? existingProfile?.mode ?? "account",
       yearOfBirth:
@@ -50,24 +52,29 @@ router.post("/profile", requireAuth, async (req, res) => {
       consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
       remindersEnabled: req.body.remindersEnabled ?? existingProfile?.remindersEnabled ?? false,
       reminderTime: req.body.reminderTime ?? existingProfile?.reminderTime ?? "09:00",
-
-      avgCycleLength: req.body.avgCycleLength !== undefined
-        ? (req.body.avgCycleLength === null ? null : Number(req.body.avgCycleLength))
-        : existingProfile?.avgCycleLength ?? null,
-      periodDuration: req.body.periodDuration !== undefined
-        ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
-        : existingProfile?.periodDuration ?? null,
-      weightKg: req.body.weightKg !== undefined
-        ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
-        : existingProfile?.weightKg ?? null,
-      heightCm: req.body.heightCm !== undefined
-        ? (req.body.heightCm === null ? null : Number(req.body.heightCm))
-        : existingProfile?.heightCm ?? null,
     };
 
+    const healthProfile = {
+      avgCycleLength: req.body.avgCycleLength !== undefined
+        ? (req.body.avgCycleLength === null ? null : Number(req.body.avgCycleLength))
+        : existing?.healthProfile?.avgCycleLength ?? null,
+
+      periodDuration: req.body.periodDuration !== undefined
+        ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
+        : existing?.healthProfile?.periodDuration ?? null,
+
+      weightKg: req.body.weightKg !== undefined
+        ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
+        : existing?.healthProfile?.weightKg ?? null,
+
+      heightCm: req.body.heightCm !== undefined
+        ? (req.body.heightCm === null ? null : Number(req.body.heightCm))
+        : existing?.healthProfile?.heightCm ?? null,
+    };
     await userRef.set(
       {
         profile,
+        healthProfile,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
       },
@@ -75,9 +82,7 @@ router.post("/profile", requireAuth, async (req, res) => {
     );
 
     // ── Audit: track which fields changed ──
-    const changedFields = Object.keys(req.body).filter(
-      (k) => k !== "role" // role changes go through admin route only
-    );
+    const changedFields = Object.keys(req.body).filter((k) => k !== "role");
 
     // Special case: YOB being set for the first time is a locked action
     const yobJustSet =
@@ -114,9 +119,17 @@ router.post("/profile", requireAuth, async (req, res) => {
         meta:       { changedFields },
        });
       }
+    
+    const savedDoc = await userRef.get();
+    const savedData = savedDoc.data();
+  
+    console.log(`[profile] saved uid=${uid}`, JSON.stringify(savedData));
+    return res.json({
+      ok: true,
+      profile: savedData?.profile ?? null,
+      healthProfile: savedData?.healthProfile ?? null,
+    });
 
-    console.log(`[profile] saved uid=${uid}`, JSON.stringify(profile));
-    return res.json({ ok: true, profile });
   } catch (err) {
     console.error("POST /profile error:", err);
     return res.status(500).json({ error: "Failed to save profile" });
