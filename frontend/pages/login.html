@@ -192,19 +192,20 @@
           // ── Restore profile ──
           if (profileRes.ok) {
             const data = await profileRes.json();
-            const profile = data?.profile || data;
+            const profile = data?.profile || {};
+            const healthProfile = data?.healthProfile || {};
             if (profile) {
               localStorage.setItem('bloom_onboarded', '1');
               const realGoal = (profile.goal === "track_cycle" || !profile.goal) ? "period" : profile.goal;
               setUserGoal(realGoal);
               const restored = {};
-              if (profile.nickname)       restored.nickname       = profile.nickname;
+              if (profile.nickname !== undefined) restored.nickname = profile.nickname;
               if (profile.yearOfBirth)    restored.yob            = profile.yearOfBirth;
-              if (profile.avgCycleLength) restored.avgCycleLength = profile.avgCycleLength;
-              if (profile.periodDuration) restored.periodDuration = profile.periodDuration;
-              if (profile.weightKg)       restored.weightKg       = profile.weightKg;
-              if (profile.heightCm)       restored.heightCm       = profile.heightCm;
               if (profile.avatar)         localStorage.setItem('bloom_avatar', profile.avatar);
+              if (healthProfile.avgCycleLength) restored.avgCycleLength = healthProfile.avgCycleLength;
+              if (healthProfile.periodDuration) restored.periodDuration = healthProfile.periodDuration;
+              if (healthProfile.weightKg)       restored.weightKg       = healthProfile.weightKg;
+              if (healthProfile.heightCm)       restored.heightCm       = healthProfile.heightCm;
               localStorage.setItem('bloom_profile', JSON.stringify(restored));
             }
           } else {

@@ -411,7 +411,7 @@ function renderPregnancyTools(goal) {
 
   try {
     const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
-    const cycleLen = Number(profile.avgCycleLength) || 28;
+    const cycleLen = Number(profile?.avgCycleLength ?? 28);
     const r = algoPregnancy.estimatedDueDate(new Date(lmp), cycleLen);
     const week = r.currentWeek;
     const size = week >= 4 && week <= 40 ? BABY_SIZES[week] : null;
