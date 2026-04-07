@@ -196,7 +196,13 @@
             const healthProfile = data?.healthProfile || {};
             if (profile) {
               localStorage.setItem('bloom_onboarded', '1');
-              const realGoal = (profile.goal === "track_cycle" || !profile.goal) ? "period" : profile.goal;
+              let realGoal = profile.goal;
+              
+              if (!realGoal || realGoal === "track_cycle") {
+                realGoal = "period";
+              } else if (realGoal === "no_period") {
+                realGoal = "track_symptoms";
+              }
               setUserGoal(realGoal);
               const restored = {};
               if (profile.nickname !== undefined) restored.nickname = profile.nickname;

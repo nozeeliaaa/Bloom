@@ -41,7 +41,15 @@ router.post("/profile", requireAuth, async (req, res) => {
         req.body.avatar !== undefined
           ? (typeof req.body.avatar === "string" ? req.body.avatar.slice(0, 10) : "👤")
           : existingProfile?.avatar ?? "👤",
-      goal: req.body.goal ?? (existingProfile?.goal === "track_cycle" ? "period" : (existingProfile?.goal ?? "period")),
+      goal:
+        req.body.goal ??
+        (
+          existingProfile?.goal === "track_cycle"
+            ? "period"
+            : existingProfile?.goal === "no_period"
+            ? "track_symptoms"
+            : (existingProfile?.goal ?? "period")
+        ),
       mode: req.body.mode ?? existingProfile?.mode ?? "account",
       yearOfBirth:
         req.body.yearOfBirth === undefined

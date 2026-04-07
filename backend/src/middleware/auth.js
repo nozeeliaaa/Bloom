@@ -82,7 +82,12 @@ export async function requireAuth(req, res, next) {
           nickname: profile.nickname ?? null,
           avatar: profile.avatar ?? "👤",
           yearOfBirth: profile.yearOfBirth ?? null,
-          goal: profile.goal === "track_cycle" ? "period" : (profile.goal ?? "period"),
+          goal:
+            profile.goal === "track_cycle"
+              ? "period"
+              : profile.goal === "no_period"
+              ? "track_symptoms"
+              : (profile.goal ?? "period"),
           mode: profile.mode ?? "account",
           consentSensitive: profile.consentSensitive ?? false,
           remindersEnabled: profile.remindersEnabled ?? false,

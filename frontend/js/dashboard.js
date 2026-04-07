@@ -192,13 +192,13 @@ function renderGoalToolCard(goal, cycle) {
   if (!el) return;
   const todayKey = toDateKey(new Date());
 
-  if (goal === "no_period" || goal === "perimenopause") {
+  if (goal === "track_symptoms" || goal === "perimenopause") {
     el.innerHTML = `
       <div class="stat-number" style="font-size:1.2rem;">Symptom Mode</div>
       <p class="text-muted">Period predictions paused. Log symptoms freely.</p>
       <a class="btn btn-outline" href="/pages/calendar.html" style="margin-top:0.5rem;display:inline-block;">Log today</a>
     `;
-    return;
+   return;
   }
 
   if (goal === "ttc") {
@@ -439,7 +439,7 @@ function renderSymptomTools(goal, logsByDate) {
   const body = document.getElementById("symptom-tools-body");
   if (!card || !body) return;
 
-  const on = goal === "no_period" || goal === "perimenopause";
+  const on = goal === "track_symptoms" || goal === "perimenopause";
   show(card, on);
   if (!on) return;
 
