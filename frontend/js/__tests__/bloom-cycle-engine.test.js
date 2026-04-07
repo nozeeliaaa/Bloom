@@ -4,7 +4,7 @@
  * Unit tests covering cycle engine edge cases, date utilities, and the
  * full set of new guard functions introduced in this sprint.
  *
- * All tests are deterministic — no network calls, no randomness.
+ * All tests are deterministic - no network calls, no randomness.
  * Reference date: 2026-03-22 (today fixture used throughout).
  */
 
@@ -51,10 +51,10 @@ function makeWindow(centerDaysAgo, spread = 2) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 1 — Natural language date parsing
+//  PART 1 - Natural language date parsing
 // ════════════════════════════════════════════════════════════════════════════
 
-describe("parseNaturalDate — relative expressions", () => {
+describe("parseNaturalDate - relative expressions", () => {
   it("TEST-01  'sometime last month' → approx mid-last-month", () => {
     const r = parseNaturalDate("sometime last month", TODAY);
     expect(r).not.toBeNull();
@@ -111,10 +111,10 @@ describe("parseNaturalDate — relative expressions", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 2 — Calendar and cycle date validation
+//  PART 2 - Calendar and cycle date validation
 // ════════════════════════════════════════════════════════════════════════════
 
-describe("validateCalendarDate — impossible dates", () => {
+describe("validateCalendarDate - impossible dates", () => {
   it("TEST-05  February 30 → rejected with calendar message", () => {
     const r = validateCalendarDate(2026, 2, 30);
     expect(r.valid).toBe(false);
@@ -142,7 +142,7 @@ describe("validateCalendarDate — impossible dates", () => {
   });
 });
 
-describe("validateCycleDate — logical constraints", () => {
+describe("validateCycleDate - logical constraints", () => {
   it("TEST-04  Future LMP date → rejected with clear message", () => {
     const tomorrow = daysAgo(-1);
     const r = validateCycleDate({ date: tomorrow, kind: "lmpDate", today: TODAY });
@@ -165,10 +165,10 @@ describe("validateCycleDate — logical constraints", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 3 — Robust average cycle length (sparse data + outlier exclusion)
+//  PART 3 - Robust average cycle length (sparse data + outlier exclusion)
 // ════════════════════════════════════════════════════════════════════════════
 
-describe("computeRobustAverageCycleLength — sparse data", () => {
+describe("computeRobustAverageCycleLength - sparse data", () => {
   it("TEST-06  Cycle length of 0 / empty array → defaults to 28", () => {
     expect(computeRobustAverageCycleLength([]).average).toBe(28);
     expect(computeRobustAverageCycleLength([]).usedDefault).toBe(true);
@@ -188,9 +188,9 @@ describe("computeRobustAverageCycleLength — sparse data", () => {
   });
 });
 
-describe("computeRobustAverageCycleLength — outlier exclusion", () => {
+describe("computeRobustAverageCycleLength - outlier exclusion", () => {
   it("TEST-09  Single outlier cycle excluded from average", () => {
-    // [28, 29, 28, 75, 28, 29] — 75 is >2 SD from the rest; below gap threshold (90)
+    // [28, 29, 28, 75, 28, 29] - 75 is >2 SD from the rest; below gap threshold (90)
     // so it goes through outlier exclusion, not pre-gap exclusion
     const r = computeRobustAverageCycleLength([28, 29, 28, 75, 28, 29]);
     expect(r.excluded).toContain(75);
@@ -199,7 +199,7 @@ describe("computeRobustAverageCycleLength — outlier exclusion", () => {
   });
 });
 
-describe("computeRobustAverageCycleLength — 90+ day gap", () => {
+describe("computeRobustAverageCycleLength - 90+ day gap", () => {
   it("TEST-18  90-day gap cycle + preceding cycles excluded from average", () => {
     // Pattern: normal, normal, 90-day gap, normal, normal
     const r = computeRobustAverageCycleLength([28, 29, 90, 27, 28]);
@@ -212,7 +212,7 @@ describe("computeRobustAverageCycleLength — 90+ day gap", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 4 — Deduplication and suspicious entries
+//  PART 4 - Deduplication and suspicious entries
 // ════════════════════════════════════════════════════════════════════════════
 
 describe("deduplicatePeriods", () => {
@@ -247,13 +247,13 @@ describe("detectSuspiciousEntries + detectSuspiciousEntrySignal", () => {
 
   it("Entries 11 days apart → no suspicious flag", () => {
     const d1 = daysAgo(30);
-    const d2 = daysAgo(19);   // 11-day gap — beyond window
+    const d2 = daysAgo(19);   // 11-day gap - beyond window
     expect(detectSuspiciousEntries([d1, d2]).suspicious).toBe(false);
   });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 5 — Dense / weird data signals
+//  PART 5 - Dense / weird data signals
 // ════════════════════════════════════════════════════════════════════════════
 
 describe("detectSymptomWithoutCycleData", () => {
@@ -294,13 +294,13 @@ describe("detectLongBleedingEntry", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 6 — Irregular cycle: postpartum, BC, teen user
+//  PART 6 - Irregular cycle: postpartum, BC, teen user
 // ════════════════════════════════════════════════════════════════════════════
 
-describe("detectIrregularCycleSignal — postpartum suppression", () => {
+describe("detectIrregularCycleSignal - postpartum suppression", () => {
   it("TEST-13  Postpartum user with 2 cycles → shows postpartum note, not irregular", () => {
     const s = detectIrregularCycleSignal({
-      cycleLengths: [28, 32, 30, 29],    // 4 cycles, range=4, sd≈1.5 — not irregular on its own
+      cycleLengths: [28, 32, 30, 29],    // 4 cycles, range=4, sd≈1.5 - not irregular on its own
       isPostpartum: true,
       postpartumCycleCount: 2,
     });
@@ -315,16 +315,16 @@ describe("detectIrregularCycleSignal — postpartum suppression", () => {
       isPostpartum: true,
       postpartumCycleCount: 3,         // no longer suppressed
     });
-    // Range = 4, sd ≈ 1.5 — neither threshold met → show: false
+    // Range = 4, sd ≈ 1.5 - neither threshold met → show: false
     expect(s.debug.reason).toBeUndefined();
     expect(s.show).toBe(false);
   });
 });
 
-describe("detectIrregularCycleSignal — recentlyStoppedBC suppression", () => {
+describe("detectIrregularCycleSignal - recentlyStoppedBC suppression", () => {
   it("TEST-14  recentlyStoppedBC + 1 cycle logged → suppression message shown", () => {
     const s = detectIrregularCycleSignal({
-      cycleLengths: [21, 35, 21, 35, 21, 35],  // very irregular — range=14, sd≈7
+      cycleLengths: [21, 35, 21, 35, 21, 35],  // very irregular - range=14, sd≈7
       recentlyStoppedBC: true,
       recentlyStoppedBCCycleCount: 1,
     });
@@ -339,20 +339,20 @@ describe("detectIrregularCycleSignal — recentlyStoppedBC suppression", () => {
       recentlyStoppedBC: true,
       recentlyStoppedBCCycleCount: 3,    // suppression window passed
     });
-    // range=14, sd≈7 — both above thresholds → show: true, normal message
+    // range=14, sd≈7 - both above thresholds → show: true, normal message
     expect(s.show).toBe(true);
     expect(s.message).not.toMatch(/birth control/i);
   });
 });
 
-describe("detectIrregularCycleSignal — teen user relaxed thresholds", () => {
+describe("detectIrregularCycleSignal - teen user relaxed thresholds", () => {
   it("TEST-19  Teen user (age 17) with 20-day cycle → NOT flagged as irregular", () => {
-    // Cycles [20, 22, 21, 23] — range=3, sd≈1.1
-    // Adult thresholds: range≥8, sd≥5 — would be fine anyway
+    // Cycles [20, 22, 21, 23] - range=3, sd≈1.1
+    // Adult thresholds: range≥8, sd≥5 - would be fine anyway
     // But with an extreme example: [20, 35, 20, 35] adult range=15 > 8 → irregular
     // Teen threshold: range ≥ 15 → not triggered (exactly 15 is not > 15)
     const s = detectIrregularCycleSignal({
-      cycleLengths: [20, 34, 20, 34],   // range=14, sd≈7 — adult: irregular; teen: not
+      cycleLengths: [20, 34, 20, 34],   // range=14, sd≈7 - adult: irregular; teen: not
       userAge: 17,
     });
     // Teen effectiveRangeThreshold=15, effectiveStdDevThreshold=8
@@ -363,17 +363,17 @@ describe("detectIrregularCycleSignal — teen user relaxed thresholds", () => {
   it("Adult with the same cycles IS flagged (range=14 ≥ rangeThreshold=8)", () => {
     const s = detectIrregularCycleSignal({
       cycleLengths: [20, 34, 20, 34],
-      // no userAge — adult thresholds
+      // no userAge - adult thresholds
     });
     expect(s.show).toBe(true);
   });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 7 — Stress delay softens LATE_PERIOD message
+//  PART 7 - Stress delay softens LATE_PERIOD message
 // ════════════════════════════════════════════════════════════════════════════
 
-describe("detectPeriodStatusSignal — stressDelay flag", () => {
+describe("detectPeriodStatusSignal - stressDelay flag", () => {
   it("TEST-15  stressDelay: true softens the LATE_PERIOD message", () => {
     // Window ended 3 days ago: daysPastWindowEnd=3 > lateGraceDays(2) → LATE_PERIOD
     const s = detectPeriodStatusSignal({
@@ -403,10 +403,10 @@ describe("detectPeriodStatusSignal — stressDelay flag", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 8 — 1-cycle trend suppression
+//  PART 8 - 1-cycle trend suppression
 // ════════════════════════════════════════════════════════════════════════════
 
-describe("detectCycleTrendSignal — sparse data guard", () => {
+describe("detectCycleTrendSignal - sparse data guard", () => {
   it("TEST-08b  1 logged cycle → trend signal suppressed (show: false)", () => {
     const s = detectCycleTrendSignal({ cycleLengths: [28] });
     expect(s.show).toBe(false);

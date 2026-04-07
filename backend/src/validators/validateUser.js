@@ -1,6 +1,6 @@
 // src/validators/validateUser.js
 
-const VALID_GOALS = ["track_cycle", "ttc"];
+const VALID_GOALS = ["period", "no_period", "ttc", "perimenopause", "pregnancy"];
 const VALID_MODES = ["account", "guest"];
 const VALID_ROLES = ["user", "teen", "guardian", "admin"];
 
@@ -29,10 +29,42 @@ export function validateUserProfile(body, existingProfile = null) {
       return { valid: false, error: "yearOfBirth is locked and cannot be changed" };
     }
 
-    // Age floor: must be at least 13
+    // Age floor: must be at least 10
     const age = currentYear - yob;
-    if (age < 13) {
-      return { valid: false, error: "User must be at least 13 years old" };
+    if (age < 10) {
+      return { valid: false, error: "User must be at least 10 years old" };
+    }
+  }
+
+  // --- avgCycleLength ---
+  if (body.avgCycleLength !== undefined && body.avgCycleLength !== null) {
+    const val = Number(body.avgCycleLength);
+    if (!Number.isFinite(val) || val <= 0 || val > 365) {
+      return { valid: false, error: "avgCycleLength must be a positive number (days)" };
+    }
+  }
+
+  // --- periodDuration ---
+  if (body.periodDuration !== undefined && body.periodDuration !== null) {
+    const val = Number(body.periodDuration);
+    if (!Number.isFinite(val) || val <= 0 || val > 30) {
+      return { valid: false, error: "periodDuration must be a positive number (days)" };
+    }
+  }
+
+  // --- weightKg ---
+  if (body.weightKg !== undefined && body.weightKg !== null) {
+    const val = Number(body.weightKg);
+    if (!Number.isFinite(val) || val <= 0 || val > 700) {
+      return { valid: false, error: "weightKg must be a positive number" };
+    }
+  }
+
+  // --- heightCm ---
+  if (body.heightCm !== undefined && body.heightCm !== null) {
+    const val = Number(body.heightCm);
+    if (!Number.isFinite(val) || val <= 0 || val > 300) {
+      return { valid: false, error: "heightCm must be a positive number" };
     }
   }
 
@@ -46,7 +78,7 @@ export function validateUserProfile(body, existingProfile = null) {
     return { valid: false, error: `mode must be one of: ${VALID_MODES.join(", ")}` };
   }
 
-  // --- role (only checked if present — setting role is an admin action) ---
+  // --- role (only checked if present - setting role is an admin action) ---
   if (body.role !== undefined && !VALID_ROLES.includes(body.role)) {
     return { valid: false, error: `role must be one of: ${VALID_ROLES.join(", ")}` };
   }

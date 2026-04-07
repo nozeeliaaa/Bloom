@@ -20,7 +20,7 @@ function sanitizeText(s, max = 300) {
 }
 
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
-// Each doc holds an items[] array — multiple symptoms per day
+// Each doc holds an items[] array - multiple symptoms per day
 
 // Create/Update symptoms for a day
 router.put("/:dateKey", requireAuth, async (req, res) => {
@@ -63,7 +63,7 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       const catalogData = catalogDoc.data();
 
       // Block only sensitive symptoms for teens without consent
-      if (catalogData.sensitive && req.user.ageBand === "13-17") {
+      if (catalogData.sensitive && req.user.ageBand === "10-17") {
         return res.status(403).json({
           error: `Symptom "${code}" requires guardian consent`,
         });
@@ -149,11 +149,12 @@ router.get("/", requireAuth, async (req, res) => {
       .collection("symptomLogs")
       .doc(uid)
       .collection("entries")
-      .orderBy("dateKey", "desc")
-      .limit(60);
+      .orderBy("dateKey", "desc");
 
     if (start) q = q.where("dateKey", ">=", start);
     if (end) q = q.where("dateKey", "<=", end);
+
+    if (start || end) q = q.limit(3650);
 
     const snap = await q.get();
     const items = snap.docs.map((d) => d.data());
@@ -162,6 +163,33 @@ router.get("/", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("GET /api/symptoms error:", err);
     return res.status(500).json({ error: "Failed to fetch symptom logs" });
+  }
+});
+
+// DELETE /api/symptoms - bulk delete all symptom logs for user
+router.delete("/", requireAuth, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const snap = await db
+      .collection("symptomLogs")
+      .doc(uid)
+      .collection("entries")
+      .get();
+
+    if (snap.empty) return res.json({ ok: true, deleted: 0 });
+
+    const BATCH_SIZE = 500;
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
+    return res.json({ ok: true, deleted: docs.length });
+  } catch (err) {
+    console.error("DELETE /api/symptoms error:", err);
+    return res.status(500).json({ error: "Failed to delete all symptom logs" });
   }
 });
 

@@ -13,9 +13,9 @@
 </head>
 
 <body>
-  <main>
-    <div id="banner-area"></div>
+  <div id="banner-area"></div>
 
+  <main>
     <div style="max-width:1200px;margin:0 auto;padding:0 1rem 3rem;">
 
       <div class="page-header admin-page-header">
@@ -31,10 +31,11 @@
 
       <!-- ── Tabs ─────────────────────────────────────────────────────────── -->
       <div class="admin-tabs" role="tablist">
-        <button class="admin-tab active" role="tab" data-tab="overview" aria-selected="true">Overview</button>
-        <button class="admin-tab"         role="tab" data-tab="users"    aria-selected="false">Users</button>
-        <button class="admin-tab"         role="tab" data-tab="pamphlets" aria-selected="false">Pamphlets</button>
-        <button class="admin-tab"         role="tab" data-tab="clinics"  aria-selected="false">Clinics</button>
+        <button class="admin-tab active" role="tab" data-tab="overview"  aria-selected="true"  type="button">Overview</button>
+        <button class="admin-tab"         role="tab" data-tab="users"    aria-selected="false" type="button">Users</button>
+        <button class="admin-tab"         role="tab" data-tab="pamphlets" aria-selected="false" type="button">Pamphlets</button>
+        <button class="admin-tab"         role="tab" data-tab="clinics"  aria-selected="false" type="button">Clinics</button>
+        <button class="admin-tab"         role="tab" data-tab="support"  aria-selected="false" type="button">Support</button>
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════════
@@ -243,6 +244,27 @@
         </section>
       </div>
 
+      <!-- ══════════════════════════════════════════════════════════════════
+           TAB: SUPPORT
+      ══════════════════════════════════════════════════════════════════ -->
+      <div id="tab-support" class="admin-tab-panel" hidden>
+        <div class="admin-row" style="margin-bottom:1rem;">
+          <h2 style="margin:0;">Support Requests</h2>
+          <div class="admin-tab-header-actions">
+            <select id="support-status-filter" class="admin-select">
+              <option value="">All statuses</option>
+              <option value="new">New</option>
+              <option value="open">Open</option>
+              <option value="resolved">Resolved</option>
+            </select>
+            <button class="btn btn-outline btn-sm" id="support-refresh-btn" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="admin-list" id="support-list">
+          <p class="text-muted">Select the Support tab to load.</p>
+        </div>
+      </div>
+
     </div><!-- /shell -->
   </main>
 
@@ -253,7 +275,7 @@
     <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="pamphlet-modal-title">
       <div class="admin-modal-header">
         <h2 id="pamphlet-modal-title">New Pamphlet</h2>
-        <button class="admin-modal-close" data-close="pamphlet-modal" aria-label="Close">&times;</button>
+        <button class="admin-modal-close" data-close="pamphlet-modal" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="admin-modal-body">
         <input type="hidden" id="pamphlet-id" />
@@ -279,6 +301,15 @@
             <label for="pamphlet-sensitive">Mark as sensitive</label>
           </div>
           <div>
+            <label class="form-label" for="pamphlet-pdf-file">PDF file (optional — upload replaces current)</label>
+            <input class="form-control" id="pamphlet-pdf-file" type="file" accept="application/pdf" />
+            <p class="pamphlet-pdf-status" id="pamphlet-pdf-status"></p>
+          </div>
+          <div>
+            <label class="form-label" for="pamphlet-pdf-url">PDF URL (auto-filled after upload, or paste an external link)</label>
+            <input class="form-control" id="pamphlet-pdf-url" type="url" placeholder="https://…" />
+          </div>
+          <div>
             <label class="form-label" for="pamphlet-content">Content (HTML) <span class="req">*</span></label>
             <textarea class="form-control admin-content-editor" id="pamphlet-content" rows="10"></textarea>
           </div>
@@ -299,7 +330,7 @@
     <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="clinic-modal-title">
       <div class="admin-modal-header">
         <h2 id="clinic-modal-title">New Clinic</h2>
-        <button class="admin-modal-close" data-close="clinic-modal" aria-label="Close">&times;</button>
+        <button class="admin-modal-close" data-close="clinic-modal" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="admin-modal-body">
         <input type="hidden" id="clinic-id" />
@@ -310,15 +341,15 @@
           </div>
           <div>
             <label class="form-label" for="clinic-country">Country <span class="req">*</span></label>
-            <input class="form-control" id="clinic-country" type="text" value="Jamaica" maxlength="60" />
+            <input class="form-control" id="clinic-country" type="text" value="Jamaica" maxlength="80" />
           </div>
           <div>
-            <label class="form-label" for="clinic-parish">Parish</label>
-            <input class="form-control" id="clinic-parish" type="text" maxlength="60" />
+            <label class="form-label" for="clinic-parish">Parish / Region</label>
+            <input class="form-control" id="clinic-parish" type="text" maxlength="80" />
           </div>
           <div>
             <label class="form-label" for="clinic-address">Address</label>
-            <input class="form-control" id="clinic-address" type="text" maxlength="160" />
+            <input class="form-control" id="clinic-address" type="text" maxlength="200" />
           </div>
           <div>
             <label class="form-label" for="clinic-type">Type</label>
@@ -336,11 +367,11 @@
           </div>
           <div>
             <label class="form-label" for="clinic-hours">Hours</label>
-            <input class="form-control" id="clinic-hours" type="text" maxlength="80" placeholder="e.g. Mon–Fri 8am–5pm" />
+            <input class="form-control" id="clinic-hours" type="text" maxlength="100" placeholder="e.g. Mon–Fri 8am–5pm" />
           </div>
           <div>
             <label class="form-label" for="clinic-services">Services <span style="font-weight:400;">(comma-separated)</span></label>
-            <input class="form-control" id="clinic-services" type="text" maxlength="300" />
+            <input class="form-control" id="clinic-services" type="text" maxlength="300" placeholder="e.g. STI testing, Family planning" />
           </div>
         </div>
         <p class="admin-error" id="clinic-modal-error" hidden></p>
@@ -359,7 +390,7 @@
     <div class="admin-modal admin-modal--sm" role="dialog" aria-modal="true" aria-labelledby="user-modal-heading">
       <div class="admin-modal-header">
         <h2 id="user-modal-heading">Manage User</h2>
-        <button class="admin-modal-close" data-close="user-modal" aria-label="Close">&times;</button>
+        <button class="admin-modal-close" data-close="user-modal" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="admin-modal-body">
         <input type="hidden" id="user-modal-uid" />

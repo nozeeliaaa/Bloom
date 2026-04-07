@@ -1,10 +1,10 @@
 /**
- * settings.js — Preferences UI
+ * settings.js - Preferences UI
  * - Loads from backend (account mode) or localStorage (anon mode)
  * - Saves to backend + localStorage in account mode
- * - Local-only in anon mode
+ * - Registers/unregisters FCM token when notification toggles change
  */
-
+ 
 import {
   renderNav,
   renderFooter,
@@ -12,26 +12,28 @@ import {
   renderBloomieFab,
   showToast,
 } from "./utils.js";
-
-import { getTheme, setTheme } from "./theme-manager.js";
-import { isAccountMode } from "./mode.js";
-import { getIdToken } from "./auth.js";
-
+ 
+import { getTheme, setTheme }                    from "./theme-manager.js";
+import { isAccountMode }                         from "./mode.js";
+import { getIdToken }                            from "./auth.js";
+import { registerFCMToken, unregisterFCMToken }  from "./notifications.js";
+ 
 renderNav("settings");
 renderFooter();
 renderBloomieFab();
 renderModeBanner(document.getElementById("banner-area"));
-
+ 
 const LOCAL_KEY = "bloom_preferences";
 const API_BASE  = window.BLOOM_API_BASE || "";
-
-// ─── DOM refs ─────────────────────────────────────────────────────────────────
+ 
+// ─── DOM refs ──────────────────────────────────────────────────────────────────
 const els = {
   hideSensitive:  document.getElementById("pref-hide-sensitive"),
   reminders:      document.getElementById("pref-reminders"),
   periodReminder: document.getElementById("pref-period-reminder"),
   fertileAlert:   document.getElementById("pref-fertile-alert"),
   compact:        document.getElementById("pref-compact"),
+  discreetNotif:  document.getElementById("pref-discreet-notif"),
   save:           document.getElementById("save-prefs"),
   reset:          document.getElementById("reset-prefs"),
   status:         document.getElementById("prefs-status"),
@@ -41,77 +43,101 @@ const els = {
     system: document.getElementById("theme-system"),
   },
 };
-
-// ─── Local helpers ────────────────────────────────────────────────────────────
+ 
+// ─── Local helpers ─────────────────────────────────────────────────────────────
 function getLocalPrefs() {
   try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {}; }
   catch { return {}; }
 }
-
+ 
 function setLocalPrefs(prefs) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(prefs));
 }
-
-// ─── Backend helpers ──────────────────────────────────────────────────────────
+ 
+// ─── Backend helpers ───────────────────────────────────────────────────────────
 async function authHeaders() {
   const token = await getIdToken();
   if (!token) return null;
   return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 }
-
+ 
 async function loadFromBackend() {
   try {
     const headers = await authHeaders();
     if (!headers) return null;
 
-    const res = await fetch(`${API_BASE}/preferences`, { headers });
+    const res = await fetch(`${API_BASE}/api/preferences`, { headers });
     if (!res.ok) return null;
-
     const data = await res.json();
     return data?.preferences || null;
   } catch {
     return null;
   }
 }
-
+ 
 async function saveToBackend(prefs) {
   try {
     const headers = await authHeaders();
     if (!headers) return false;
-
+ 
     const payload = {
-      theme:          getTheme(),
-      hideSensitive:  prefs.hideSensitive  ?? false,
-      compact:        prefs.compact        ?? false,
+      theme:         getTheme(),
+      hideSensitive: prefs.hideSensitive  ?? false,
+      compact:       prefs.compact        ?? false,
       reminders: {
         enabled:      prefs.reminders      ?? false,
-        discreetCopy: false,
+        discreetCopy: prefs.discreetNotif ?? false,
         types: [
-          ...(prefs.periodReminder ? ["PERIOD_SOON"] : []),
-          ...(prefs.fertileAlert   ? ["FERTILE_WINDOW"] : []),
+          ...(prefs.periodReminder ? ["PERIOD_SOON"]     : []),
+          ...(prefs.fertileAlert   ? ["FERTILE_WINDOW"]  : []),
         ],
       },
     };
 
-    const res = await fetch(`${API_BASE}/preferences`, {
+    const res = await fetch(`${API_BASE}/api/preferences`, {
       method:  "PUT",
       headers,
       body:    JSON.stringify(payload),
     });
 
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("[Bloom] preferences save failed:", res.status, err);
+    } else {
+      console.log("[Bloom] preferences saved to backend ✓");
+    }
     return res.ok;
-  } catch {
+  } catch (e) {
+    console.error("[Bloom] preferences save error:", e);
     return false;
   }
 }
-
-// ─── UI helpers ───────────────────────────────────────────────────────────────
+ 
+// ─── FCM helpers ───────────────────────────────────────────────────────────────
+function anyNotificationEnabled() {
+  return (
+    els.reminders?.checked      ||
+    els.periodReminder?.checked ||
+    els.fertileAlert?.checked
+  );
+}
+ 
+async function syncFCMToken() {
+  if (!isAccountMode()) return;
+  if (anyNotificationEnabled()) {
+    await registerFCMToken();
+  } else {
+    await unregisterFCMToken();
+  }
+}
+ 
+// ─── UI helpers ────────────────────────────────────────────────────────────────
 function updateThemeButtons(current) {
   Object.entries(els.themeBtns).forEach(([key, btn]) => {
     if (btn) btn.classList.toggle("active", key === current);
   });
 }
-
+ 
 function applyPrefsToUI(prefs) {
   const theme = prefs.theme || getTheme();
   updateThemeButtons(theme);
@@ -120,10 +146,10 @@ function applyPrefsToUI(prefs) {
   if (els.hideSensitive)  els.hideSensitive.checked  = !!prefs.hideSensitive;
   if (els.compact)        els.compact.checked        = !!prefs.compact;
 
-  // Reminders — flatten from backend shape or local shape
+  // Reminders - flatten from backend shape or local shape
   const remindersEnabled = prefs.reminders?.enabled ?? !!prefs.reminders;
   if (els.reminders) els.reminders.checked = remindersEnabled;
-
+ 
   const types = prefs.reminders?.types || [];
   if (els.periodReminder) {
     els.periodReminder.checked = types.includes("PERIOD_SOON") || !!prefs.periodReminder;
@@ -131,41 +157,49 @@ function applyPrefsToUI(prefs) {
   if (els.fertileAlert) {
     els.fertileAlert.checked = types.includes("FERTILE_WINDOW") || !!prefs.fertileAlert;
   }
+  if (els.discreetNotif) {
+    els.discreetNotif.checked = prefs.reminders?.discreetCopy ?? !!prefs.discreetNotif;
+  }
 }
-
+ 
 function showStatus(msg) {
   if (!els.status) return;
   els.status.textContent = msg;
   setTimeout(() => (els.status.textContent = ""), 2500);
 }
-
-// ─── Init: load preferences ───────────────────────────────────────────────────
+ 
+// ─── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   let prefs = getLocalPrefs();
-
+ 
   if (isAccountMode()) {
     const cloudPrefs = await loadFromBackend();
     if (cloudPrefs) {
-      // Cloud is source of truth — merge into local cache
+      // Cloud is source of truth - merge into local cache
       prefs = { ...prefs, ...cloudPrefs };
       setLocalPrefs(prefs);
     }
   }
-
+ 
   applyPrefsToUI(prefs);
 }
-
+ 
 init();
-
-// ─── Theme button clicks ──────────────────────────────────────────────────────
+ 
+// ─── Theme button clicks ───────────────────────────────────────────────────────
 Object.entries(els.themeBtns).forEach(([key, btn]) => {
   btn?.addEventListener("click", () => {
     setTheme(key);
     updateThemeButtons(key);
   });
 });
-
-// ─── Save ─────────────────────────────────────────────────────────────────────
+ 
+// ─── Notification toggle changes - sync FCM immediately ───────────────────────
+[els.reminders, els.periodReminder, els.fertileAlert].forEach((toggle) => {
+  toggle?.addEventListener("change", () => syncFCMToken());
+});
+ 
+// ─── Save ──────────────────────────────────────────────────────────────────────
 els.save?.addEventListener("click", async () => {
   const prefs = {
     hideSensitive:  els.hideSensitive?.checked  ?? false,
@@ -173,20 +207,23 @@ els.save?.addEventListener("click", async () => {
     periodReminder: els.periodReminder?.checked ?? false,
     fertileAlert:   els.fertileAlert?.checked   ?? false,
     compact:        els.compact?.checked        ?? false,
+    discreetNotif:  els.discreetNotif?.checked  ?? false,
   };
-
-  // Always save locally first
+ 
   setLocalPrefs(prefs);
-
+ 
   if (isAccountMode()) {
-    els.save.disabled = true;
+    els.save.disabled    = true;
     els.save.textContent = "Saving…";
-
-    const ok = await saveToBackend(prefs);
-
-    els.save.disabled = false;
-    els.save.textContent = "Save";
-
+ 
+    const [ok] = await Promise.all([
+      saveToBackend(prefs),
+      syncFCMToken(),
+    ]);
+ 
+    els.save.disabled    = false;
+    els.save.textContent = "Save Preferences";
+ 
     if (ok) {
       showStatus("Saved to cloud!");
       showToast("Preferences saved.");
@@ -199,11 +236,13 @@ els.save?.addEventListener("click", async () => {
     showToast("Preferences saved.");
   }
 });
-
-// ─── Reset ────────────────────────────────────────────────────────────────────
-els.reset?.addEventListener("click", () => {
+ 
+// ─── Reset ─────────────────────────────────────────────────────────────────────
+els.reset?.addEventListener("click", async () => {
   localStorage.removeItem(LOCAL_KEY);
   applyPrefsToUI({});
+  // All toggles now off - unregister FCM
+  if (isAccountMode()) await unregisterFCMToken();
   showStatus("Reset to defaults.");
   showToast("Preferences reset.", "info");
 });

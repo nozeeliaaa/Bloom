@@ -13,8 +13,8 @@ export const GOALS = [
   },
   {
     id: "no_period",
-    title: "Track without a period",
-    desc: "Track symptoms and patterns without bleeding-based predictions.",
+    title: "Track symptoms",
+    desc: "Log symptoms and patterns without bleeding-based predictions.",
   },
   {
     id: "pregnancy",

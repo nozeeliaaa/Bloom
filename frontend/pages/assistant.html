@@ -11,91 +11,127 @@
 
   <style>
     .bloomie-shell {
-      max-width: 900px;
+      max-width: 860px;
       margin: 0 auto;
       padding: 0 0 2rem;
     }
 
+    /* Header row */
+    .bloomie-page-header {
+      margin-bottom: 1.25rem;
+    }
+
+    /* Chat card */
     .bloomie-card {
       display: flex;
       flex-direction: column;
-      min-height: calc(100vh - 260px);
+      min-height: calc(100vh - 280px);
+      padding: 0;
+      overflow: hidden;
     }
 
+    .bloomie-card .card-header {
+      background: linear-gradient(135deg, var(--color-primary-lightest, #fce4ec) 0%, transparent 100%);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .bloomie-card-title-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .bloomie-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4caf82;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(76, 175, 130, 0.22);
+    }
+
+    /* Chat feed */
     .chat-box {
       flex: 1;
       overflow-y: auto;
-      padding: 1rem 0;
+      padding: 1.25rem 1rem;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-      min-height: 420px;
+      gap: 0.85rem;
+      min-height: 400px;
     }
 
     .msg {
       display: flex;
+      align-items: flex-end;
+      gap: 0.5rem;
     }
 
     .msg.bot { justify-content: flex-start; }
     .msg.user { justify-content: flex-end; }
 
+    /* Small bot avatar dot */
+    .msg-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f8c8db, #D4749A);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+
     .bubble {
-      max-width: 80%;
+      max-width: 75%;
       padding: 0.75rem 1rem;
-      border-radius: 16px;
-      background: var(--color-bg-soft);
+      border-radius: 18px;
       font-size: 0.95rem;
-      line-height: 1.45;
+      line-height: 1.5;
       border: 1px solid var(--color-border);
+      background: var(--color-bg-card, #fff);
+    }
+
+    .msg.bot .bubble {
+      border-radius: 4px 18px 18px 18px;
+      background: var(--color-bg-card, #fff);
+      border-color: var(--color-border);
     }
 
     .msg.user .bubble {
       background: var(--color-primary);
       color: white;
       border-color: var(--color-primary);
+      border-radius: 18px 18px 4px 18px;
     }
 
-    .chat-form {
-      display: flex;
-      gap: 0.5rem;
-      border-top: 1px solid var(--color-border);
-      padding-top: 0.9rem;
-      margin-top: 0.25rem;
-    }
-
-    .chat-input {
-      flex: 1;
-      padding: 0.75rem 0.9rem;
-      border-radius: 10px;
-      border: 1px solid var(--color-border);
-      background: var(--color-bg);
-      font: inherit;
-    }
-
-    .chat-input:focus {
-      outline: none;
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
-    }
-
+    /* Quick-reply chips */
     .choices {
-      margin-top: 0.75rem;
+      margin-top: 0.65rem;
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
+      gap: 0.45rem;
     }
 
     .reply {
       border-radius: 999px;
-      padding: 0.45rem 0.95rem;
-      border: 1px solid var(--color-border);
+      padding: 0.4rem 0.9rem;
+      border: 1.5px solid var(--color-border);
       background: var(--color-bg);
       cursor: pointer;
       font-weight: 700;
+      font-size: 0.88rem;
       font-family: inherit;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
     }
 
-    .reply:hover { transform: translateY(-1px); }
+    .reply:hover {
+      border-color: var(--color-primary);
+      background: var(--color-primary-lightest, #fce4ec);
+      transform: translateY(-1px);
+    }
 
     .reply--primary {
       background: var(--color-primary);
@@ -103,16 +139,96 @@
       border-color: var(--color-primary);
     }
 
-    .tiny-note {
-      font-size: 0.78rem;
-      text-align: center;
-      color: var(--color-text-muted);
-      margin-top: 0.9rem;
+    .reply--primary:hover {
+      background: var(--color-primary-dark, #b85c82);
+      border-color: var(--color-primary-dark, #b85c82);
     }
 
+    /* Input area */
+    .chat-input-area {
+      border-top: 1px solid var(--color-border);
+      padding: 0.85rem 1rem;
+      background: var(--color-bg-card, #fff);
+    }
+
+    .chat-form {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      border: 1.5px solid var(--color-border);
+      background: var(--color-bg);
+      font: inherit;
+      font-size: 0.95rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(212, 116, 154, 0.12);
+    }
+
+    .chat-send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, transform 0.1s;
+      color: white;
+    }
+
+    .chat-send-btn--text {
+      width: auto;
+      border-radius: 999px;
+      padding: 0 1.25rem;
+      font: inherit;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .chat-send-btn:hover {
+      background: var(--color-primary-dark, #b85c82);
+      transform: scale(1.06);
+    }
+
+    .chat-send-btn:active { transform: scale(0.96); }
+
+    .tiny-note {
+      font-size: 0.76rem;
+      text-align: center;
+      color: var(--color-text-muted);
+      margin: 0.5rem 0 0;
+    }
+
+    .bloomie-heading { margin: 0; }
+    .bloomie-subheading { margin: 0.15rem 0 0; }
+
+    .bloomie-card-name {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--color-text);
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    .bloomie-status-dot--right { margin-left: auto; }
+
     @media (max-width: 640px) {
-      .bubble { max-width: 90%; }
-      .bloomie-card { min-height: calc(100vh - 220px); }
+      .bubble { max-width: 88%; }
+      .bloomie-card { min-height: calc(100vh - 230px); }
+      .msg-avatar { display: none; }
     }
 
     /* ── Settings toggle switch ──────────────────────────────────────────── */
@@ -163,13 +279,13 @@
 </head>
 
 <body>
-  <main>
-    <div id="banner-area"></div>
+  <div id="banner-area"></div>
 
+  <main>
     <div class="bloomie-shell">
       <div class="page-header">
         <h1>Bloomie</h1>
-        <p class="text-muted">Ask a question, describe a symptom, or use the quick replies 🩷</p>
+        <p class="text-muted">Your guided health education assistant</p>
       </div>
 
       <section class="card bloomie-card">
@@ -208,21 +324,19 @@
         <div class="card-body">
           <div class="chat-box" id="chat-box" aria-live="polite"></div>
 
+        <div class="chat-input-area">
           <form class="chat-form" id="chat-form">
             <input
               class="chat-input"
               id="chat-input"
               type="text"
-              placeholder="Type here or use the buttons…"
+              placeholder="Type your question…"
               autocomplete="off"
               maxlength="240"
             />
+            <button class="chat-send-btn chat-send-btn--text" type="submit" aria-label="Send message">Send</button>
           </form>
-
-          <p class="tiny-note">
-            Bloomie provides educational information only. This is not medical advice.
-            Always consult a healthcare provider.
-          </p>
+          <p class="tiny-note">Bloomie provides educational information only. This is not medical advice. Always consult a healthcare provider for medical concerns.</p>
         </div>
       </section>
     </div>
@@ -295,23 +409,59 @@
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
     import { getAllLogs } from '/js/db.js';
-    import { computeCyclePhase } from '/js/phase.js';
     import { getUserGoal } from '/js/goals.js';
-    import { onAuthChange } from '/js/auth.js';
+    import { onAuthChange, getIdToken } from '/js/auth.js';
     import { mountChat } from '/js/assistant.js';
     import { initChatSettings } from '/js/bloomie-settings.js';
+    import { isAnonMode } from '/js/mode.js';
+
+    function computeCycleBase(logs) {
+      const periodDays = Object.keys(logs)
+        .filter(k => logs[k]?.flow && logs[k].flow !== 'none')
+        .sort();
+      const starts = [];
+      let prev = null;
+      for (const d of periodDays) {
+        if (!prev || (new Date(d) - new Date(prev)) / 86400000 > 3) starts.push(d);
+        prev = d;
+      }
+      const lengths = [];
+      for (let i = 1; i < starts.length; i++)
+        lengths.push((new Date(starts[i]) - new Date(starts[i-1])) / 86400000);
+      const avg = lengths.length
+        ? Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length)
+        : 28;
+      const last = starts.length ? starts[starts.length - 1] : null;
+      const next = last
+        ? new Date(new Date(last).getTime() + avg * 86400000).toISOString().slice(0, 10)
+        : null;
+      return { cycleStarts: starts, avgCycleLength: avg, nextPeriodDate: next };
+    }
 
     renderNav('assistant');
     renderFooter();
     renderModeBanner(document.getElementById('banner-area'));
     initChatSettings();
 
+    if (isAnonMode()) {
+      document.getElementById('chat-container').innerHTML = `
+        <div style="text-align:center;padding:3rem 1.5rem;max-width:400px;margin:0 auto;">
+          <div style="font-size:2.5rem;margin-bottom:1rem;">🔒</div>
+          <h2 style="color:var(--color-primary-dark);margin-bottom:0.5rem;">Bloomie is for account holders</h2>
+          <p style="color:var(--color-text-muted);margin-bottom:1.5rem;">Create a free account to chat with Bloomie, get personalised cycle insights, and more.</p>
+          <a href="/pages/register.html" class="btn btn-primary">Create free account</a>
+          <p style="margin-top:1rem;font-size:0.88rem;color:var(--color-text-muted);">
+            Already have one? <a href="/pages/login.html" style="font-weight:700;">Log in</a>
+          </p>
+        </div>`;
+    } else {
+
     async function init(user) {
       const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
       const isMinor = profile.ageRange === "under18";
       const isAnon  = !user;
       const logsByDate = await getAllLogs();
-      const cycle = computeCyclePhase(logsByDate);
+      const cycle = computeCycleBase(logsByDate);
       const goal = getUserGoal();
 
       const lastLmp = cycle.cycleStarts?.length
@@ -340,10 +490,28 @@
           })),
         }));
 
-      await mountChat(user, cycleData, symptomHistory.length ? symptomHistory : null, { isMinor, isAnon });
+      // Fetch nickname from Firestore profile so Bloomie can address the user by name
+      let enrichedUser = user;
+      if (user) {
+        try {
+          const token = await getIdToken();
+          const apiBase = window.BLOOM_API_BASE ?? '';
+          const res = await fetch(`${apiBase}/api/user/profile`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const nickname = data?.profile?.nickname || '';
+            if (nickname) enrichedUser = { ...user, nickname };
+          }
+        } catch (_) { /* fall back to user.displayName */ }
+      }
+
+      await mountChat(enrichedUser, cycleData, symptomHistory.length ? symptomHistory : null, { isMinor, isAnon });
     }
 
-    onAuthChange(user => { init(user); });
+      onAuthChange(user => { init(user); });
+    }
   </script>
 </body>
 </html>

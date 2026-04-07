@@ -28,8 +28,7 @@
 
 import express    from "express";
 import rateLimit  from "express-rate-limit";
-import { db, admin } from "../firebaseAdmin.js";
-import { auth }      from "../firebaseAdmin.js";
+import { db, admin, auth } from "../firebaseAdmin.js";
 
 const FieldValue = admin.firestore.FieldValue;
 const router = express.Router();

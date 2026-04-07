@@ -214,7 +214,7 @@ export function initBloomieChat({
 
   if (!$box) throw new Error(`Missing #${chatBoxId}`);
 
-  // Stable random ID for this chat session — sent with every feedback event
+  // Stable random ID for this chat session - sent with every feedback event
   const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
   // ── Inject typing indicator CSS once per page load ───────────────────────
@@ -286,7 +286,7 @@ export function initBloomieChat({
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
-  // ── User state — derived from Firestore cycleData ────────────────────────
+  // ── User state - derived from Firestore cycleData ────────────────────────
   const cd = {
     lmp:                 toDate(cycleData?.lmp),
     cycleLength:         Number(cycleData?.cycleLength) || 28,
@@ -294,7 +294,7 @@ export function initBloomieChat({
     edd:                 toDate(cycleData?.edd),
     hasData:             !!(cycleData?.lmp),  // also re-checked via hasLmpData()
 
-    // Explicit mode from dashboard — never guessed by Bloomie
+    // Explicit mode from dashboard - never guessed by Bloomie
     mode: cycleData?.mode || (
       cycleData?.isTrackingPregnancy ? "pregnancy_tracking" :
       cycleData?.lmp                 ? "cycle_tracking"     :
@@ -339,7 +339,7 @@ export function initBloomieChat({
     return { lmp, cycleLength, dayOfCycle, daysLate };
   }
 
-  // Reactive mode checks — always use these instead of cd.mode directly
+  // Reactive mode checks - always use these instead of cd.mode directly
   // so session overrides apply automatically everywhere.
   const userMode = {
     get isCycleTracking() { return effectiveMode() === "cycle_tracking"; },
@@ -363,9 +363,9 @@ export function initBloomieChat({
     const dayOfCycle = daysBetween(lmp, today) % effectiveCycleLength();
     if (dayOfCycle < 0) return null;
     if (dayOfCycle <= 5)  return { phase: "menstrual",   days: dayOfCycle, label: "your period phase (days 1–5)" };
-    if (dayOfCycle <= 13) return { phase: "follicular",  days: dayOfCycle, label: "the follicular phase (days 6–13) — your body is preparing to ovulate" };
-    if (dayOfCycle <= 15) return { phase: "ovulation",   days: dayOfCycle, label: "your ovulation window — days 13–15" };
-    if (dayOfCycle <= 28) return { phase: "luteal",      days: dayOfCycle, label: "the luteal phase (days 16–28) — this is when PMS symptoms can show up" };
+    if (dayOfCycle <= 13) return { phase: "follicular",  days: dayOfCycle, label: "the follicular phase (days 6–13) - your body is preparing to ovulate" };
+    if (dayOfCycle <= 15) return { phase: "ovulation",   days: dayOfCycle, label: "your ovulation window - days 13–15" };
+    if (dayOfCycle <= 28) return { phase: "luteal",      days: dayOfCycle, label: "the luteal phase (days 16–28) - this is when PMS symptoms can show up" };
     return null;
   }
 
@@ -374,7 +374,7 @@ export function initBloomieChat({
   function phaseNudge() {
     if (ctx.adviceGiven.has("phase_nudge")) return null;
     ctx.adviceGiven.add("phase_nudge");
-    return "By the way — if you log your last period date in the dashboard I can give you more personalised insight based on where you are in your cycle 🩷";
+    return "By the way - if you log your last period date in the dashboard I can give you more personalised insight based on where you are in your cycle 🩷";
   }
 
   // Nodes where a phase insight must never appear regardless of other logic.
@@ -393,7 +393,7 @@ export function initBloomieChat({
   }
 
   // Given a phase and an array of concern strings, return the highest-priority
-  // concern that has a non-null insight — using the exported CONCERN_PRIORITY order.
+  // concern that has a non-null insight - using the exported CONCERN_PRIORITY order.
   function pickPriorityConcern(phase, concerns) {
     for (const concern of CONCERN_PRIORITY) {
       if (concerns.includes(concern) && getPhaseInsight(phase, concern)) {
@@ -423,7 +423,7 @@ export function initBloomieChat({
     if (ctx.insightsGiven.has(key)) {
       return pick([
         `As I mentioned earlier, this can be part of the ${phase} phase pattern 🩷`,
-        `We touched on this — it's a common experience at this point in the cycle 🩷`,
+        `We touched on this - it's a common experience at this point in the cycle 🩷`,
         `This is part of the pattern I mentioned for this phase of the cycle 🩷`,
       ]);
     }
@@ -499,7 +499,7 @@ export function initBloomieChat({
     // Build one cohesive sentence per pattern (max 2 to avoid wall of text)
     const lines = insights.slice(0, 2).map(({ label, count, dayRange, todayCycleDay }) => {
       const dayNote = todayCycleDay !== null
-        ? ` — and you're on day ${todayCycleDay} right now, which lines up`
+        ? ` - and you're on day ${todayCycleDay} right now, which lines up`
         : "";
       return `📊 Your logs show **${label}** tends to appear around ${dayRange} of your cycle (logged ${count} time${count > 1 ? "s" : ""}${dayNote}).`;
     });
@@ -554,7 +554,7 @@ export function initBloomieChat({
   }
 
   // Persist a compact memory snapshot after a meaningful exchange.
-  // Safe to call fire-and-forget — saves to localStorage immediately,
+  // Safe to call fire-and-forget - saves to localStorage immediately,
   // Firestore sync happens in the background.
   function persistMemory(entities, reason) {
     const activeSymptoms = Object.entries(entities.symptoms)
@@ -669,7 +669,7 @@ export function initBloomieChat({
   // symptoms the user mentioned then stay active in inferRoute this session.
   // Staleness boundary: symptoms older than 24 hours are no longer merged
   // into entityHistory (where they would silently influence routing).
-  // Instead they land in ctx.backgroundContext — readable by recall helpers
+  // Instead they land in ctx.backgroundContext - readable by recall helpers
   // and PDF export, but invisible to inferRoute / topic-switch logic.
   // This separation prevents a Monday complaint about cramps from nudging
   // Wednesday's "I feel fine" message toward a pain route the user has
@@ -695,13 +695,13 @@ export function initBloomieChat({
         raw:       "",
       };
       if (sessionDate >= oneDayAgo) {
-        // Recent — merge into active entity history so routing picks it up.
+        // Recent - merge into active entity history so routing picks it up.
         ctx.entityHistory = [seedEntry];
         // MEMORY AUDIT: ctx.entityHistory — seeded from recent session (<24 h).
         //   Recent symptoms stay active for inferRoute merging. Handled correctly.
         logAnalyticsEvent("memory_recall_used", { type: "entity_history" }, ctx);
       } else {
-        // Stale (>24 h) — park in backgroundContext for reference only.
+        // Stale (>24 h) - park in backgroundContext for reference only.
         ctx.backgroundContext = { ...seedEntry, seededAt: bloomieMemory.lastSessionDate };
         // MEMORY AUDIT: ctx.backgroundContext — stale session data (>24 h) parked here,
         //   invisible to inferRoute. Readable by recall helpers and PDF export only.
@@ -829,7 +829,8 @@ export function initBloomieChat({
   function isLowInformationInput(text) {
     if (!text) return true;
     const cleaned = text.trim().toLowerCase();
-    if (cleaned.length <= 2) return true;
+    const SHORT_GREETINGS = new Set(["hi", "yo", "ok", "no"]);
+    if (cleaned.length <= 2 && !SHORT_GREETINGS.has(cleaned)) return true;
     // Single repeated character: "aaaaa", "fffff"
     if (/^([a-z])\1{2,}$/.test(cleaned)) return true;
     // Mostly same characters: "feeeeeee"
@@ -927,7 +928,7 @@ export function initBloomieChat({
       }
 
       if (inputQuality.isKeyboardSmash) {
-        say("That one didn't quite come through 🩷 Try typing what's going on — even a few words like \"my period is late\" or \"I have cramps\" works.");
+        say("That one didn't quite come through 🩷 Try typing what's going on - even a few words like \"my period is late\" or \"I have cramps\" works.");
         render();
         return;
       }
@@ -963,7 +964,7 @@ export function initBloomieChat({
         const today = new Date();
 
         // ── Universal steps that always run on every user message ─────────
-        // Safety re-check: urgent language in any message — even date capture —
+        // Safety re-check: urgent language in any message - even date capture -
         // must always be caught and escalated immediately.
         {
           const captureUrgent = extractUrgency(normalizePatois(text).toLowerCase());
@@ -982,9 +983,9 @@ export function initBloomieChat({
             return;
           }
         }
-        // Tone detection — update every turn so openers stay current.
+        // Tone detection - update every turn so openers stay current.
         ctx.currentTone = detectUserTone(normalizePatois(text));
-        // Loop detection — track inputs even in capture mode.
+        // Loop detection - track inputs even in capture mode.
         ctx.recentInputs = ctx.recentInputs || [];
         ctx.recentInputs.push(text);
         if (ctx.recentInputs.length > 5) ctx.recentInputs.shift();
@@ -997,7 +998,7 @@ export function initBloomieChat({
         const _sameAttemptCount = ctx._invalidDateAttempts[captureKind][_attemptKey];
         if (_sameAttemptCount >= 3) {
           pushMsg("user", text);
-          say("No worries 🩷 We can skip the date for now. I can still help with everything else — the cycle timing will just be approximate.");
+          say("No worries 🩷 We can skip the date for now. I can still help with everything else - the cycle timing will just be approximate.");
           ctx._invalidDateAttempts[captureKind] = {};
           const _skipNext = ctx.captureReturnTo || ctx.capture.next;
           ctx.captureReturnTo = null;
@@ -1013,7 +1014,7 @@ export function initBloomieChat({
 
         if (naturalResult?.forgotten) {
           pushMsg("user", text);
-          say("That's okay 🩷 I can still help — I just won't be able to give you personalised cycle timing until you log a period date. Everything else still works.");
+          say("That's okay 🩷 I can still help - I just won't be able to give you personalised cycle timing until you log a period date. Everything else still works.");
           ctx.captureReturnTo = null;
           ctx.capture = null;
           transition(ctx.capture?.next || "START_MENU");
@@ -1031,7 +1032,7 @@ export function initBloomieChat({
             // Confirm approximate date with the user before committing
             pushMsg("user", text);
             const approxStr = parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-            say(`I'll use **${approxStr}** as an estimate — does that sound about right?`, {
+            say(`I'll use **${approxStr}** as an estimate - does that sound about right?`, {
               choices: [
                 { id: "approx_yes", label: "Yes, that's right", next: "__APPROX_CONFIRM__" },
                 { id: "approx_no",  label: "No, let me re-enter", next: "__APPROX_RETRY__" },
@@ -1079,7 +1080,7 @@ export function initBloomieChat({
 
           if (!parsed || Number.isNaN(parsed.getTime())) {
             pushMsg("user", text);
-            say("Hm, I couldn't read that date 🩷 Try typing it like: 2026-02-08, or 08/02/2026 — or just say something like \"last week\" or \"early March\".");
+            say("Hm, I couldn't read that date 🩷 Try typing it like: 2026-02-08, or 08/02/2026 - or just say something like \"last week\" or \"early March\".");
             return;
           }
         }
@@ -1097,7 +1098,7 @@ export function initBloomieChat({
             return;
           }
           if (v.staleData) {
-            // Proceed but show a nudge — do not block
+            // Proceed but show a nudge - do not block
             say(v.message);
           }
         }
@@ -1105,7 +1106,7 @@ export function initBloomieChat({
         if (captureKind === "sexDate") {
           if (parsed > todayStart) {
             pushMsg("user", text);
-            say("That date looks like it's in the future 🩷 The sex date needs to be today or before — try again.");
+            say("That date looks like it's in the future 🩷 The sex date needs to be today or before - try again.");
             return;
           }
           if (parsed < oneYearAgo) {
@@ -1123,7 +1124,7 @@ export function initBloomieChat({
           }
           if (parsed > ninetyDaysAhead) {
             pushMsg("user", text);
-            say("That date is more than 90 days away 🩷 Your expected period date should be coming up soon — try again, or tap the back button to choose a different option.");
+            say("That date is more than 90 days away 🩷 Your expected period date should be coming up soon - try again, or tap the back button to choose a different option.");
             return;
           }
         }
@@ -1140,7 +1141,7 @@ export function initBloomieChat({
           ctx.sessionData.phaseConfidence = computePhaseConfidence({ approximate: true });
         }
 
-        // If capturing LMP — save to sessionData so all cycle helpers use it
+        // If capturing LMP - save to sessionData so all cycle helpers use it
         if (captureKind === "lmpDate") {
           ctx.sessionData = ctx.sessionData || {};
           ctx.sessionData.lmp = parsed.toISOString();
@@ -1197,11 +1198,11 @@ export function initBloomieChat({
         ctx.isRetryAttempt = false;
       }
 
-      // "idk" loop — 3+ times total in recent inputs
+      // "idk" loop - 3+ times total in recent inputs
       const _idkPattern = /^\s*(idk|i don'?t know|not sure|nuh sure|mi nuh know)\s*$/i;
       const _idkCount = ctx.recentInputs.filter(m => _idkPattern.test(m)).length;
       if (_idkCount >= 3) {
-        say("That's okay — not knowing is okay 🩷 Sometimes it helps to just pick the closest thing. What feels most like what's going on?");
+        say("That's okay - not knowing is okay 🩷 Sometimes it helps to just pick the closest thing. What feels most like what's going on?");
         transition("ELSE_NOT_SURE_ROUTE");
         return;
       }
@@ -1306,7 +1307,7 @@ export function initBloomieChat({
         const retestDate = addDays(new Date(), 3);
         say([
           `${ack()} Whatever the result, here's what to know 🩷`,
-          `If it was negative, retest around **${fmtDate(retestDate)}** — 48–72 hours from now — with first morning urine for the most accurate reading.`,
+          `If it was negative, retest around **${fmtDate(retestDate)}** - 48–72 hours from now - with first morning urine for the most accurate reading.`,
           "A second negative at that point is more reliable than a single early one.",
           "If it was positive, the next step is connecting with a healthcare provider.",
         ], { keepLocked: true });
@@ -1316,7 +1317,7 @@ export function initBloomieChat({
       }
 
       // ── Context-aware choice matching ────────────────────────────────────
-      // Skip when a clarifying question was pending — the user is answering
+      // Skip when a clarifying question was pending - the user is answering
       // Bloomie's question, not selecting from the previous menu.
       const contextMatch = hasPendingContext ? null : matchTypedToChoice(text);
       // pendingQuestion is strictly turn-bound: consume it now regardless of
@@ -1344,7 +1345,7 @@ export function initBloomieChat({
       // ── Full input processing pipeline (steps 3–7) ───────────────────────
       // Step 3: Patois → English phrase/word normalization
       const _patoisNorm = normalizePatois(text);
-      // Step 4: Medical spell correction — phonetic variants then Levenshtein token correction
+      // Step 4: Medical spell correction - phonetic variants then Levenshtein token correction
       const _fuzzyText  = fuzzyCorrect(_patoisNorm) ?? _patoisNorm;
       // Step 5: Collapse repeated characters ("helpppppp" → "help")
       const _collapsed  = collapseRepeatedLetters(_fuzzyText);
@@ -1425,9 +1426,9 @@ export function initBloomieChat({
             /\bdizzy|dizziness/.test(normalizedText) ? "dizziness" :
             /\bpain/.test(normalizedText) ? "pain" : "the symptom you mentioned";
           say([
-            `I hear you — and I don't want to alarm you. But when ${symptomMentioned} is involved, I want to make sure I'm giving you the right picture. Can you tell me a little more about ${symptomMentioned}?`,
+            `I hear you - and I don't want to alarm you. But when ${symptomMentioned} is involved, I want to make sure I'm giving you the right picture. Can you tell me a little more about ${symptomMentioned}?`,
           ], { keepLocked: false });
-          // Continue routing below — do not return here. Safety checks still run.
+          // Continue routing below - do not return here. Safety checks still run.
         }
       }
 
@@ -1533,7 +1534,7 @@ export function initBloomieChat({
           ? primaryBucket(ctx.entityHistory[ctx.entityHistory.length - 1])
           : null;
         if (newBucket && prevBucket && newBucket !== prevBucket && newBucket !== "urgent") {
-          console.log("[Bloomie] Topic switch:", prevBucket, "→", newBucket, "— clearing entity history");
+          console.log("[Bloomie] Topic switch:", prevBucket, "→", newBucket, "- clearing entity history");
           ctx.entityHistory = [];
         }
       }
@@ -1634,7 +1635,7 @@ export function initBloomieChat({
       const catalogCodes = detectedCatalogKeys(mergedEntities.symptoms);
       const historyContext = buildSymptomContext(catalogCodes);
       if (historyContext) {
-        // keepLocked: true — guidance or a transition always follows this bubble.
+        // keepLocked: true - guidance or a transition always follows this bubble.
         // Without it, the say() completion timer fires lockUI(false) while
         // ctx.state is still the old node. render() has already re-stamped the
         // old choices with the current flowId so the flowId guard passes and a
@@ -1817,7 +1818,7 @@ export function initBloomieChat({
         // guidance bubble and the transition firing, so old node buttons
         // cannot be clicked during that gap.
         console.log("[Bloomie guidance] scenario →", guidance.scenario);
-        // Prepend a tone-aware opener unless the route is an emergency / safety node —
+        // Prepend a tone-aware opener unless the route is an emergency / safety node -
         // those must stay grounded and consistent regardless of user tone.
         const EMERGENCY_NODES = new Set([
           "HEAVY_URGENT", "CRISIS_SUPPORT", "SAFETY_SUPPORT",
@@ -1936,7 +1937,8 @@ export function initBloomieChat({
         // clearTimers() inside transition() does not nuke the reply bubbles.
         const lines = Array.isArray(routed.reply) ? routed.reply : [routed.reply];
         const isOOS = !!routed.payload?.oos;
-        if (isOOS) {
+        const isGreetingOOS = routed.payload?.oos === "greeting";
+        if (isOOS && !isGreetingOOS) {
           ctx.oosStreakCount = (ctx.oosStreakCount || 0) + 1;
           logAnalyticsEvent("oos_event", { streak: ctx.oosStreakCount }, ctx);
         } else {
@@ -2003,7 +2005,7 @@ export function initBloomieChat({
               : "";
           const routerLines = routerOpener ? [routerOpener, ...lines] : lines;
           const delay = estimateSayTime(routerLines);
-          // keepLocked: true — a transition is scheduled right after this say().
+          // keepLocked: true - a transition is scheduled right after this say().
           // Without it, lockUI(false) fires when the last line plays, re-enabling
           // the old node's buttons (which render() has re-stamped with the current
           // flowId) before the transition moves ctx.state forward.
@@ -2165,32 +2167,32 @@ export function initBloomieChat({
   ];
 
   const CONSENT_PREFIX = [
-    "If you're comfortable sharing —",
-    "Only if you want to —",
+    "If you're comfortable sharing -",
+    "Only if you want to -",
     "No pressure, but it helps to know:",
-    "If you're open to it —",
+    "If you're open to it -",
   ];
 
   const ESTIMATE_QUALIFIER = [
     "I can estimate, though keep in mind this is based on averages.",
-    "This is an estimate — cycles vary person to person.",
+    "This is an estimate - cycles vary person to person.",
     "Keep in mind this is a prediction, not a guarantee.",
     "Actual timing can shift based on stress, health, and other factors.",
   ];
 
-  // ack() — random acknowledgement opener, optionally followed by custom text
+  // ack() - random acknowledgement opener, optionally followed by custom text
   function ack(extra = null) {
     const base = pick(ACK);
     return extra ? `${base} ${extra}` : base;
   }
 
-  // qualifier() — opening a data-driven answer
+  // qualifier() - opening a data-driven answer
   function qualifier() { return pick(GENTLE_QUALIFIER); }
 
-  // consent() — before asking something personal
+  // consent() - before asking something personal
   function consent() { return pick(CONSENT_PREFIX); }
 
-  // estimate() — when giving a calculated answer
+  // estimate() - when giving a calculated answer
   function estimate() { return pick(ESTIMATE_QUALIFIER); }
 
   // ── Quick summary formatter ──────────────────────────────────────────────
@@ -2213,7 +2215,7 @@ export function initBloomieChat({
     return ["_This is educational information, not a diagnosis. If something feels off, trust your body._"];
   }
   function urgentFooter() {
-    return ["_If symptoms are severe, sudden, or worsening — please seek medical care._"];
+    return ["_If symptoms are severe, sudden, or worsening - please seek medical care._"];
   }
   function anonNudge() {
     if (!ctx.isAnon) return null;
@@ -2243,7 +2245,7 @@ export function initBloomieChat({
   // ---------------- CONTEXT-AWARE CHOICE MATCHER ----------------
   // Tries to match what the user typed to one of the current node's choices.
   // Handles: yes/no/not sure answers, patois variants, and partial label matches.
-  // Resolve choices — can be a plain array OR a function returning an array
+  // Resolve choices - can be a plain array OR a function returning an array
   function resolveChoices(node) {
     if (!node) return [];
     const raw = typeof node.choices === "function" ? node.choices() : node.choices;
@@ -2255,7 +2257,7 @@ export function initBloomieChat({
     const choices = resolveChoices(node);
     if (!choices.length) return null;
 
-    // flowId guard — mirrors the stale-button check used by button clicks.
+    // flowId guard - mirrors the stale-button check used by button clicks.
     // advanceFlow() is called before matchTypedToChoice, so ctx.flowId is
     // already N+1 at this point. The choices are only valid if they were
     // rendered in epoch N (i.e. ctx.nodeFlowId === ctx.flowId - 1).
@@ -2554,7 +2556,7 @@ export function initBloomieChat({
   const NODE_HISTORY_MAX = 30;
 
   // Tune all Bloomie message pacing from one place.
-  // calcDelay() and estimateSayTime() read these values — never hardcode ms.
+  // calcDelay() and estimateSayTime() read these values - never hardcode ms.
   const BLOOMIE_TIMING = {
     firstBubbleMs: 500,   // delay before the very first bubble in any sequence
     msPerChar:       9,   // reading-pace coefficient (ms per visible character)
@@ -2564,7 +2566,7 @@ export function initBloomieChat({
     long:   {             minMs: 1200, maxMs: 1500 },   // > 220 chars
   };
 
-  // Returns the inter-bubble delay after showing `text` — scales with length.
+  // Returns the inter-bubble delay after showing `text` - scales with length.
   // If a node sets an explicit delayMs override, use that instead.
   function calcDelay(text) {
     const len = String(text ?? "").length;
@@ -2612,10 +2614,10 @@ export function initBloomieChat({
   }
 
   // say(lines, opts)
-  // keepLocked — stay locked after the last message fires (use when a
+  // keepLocked - stay locked after the last message fires (use when a
   //              transition() is already scheduled right after this call,
   //              so the old node's buttons can never be clicked in the gap).
-  // delayMs    — optional flat override for inter-bubble delay; when null
+  // delayMs    - optional flat override for inter-bubble delay; when null
   //              (default) each gap is calculated from the previous bubble's
   //              length via calcDelay() using BLOOMIE_TIMING buckets.
   function say(lines, { delayMs = null, keepLocked = false } = {}) {
@@ -2672,7 +2674,7 @@ export function initBloomieChat({
 
   // Helper used by mode nodes to update userMode for the rest of the session
   function applySessionMode(mode) {
-    // Just update sessionMode — userMode uses getters derived from effectiveMode()
+    // Just update sessionMode - userMode uses getters derived from effectiveMode()
     // so all checks update automatically without any manual property assignment.
     ctx.sessionMode = mode;
     console.log("[Bloomie] session mode →", mode);
@@ -2813,7 +2815,7 @@ export function initBloomieChat({
         const firstUnresolved = prof.concernsUnresolved[0];
         const label = TOPIC_LABELS[firstUnresolved] || firstUnresolved;
         say([
-          "Before you go — you also mentioned " + label + " earlier. Do you want to quickly look at that too? 💗",
+          "Before you go - you also mentioned " + label + " earlier. Do you want to quickly look at that too? 💗",
         ], {
           choices: [
             { id: "yes_unresolved", label: "Yes, let’s look at that", next: "START_MENU" },
@@ -2827,10 +2829,10 @@ export function initBloomieChat({
 
     const node = NODES[nextState];
     if (!node) return;
-    // Fire onEnter hook — used by session mode setters and gate nodes
+    // Fire onEnter hook - used by session mode setters and gate nodes
     if (typeof node.onEnter === "function") {
       node.onEnter();
-      // Gate nodes (say: []) handle their own redirect inside onEnter — stop here
+      // Gate nodes (say: []) handle their own redirect inside onEnter - stop here
       if (Array.isArray(node.say) && node.say.length === 0) return;
     }
     clearTimers();
@@ -2902,10 +2904,10 @@ export function initBloomieChat({
 
   // ── Summary card builder ───────────────────────────────────────────────────
   // Produces an HTML string for the SUMMARY node bubble.
-  // All content is internally generated — never interpolates raw user text
+  // All content is internally generated - never interpolates raw user text
   // into HTML without going through escapeHtml().
   function buildSummaryCard() {
-    // ── Section 1: What I heard — detected symptoms ───────────────────────
+    // ── Section 1: What I heard - detected symptoms ───────────────────────
     const TOPIC_LABELS = {
       late_period:      "a late or missed period",
       heavy_bleeding:   "heavy or unusual bleeding",
@@ -2969,7 +2971,7 @@ export function initBloomieChat({
     return `
       <div class="summary-card">
         <div class="summary-header">Your session summary</div>
-        <p class="summary-disclaimer">This is not a diagnosis — it's a record of what we talked about 🩷</p>
+        <p class="summary-disclaimer">This is not a diagnosis - it's a record of what we talked about 🩷</p>
         <div class="summary-section">
           <div class="summary-section-title">What I heard</div>
           ${heardSection}
@@ -3030,7 +3032,7 @@ export function initBloomieChat({
         body: JSON.stringify(body),
       });
     } catch (_) {
-      // Silently swallow — feedback must never break the chat flow
+      // Silently swallow - feedback must never break the chat flow
     }
   }
 
@@ -3199,7 +3201,7 @@ export function initBloomieChat({
   // ---------- Conversation Nodes ----------
 
   // Returns a recall sentence if memory is recent and has symptom data, else null.
-  // e.g. "Last time we talked, you mentioned a missed period and nausea —
+  // e.g. "Last time we talked, you mentioned a missed period and nausea -
   //        is that still going on, or is something new coming up?"
   function buildRecallLine() {
     if (ctx.isAnon) return null;
@@ -3221,7 +3223,7 @@ export function initBloomieChat({
       ? labels[0]
       : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
 
-    return `Last time we talked, you mentioned **${list}** — is that still going on, or is something new coming up?`;
+    return `Last time we talked, you mentioned **${list}** - is that still going on, or is something new coming up?`;
   }
 
 

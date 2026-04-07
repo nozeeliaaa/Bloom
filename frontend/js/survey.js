@@ -1,5 +1,6 @@
 import { isAnonMode } from "./mode.js";
 import { setUserGoal } from "./goals.js";
+import { getIdToken } from "./auth.js";
 
 export function Survey() {
   return `
@@ -23,7 +24,7 @@ export function Survey() {
           </div>
 
           <div class="survey-meta">
-            <span id="surveyStepTag" class="survey-chip">Step 1 of 10</span>
+            <span id="surveyStepTag" class="survey-chip">Step 1 of 11</span>
             <span id="surveyHint" class="survey-hint"></span>
           </div>
 
@@ -92,6 +93,12 @@ export function mountSurvey() {
       return;
     }
 
+    if (current.type === "select") {
+      const el = document.getElementById(current.key);
+      if (el && el.value) answers[current.key] = el.value;
+      return;
+    }
+
     if (current.key === "lastPeriod") {
       const knows = document.querySelector(`input[name="knowsLastPeriod"]:checked`);
       if (knows) answers.knowsLastPeriod = knows.value;
@@ -102,8 +109,21 @@ export function mountSurvey() {
       const cycleLen = document.getElementById("cycleLength");
       if (cycleLen && cycleLen.value) answers.cycleLength = cycleLen.value;
 
+      const periodDur = document.getElementById("periodDuration");
+      if (periodDur && periodDur.value) answers.periodDuration = periodDur.value;
+
       const flow = document.querySelector(`input[name="flow"]:checked`);
       if (flow) answers.flow = flow.value;
+
+      return;
+    }
+
+    if (current.key === "bodyBasics") {
+      const w = document.getElementById("surveyWeight");
+      if (w && w.value) answers.surveyWeight = w.value;
+
+      const h = document.getElementById("surveyHeight");
+      if (h && h.value) answers.surveyHeight = h.value;
 
       return;
     }
@@ -117,6 +137,7 @@ export function mountSurvey() {
     if (step.autoAdvance === false) return false;
     if (step.type === "multi") return false;
     if (step.type === "range") return false;
+    if (step.type === "select") return false;
     if (step.key === "lastPeriod") return false;
     return true;
   }
@@ -148,16 +169,35 @@ export function mountSurvey() {
     btnNext.textContent = stepIndex === total - 1 ? (isAnonMode() ? "Finish" : "Continue") : "Next";
   }
 
-  function finish() {
-    saveAnswers(answers);
+  async function finish() {
+    // Coerce YOB to number before persisting
+    if (answers.yob) answers.yob = Number(answers.yob);
+
+    // Map survey keys → profile keys so profile page reads them correctly
+    if (answers.cycleLength)   answers.avgCycleLength = Number(answers.cycleLength);
+    if (answers.periodDuration) answers.periodDuration = Number(answers.periodDuration);
+    if (answers.surveyWeight)  answers.weightKg = Number(answers.surveyWeight);
+    if (answers.surveyHeight)  answers.heightCm = Number(answers.surveyHeight);
+
+    saveAnswers(answers); // also calls setUserGoal(answers.focusGoal)
     localStorage.setItem("bloom_onboarded", "1");
 
-    // anon users go straight to dashboard, account users can go to register if you want
-    if (isAnonMode()) window.location.href = "/pages/dashboard.html";
-    else window.location.href = "/pages/dashboard.html";
+    // Save LMP so pregnancy/cycle cards can use it immediately
+    if (answers.lastPeriodDate) {
+      localStorage.setItem("bloom_lmp", answers.lastPeriodDate);
+    }
+
+    if (answers.yob) {
+      localStorage.setItem("bloom_yob_locked", "true");
+    }
+
+    // Sync all profile data to backend (account mode only) - await so it completes before navigation
+    if (!isAnonMode()) await writeProfileToBackend(answers).catch(() => {});
+
+    window.location.href = "/pages/dashboard.html";
   }
 
-  function goNext() {
+  async function goNext() {
     readCurrentStepInputs();
     const current = steps[stepIndex];
     if (typeof current?.onNext === "function") current.onNext();
@@ -172,7 +212,7 @@ export function mountSurvey() {
     }
 
     if (stepIndex >= steps.length - 1) {
-      finish();
+      await finish();
       return;
     }
     stepIndex++;
@@ -212,8 +252,8 @@ export function mountSurvey() {
 
 /* ------------------ Step Builder (curated flow) ------------------ */
 function buildSteps(answers) {
-  const goals = Array.isArray(answers.goals) ? answers.goals : [];
-  const focus = answers.focusGoal || deriveFocusFromGoals(goals) || "track";
+  // focusGoal now uses real dashboard goal IDs directly
+  const focus = answers.focusGoal || "period";
 
   const base = [
     {
@@ -228,85 +268,58 @@ function buildSteps(answers) {
       },
     },
     {
-      key: "ageRange",
-      title: "What’s your age range?",
-      note: "This helps with safety + the right recommendations.",
+      key: "yob",
+      type: "select",
+      title: "What year were you born?",
+      note: "Helps us give you age-appropriate content. This can only be set once.",
       hint: "",
-      render: () =>
-        radioGroup(
-          "ageRange",
-          [
-            { label: "Under 18", value: "under18" },
-            { label: "18–24", value: "18-24" },
-            { label: "25–34", value: "25-34" },
-            { label: "35–44", value: "35-44" },
-            { label: "45+", value: "45plus" },
-            { label: "Prefer not to say", value: "na" },
-          ],
-          answers.ageRange
-        ),
+      autoAdvance: false,
+      render: () => yobSelectBlock(answers.yob),
     },
     {
-      key: "goals",
-      type: "multi",
-      title: "What can Bloom help you do?",
-      note: "Select all goals that apply.",
-      hint: "Select all that apply",
+      // Single step - directly picks the dashboard goal
+      key: "focusGoal",
+      title: "What would you like Bloom to focus on?",
+      note: "This sets up your dashboard. You can change it anytime.",
+      hint: "",
       autoAdvance: false,
       render: () =>
-        cardMultiSelect(
-          "goals",
+        cardRadio(
+          "focusGoal",
           [
-            { label: "Track my period", value: "track", icon: "🗓️" },
-            { label: "Symptoms & relief", value: "symptoms", icon: "🩷" },
-            { label: "Fertility / trying", value: "fertility", icon: "🌱" },
-            { label: "Menopause / changes", value: "menopause", icon: "🌙" },
-            { label: "Understand my body", value: "understand", icon: "🧠" },
-            { label: "Just exploring", value: "exploring", icon: "✨" },
+            { value: "period",        icon: "🗓️", title: "Track my period",              desc: "Cycle predictions, phases, and period timing" },
+            { value: "no_period",     icon: "🩷", title: "Track symptoms",               desc: "Log symptoms and patterns without period predictions" },
+            { value: "ttc",           icon: "🌱", title: "Try to conceive",              desc: "Fertility window, ovulation insights, and timing tools" },
+            { value: "perimenopause", icon: "🌙", title: "Track menopause / perimenopause", desc: "Cycle changes, hot flashes, and transitions" },
+            { value: "pregnancy",     icon: "🤰", title: "Track my pregnancy",           desc: "Due date, trimester milestones, and pregnancy logs" },
           ],
-          answers.goals
+          answers.focusGoal || "period"
         ),
       onNext: () => {
-        const picked = Array.isArray(answers.goals) ? answers.goals : [];
-        if (!picked.length) answers.goals = ["track"];
-        answers.focusGoal = answers.focusGoal || deriveFocusFromGoals(answers.goals) || "track";
+        answers.focusGoal = answers.focusGoal || "period";
       },
-    },
-    {
-      key: "focusGoal",
-      title: "Which one should Bloom focus on first?",
-      note: "This decides what questions we ask next.",
-      hint: "",
-      render: () => {
-        const picked = Array.isArray(answers.goals) ? answers.goals : [];
-        const opts = mapGoalsToCards(picked.length ? picked : ["track"]);
-        return cardRadio("focusGoal", opts, answers.focusGoal || deriveFocusFromGoals(picked) || "track");
-      },
-      onNext: () => {
-        answers.focusGoal = answers.focusGoal || deriveFocusFromGoals(answers.goals) || "track";
-      },
-    },
-    {
-      key: "periodTracking",
-      title: "Do you track your periods right now?",
-      note: "No judgment — this helps us meet you where you are.",
-      hint: "",
-      render: () =>
-        radioGroup(
-          "periodTracking",
-          [
-            { label: "Yes, I already track", value: "yes" },
-            { label: "Sometimes / not consistently", value: "sometimes" },
-            { label: "No, I don’t track", value: "no" },
-          ],
-          answers.periodTracking
-        ),
     },
   ];
 
   const curated = [];
 
-  if (focus === "track") {
+  // Steps only relevant when tracking periods, trying to conceive, or pregnancy
+  if (["period", "ttc", "pregnancy"].includes(focus)) {
+    curated.push({
+      key: "lastPeriod",
+      title: "Last period + basics",
+      note: "Optional details that improve tracking (best guess is fine).",
+      hint: "",
+      autoAdvance: false,
+      render: () => lastPeriodBlock(answers),
+      onNext: () => {
+        answers.knowsLastPeriod = answers.knowsLastPeriod || "na";
+      },
+    });
+  }
+
+  // Regularity + reminders only for period tracking and TTC
+  if (["period", "ttc"].includes(focus)) {
     curated.push(
       {
         key: "regularity",
@@ -334,10 +347,10 @@ function buildSteps(answers) {
           cardRadio(
             "reminders",
             [
-              { value: "period", icon: "🔔", title: "Period start reminders", desc: "Heads-up before it begins" },
-              { value: "ovulation", icon: "🌸", title: "Ovulation window", desc: "Optional — for planning" },
-              { value: "both", icon: "✨", title: "Both", desc: "Period + ovulation window" },
-              { value: "none", icon: "🫶", title: "No reminders", desc: "Keep it quiet for now" },
+              { value: "period",    icon: "🔔", title: "Period start reminders", desc: "Heads-up before it begins" },
+              { value: "ovulation", icon: "🌸", title: "Ovulation window",       desc: "For planning ahead" },
+              { value: "both",      icon: "✨", title: "Both",                   desc: "Period + ovulation window" },
+              { value: "none",      icon: "🫶", title: "No reminders",           desc: "Keep it quiet for now" },
             ],
             answers.reminders || "period"
           ),
@@ -345,27 +358,14 @@ function buildSteps(answers) {
     );
   }
 
-  // keep your existing curated sections…
-  // (Your snippet continues, so keep the rest of your file as-is.)
-  // IMPORTANT: Do NOT reintroduce location.hash anywhere.
-
   const tail = [
     {
-      key: "surprise",
-      title: "Has your period ever caught you by surprise?",
-      note: "We can improve predictions and reminders.",
-      hint: "",
-      render: () =>
-        radioGroup(
-          "surprise",
-          [
-            { label: "Yes, sometimes", value: "sometimes" },
-            { label: "Yes, often", value: "often" },
-            { label: "Rarely / no", value: "rarely" },
-            { label: "Prefer not to answer", value: "na" },
-          ],
-          answers.surprise
-        ),
+      key: "bodyBasics",
+      title: "A few optional details",
+      note: "Helps personalise insights. All fields are optional - you can fill these in later from your profile.",
+      hint: "All optional",
+      autoAdvance: false,
+      render: () => bodyBasicsBlock(answers),
     },
     {
       key: "privacyPref",
@@ -376,23 +376,12 @@ function buildSteps(answers) {
         cardRadio(
           "privacyPref",
           [
-            { value: "lowkey", icon: "🫶", title: "Low-key", desc: "Minimal notifications" },
-            { value: "balanced", icon: "✨", title: "Balanced", desc: "Helpful reminders" },
-            { value: "high", icon: "🔒", title: "High privacy", desc: "Keep it discreet" },
+            { value: "lowkey",   icon: "🫶", title: "Low-key",       desc: "Minimal notifications" },
+            { value: "balanced", icon: "✨", title: "Balanced",      desc: "Helpful reminders" },
+            { value: "high",     icon: "🔒", title: "High privacy",  desc: "Keep it discreet" },
           ],
           answers.privacyPref || "balanced"
         ),
-    },
-    {
-      key: "lastPeriod",
-      title: "Last period + basics",
-      note: "Optional details that improve tracking (best guess is fine).",
-      hint: "",
-      autoAdvance: false,
-      render: () => lastPeriodBlock(answers),
-      onNext: () => {
-        answers.knowsLastPeriod = answers.knowsLastPeriod || "na";
-      },
     },
   ];
 
@@ -404,6 +393,61 @@ function buildSteps(answers) {
 // consentCard, cardRadio, radioGroup, rangeBlock, lastPeriodBlock, cardMultiSelect,
 // wireRangeLabels, deriveFocusFromGoals, mapGoalsToCards, loadAnswers, saveAnswers,
 // escapeHtml, escapeAttr
+
+function yobSelectBlock(selectedYear) {
+  const currentYear = new Date().getFullYear();
+  const opts = ['<option value="">- Select year -</option>'];
+  for (let y = currentYear; y >= 1930; y--) {
+    const sel = String(selectedYear) === String(y) ? "selected" : "";
+    opts.push(`<option value="${y}" ${sel}>${y}</option>`);
+  }
+  return `
+    <div style="margin-top:14px;">
+      <select id="yob" class="input" style="width:100%;padding:10px 14px;font-size:1rem;border-radius:12px;border:1px solid rgba(0,0,0,0.12);background:#fff;color:#333;">
+        ${opts.join("")}
+      </select>
+      <div class="tiny-note" style="margin-top:8px;opacity:0.8;">Optional - you can skip this. Once set, it can only be changed by contacting support.</div>
+    </div>
+  `;
+}
+
+async function writeProfileToBackend(answers) {
+  try {
+    const token = await getIdToken();
+    if (!token) return;
+    const apiBase = window.BLOOM_API_BASE || "";
+    const payload = {};
+    if (answers.focusGoal)     payload.goal           = answers.focusGoal;
+    if (answers.yob)           payload.yearOfBirth    = Number(answers.yob);
+    if (answers.nickname)      payload.nickname       = answers.nickname;
+    if (answers.avgCycleLength) payload.avgCycleLength = Number(answers.avgCycleLength);
+    if (answers.periodDuration) payload.periodDuration = Number(answers.periodDuration);
+    if (answers.weightKg)      payload.weightKg       = Number(answers.weightKg);
+    if (answers.heightCm)      payload.heightCm       = Number(answers.heightCm);
+    await fetch(`${apiBase}/api/user/profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // silently fail - localStorage is the source of truth on this device
+  }
+}
+
+async function writeYobToBackend(yearOfBirth) {
+  try {
+    const token = await getIdToken();
+    if (!token) return;
+    const apiBase = window.BLOOM_API_BASE || "";
+    await fetch(`${apiBase}/api/user/profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ yearOfBirth }),
+    });
+  } catch {
+    // silently fail - localStorage is the source of truth on this device
+  }
+}
 
 function consentCard() {
   return `
@@ -500,6 +544,7 @@ function lastPeriodBlock(answers) {
   const knows = answers.knowsLastPeriod || "na";
   const dateVal = answers.lastPeriodDate || "";
   const cycleLen = answers.cycleLength || "";
+  const periodDur = answers.periodDuration || "";
   const flowVal = answers.flow || "";
 
   return `
@@ -534,7 +579,7 @@ function lastPeriodBlock(answers) {
           padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
           background:rgba(255,255,255,0.92);
         ">
-          <div class="tiny-note" style="margin-bottom:8px;">Average cycle length (optional)</div>
+          <div class="tiny-note" style="margin-bottom:8px;">Average cycle length in days (optional)</div>
           <input
             id="cycleLength"
             type="number"
@@ -547,6 +592,25 @@ function lastPeriodBlock(answers) {
             style="width:100%;"
           />
           <div class="tiny-note" style="margin-top:8px; opacity:0.8;">Leave blank if unsure.</div>
+        </div>
+
+        <div style="
+          padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
+          background:rgba(255,255,255,0.92);
+        ">
+          <div class="tiny-note" style="margin-bottom:8px;">Typical period duration in days (optional)</div>
+          <input
+            id="periodDuration"
+            type="number"
+            inputmode="numeric"
+            placeholder="e.g., 5"
+            min="1"
+            max="14"
+            value="${escapeAttr(periodDur)}"
+            class="input"
+            style="width:100%;"
+          />
+          <div class="tiny-note" style="margin-top:8px; opacity:0.8;">How many days it usually lasts.</div>
         </div>
       </div>
 
@@ -570,36 +634,52 @@ function lastPeriodBlock(answers) {
   `;
 }
 
-function cardMultiSelect(key, options, selectedValues) {
-  const picked = Array.isArray(selectedValues)
-    ? selectedValues
-    : selectedValues
-    ? [selectedValues]
-    : [];
+function bodyBasicsBlock(answers) {
+  const weight = answers.surveyWeight || "";
+  const height = answers.surveyHeight || "";
 
   return `
-    <div class="q-2col">
-      ${options
-        .map((opt) => {
-          const checked = picked.includes(opt.value) ? "checked" : "";
-          return `
-            <label class="cardPick">
-              <input
-                type="checkbox"
-                name="${key}[]"
-                value="${escapeAttr(opt.value)}"
-                ${checked}
-              />
-              <div class="cardPick__dot" aria-hidden="true"></div>
-              <div class="cardPick__icon">${opt.icon}</div>
-              <div class="cardPick__meta">
-                <div class="cardPick__title">${escapeHtml(opt.label)}</div>
-                <div class="cardPick__desc">Tap to select</div>
-              </div>
-            </label>
-          `;
-        })
-        .join("")}
+    <div style="display:grid; gap:14px; margin-top:14px;">
+      <div class="miniGrid">
+        <div style="
+          padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
+          background:rgba(255,255,255,0.92);
+        ">
+          <div class="tiny-note" style="margin-bottom:8px;">Weight in kg (optional)</div>
+          <input
+            id="surveyWeight"
+            type="number"
+            inputmode="decimal"
+            placeholder="e.g., 60"
+            min="20"
+            max="300"
+            step="0.1"
+            value="${escapeAttr(weight)}"
+            class="input"
+            style="width:100%;"
+          />
+        </div>
+
+        <div style="
+          padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
+          background:rgba(255,255,255,0.92);
+        ">
+          <div class="tiny-note" style="margin-bottom:8px;">Height in cm (optional)</div>
+          <input
+            id="surveyHeight"
+            type="number"
+            inputmode="decimal"
+            placeholder="e.g., 165"
+            min="50"
+            max="272"
+            step="0.1"
+            value="${escapeAttr(height)}"
+            class="input"
+            style="width:100%;"
+          />
+        </div>
+      </div>
+      <div class="tiny-note" style="text-align:center; opacity:0.75;">You can change units (kg/lb, cm/ft) any time on your profile page.</div>
     </div>
   `;
 }
@@ -616,26 +696,6 @@ function wireRangeLabels(step) {
   sync();
 }
 
-function deriveFocusFromGoals(goals) {
-  const g = Array.isArray(goals) ? goals : [];
-  const priority = ["symptoms", "fertility", "menopause", "track", "understand", "exploring"];
-  return priority.find((p) => g.includes(p)) || "";
-}
-
-function mapGoalsToCards(goalValues) {
-  const all = {
-    track: { value: "track", icon: "🗓️", title: "Period tracking", desc: "Predictions, reminders, patterns" },
-    symptoms: { value: "symptoms", icon: "🩷", title: "Symptoms & relief", desc: "Cramps, mood, bloating, headaches" },
-    fertility: { value: "fertility", icon: "🌱", title: "Fertility / trying", desc: "Cycle insights + timing support" },
-    menopause: { value: "menopause", icon: "🌙", title: "Menopause / changes", desc: "Transitions, hot flashes, sleep" },
-    understand: { value: "understand", icon: "🧠", title: "Understand my body", desc: "Education + what’s “normal”" },
-    exploring: { value: "exploring", icon: "✨", title: "Just exploring", desc: "Low-pressure setup" },
-  };
-  const unique = Array.from(new Set(goalValues || []));
-  const cards = unique.map((k) => all[k]).filter(Boolean);
-  return cards.length ? cards : [all.track];
-}
-
 /* ------------------ storage ------------------ */
 function loadAnswers() {
   try {
@@ -646,7 +706,7 @@ function loadAnswers() {
 }
 function saveAnswers(obj) {
   localStorage.setItem("bloom_profile", JSON.stringify(obj || {}));
-  setUserGoal(answers.focusGoal);
+  setUserGoal((obj || {}).focusGoal);
 }
 
 /* ------------------ safety helpers ------------------ */

@@ -1,5 +1,5 @@
 /**
- * fertility.js — TTC-only tools page
+ * fertility.js - TTC-only tools page
  * Account mode only + goal must be "ttc"
  */
 

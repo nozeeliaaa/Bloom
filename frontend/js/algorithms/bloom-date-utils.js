@@ -11,8 +11,8 @@
  *   computePhaseConfidence(result)  → "low" | "medium" | "high"
  *
  * ParseResult shapes:
- *   { date: Date, approximate: boolean }   — resolved date
- *   { forgotten: true }                    — user doesn't know the date
+ *   { date: Date, approximate: boolean }   - resolved date
+ *   { forgotten: true }                    - user doesn't know the date
  *
  * ValidationResult shapes:
  *   { valid: true }
@@ -70,9 +70,9 @@ const FORGOTTEN_RE = /\b(i forgot|i forget|can'?t remember|not sure|i don'?t kno
  * @param  {string}  text   - Raw (or normalised) user input
  * @param  {Date}    today  - Reference date (defaults to now)
  * @returns {ParseResult | null}
- *   { date, approximate }  — resolved date
- *   { forgotten: true }    — user can't recall
- *   null                   — not a date expression
+ *   { date, approximate }  - resolved date
+ *   { forgotten: true }    - user can't recall
+ *   null                   - not a date expression
  */
 export function parseNaturalDate(text, today = new Date()) {
   if (!text || typeof text !== "string") return null;
@@ -144,7 +144,7 @@ export function parseNaturalDate(text, today = new Date()) {
     if (new RegExp(`\\blate\\s+${name}\\b`).test(t))
       return { date: new Date(refYear, num - 1, 25),   approximate: true  };
 
-    // Bare month name only — no positional qualifier
+    // Bare month name only - no positional qualifier
     return { date: new Date(refYear, num - 1, 1), approximate: true };
   }
 
@@ -216,7 +216,7 @@ export function validateCycleDate({
       return {
         valid: true,
         staleData: true,
-        message: "Your last logged period was a while ago — logging a more recent one will help Bloom give you better predictions 🩷",
+        message: "Your last logged period was a while ago - logging a more recent one will help Bloom give you better predictions 🩷",
       };
     }
   }

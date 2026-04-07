@@ -1,7 +1,8 @@
 /**
  * Shared utility functions: nav, footer, date helpers
  */
-import { isAccountMode } from "./mode.js";
+import { isAccountMode, isAnonMode } from "./mode.js";
+import { getUser } from "./auth.js";
 import { initTheme } from "./theme-manager.js";
 
 // ✅ Single source of truth for this key
@@ -23,6 +24,7 @@ export const ICONS = {
   shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
   admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z"/><path d="M9 12l2 2 4-4"/></svg>`,
   bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+  help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
 };
 
 export function icon(name, size = 18) {
@@ -37,24 +39,31 @@ export function renderNav(activePage = "") {
   nav.setAttribute("role", "navigation");
   nav.setAttribute("aria-label", "Main navigation");
 
-  const links = [
+  const anon = isAnonMode();
+
+  const allLinks = [
     { href: "/pages/dashboard.html", label: "Dashboard", icon: "home", page: "dashboard" },
-    { href: "/pages/calendar.html", label: "Calendar", icon: "calendar", page: "calendar" },
-    { href: "/pages/assistant.html", label: "Bloomie", icon: "chat", page: "assistant" },
-    { href: "/pages/pamphlets.html", label: "Learn", icon: "book", page: "pamphlets" },
-    { href: "/pages/clinics.html", label: "Clinics", icon: "mapPin", page: "clinics" },
+    { href: "/pages/calendar.html",  label: "Calendar",  icon: "calendar", page: "calendar" },
+    { href: "/pages/assistant.html", label: "Bloomie",   icon: "chat", page: "assistant", accountOnly: true },
+    { href: "/pages/pamphlets.html", label: "Learn",     icon: "book", page: "pamphlets" },
+    { href: "/pages/clinics.html",   label: "Clinics",   icon: "mapPin", page: "clinics" },
   ];
+
+  const links = allLinks.filter(l => !l.accountOnly || !anon);
 
   // ✅ Admin link: account-only + cached flag set by auth.js
   const showAdmin = isAccountMode() && localStorage.getItem("bloom_is_admin") === "1";
   if (showAdmin) links.push({ href: "/pages/admin.html", label: "Admin", icon: "admin", page: "admin" });
 
   const avatar = localStorage.getItem("bloom_avatar") || "👤";
-  const profileBtn = `
-    <a href="/pages/profile.html" class="nav-avatar ${activePage === "profile" ? "active" : ""}" aria-label="Open profile">
-      <span class="nav-avatar-circle">${avatar}</span>
-    </a>
-  `;
+
+  // Account mode: avatar + logout button
+  // Anon mode: "Create an account" outline button
+  const profileSection = anon
+    ? `<a href="/pages/register.html" class="btn btn-outline btn-sm nav-login-btn">Create an account</a>`
+    : `<a href="/pages/profile.html" class="nav-avatar ${activePage === 'profile' ? 'active' : ''}" aria-label="Open profile">
+        <span class="nav-avatar-circle">${avatar}</span>
+      </a>`;
 
   nav.innerHTML = `
     <div class="navbar-inner">
@@ -88,7 +97,7 @@ export function renderNav(activePage = "") {
             <div id="notif-list" class="notif-list"></div>
           </div>
         </div>
-        ${profileBtn}
+        ${profileSection}
       </div>
     </div>
   `;
@@ -106,6 +115,29 @@ export function renderNav(activePage = "") {
   linkContainer.querySelectorAll("a").forEach((a) => {
     a.addEventListener("click", () => linkContainer.classList.remove("open"));
   });
+
+  // ── Back button (inject for non-primary pages) ───────────────────────────
+  const PRIMARY_PAGES = new Set(["dashboard", "calendar", "assistant", "pamphlets", "clinics", ""]);
+  if (!PRIMARY_PAGES.has(activePage)) {
+    const back = document.createElement("div");
+    back.className = "back-btn-wrap";
+    back.innerHTML = `
+      <button class="back-btn" type="button" aria-label="Go back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>`;
+    back.querySelector(".back-btn").addEventListener("click", () => {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = "/pages/dashboard.html";
+      }
+    });
+    // Insert at top of <main> if present, else after <nav>
+    const main = document.querySelector("main");
+    if (main) main.prepend(back);
+    else nav.insertAdjacentElement("afterend", back);
+  }
 
   // ── Notification bell logic ──────────────────────────────────────────────
   const INBOX_KEY = "bloom_notification_inbox";
@@ -206,6 +238,17 @@ export function renderFooter() {
   footer.setAttribute("role", "contentinfo");
   footer.innerHTML = `
     <p class="footer-disclaimer">${icon("shield", 14)} Bloom is an educational tool and does not provide medical diagnoses. Always consult a qualified healthcare provider for medical advice.</p>
+    <nav class="footer-legal" aria-label="Legal links">
+      <a href="/pages/privacy.html">Privacy Policy</a>
+      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <a href="/pages/terms.html">Terms of Use</a>
+      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <a href="/pages/accessibility.html">Accessibility</a>
+      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <a href="/pages/cookie-policy.html">Cookie Policy</a>
+      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <a href="/pages/about-us.html">About Us</a>
+    </nav>
   `;
   document.body.appendChild(footer);
 }
@@ -214,23 +257,20 @@ export function renderFooter() {
 export function renderModeBanner(container) {
   if (!container) return;
 
-  if (localStorage.getItem(MODE_BANNER_ONCE_KEY) !== "1") {
-    container.innerHTML = "";
+  // Consent status banner - shown to teens with a pending approval request
+  const _consentUser = getUser();
+  const _consentKey  = _consentUser ? `bloom_consent_status_${_consentUser.uid}` : null;
+  const consentStatus = _consentKey ? localStorage.getItem(_consentKey) : null;
+  if (consentStatus === "pending") {
+    container.innerHTML = `
+      <div class="banner banner-warning" role="status">
+        ⏳ Your account is waiting for guardian approval.
+        <a href="/pages/consent-pending.html" style="font-weight:700;margin-left:0.5rem;">View status</a>
+      </div>
+    `;
     return;
   }
 
-  localStorage.removeItem(MODE_BANNER_ONCE_KEY);
-
-  if (!isAccountMode()) {
-    container.innerHTML = "";
-    return;
-  }
-
-  container.innerHTML = `
-    <div class="banner banner-success">
-      ✅ Synced to cloud. Your data is backed up securely.
-    </div>
-  `;
 }
 
 /* ===== DATE HELPERS ===== */
@@ -281,6 +321,84 @@ export const SYMPTOM_CATEGORIES = {
   "Social":         ["Sociable", "Withdrawn"],
   "Cycle":          ["Missed period", "Irregular period"],
   "Fertility":      ["Increased libido", "Decreased libido", "Cervical mucus change", "Vaginal dryness", "Pain during sex"],
+};
+
+/** Health-icons path for each symptom label (resolvetosavelives/healthicons) */
+const _HI = 'https://raw.githubusercontent.com/resolvetosavelives/healthicons/main/public/icons/svg/filled';
+export const SYMPTOM_ICONS = {
+  // Bleeding
+  "Vaginal bleeding":      `${_HI}/body/blood-drop.svg`,
+  "Spotting":              `${_HI}/body/blood-drop.svg`,
+  "Heavy flow":            `${_HI}/body/blood-drop.svg`,
+  "Large clots":           `${_HI}/body/blood-cells.svg`,
+  // Pain
+  "Cramps":                `${_HI}/conditions/intestinal-pain.svg`,
+  "Pelvic pain":           `${_HI}/conditions/intestinal-pain.svg`,
+  "Ovulation pain":        `${_HI}/body/female-reproductive_system.svg`,
+  "Headache":              `${_HI}/conditions/headache.svg`,
+  "Joint or muscle pain":  `${_HI}/body/joints.svg`,
+  "Breast tenderness":     `${_HI}/body/breasts.svg`,
+  // Digestive
+  "Bloating":              `${_HI}/body/stomach.svg`,
+  "Gassy":                 `${_HI}/body/intestine.svg`,
+  "Heartburn":             `${_HI}/body/stomach.svg`,
+  "Nausea":                `${_HI}/conditions/nausea.svg`,
+  "Constipation":          `${_HI}/body/intestine.svg`,
+  "Diarrhea":              `${_HI}/conditions/diarrhea.svg`,
+  // Discharge
+  "No discharge":          `${_HI}/body/vagina.svg`,
+  "Sticky discharge":      `${_HI}/body/vagina.svg`,
+  "Creamy discharge":      `${_HI}/body/vagina.svg`,
+  "Egg-white discharge":   `${_HI}/body/vagina-alt.svg`,
+  "Unusual discharge":     `${_HI}/conditions/sti.svg`,
+  // Energy & Sleep
+  "Fatigue":               `${_HI}/emotions/sleepy.svg`,
+  "Insomnia":              `${_HI}/emotions/woozy.svg`,
+  "Brain fog":             `${_HI}/emotions/dizzy.svg`,
+  "Forgetfulness":         `${_HI}/body/neurology.svg`,
+  "Poor concentration":    `${_HI}/body/neurology.svg`,
+  // Mood
+  "Mood swings":           `${_HI}/emotions/woozy.svg`,
+  "Irritability":          `${_HI}/emotions/angry.svg`,
+  "Anxiety":               `${_HI}/emotions/nervous.svg`,
+  "Low mood":              `${_HI}/emotions/sad.svg`,
+  "Crying spells":         `${_HI}/emotions/crying.svg`,
+  "Calm":                  `${_HI}/emotions/calm.svg`,
+  "Stressed":              `${_HI}/emotions/not-ok.svg`,
+  // Skin & Hair
+  "Acne":                  `${_HI}/conditions/allergies.svg`,
+  "Dry skin":              `${_HI}/conditions/dry-eyes.svg`,
+  "Hair thinning":         `${_HI}/body/head.svg`,
+  // Temperature
+  "Hot flashes":           `${_HI}/emotions/sweating.svg`,
+  "Night sweats":          `${_HI}/emotions/sweating.svg`,
+  "Cold flashes":          `${_HI}/conditions/chills.svg`,
+  "Basal temp shift":      `${_HI}/emotions/fever.svg`,
+  // Cravings
+  "Sweet cravings":        `${_HI}/nutrition/sugar.svg`,
+  "Salty cravings":        `${_HI}/nutrition/nutrition.svg`,
+  "Greasy food cravings":  `${_HI}/nutrition/unhealthy-food.svg`,
+  "Spicy food cravings":   `${_HI}/nutrition/hot-meal.svg`,
+  "Increased appetite":    `${_HI}/nutrition/nutrition.svg`,
+  "Decreased appetite":    `${_HI}/nutrition/nutrition.svg`,
+  // Physical
+  "Fluid retention":       `${_HI}/body/kidneys.svg`,
+  "Frequent urination":    `${_HI}/body/bladder.svg`,
+  "Smell sensitivity":     `${_HI}/body/nose.svg`,
+  "Nasal congestion":      `${_HI}/body/nose.svg`,
+  "Weight change":         `${_HI}/conditions/overweight.svg`,
+  // Social
+  "Sociable":              `${_HI}/emotions/happy.svg`,
+  "Withdrawn":             `${_HI}/emotions/neutral.svg`,
+  // Cycle
+  "Missed period":         `${_HI}/body/female-reproductive_system.svg`,
+  "Irregular period":      `${_HI}/body/female-reproductive_system.svg`,
+  // Fertility
+  "Increased libido":      `${_HI}/emotions/happy.svg`,
+  "Decreased libido":      `${_HI}/emotions/sad.svg`,
+  "Cervical mucus change": `${_HI}/body/vagina-alt.svg`,
+  "Vaginal dryness":       `${_HI}/conditions/dry-mouth.svg`,
+  "Pain during sex":       `${_HI}/conditions/pain.svg`,
 };
 
 export const SYMPTOMS = Object.values(SYMPTOM_CATEGORIES).flat();

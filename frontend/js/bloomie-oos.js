@@ -221,7 +221,15 @@ export function createOOS(env) {
     // ── Greetings ─────────────────────────────────────────────────────────
     {
       name: "greeting",
-      patterns: [/^(hi|hello|hey|yo|sup|hiya|morning|afternoon|evening)$/, /^\b(hi|hello|hey|yo|sup|hiya)\b\s*$/, /\b(wah gwaan|wagwaan|wha gwan|howdy)\b/],
+      patterns: [
+        /^(hi|hello|hey|yo|sup|hiya|morning|afternoon|evening)$/,
+        /^\b(hi|hello|hey|yo|sup|hiya)\b\s*$/,
+        /\b(wah gwaan|wagwaan|wha gwan|howdy)\b/,
+        /^h+i+[!.\s]*$/i,      // hii, hiii, hiiii…
+        /^h+e+y+[!.\s]*$/i,    // heyy, heyyy…
+        /^h+e+l+o+[!.\s]*$/i,  // helloo, helloooo…
+        /^y+o+[!.\s]*$/i,      // yoo, yooo…
+      ],
       replies: [
         () => ctx.greeted
           ? pick([

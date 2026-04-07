@@ -10,7 +10,7 @@ import { createCtx } from "../bloomie-session.js";
 
 // ─── fuzzyCorrect ─────────────────────────────────────────────────────────────
 
-describe("fuzzyCorrect — exact matches", () => {
+describe("fuzzyCorrect - exact matches", () => {
   it("returns the term itself when input is already correct", () => {
     expect(fuzzyCorrect("pregnancy")).toBe("pregnancy");
     expect(fuzzyCorrect("period")).toBe("period");
@@ -21,7 +21,7 @@ describe("fuzzyCorrect — exact matches", () => {
   });
 });
 
-describe("fuzzyCorrect — threshold=1 for tokens < 8 chars", () => {
+describe("fuzzyCorrect - threshold=1 for tokens < 8 chars", () => {
   it("corrects a dropped letter in a short term", () => {
     expect(fuzzyCorrect("dizy")).toBe("dizzy");       // 4 chars, dist 1
     expect(fuzzyCorrect("perod")).toBe("period");     // 5 chars, dist 1
@@ -29,7 +29,7 @@ describe("fuzzyCorrect — threshold=1 for tokens < 8 chars", () => {
   });
 
   it("corrects transpositions in short terms via phonetic table (Damerau-Levenshtein)", () => {
-    // "peroid" is in PHONETIC_VARIANTS — caught before Levenshtein runs.
+    // "peroid" is in PHONETIC_VARIANTS - caught before Levenshtein runs.
     expect(fuzzyCorrect("peroid")).toBe("period");
   });
 
@@ -39,7 +39,7 @@ describe("fuzzyCorrect — threshold=1 for tokens < 8 chars", () => {
   });
 });
 
-describe("fuzzyCorrect — threshold=2 for tokens ≥ 8 chars", () => {
+describe("fuzzyCorrect - threshold=2 for tokens ≥ 8 chars", () => {
   it("corrects a single dropped letter in a long term", () => {
     expect(fuzzyCorrect("pregnacy")).toBe("pregnancy");   // 8 chars, dist 1
     expect(fuzzyCorrect("spoting")).toBe("spotting");     // 7 chars but dist 1 ≤ threshold 1
@@ -55,7 +55,7 @@ describe("fuzzyCorrect — threshold=2 for tokens ≥ 8 chars", () => {
   });
 });
 
-describe("fuzzyCorrect — null cases", () => {
+describe("fuzzyCorrect - null cases", () => {
   it("returns null for unrelated words", () => {
     expect(fuzzyCorrect("hello")).toBeNull();
     expect(fuzzyCorrect("cat")).toBeNull();
@@ -73,11 +73,11 @@ describe("fuzzyCorrect — null cases", () => {
   });
 });
 
-// ─── normalizePatois — medical misspelling correction end-to-end ──────────────
+// ─── normalizePatois - medical misspelling correction end-to-end ──────────────
 // normalizePatois() calls fuzzyCorrect() internally (Stage 3), so the full
 // pipeline result is available from a single normalizePatois() call.
 
-describe("normalizePatois — medical term fuzzy correction end-to-end", () => {
+describe("normalizePatois - medical term fuzzy correction end-to-end", () => {
   it("corrects a misspelled medical term in plain English input", () => {
     const result = normalizePatois("i have been spoting between my periods");
     expect(result).toMatch(/spotting/);
@@ -100,9 +100,9 @@ describe("normalizePatois — medical term fuzzy correction end-to-end", () => {
   });
 });
 
-// ─── normalizePatois — Patois pipeline unchanged ─────────────────────────────
+// ─── normalizePatois - Patois pipeline unchanged ─────────────────────────────
 
-describe("normalizePatois — Patois normalisation still works", () => {
+describe("normalizePatois - Patois normalisation still works", () => {
   it("translates a basic Patois phrase", () => {
     const result = normalizePatois("mi belly a hurt");
     expect(result).toMatch(/stomach pain|cramp/i);
@@ -131,7 +131,7 @@ describe("detectPatois", () => {
 
 // ─── detectUserTone ───────────────────────────────────────────────────────────
 
-describe("detectUserTone — distressed", () => {
+describe("detectUserTone - distressed", () => {
   it("detects English distress signals", () => {
     expect(detectUserTone("i don't know what to do i'm so scared")).toBe("distressed");
     expect(detectUserTone("i'm freaking out right now")).toBe("distressed");
@@ -145,7 +145,7 @@ describe("detectUserTone — distressed", () => {
   });
 });
 
-describe("detectUserTone — frustrated", () => {
+describe("detectUserTone - frustrated", () => {
   it("detects repeated-issue frustration", () => {
     expect(detectUserTone("this keeps happening every single time")).toBe("frustrated");
     expect(detectUserTone("sick and tired of dealing with this again")).toBe("frustrated");
@@ -156,7 +156,7 @@ describe("detectUserTone — frustrated", () => {
   });
 });
 
-describe("detectUserTone — exhausted", () => {
+describe("detectUserTone - exhausted", () => {
   it("detects English exhaustion signals", () => {
     expect(detectUserTone("i'm exhausted and can't deal with this anymore")).toBe("exhausted");
     expect(detectUserTone("i feel drained i have no energy")).toBe("exhausted");
@@ -169,14 +169,14 @@ describe("detectUserTone — exhausted", () => {
   });
 });
 
-describe("detectUserTone — angry", () => {
+describe("detectUserTone - angry", () => {
   it("detects anger signals", () => {
     expect(detectUserTone("i'm so vex right now this is ridiculous")).toBe("angry");
     expect(detectUserTone("mi vex bad, not fair at all")).toBe("angry");
   });
 });
 
-describe("detectUserTone — casual", () => {
+describe("detectUserTone - casual", () => {
   it("detects casual tone by keywords", () => {
     expect(detectUserTone("omg lol okay what")).toBe("casual");
     expect(detectUserTone("bruh idk what to think")).toBe("casual");
@@ -188,7 +188,7 @@ describe("detectUserTone — casual", () => {
   });
 });
 
-describe("detectUserTone — neutral", () => {
+describe("detectUserTone - neutral", () => {
   it("returns neutral for plain health questions", () => {
     expect(detectUserTone("my period is 5 days late and i am wondering what might be causing it")).toBe("neutral");
     expect(detectUserTone("i have been experiencing spotting between my periods for two weeks")).toBe("neutral");
@@ -200,9 +200,9 @@ describe("detectUserTone — neutral", () => {
   });
 });
 
-describe("detectUserTone — priority ordering", () => {
+describe("detectUserTone - priority ordering", () => {
   it("distressed takes priority over casual short-message rule", () => {
-    // "help me" is ≤ 40 chars AND matches distressed — distressed wins
+    // "help me" is ≤ 40 chars AND matches distressed - distressed wins
     expect(detectUserTone("help me")).toBe("distressed");
   });
 
@@ -213,7 +213,7 @@ describe("detectUserTone — priority ordering", () => {
 
 // ─── NEW: weighted matching and overlap resolution ─────────────────────────────
 
-describe("detectUserTone — casual + distressed overlap", () => {
+describe("detectUserTone - casual + distressed overlap", () => {
   it("'lol I'm scared' → distressed (not casual)", () => {
     // A single casual word must not override a clear distress signal
     expect(detectUserTone("lol I'm scared")).toBe("distressed");
@@ -228,7 +228,7 @@ describe("detectUserTone — casual + distressed overlap", () => {
   });
 });
 
-describe("detectUserTone — 'mi weak' casual slang vs fatigue context", () => {
+describe("detectUserTone - 'mi weak' casual slang vs fatigue context", () => {
   it("'mi weak' alone → casual (Patois laughing slang, no fatigue signals)", () => {
     expect(detectUserTone("mi weak")).toBe("casual");
   });
@@ -244,7 +244,7 @@ describe("detectUserTone — 'mi weak' casual slang vs fatigue context", () => {
   });
 });
 
-describe("detectUserTone — short messages under 40 chars not casual when urgent", () => {
+describe("detectUserTone - short messages under 40 chars not casual when urgent", () => {
   it("'I'm scared' (short) → distressed, not casual", () => {
     expect(detectUserTone("I'm scared")).toBe("distressed");
   });
@@ -267,7 +267,7 @@ describe("detectUserTone — short messages under 40 chars not casual when urgen
   });
 });
 
-describe("detectUserTone — mixed Patois/English tone detection", () => {
+describe("detectUserTone - mixed Patois/English tone detection", () => {
   it("'mi belly a hurt mi bad I'm scared' → distressed (mixed)", () => {
     expect(detectUserTone("mi belly a hurt mi bad I'm scared")).toBe("distressed");
   });
@@ -285,7 +285,7 @@ describe("detectUserTone — mixed Patois/English tone detection", () => {
   });
 });
 
-describe("detectUserTone — priority resolution across 3 competing tones", () => {
+describe("detectUserTone - priority resolution across 3 competing tones", () => {
   it("vex + drained + scared → distressed (highest priority wins)", () => {
     // All three serious tones match; distressed > angry > exhausted
     expect(detectUserTone("I'm vex and drained and scared")).toBe("distressed");
@@ -309,7 +309,7 @@ describe("detectUserTone — priority resolution across 3 competing tones", () =
   });
 });
 
-describe("detectUserToneWithScores — returns scores alongside tone", () => {
+describe("detectUserToneWithScores - returns scores alongside tone", () => {
   it("returns tone and scores object", () => {
     const { tone, scores } = detectUserToneWithScores("I'm scared and panicking");
     expect(tone).toBe("distressed");
@@ -329,9 +329,9 @@ describe("detectUserToneWithScores — returns scores alongside tone", () => {
   });
 });
 
-// ─── normalizePatois — new conversational Patois phrases ─────────────────────
+// ─── normalizePatois - new conversational Patois phrases ─────────────────────
 
-describe("normalizePatois — frustration, agreement, and conversational phrases", () => {
+describe("normalizePatois - frustration, agreement, and conversational phrases", () => {
   it("normalizes 'u nuh understand' → 'you don't understand'", () => {
     expect(normalizePatois("u nuh understand")).toMatch(/you don't understand/i);
   });
@@ -373,7 +373,7 @@ describe("normalizePatois — frustration, agreement, and conversational phrases
   });
 });
 
-describe("updateSessionTone — session tone stability", () => {
+describe("updateSessionTone - session tone stability", () => {
   it("sets currentTone on first message", () => {
     const ctx = createCtx();
     updateSessionTone(ctx, "I'm scared");
@@ -397,16 +397,16 @@ describe("updateSessionTone — session tone stability", () => {
   });
 });
 
-// ─── NEW: fuzzyCorrect — phonetic variants ────────────────────────────────────
+// ─── NEW: fuzzyCorrect - phonetic variants ────────────────────────────────────
 
-describe("fuzzyCorrect — phonetic variants (panadol)", () => {
+describe("fuzzyCorrect - phonetic variants (panadol)", () => {
   it("panandol → panadol", () => expect(fuzzyCorrect("panandol")).toBe("panadol"));
   it("panadoll → panadol", () => expect(fuzzyCorrect("panadoll")).toBe("panadol"));
   it("panaodl  → panadol", () => expect(fuzzyCorrect("panaodl")).toBe("panadol"));
   it("pnadol   → panadol", () => expect(fuzzyCorrect("pnadol")).toBe("panadol"));
 });
 
-describe("fuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)", () => {
+describe("fuzzyCorrect - phonetic variants (pregnancy / spotting / bleeding)", () => {
   it("pregnat  → pregnant",  () => expect(fuzzyCorrect("pregnat")).toBe("pregnant"));
   it("pregnacy → pregnancy", () => expect(fuzzyCorrect("pregnacy")).toBe("pregnancy"));
   it("spotian  → spotting",  () => expect(fuzzyCorrect("spotian")).toBe("spotting"));
@@ -418,9 +418,9 @@ describe("fuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)",
   it("menapose → menopause",  () => expect(fuzzyCorrect("menapose")).toBe("menopause"));
 });
 
-// ─── NEW: fuzzyCorrect — Levenshtein catches ──────────────────────────────────
+// ─── NEW: fuzzyCorrect - Levenshtein catches ──────────────────────────────────
 
-describe("fuzzyCorrect — Levenshtein catches (not in phonetic table)", () => {
+describe("fuzzyCorrect - Levenshtein catches (not in phonetic table)", () => {
   it("spottng  → spotting  (deletion)",      () => expect(fuzzyCorrect("spottng")).toBe("spotting"));
   it("bleedin  → bleeding  (deletion)",      () => expect(fuzzyCorrect("bleedin")).toBe("bleeding"));
   it("craming  → cramping  (phonetic/dl)",   () => expect(fuzzyCorrect("craming")).toBe("cramping"));
@@ -431,18 +431,18 @@ describe("fuzzyCorrect — Levenshtein catches (not in phonetic table)", () => {
   it("ovultaion → ovulation (transposition)", () => expect(fuzzyCorrect("ovultaion")).toBe("ovulation"));
 });
 
-// ─── NEW: fuzzyCorrect — protected Patois tokens ─────────────────────────────
+// ─── NEW: fuzzyCorrect - protected Patois tokens ─────────────────────────────
 
-describe("fuzzyCorrect — protected tokens must NOT be corrected", () => {
+describe("fuzzyCorrect - protected tokens must NOT be corrected", () => {
   it("mi  → null (protected)",  () => expect(fuzzyCorrect("mi")).toBeNull());
   it("nuh → null (protected)",  () => expect(fuzzyCorrect("nuh")).toBeNull());
   it("fi  → null (too short)",  () => expect(fuzzyCorrect("fi")).toBeNull());
   it("bad → null (protected)",  () => expect(fuzzyCorrect("bad")).toBeNull());
 });
 
-// ─── NEW: fuzzyCorrect — short words not fuzzily corrected ───────────────────
+// ─── NEW: fuzzyCorrect - short words not fuzzily corrected ───────────────────
 
-describe("fuzzyCorrect — short words must NOT be fuzzily corrected", () => {
+describe("fuzzyCorrect - short words must NOT be fuzzily corrected", () => {
   it("pad → null (not corrected to 'pain')", () => expect(fuzzyCorrect("pad")).toBeNull());
   it("pms → null (too short for fuzzy)",     () => expect(fuzzyCorrect("pms")).toBeNull());
 });
@@ -467,9 +467,9 @@ describe("full sentence correction through normalizePatois pipeline", () => {
   });
 });
 
-// ─── NEW: fuzzyCorrect — correction cache ────────────────────────────────────
+// ─── NEW: fuzzyCorrect - correction cache ────────────────────────────────────
 
-describe("fuzzyCorrect — correction cache", () => {
+describe("fuzzyCorrect - correction cache", () => {
   beforeEach(() => _resetFuzzyCache());
 
   it("returns same result on second call (cached)", () => {
@@ -480,7 +480,7 @@ describe("fuzzyCorrect — correction cache", () => {
   });
 
   it("increments cache hit counter on second call", () => {
-    fuzzyCorrect("panandol");           // miss — populates cache
+    fuzzyCorrect("panandol");           // miss - populates cache
     fuzzyCorrect("panandol");           // hit
     expect(_getFuzzyCacheHits()).toBe(1);
   });

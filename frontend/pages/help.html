@@ -3,52 +3,499 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bloom — Help</title>
+  <title>Help & Resources - Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
 
-<link rel="stylesheet" href="../css/base.css">
-<link rel="stylesheet" href="../css/main.css">
-<link rel="stylesheet" href="../css/pages.css">
+  <style>
+    /* ── Tab nav ─────────────────────────────────────────────────── */
+    .help-tabs {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+      border-bottom: 2px solid var(--color-border);
+      margin-bottom: 1.5rem;
+    }
+    .help-tab {
+      padding: 0.6rem 1.1rem;
+      border: none;
+      background: none;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: var(--radius-sm, 6px) var(--radius-sm, 6px) 0 0;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .help-tab:hover { color: var(--color-primary); }
+    .help-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
 
+    .help-panel { display: none; }
+    .help-panel.active { display: block; }
+
+    /* ── How to Use steps ────────────────────────────────────────── */
+    .how-section { margin-bottom: 1.75rem; }
+    .how-section h3 { margin-bottom: 0.75rem; font-size: 1rem; }
+    .step-list { list-style: none; padding: 0; margin: 0; counter-reset: steps; }
+    .step-list li {
+      counter-increment: steps;
+      display: flex;
+      gap: 0.9rem;
+      align-items: flex-start;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--color-border);
+      font-size: 0.93rem;
+    }
+    .step-list li:last-child { border-bottom: none; }
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* ── FAQ accordion ───────────────────────────────────────────── */
+    .faq-item {
+      border-bottom: 1px solid var(--color-border);
+    }
+    .faq-q {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.85rem 0;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.93rem;
+      gap: 0.5rem;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .faq-q .faq-icon {
+      font-size: 1.1rem;
+      font-weight: 400;
+      color: var(--color-text-muted);
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    .faq-item.open .faq-icon { transform: rotate(45deg); }
+    .faq-a {
+      display: none;
+      padding: 0 0 0.85rem;
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      line-height: 1.6;
+    }
+    .faq-item.open .faq-a { display: block; }
+
+    /* ── Glossary ────────────────────────────────────────────────── */
+    .glossary-list { list-style: none; padding: 0; margin: 0; }
+    .glossary-list li {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--color-border);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+    .glossary-list li:last-child { border-bottom: none; }
+    .glossary-term {
+      font-weight: 800;
+      color: var(--color-primary);
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+
+    /* ── Resources ───────────────────────────────────────────────── */
+    .resource-cards { display: flex; flex-direction: column; gap: 1rem; }
+    .resource-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius, 12px);
+      padding: 1rem 1.1rem;
+      background: var(--color-bg-card);
+    }
+    .resource-card.urgent {
+      border-color: #e05c7a;
+      background: #fff5f7;
+    }
+    .resource-name {
+      font-weight: 800;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+    }
+    .resource-card.urgent .resource-name { color: #c0304a; }
+    .resource-desc {
+      font-size: 0.86rem;
+      color: var(--color-text-muted);
+      margin-bottom: 0.5rem;
+      line-height: 1.5;
+    }
+    .resource-details {
+      font-size: 0.84rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 1rem;
+    }
+    .resource-details span { color: var(--color-text-muted); }
+    .resource-details strong { color: var(--color-text); }
+
+    /* ── Contact form ────────────────────────────────────────────── */
+    .contact-form { display: flex; flex-direction: column; gap: 1rem; max-width: 540px; }
+    .contact-form label { font-weight: 700; font-size: 0.88rem; display: block; margin-bottom: 0.3rem; }
+    .contact-form select,
+    .contact-form textarea,
+    .contact-form input[type="email"] {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-sm, 8px);
+      background: var(--color-bg);
+      font: inherit;
+      font-size: 0.92rem;
+      box-sizing: border-box;
+      transition: border-color 0.15s;
+    }
+    .contact-form select:focus,
+    .contact-form textarea:focus,
+    .contact-form input[type="email"]:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(212,116,154,0.1);
+    }
+    .contact-form textarea { resize: vertical; min-height: 120px; }
+    .contact-hint { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 0.2rem; }
+    .contact-success {
+      display: none;
+      padding: 0.9rem 1rem;
+      background: #f0faf4;
+      border: 1px solid #6bcb77;
+      border-radius: var(--radius-sm, 8px);
+      color: #1a5c2a;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    /* ── Shared ──────────────────────────────────────────────────── */
+    .section-intro {
+      font-size: 0.92rem;
+      color: var(--color-text-muted);
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+    }
+    .resource-clinic-btn { margin-top: 0.4rem; font-size: 0.85rem; }
+    .contact-email-hint  { font-weight: 400; color: var(--color-text-muted); }
+    .resources-footnote  { margin-top: 1.25rem; }
+  </style>
 </head>
 <body>
   <div id="banner-area"></div>
 
-  <main class="page">
-    <header class="page-header">
-      <div class="page-title">
-        <span class="title-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 17a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 19zm1.4-6.7c-.9.6-1.1.9-1.1 1.7v.3h-2v-.5c0-1.6.7-2.4 2-3.2.9-.6 1.4-1 1.4-1.8 0-.8-.6-1.3-1.5-1.3-1 0-1.6.6-1.7 1.6l-2-.2c.2-2 1.7-3.3 3.8-3.3 2.2 0 3.6 1.2 3.6 3.2 0 1.7-1 2.6-2.5 3.5z"/></svg>
-        </span>
-        <h1>Help</h1>
+  <main>
+    <div class="page-header">
+      <h1>Help &amp; Resources</h1>
+      <p>Guides, answers, definitions, and Jamaican health resources.</p>
+    </div>
+
+    <div class="card">
+      <!-- Tab bar -->
+      <nav class="help-tabs" role="tablist" aria-label="Help sections">
+        <button type="button" class="help-tab active" data-tab="how"     role="tab" aria-selected="true">How to Use</button>
+        <button type="button" class="help-tab"        data-tab="faq"     role="tab" aria-selected="false">FAQ</button>
+        <button type="button" class="help-tab"        data-tab="glossary" role="tab" aria-selected="false">Glossary</button>
+        <button type="button" class="help-tab"        data-tab="resources" role="tab" aria-selected="false">Resources</button>
+        <button type="button" class="help-tab"        data-tab="contact" role="tab" aria-selected="false">Contact</button>
+      </nav>
+
+      <!-- ── How to Use ────────────────────────────────────────── -->
+      <div class="help-panel active" id="tab-how" role="tabpanel">
+        <p class="section-intro">Step-by-step guides for the most common actions in Bloom.</p>
+
+        <div class="how-section">
+          <h3>Log a period day</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span>Open <strong>Calendar</strong> from the navigation bar.</span></li>
+            <li><span class="step-num">2</span><span>Tap or click the day you want to log.</span></li>
+            <li><span class="step-num">3</span><span>In the day panel, select your <strong>flow intensity</strong> (light, medium, heavy, or spotting).</span></li>
+            <li><span class="step-num">4</span><span>Optionally add symptoms, a mood, and a note.</span></li>
+            <li><span class="step-num">5</span><span>Press <strong>Save</strong>. The day will be coloured on the calendar and your cycle stats will update.</span></li>
+          </ol>
+        </div>
+
+        <div class="how-section">
+          <h3>Switch your health goal</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span>Open <strong>Settings</strong> from your profile page.</span></li>
+            <li><span class="step-num">2</span><span>Find the <strong>Health Goal</strong> section and select your goal (Track my cycle, Get pregnant, I am pregnant, or Manage symptoms).</span></li>
+            <li><span class="step-num">3</span><span>Save. The Dashboard will immediately adapt its cards and insights to your chosen goal.</span></li>
+          </ol>
+        </div>
+
+        <div class="how-section">
+          <h3>Read the Dashboard</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span>The top card shows your <strong>current cycle day</strong> and estimated phase (menstrual, follicular, ovulation, luteal).</span></li>
+            <li><span class="step-num">2</span><span>Below that, goal-specific cards appear - for example, a fertile window for TTC users or a due date for pregnancy.</span></li>
+            <li><span class="step-num">3</span><span>The <strong>Cycle History</strong> section shows a chart and table of your past cycles. Use <strong>Export as PDF</strong> to download a report.</span></li>
+            <li><span class="step-num">4</span><span>Advanced Insights (account mode only) flags any unusual patterns Bloom has noticed.</span></li>
+          </ol>
+        </div>
+
+        <div class="how-section">
+          <h3>Use Bloomie (chat assistant)</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span>Tap <strong>Bloomie</strong> in the nav or the pink chat button on any page.</span></li>
+            <li><span class="step-num">2</span><span>Type a question or choose a quick-reply button to start.</span></li>
+            <li><span class="step-num">3</span><span>Bloomie gives educational responses. It is not a doctor - for medical concerns, always consult a healthcare provider.</span></li>
+          </ol>
+        </div>
+
+        <div class="how-section">
+          <h3>Switch between Anonymous and Account mode</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span><strong>Anonymous mode</strong> stores all data on your device only. Good for privacy, but data is lost if you clear your browser.</span></li>
+            <li><span class="step-num">2</span><span><strong>Account mode</strong> backs data up securely to the cloud and unlocks advanced features. You must be 18+.</span></li>
+            <li><span class="step-num">3</span><span>To upgrade from anonymous, go to <strong>Profile</strong> and tap <strong>Create Account</strong>.</span></li>
+          </ol>
+        </div>
       </div>
-      <p class="page-subtitle">Quick answers to common questions about using Bloom.</p>
-    </header>
 
-    <section class="card">
-      <h2>FAQs</h2>
+      <!-- ── FAQ ──────────────────────────────────────────────────── -->
+      <div class="help-panel" id="tab-faq" role="tabpanel">
+        <p class="section-intro">Common questions about Bloom.</p>
 
-      <div class="stack stack-margin-top">
         <div class="faq-item">
-          <div class="faq-q"><strong>How do I log my period?</strong><span class="muted">+</span></div>
-          <div class="faq-a">Go to <strong>Calendar</strong>, tap a day, choose your flow, symptoms, then save.</div>
+          <div class="faq-q">How do I log my period?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Go to <strong>Calendar</strong>, tap a day, select your flow intensity (light, medium, heavy, or spotting), optionally add symptoms, then press <strong>Save</strong>.</div>
         </div>
 
         <div class="faq-item">
-          <div class="faq-q"><strong>How is my cycle length calculated?</strong><span class="muted">+</span></div>
-          <div class="faq-a">Bloom detects your period <strong>start days</strong> from your flow logs, then measures the days between starts.</div>
+          <div class="faq-q">How is my cycle length calculated?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Bloom detects your period <strong>start days</strong> from your flow logs, then counts the days between consecutive starts. You need at least two period starts before a cycle length can be calculated.</div>
         </div>
 
         <div class="faq-item">
-          <div class="faq-q"><strong>Is my data private?</strong><span class="muted">+</span></div>
-          <div class="faq-a">Your logs stay on your device in this demo (localStorage). In a full version, we’d add secure storage + consent controls.</div>
+          <div class="faq-q">Is my data private?<span class="faq-icon">+</span></div>
+          <div class="faq-a">In <strong>Anonymous mode</strong> your data never leaves your device - it is stored in your browser's local storage. In <strong>Account mode</strong> data is encrypted and stored securely. We never sell your data. See our <a href="/pages/privacy.html">Privacy Policy</a> for details.</div>
         </div>
 
         <div class="faq-item">
-          <div class="faq-q"><strong>How do I download a report?</strong><span class="muted">+</span></div>
-          <div class="faq-a">Open <strong>Report for Doctor</strong> and click <strong>Download Health Report</strong>.</div>
+          <div class="faq-q">How do I download a health report?<span class="faq-icon">+</span></div>
+          <div class="faq-a">From the <strong>Dashboard</strong>, press <strong>Export as PDF</strong> in the Cycle History section. The report downloads immediately without leaving the page.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">What do the cycle phases mean?<span class="faq-icon">+</span></div>
+          <div class="faq-a"><strong>Menstrual</strong> - bleeding days. <strong>Follicular</strong> - after your period ends, leading up to ovulation. <strong>Ovulation</strong> - estimated peak fertile day. <strong>Luteal</strong> - after ovulation until your next period. See the Glossary tab for full definitions.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">Can Bloom predict my next period?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Yes - once you have logged at least two cycles, Bloom estimates your next period start based on your average cycle length. The more cycles you log, the more accurate the prediction. Predictions are educational estimates only.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">What if I have irregular cycles?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Bloom will flag cycle variability in Advanced Insights and give lower-confidence predictions. Keep logging - even irregular data builds a useful record over time. If irregularity is persistent or concerning, speak with a healthcare provider.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">How do I switch my health goal?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Go to <strong>Profile &rarr; Settings &rarr; Health Goal</strong> and select a new goal. The Dashboard adapts immediately.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">Why did my cycle data disappear?<span class="faq-icon">+</span></div>
+          <div class="faq-a">In Anonymous mode, data is stored in your browser. Clearing your browser history or cache can erase it. To protect your data, create a free account to enable cloud backup.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">Is Bloom a substitute for medical advice?<span class="faq-icon">+</span></div>
+          <div class="faq-a">No. Bloom is an educational tool only. It does not diagnose conditions or replace a doctor. Always consult a qualified healthcare provider for medical concerns.</div>
         </div>
       </div>
-    </section>
+
+      <!-- ── Glossary ──────────────────────────────────────────────── -->
+      <div class="help-panel" id="tab-glossary" role="tabpanel">
+        <p class="section-intro">Definitions for terms used in Bloom and reproductive health.</p>
+
+        <ul class="glossary-list">
+          <li>
+            <span class="glossary-term">Amenorrhea</span>
+            The absence of menstruation. Primary amenorrhea means a period has never started by age 16. Secondary amenorrhea means periods stopped for 3 or more months in someone who previously had them. Both can have many causes and should be discussed with a doctor.
+          </li>
+          <li>
+            <span class="glossary-term">Cycle length</span>
+            The number of days from the first day of one period to the first day of the next. The average is 28 days, but 21–35 days is considered a normal range.
+          </li>
+          <li>
+            <span class="glossary-term">EDD (Estimated Due Date)</span>
+            The estimated date a pregnancy is expected to reach 40 weeks. It is calculated from the first day of the last menstrual period (LMP) and is an estimate - fewer than 5% of babies are born exactly on their EDD.
+          </li>
+          <li>
+            <span class="glossary-term">Fertile window</span>
+            The days each cycle when pregnancy is most possible - typically the 5 days before ovulation and the day of ovulation itself. Bloom estimates this window based on your cycle history.
+          </li>
+          <li>
+            <span class="glossary-term">Follicular phase</span>
+            The phase from the first day of your period until ovulation. The pituitary gland releases FSH (follicle-stimulating hormone), prompting follicles in the ovaries to develop. Oestrogen rises, thickening the uterine lining.
+          </li>
+          <li>
+            <span class="glossary-term">LMP (Last Menstrual Period)</span>
+            The first day of your most recent period. Doctors use this date to estimate gestational age and calculate an EDD.
+          </li>
+          <li>
+            <span class="glossary-term">Luteal phase</span>
+            The phase after ovulation until the start of the next period, typically 12–16 days. Progesterone rises to prepare the uterus for a potential pregnancy. If no implantation occurs, progesterone drops and menstruation begins.
+          </li>
+          <li>
+            <span class="glossary-term">Menarche</span>
+            The first menstrual period. It typically occurs between ages 10 and 16 and signals the beginning of reproductive capacity.
+          </li>
+          <li>
+            <span class="glossary-term">Menopause</span>
+            The point when menstruation has stopped for 12 consecutive months, marking the end of the reproductive years. The average age is 51. It is confirmed retrospectively after 12 period-free months.
+          </li>
+          <li>
+            <span class="glossary-term">Ovulation</span>
+            The release of a mature egg from an ovary. It typically occurs around day 14 of a 28-day cycle, though timing varies. The egg is viable for 12–24 hours; sperm can survive up to 5 days, making the window around ovulation the fertile period.
+          </li>
+          <li>
+            <span class="glossary-term">Perimenopause</span>
+            The transition period leading up to menopause, which can last several years. Hormones fluctuate, causing irregular periods, hot flashes, mood changes, and other symptoms.
+          </li>
+          <li>
+            <span class="glossary-term">PMS (Premenstrual Syndrome)</span>
+            A combination of physical and emotional symptoms that occur in the 1–2 weeks before a period. Common symptoms include bloating, breast tenderness, mood changes, and fatigue. More severe cases may indicate PMDD.
+          </li>
+          <li>
+            <span class="glossary-term">PCOS (Polycystic Ovary Syndrome)</span>
+            A hormonal condition affecting the ovaries. It can cause irregular or absent periods, excess androgen (male hormones), and small fluid-filled sacs on the ovaries. It is one of the most common causes of irregular cycles.
+          </li>
+        </ul>
+      </div>
+
+      <!-- ── Resources ─────────────────────────────────────────────── -->
+      <div class="help-panel" id="tab-resources" role="tabpanel">
+        <p class="section-intro">Trusted Jamaican and international reproductive health organisations.</p>
+
+        <div class="resource-cards">
+
+          <div class="resource-card urgent">
+            <div class="resource-name">National Domestic Violence Hotline - Jamaica</div>
+            <div class="resource-desc">Free, confidential support for people experiencing domestic or gender-based violence. Available 24 hours.</div>
+            <div class="resource-details">
+              <span>Hotline: <strong>888-CRISIS (888-274-747)</strong></span>
+              <span>Ministry of Culture, Gender, Entertainment and Sport</span>
+            </div>
+          </div>
+
+          <div class="resource-card">
+            <div class="resource-name">National Family Planning Board (NFPB)</div>
+            <div class="resource-desc">Jamaica's lead agency for reproductive health services. Offers family planning, STI screening, cervical cancer screening, and health education island-wide.</div>
+            <div class="resource-details">
+              <span>Phone: <strong>(876) 926-6635 / 926-6637</strong></span>
+              <span>Email: <strong>nfpb@nfpb.gov.jm</strong></span>
+              <span>Location: 11–15 Oxford Road, Kingston 5</span>
+            </div>
+          </div>
+
+          <div class="resource-card">
+            <div class="resource-name">Jamaica Cancer Society</div>
+            <div class="resource-desc">Provides cancer education, cervical cancer screening, and patient support services. Cervical cancer is one of the leading cancers affecting Jamaican women - early screening saves lives.</div>
+            <div class="resource-details">
+              <span>Phone: <strong>(876) 927-7383</strong></span>
+              <span>Email: <strong>info@jamaicacancer.org</strong></span>
+              <span>Location: 16 Lady Musgrave Road, Kingston 5</span>
+            </div>
+          </div>
+
+          <div class="resource-card">
+            <div class="resource-name">Clinic Finder - Bloom</div>
+            <div class="resource-desc">Browse reproductive health clinics across Jamaica directly in the app. Filter by parish and see contact details.</div>
+            <div class="resource-details">
+              <a href="/pages/clinics.html" class="btn btn-outline resource-clinic-btn">Open Clinic Map</a>
+            </div>
+          </div>
+
+          <div class="resource-card">
+            <div class="resource-name">Ministry of Health &amp; Wellness - Jamaica</div>
+            <div class="resource-desc">Official source for public health information, sexual and reproductive health guidelines, and health facility listings for Jamaica.</div>
+            <div class="resource-details">
+              <span>Phone: <strong>(876) 633-7443</strong></span>
+              <span>Website: <strong>moh.gov.jm</strong></span>
+            </div>
+          </div>
+
+        </div>
+
+        <p class="form-hint resources-footnote">
+          These resources are provided for informational purposes. Bloom is not affiliated with any listed organisation.
+          Always verify contact details directly with the organisation.
+        </p>
+      </div>
+
+      <!-- ── Contact ────────────────────────────────────────────────── -->
+      <div class="help-panel" id="tab-contact" role="tabpanel">
+        <p class="section-intro">Have a question, report an issue, or send us feedback. We read every message.</p>
+
+        <div id="contact-success" class="contact-success hidden">
+          <strong>Message sent successfully.</strong>
+          <p class="contact-success-body">We have received your message and will get back to you if a reply is needed.</p>
+          <p id="contact-request-id" class="contact-request-id"></p>
+          <button type="button" id="contact-send-another" class="btn btn-outline btn-sm contact-send-another">Send another message</button>
+        </div>
+
+        <div id="contact-error" class="contact-error hidden"></div>
+
+        <form class="contact-form" id="contact-form" novalidate>
+          <div>
+            <label for="contact-name">Your name <span class="contact-email-hint">(optional)</span></label>
+            <input type="text" id="contact-name" name="name" placeholder="e.g. Jane" autocomplete="given-name" maxlength="100" />
+          </div>
+
+          <div>
+            <label for="contact-subject">Subject</label>
+            <select id="contact-subject" name="subject" required>
+              <option value="" disabled selected>Select a topic…</option>
+              <option value="bug">Something is not working</option>
+              <option value="data">Question about my data</option>
+              <option value="privacy">Privacy concern</option>
+              <option value="feedback">General feedback</option>
+              <option value="accessibility">Accessibility issue</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="contact-message">Message</label>
+            <textarea id="contact-message" name="message" placeholder="Describe your question or issue…" required maxlength="1200"></textarea>
+            <p class="contact-hint">Max 1200 characters.</p>
+          </div>
+
+          <div>
+            <label for="contact-email">Your email <span class="contact-email-hint">(optional = only if you want a reply)</span></label>
+            <input type="email" id="contact-email" name="email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+
+          <div>
+            <button type="submit" class="btn btn-primary" id="contact-submit">Send message</button>
+          </div>
+        </form>
+      </div>
+
+    </div><!-- /card -->
   </main>
 
   <script type="module">
@@ -58,11 +505,99 @@
     renderBloomieFab();
     renderModeBanner(document.getElementById("banner-area"));
 
+    // ── Tabs ────────────────────────────────────────────────────────
+    const tabs   = document.querySelectorAll(".help-tab");
+    const panels = document.querySelectorAll(".help-panel");
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => { t.classList.remove("active"); t.setAttribute("aria-selected","false"); });
+        panels.forEach(p => p.classList.remove("active"));
+        tab.classList.add("active");
+        tab.setAttribute("aria-selected","true");
+        document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+      });
+    });
+
+    // Open to anchor if URL hash matches a tab
+    const hash = location.hash.replace("#","");
+    const hashTab = document.querySelector(`.help-tab[data-tab="${hash}"]`);
+    if (hashTab) hashTab.click();
+
+    // ── FAQ accordion ────────────────────────────────────────────────
     document.querySelectorAll(".faq-item").forEach(item => {
       item.querySelector(".faq-q").addEventListener("click", () => {
         item.classList.toggle("open");
       });
     });
+
+    // ── Contact form ─────────────────────────────────────────────────
+    import { getIdToken, getCurrentUser } from "/js/auth.js";
+
+    const form      = document.getElementById("contact-form");
+    const successEl = document.getElementById("contact-success");
+    const errorEl   = document.getElementById("contact-error");
+    const submitBtn = document.getElementById("contact-submit");
+    const requestIdEl = document.getElementById("contact-request-id");
+
+    document.getElementById("contact-send-another").addEventListener("click", () => {
+      successEl.classList.add("hidden");
+      form.classList.remove("hidden");
+      form.reset();
+    });
+
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      errorEl.classList.add("hidden");
+
+      const subject = document.getElementById("contact-subject").value;
+      const message = document.getElementById("contact-message").value.trim();
+      const email   = document.getElementById("contact-email").value.trim();
+      const name    = document.getElementById("contact-name").value.trim();
+
+      if (!subject) { showError("Please select a subject."); return; }
+      if (!message) { showError("Please enter a message."); return; }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Sending…";
+
+      try {
+        const token  = await getIdToken().catch(() => null);
+        const userId = getCurrentUser()?.uid ?? null;
+
+        const payload = { subject, message, ...(email && { email }), ...(name && { name }), ...(userId && { userId }) };
+
+        const res  = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          showError(json.error || "We couldn't send your message right now. Please try again.");
+          return;
+        }
+
+        if (json.requestId) {
+          requestIdEl.textContent = `Reference ID: ${json.requestId}`;
+        }
+        form.classList.add("hidden");
+        successEl.classList.remove("hidden");
+
+      } catch (_) {
+        showError("We couldn't send your message right now. Please try again.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Send message";
+      }
+    });
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove("hidden");
+    }
   </script>
 </body>
 </html>

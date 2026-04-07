@@ -1,5 +1,5 @@
 /**
- * admin.js — Full admin dashboard logic
+ * admin.js - Full admin dashboard logic
  * Tabs: Overview | Users | Pamphlets | Clinics
  */
 
@@ -82,6 +82,7 @@ function initTabs() {
       if (target === "pamphlets") loadPamphlets();
       if (target === "clinics") loadClinics();
       if (target === "overview") loadBloomieAnalytics();
+      if (target === "support") loadSupportMessages();
     });
   });
 
@@ -91,6 +92,7 @@ function initTabs() {
     if (active === "users") loadUsers();
     if (active === "pamphlets") loadPamphlets();
     if (active === "clinics") loadClinics();
+    if (active === "support") loadSupportMessages();
   });
 
   document.getElementById("ba-refresh-btn")?.addEventListener("click", loadBloomieAnalytics);
@@ -105,19 +107,19 @@ async function loadOverview() {
   try {
     const { stats } = await api("GET", "/stats");
 
-    setText("stat-users", stats.totalUsers ?? "—");
-    setText("stat-new-users", stats.newUsersThisWeek ?? "—");
-    setText("stat-cycle-logs", stats.totalCycleLogs ?? "—");
-    setText("stat-symptom-logs", stats.totalSymptomLogs ?? "—");
+    setText("stat-users", stats.totalUsers ?? "-");
+    setText("stat-new-users", stats.newUsersThisWeek ?? "-");
+    setText("stat-cycle-logs", stats.totalCycleLogs ?? "-");
+    setText("stat-symptom-logs", stats.totalSymptomLogs ?? "-");
 
     // Pamphlet + clinic counts come from their own endpoints
     api("GET", "/pamphlets")
-      .then((d) => setText("stat-pamphlets", d.pamphlets?.length ?? "—"))
-      .catch(() => setText("stat-pamphlets", "—"));
+      .then((d) => setText("stat-pamphlets", d.pamphlets?.length ?? "-"))
+      .catch(() => setText("stat-pamphlets", "-"));
 
     api("GET", "/clinics")
-      .then((d) => setText("stat-clinics", d.clinics?.length ?? "—"))
-      .catch(() => setText("stat-clinics", "—"));
+      .then((d) => setText("stat-clinics", d.clinics?.length ?? "-"))
+      .catch(() => setText("stat-clinics", "-"));
 
     const distEl = document.getElementById("goal-distribution");
     const dist = stats.goalDistribution || {};
@@ -168,8 +170,8 @@ async function loadUsers(pageToken = null) {
         </div>
         <div class="admin-item-meta">
           UID: ${u.uid} &bull;
-          Joined: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"} &bull;
-          Last sign-in: ${u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString() : "—"}
+          Joined: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"} &bull;
+          Last sign-in: ${u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString() : "-"}
         </div>
         <div style="margin-top:0.5rem;">
           <button class="btn btn-outline btn-sm" data-action="manage-user"
@@ -226,7 +228,7 @@ async function loadPamphlets() {
             ${p.sensitive ? `<span class="admin-badge admin-badge--warning">sensitive</span>` : ""}
           </div>
         </div>
-        <div class="admin-item-meta">${p.readTime ? p.readTime + " read" : ""} ${p.summary ? "— " + escHtml(p.summary.slice(0, 80)) + "…" : ""}</div>
+        <div class="admin-item-meta">${p.readTime ? p.readTime + " read" : ""} ${p.summary ? "- " + escHtml(p.summary.slice(0, 80)) + "…" : ""}</div>
         <div style="margin-top:0.5rem;display:flex;gap:0.4rem;">
           <button class="btn btn-outline btn-sm" data-action="edit-pamphlet" data-id="${p.id}">Edit</button>
           <button class="btn btn-sm" style="background:#ff3b6a;color:#fff;border:none;"
@@ -333,9 +335,44 @@ function openPamphletModal(pamphlet = null) {
   document.getElementById("pamphlet-readtime").value = pamphlet?.readTime || "";
   document.getElementById("pamphlet-sensitive").checked = pamphlet?.sensitive === true;
   document.getElementById("pamphlet-content").value = pamphlet?.content || "";
+  // PDF fields
+  document.getElementById("pamphlet-pdf-url").value = pamphlet?.pdf || "";
+  document.getElementById("pamphlet-pdf-file").value = "";
+  const statusEl = document.getElementById("pamphlet-pdf-status");
+  statusEl.textContent = pamphlet?.pdf ? "Current PDF saved. Upload a new file to replace it." : "";
   setModalError("pamphlet-modal-error", "");
   openModal(modal);
 }
+
+// PDF file → base64 → upload → fill URL field
+document.getElementById("pamphlet-pdf-file")?.addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  const statusEl = document.getElementById("pamphlet-pdf-status");
+  if (!file) return;
+  if (file.type !== "application/pdf") {
+    statusEl.textContent = "Only PDF files are accepted.";
+    e.target.value = "";
+    return;
+  }
+  statusEl.textContent = "Uploading…";
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const result = await api("POST", "/pamphlets/upload-pdf", {
+      filename: file.name,
+      mimeType: "application/pdf",
+      data: base64,
+    });
+    document.getElementById("pamphlet-pdf-url").value = result.url;
+    statusEl.textContent = "PDF uploaded successfully.";
+  } catch (err) {
+    statusEl.textContent = "Upload failed: " + err.message;
+  }
+});
 
 document.getElementById("pamphlet-add-btn")?.addEventListener("click", () => openPamphletModal());
 
@@ -348,6 +385,7 @@ document.getElementById("pamphlet-save-btn")?.addEventListener("click", async ()
     readTime: document.getElementById("pamphlet-readtime").value.trim(),
     sensitive: document.getElementById("pamphlet-sensitive").checked,
     content: document.getElementById("pamphlet-content").value.trim(),
+    pdf: document.getElementById("pamphlet-pdf-url").value.trim() || null,
   };
 
   if (!body.title || !body.category || !body.content) {
@@ -650,3 +688,73 @@ async function loadBloomieAnalytics() {
     if (statusEl) { statusEl.textContent = `Failed to load: ${err.message}`; statusEl.hidden = false; }
   }
 }
+
+// ─────────────────────────────────────────
+// Support Messages
+// ─────────────────────────────────────────
+
+const STATUS_LABELS = { new: "New", open: "Open", resolved: "Resolved" };
+const STATUS_COLOURS = {
+  new:      "background:#fff3cd;color:#856404;",
+  open:     "background:#cfe2ff;color:#084298;",
+  resolved: "background:#d1e7dd;color:#0a3622;",
+};
+
+async function loadSupportMessages() {
+  const list   = document.getElementById("support-list");
+  const filter = document.getElementById("support-status-filter").value;
+  list.innerHTML = "<p class='text-muted'>Loading…</p>";
+
+  try {
+    const url = "/api/admin/contact-messages" + (filter ? `?status=${filter}` : "");
+    const { messages } = await api("GET", url.replace("/api/admin", ""));
+
+    if (!messages.length) {
+      list.innerHTML = "<p class='text-muted'>No support requests found.</p>";
+      return;
+    }
+
+    list.innerHTML = messages.map(m => {
+      const date    = m.createdAt ? new Date(m.createdAt).toLocaleString() : "-";
+      const badge   = `<span style="padding:2px 8px;border-radius:999px;font-size:0.78rem;font-weight:700;${STATUS_COLOURS[m.status] || ""}">${STATUS_LABELS[m.status] || m.status}</span>`;
+      const options = ["new", "open", "resolved"]
+        .map(s => `<option value="${s}"${m.status === s ? " selected" : ""}>${STATUS_LABELS[s]}</option>`)
+        .join("");
+
+      return `
+        <div class="admin-list-item" style="flex-direction:column;align-items:flex-start;gap:0.4rem;">
+          <div class="admin-row" style="width:100%;">
+            <div>
+              <strong>${m.requestId || "-"}</strong>
+              <span class="text-muted" style="margin-left:0.5rem;font-size:0.85rem;">${date}</span>
+              ${badge}
+            </div>
+            <select class="admin-select" data-id="${m.id}" data-action="status" style="width:auto;">
+              ${options}
+            </select>
+          </div>
+          <div style="font-size:0.88rem;"><strong>Subject:</strong> ${m.subject || "-"}</div>
+          ${m.name    ? `<div style="font-size:0.88rem;"><strong>Name:</strong> ${m.name}</div>` : ""}
+          ${m.replyEmail ? `<div style="font-size:0.88rem;"><strong>Reply-to:</strong> ${m.replyEmail}</div>` : ""}
+          <div style="font-size:0.88rem;white-space:pre-wrap;background:var(--color-bg-soft,#f5f0f3);padding:0.5rem 0.75rem;border-radius:8px;width:100%;box-sizing:border-box;">${m.message || ""}</div>
+        </div>`;
+    }).join("");
+
+    // Status change handlers
+    list.querySelectorAll("select[data-action='status']").forEach(sel => {
+      sel.addEventListener("change", async () => {
+        try {
+          await api("PATCH", `/contact-messages/${sel.dataset.id}/status`, { status: sel.value });
+        } catch (err) {
+          alert("Could not update status: " + err.message);
+        }
+      });
+    });
+
+  } catch (err) {
+    list.innerHTML = `<p class="text-muted">Failed to load: ${err.message}</p>`;
+  }
+}
+
+document.getElementById("support-status-filter")?.addEventListener("change", loadSupportMessages);
+document.getElementById("support-refresh-btn")?.addEventListener("click", loadSupportMessages);

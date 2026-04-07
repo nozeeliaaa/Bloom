@@ -1,5 +1,5 @@
 /**
- * admin.js — Bloom Admin API Routes
+ * admin.js - Bloom Admin API Routes
  * All endpoints require role="admin" (set via Firebase Custom Claims).
  */
 import express from "express";
@@ -112,7 +112,7 @@ router.get("/stats", async (req, res) => {
 });
 
 // ─────────────────────────────────────────
-// USERS — List, search, view
+// USERS - List, search, view
 // ─────────────────────────────────────────
 router.get("/users", async (req, res) => {
   try {
@@ -191,7 +191,7 @@ router.get("/users/:uid", async (req, res) => {
 });
 
 // ─────────────────────────────────────────
-// USER ACTIONS — Disable, enable, promote
+// USER ACTIONS - Disable, enable, promote
 // ─────────────────────────────────────────
 router.post("/users/:uid/disable", async (req, res) => {
   try {
@@ -301,21 +301,56 @@ router.get("/activity", async (req, res) => {
 });
 
 // ─────────────────────────────────────────
-// PAMPHLETS — Full CRUD
+// PAMPHLETS - Full CRUD
 // ─────────────────────────────────────────
 router.get("/pamphlets", async (req, res) => {
   try {
-    const snap = await db.collection("pamphlets").orderBy("createdAt", "desc").get();
+    // No orderBy = avoids Firestore silently excluding docs that lack the field
+    const snap = await db.collection("pamphlets").get();
     const pamphlets = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // Sort by updatedAt descending, then title ascending as tiebreaker
+    pamphlets.sort((a, b) => {
+      const at = a.updatedAt?.toDate?.()?.getTime() ?? a.createdAt?.toDate?.()?.getTime() ?? 0;
+      const bt = b.updatedAt?.toDate?.()?.getTime() ?? b.createdAt?.toDate?.()?.getTime() ?? 0;
+      return bt - at || (a.title ?? "").localeCompare(b.title ?? "");
+    });
     res.json({ ok: true, pamphlets });
   } catch (err) {
+    console.error("Admin GET /pamphlets error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /pamphlets/upload-pdf ───────────────────────────────
+// Accepts base64-encoded PDF, stores in Firebase Storage, returns public URL.
+// Body: { filename: string, mimeType: "application/pdf", data: base64string }
+router.post("/pamphlets/upload-pdf", async (req, res) => {
+  try {
+    const { filename, mimeType, data } = req.body;
+    if (!data || mimeType !== "application/pdf") {
+      return res.status(400).json({ error: "Only PDF files are allowed." });
+    }
+    const buffer = Buffer.from(data, "base64");
+    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `pamphlets/${Date.now()}_${safeName}`;
+
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(storagePath);
+    await file.save(buffer, { contentType: "application/pdf", resumable: false });
+    await file.makePublic();
+
+    const url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    console.log(`[admin] PDF uploaded: ${storagePath}`);
+    return res.json({ ok: true, url });
+  } catch (err) {
+    console.error("[admin] PDF upload error:", err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 
 router.post("/pamphlets", async (req, res) => {
   try {
-    const { title, category, summary, content, readTime, sensitive } = req.body;
+    const { title, category, summary, content, readTime, sensitive, pdf } = req.body;
     if (!title || !category || !content) {
       return res.status(400).json({ error: "title, category, and content are required" });
     }
@@ -326,6 +361,7 @@ router.post("/pamphlets", async (req, res) => {
       content,
       readTime: readTime || "",
       sensitive: sensitive === true,
+      pdf: pdf || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdBy: req.user.uid,
@@ -349,7 +385,7 @@ router.post("/pamphlets", async (req, res) => {
 router.put("/pamphlets/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, category, summary, content, readTime, sensitive } = req.body;
+    const { title, category, summary, content, readTime, sensitive, pdf } = req.body;
     const updates = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: req.user.uid,
@@ -360,6 +396,7 @@ router.put("/pamphlets/:id", async (req, res) => {
     if (content   !== undefined) updates.content   = content;
     if (readTime  !== undefined) updates.readTime  = readTime;
     if (sensitive !== undefined) updates.sensitive = sensitive === true;
+    if (pdf       !== undefined) updates.pdf       = pdf || null;
 
     await db.collection("pamphlets").doc(id).update(updates);
 
@@ -398,7 +435,7 @@ router.delete("/pamphlets/:id", async (req, res) => {
 });
 
 // ─────────────────────────────────────────
-// CLINICS — Full CRUD
+// CLINICS - Full CRUD
 // ─────────────────────────────────────────
 router.get("/clinics", async (req, res) => {
   try {
@@ -629,6 +666,128 @@ router.get("/bloomie-analytics/summary", async (req, res) => {
     // Never 500 — return zeroed values on any failure
     console.error("bloomie-analytics summary error:", err);
     res.json({ ok: true, summary: _zeroedSummary() });
+     }
+});
+
+// SAFETY LOGS - Read & mark reviewed
+// ─────────────────────────────────────────
+router.get("/safety-logs", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const includeReviewed = req.query.reviewed === "true";
+
+    // Avoid compound query (reviewed + orderBy) which needs a composite index.
+    // Fetch unreviewed first; fall back to simple get if that also fails.
+    let snap;
+    try {
+      snap = await db.collection("bloomieSafetyLogs")
+        .where("reviewed", "==", false)
+        .get();
+    } catch (_) {
+      snap = await db.collection("bloomieSafetyLogs").get();
+    }
+
+    let logs = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+      ts: d.data().ts?.toDate?.()?.toISOString() ?? null,
+    }));
+
+    if (!includeReviewed) logs = logs.filter((l) => l.reviewed === false);
+
+    // Sort by ts descending in JS
+    logs.sort((a, b) => (b.ts ?? "").localeCompare(a.ts ?? ""));
+    logs = logs.slice(0, limit);
+
+    res.json({ ok: true, logs });
+  } catch (err) {
+    console.error("Admin GET /safety-logs error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch("/safety-logs/:id/reviewed", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection("bloomieSafetyLogs").doc(id).update({
+      reviewed: true,
+      reviewedBy: req.user.uid,
+      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Admin PATCH /safety-logs/:id/reviewed error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────
+// CONTACT MESSAGES - support inbox
+// ─────────────────────────────────────────
+
+router.get("/contact-messages", async (req, res) => {
+  try {
+    const limit  = Math.min(Number(req.query.limit) || 50, 200);
+    const status = req.query.status || null; // filter: "new" | "open" | "resolved"
+
+    const snap = await db.collection("contactMessages").get();
+    let messages = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate?.()?.toISOString() ?? null,
+    }));
+
+    if (status) messages = messages.filter(m => m.status === status);
+    messages.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    messages = messages.slice(0, limit);
+
+    res.json({ ok: true, messages });
+  } catch (err) {
+    console.error("Admin GET /contact-messages error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch("/contact-messages/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const VALID = new Set(["new", "open", "resolved"]);
+    if (!VALID.has(status)) return res.status(400).json({ error: "Invalid status." });
+
+    await db.collection("contactMessages").doc(id).update({
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Admin PATCH /contact-messages/:id/status error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────
+// FEEDBACK REVIEW - Bloomie user ratings
+// ─────────────────────────────────────────
+router.get("/feedback-review", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const snap = await db.collection("bloomieFeedback").get();
+
+    let feedback = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate?.()?.toISOString() ?? null,
+    }));
+
+    // Sort newest first in JS = avoids needing a Firestore index
+    feedback.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    feedback = feedback.slice(0, limit);
+
+    res.json({ ok: true, feedback });
+  } catch (err) {
+    console.error("Admin GET /feedback-review error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 

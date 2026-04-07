@@ -253,7 +253,7 @@ export function createNodes(env) {
     if (userMode.isCycleTracking && cd.lmp) {
       const daysLeft = daysUntilNextPeriod();
       const dueSoon  = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
-      const overdue  = daysLeft !== null && daysLeft < 0;
+      const overdue  = daysLeft !== null && daysLeft < -1;
 
       if (overdue) {
         const lateDays = Math.abs(daysLeft);

@@ -18,51 +18,68 @@ export async function requireAuth(req, res, next) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      // Brand new user — create full doc
+      // Brand new user - create full doc with all expected fields
       await userRef.set({
         role: "user",
+        email: decoded.email || null,
         profile: {
           role: "user",
+          nickname: null,
+          avatar: null,
+          goal: "period",
+          mode: "account",
           yearOfBirth: null,
+          avgCycleLength: null,
+          periodDuration: null,
+          weightKg: null,
+          heightCm: null,
           consentSensitive: false,
           remindersEnabled: false,
           reminderTime: "09:00",
-          mode: "account",
-          goal: "track_cycle",
         },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       req.user = {
-        uid:            decoded.uid,
-        email:          decoded.email || null,
-        email_verified: !!decoded.email_verified,
-        role:           "user",
-        ageBand:        null,
-        yob:            null,
+        uid:              decoded.uid,
+        email:            decoded.email || null,
+        email_verified:   !!decoded.email_verified,
+        role:             "user",
+        ageBand:          null,
+        yob:              null,
+        consentSensitive: false,
       };
 
       return next();
     }
 
-    // Doc exists — read it
+    // Doc exists - read it
     const data    = userDoc.data();
     const profile = data?.profile || {};
 
     // Backfill any missing fields for legacy accounts
-    const needsBackfill = !data.role || !data.profile;
+    const needsBackfill = !data.role || !data.profile ||
+      profile.nickname === undefined || profile.avatar === undefined ||
+      profile.avgCycleLength === undefined || profile.goal === "track_cycle";
     if (needsBackfill) {
       const backfill = {
         role: data.role || profile.role || "user",
+        email: data.email || decoded.email || null,
         profile: {
           role:             profile.role             || "user",
+          nickname:         profile.nickname         ?? null,
+          avatar:           profile.avatar           ?? null,
+          goal:             profile.goal === "track_cycle" ? "period" : (profile.goal || "period"),
+          mode:             profile.mode             || "account",
           yearOfBirth:      profile.yearOfBirth      ?? null,
+          avgCycleLength:   profile.avgCycleLength   ?? null,
+          periodDuration:   profile.periodDuration   ?? null,
+          weightKg:         profile.weightKg         ?? null,
+          heightCm:         profile.heightCm         ?? null,
           consentSensitive: profile.consentSensitive ?? false,
           remindersEnabled: profile.remindersEnabled ?? false,
           reminderTime:     profile.reminderTime     || "09:00",
-          mode:             profile.mode             || "account",
-          goal:             profile.goal             || "track_cycle",
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
@@ -76,12 +93,13 @@ export async function requireAuth(req, res, next) {
     const ageBand = deriveAgeBand(profile.yearOfBirth);
 
     req.user = {
-      uid:            decoded.uid,
-      email:          decoded.email || null,
-      email_verified: !!decoded.email_verified,
-      role:           decoded.role || data.role || profile.role || "user",
+      uid:              decoded.uid,
+      email:            decoded.email || null,
+      email_verified:   !!decoded.email_verified,
+      role:             decoded.role || data.role || profile.role || "user",
       ageBand,
-      yob:            profile.yearOfBirth || null,
+      yob:              profile.yearOfBirth || null,
+      consentSensitive: profile.consentSensitive === true,
     };
 
     return next();

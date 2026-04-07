@@ -1,5 +1,5 @@
 /**
- * Bloom — Pregnancy-Related Algorithm
+ * Bloom - Pregnancy-Related Algorithm
  * All outputs are educational estimates, not medical predictions.
  * Always display the disclaimer field to the user.
  */
@@ -62,8 +62,8 @@ export function whenToTest(sexDate, expectedPeriodDate = null) {
   const earlyTestDate = addDays(sexDate, 10); // hCG may be detectable ~10 days post-conception
 
   const message = basis === "missed-period"
-    ? `Test from ${formatDate(primaryTestDate)} — the day after your expected period.`
-    : `Test from ${formatDate(primaryTestDate)} — at least 21 days after unprotected sex.`;
+    ? `Test from ${formatDate(primaryTestDate)} - the day after your expected period.`
+    : `Test from ${formatDate(primaryTestDate)} - at least 21 days after unprotected sex.`;
 
   const retestMessage = `If the result is negative but your period hasn't started, retest on ${formatDate(retestDate)}.`;
 
@@ -176,5 +176,5 @@ export function fertilityConfidence(cycleLengths, ovulationDay) {
 
 // UTILITY
 function formatDate(date) {
-  return date?.toLocaleDateString("en-JM", { month: "short", day: "numeric", year: "numeric" }) ?? "—";
+  return date?.toLocaleDateString("en-JM", { month: "short", day: "numeric", year: "numeric" }) ?? "-";
 }

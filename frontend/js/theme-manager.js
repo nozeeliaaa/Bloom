@@ -1,7 +1,7 @@
 /**
  * theme-manager.js - Light/Dark/System Theme Module (frontend-only).
  * Persists theme preference in localStorage only.
- * All functions are synchronous — no async needed for localStorage.
+ * All functions are synchronous - no async needed for localStorage.
  */
 const THEME_KEY = "bloom_theme";
 

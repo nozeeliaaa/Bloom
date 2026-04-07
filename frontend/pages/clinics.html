@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clinic Finder - Bloom</title>
   
-  <script>
-    window.BLOOM_API_BASE = "http://localhost:4000";
-  </script>
-
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
@@ -94,11 +90,47 @@
       color: var(--color-text-muted);
     }
 
-    /* Distance badge */
+    /* Distance badge - primary-tinted */
     .badge-distance {
-      background: rgba(0,0,0,0.06);
-      color: var(--color-text);
-      border: 1px solid var(--color-border);
+      background: var(--color-primary-light, rgba(212,116,154,0.12));
+      color: var(--color-primary-dark, #8a2c50);
+      border: 1px solid var(--color-primary-light, rgba(212,116,154,0.35));
+      font-weight: 600;
+    }
+
+    .search-wrap {
+      margin-bottom: 0.75rem;
+    }
+
+
+    /* Status error */
+    .status-error {
+      color: #e53e3e !important;
+      font-weight: 600;
+    }
+
+    /* Route error text inside card */
+    .route-fetch-error {
+      font-size: 0.85rem;
+      color: #e53e3e;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    /* Selected clinic marker pulse - compositor-only (transform + opacity) */
+    .clinic-marker-pulse {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--color-primary, #d4749a);
+      will-change: transform, opacity;
+      animation: markerPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes markerPulse {
+      0%, 100% { transform: scale(1);   opacity: 1;   }
+      50%       { transform: scale(1.5); opacity: 0.5; }
     }
   </style>
 </head>
@@ -110,6 +142,18 @@
     <div class="page-header">
       <h1>Clinic Finder</h1>
       <p>Find reproductive health clinics in Jamaica </p>
+    </div>
+
+    <!-- Search -->
+    <div class="search-wrap">
+      <input
+        class="form-input"
+        type="search"
+        id="search-clinics"
+        placeholder="Search by name, address, or service…"
+        aria-label="Search clinics"
+        autocomplete="off"
+      >
     </div>
 
     <!-- Filters -->
@@ -134,7 +178,8 @@
     <!-- Actions -->
     <div class="clinic-actions">
       <button class="btn btn-outline" id="btn-locate" type="button">Use my location</button>
-      <span class="status-line" id="loc-status">Tip: Allow location to sort clinics near you.</span>
+      <button class="btn btn-outline" id="btn-pin" type="button">Pin location on map</button>
+      <span class="status-line" id="loc-status">Tip: Allow location or pin yourself on the map.</span>
     </div>
 
     <!-- Map -->
@@ -164,7 +209,7 @@
     renderFooter();
     renderModeBanner(document.getElementById('banner-area'));
 
-    // Representative coordinates per parish (approx) — Jamaica-focused
+    // Representative coordinates per parish (approx) - Jamaica-focused
     const parishCoords = {
       "Kingston": [17.997, -76.793],
       "St. Andrew": [18.012, -76.80],
@@ -187,7 +232,11 @@
     let clinics = [];
     window.debugClinics = () => clinics;
     let map, markersLayer;
-    let userLocation = null; // { lat, lng }
+    let userLocation = null;       // { lat, lng }
+    let routeLayer = null;         // active route polyline
+    let userAccuracyCircle = null; // accuracy radius circle on map
+    let selectedClinicIdx = null;  // idx into currentFiltered
+    let currentFiltered = [];      // last rendered filtered list
 
     // ----- Utilities -----
     function toRad(x) { return x * Math.PI / 180; }
@@ -237,8 +286,11 @@
       return c.phone || "";
     }
 
+    let searchQuery = '';
+
     function getFilters() {
       return {
+        query: searchQuery,
         parish: document.getElementById('filter-parish').value,
         type: document.getElementById('filter-type').value,
         service: document.getElementById('filter-service').value,
@@ -246,9 +298,20 @@
     }
 
     function getFilteredClinics() {
-      const { parish, type, service } = getFilters();
+      const { query, parish, type, service } = getFilters();
 
       let filtered = clinics;
+
+      if (query) {
+        filtered = filtered.filter(c => {
+          const haystack = [
+            c.name, c.address, c.parish,
+            ...(c.services || []).map(serviceLabel),
+            typeLabel(c.type),
+          ].join(' ').toLowerCase();
+          return haystack.includes(query);
+        });
+      }
 
       if (parish !== 'all') filtered = filtered.filter(c => c.parish === parish);
       if (type !== 'all') filtered = filtered.filter(c => c.type === type);
@@ -269,7 +332,122 @@
       return filtered;
     }
 
+    // ----- Routing -----
+
+    function clearRoute() {
+      if (routeLayer && map) { map.removeLayer(routeLayer); routeLayer = null; }
+      document.querySelectorAll('.route-info').forEach(el => {
+        el.style.display = 'none';
+        el.innerHTML = '';
+      });
+    }
+
+    function drawRoute(coords) {
+      if (routeLayer && map) map.removeLayer(routeLayer);
+      routeLayer = L.polyline(coords, {
+        color: '#7c4dff', weight: 5, opacity: 0.85, dashArray: '10, 6',
+      }).addTo(map);
+      map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+    }
+
+    // Academic Dijkstra fallback - runs on clinic nodes when ORS is unavailable.
+    // Edges are Haversine distances; triangle inequality means the direct path
+    // wins, but the algorithm is correct and demonstrates the approach.
+    function dijkstraFallback(nodes, targetIdx) {
+      const n = nodes.length;
+      const dist = new Array(n).fill(Infinity);
+      const prev = new Array(n).fill(-1);
+      const visited = new Array(n).fill(false);
+      dist[0] = 0; // nodes[0] = user location
+
+      for (let iter = 0; iter < n; iter++) {
+        let u = -1;
+        for (let j = 0; j < n; j++) {
+          if (!visited[j] && (u === -1 || dist[j] < dist[u])) u = j;
+        }
+        if (u === -1 || dist[u] === Infinity) break;
+        visited[u] = true;
+        if (u === targetIdx) break;
+
+        for (let v = 0; v < n; v++) {
+          if (visited[v]) continue;
+          const w = distanceKm(nodes[u].lat, nodes[u].lng, nodes[v].lat, nodes[v].lng);
+          if (dist[u] + w < dist[v]) { dist[v] = dist[u] + w; prev[v] = u; }
+        }
+      }
+
+      const path = [];
+      for (let cur = targetIdx; cur !== -1; cur = prev[cur]) path.unshift(cur);
+      const km = dist[targetIdx];
+      return {
+        distance_km: +km.toFixed(2),
+        duration_min: Math.round((km / 40) * 60), // 40 km/h average
+        coords: path.map(i => [nodes[i].lat, nodes[i].lng]),
+      };
+    }
+
+    async function getDirections(clinic, idx) {
+      if (!userLocation) {
+        setStatus('Set your location first - use "Use my location" or "Pin location on map".', true);
+        return;
+      }
+
+      // Show loading state on button
+      const card = document.querySelector(`.clinic-card[data-idx="${idx}"]`);
+      const btn = card?.querySelector('.btn-get-directions');
+      if (btn) { btn.disabled = true; btn.textContent = 'Routing…'; }
+
+      const infoEl = document.getElementById(`route-info-${idx}`);
+      if (infoEl) {
+        infoEl.style.display = 'block';
+        infoEl.innerHTML = '<em style="font-size:0.85rem;color:var(--color-text-muted)">Calculating route…</em>';
+      }
+
+      let result = null;
+      let isFallback = false;
+
+      try {
+        const apiBase = window.BLOOM_API_BASE ?? '';
+        const res = await fetch(
+          `${apiBase}/catalog/route?fromLat=${userLocation.lat}&fromLng=${userLocation.lng}` +
+          `&toLat=${clinic.lat}&toLng=${clinic.lng}&mode=driving-car`
+        );
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || `Status ${res.status}`);
+        result = data;
+      } catch (err) {
+        console.warn('ORS routing unavailable, using Dijkstra fallback:', err.message);
+        isFallback = true;
+
+        // Build graph: user + all currently visible clinics
+        const visible = getFilteredClinics();
+        const nodes = [{ lat: userLocation.lat, lng: userLocation.lng }, ...visible];
+        let tIdx = nodes.findIndex(n => n.lat === clinic.lat && n.lng === clinic.lng);
+        if (tIdx === -1) { nodes.push(clinic); tIdx = nodes.length - 1; }
+        result = dijkstraFallback(nodes, tIdx);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Get directions'; }
+      }
+
+      drawRoute(result.coords);
+
+      if (infoEl) {
+        const tag = isFallback
+          ? `<span class="badge badge-distance" style="font-size:0.75rem;margin-left:0.4rem">Straight-line est.</span>`
+          : '';
+        infoEl.innerHTML = `
+          <div class="clinic-detail" style="margin-top:0.5rem;margin-bottom:0;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+            </svg>
+            <span><strong>${result.distance_km} km</strong> · ~${result.duration_min} min${tag}</span>
+          </div>`;
+      }
+    }
+
     // ----- Map -----
+    let pinMode = false;
+
     function initMap() {
       map = L.map("clinic-map").setView(JAMAICA_CENTER, 8);
 
@@ -278,34 +456,79 @@
       }).addTo(map);
 
       markersLayer = L.layerGroup().addTo(map);
+
+      // Click-to-pin: let user manually place their location on the map
+      map.on('click', (e) => {
+        if (!pinMode) return;
+        pinMode = false;
+        document.getElementById('clinic-map').style.cursor = '';
+        document.getElementById('btn-pin').textContent = 'Pin location on map';
+
+        userLocation = { lat: e.latlng.lat, lng: e.latlng.lng };
+        setStatus('Location pinned. Showing clinics near you.');
+
+        if (userAccuracyCircle) { map.removeLayer(userAccuracyCircle); userAccuracyCircle = null; }
+        renderClinics();
+      });
     }
+
+    function togglePinMode() {
+      pinMode = !pinMode;
+      const btn = document.getElementById('btn-pin');
+      if (pinMode) {
+        btn.textContent = 'Cancel - click map to place pin';
+        document.getElementById('clinic-map').style.cursor = 'crosshair';
+        setStatus('Click anywhere on the map to set your location.');
+      } else {
+        btn.textContent = 'Pin location on map';
+        document.getElementById('clinic-map').style.cursor = '';
+        setStatus('Tip: Allow location or pin yourself on the map.');
+      }
+    }
+
+    const pulseIcon = L.divIcon({
+      className: '',
+      html: '<div class="clinic-marker-pulse"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
 
     function renderMarkers(filtered) {
       if (!markersLayer) return;
       markersLayer.clearLayers();
 
-      filtered.forEach(c => {
+      filtered.forEach((c, i) => {
         const popup = `
           <strong>${c.name}</strong><br>
           ${c.address}${c.parish ? ", " + c.parish : ""}<br>
           ${c.phone ? c.phone + "<br>" : ""}
           ${c.hours ? "<em>" + c.hours + "</em>" : ""}
         `;
-        L.marker([c.lat, c.lng]).addTo(markersLayer).bindPopup(popup);
+        const marker = i === selectedClinicIdx
+          ? L.marker([c.lat, c.lng], { icon: pulseIcon })
+          : L.marker([c.lat, c.lng]);
+        marker.addTo(markersLayer).bindPopup(popup);
       });
 
       // Add user marker (if available)
       if (userLocation) {
-        L.circleMarker([userLocation.lat, userLocation.lng], { radius: 8 })
-          .addTo(markersLayer)
-          .bindPopup("You are here");
+        L.circleMarker([userLocation.lat, userLocation.lng], {
+          radius: 8, color: '#7c4dff', fillColor: '#7c4dff', fillOpacity: 1, weight: 2,
+        }).addTo(markersLayer).bindPopup("You are here (approximate)");
       }
+    }
+
+    function selectClinic(idx) {
+      selectedClinicIdx = idx;
+      renderMarkers(currentFiltered);
     }
 
     // ----- UI Rendering -----
     function renderClinics() {
       const grid = document.getElementById('clinic-grid');
       const filtered = getFilteredClinics();
+      currentFiltered = filtered;
+      selectedClinicIdx = null;
 
       if (filtered.length === 0) {
         grid.innerHTML = `<div class="clinic-empty"><p>No clinics match your filters.</p></div>`;
@@ -314,10 +537,10 @@
       }
 
       // Update grid
-      grid.innerHTML = filtered.map(c => {
+      grid.innerHTML = filtered.map((c, i) => {
         const phone = clinicPhone(c);
         return `
-        <div class="card clinic-card" data-lat="${c.lat}" data-lng="${c.lng}">
+        <div class="card clinic-card" data-lat="${c.lat}" data-lng="${c.lng}" data-idx="${i}">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
             <h3 style="margin:0;">${c.name}</h3>
             <div style="display:flex;gap:0.35rem;flex-wrap:wrap;align-items:center;">
@@ -351,8 +574,11 @@
             ${(c.services || []).map(s => `<span class="badge badge-primary">${serviceLabel(s)}</span>`).join('')}
           </div>
 
-          <div style="margin-top:0.9rem;">
+          <div id="route-info-${i}" class="route-info" style="display:none;"></div>
+
+          <div style="margin-top:0.9rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
             <button class="btn btn-outline btn-sm btn-focus-map" type="button">View on map</button>
+            <button class="btn btn-outline btn-sm btn-get-directions" type="button">Get directions</button>
           </div>
         </div>
       `}).join('');
@@ -364,11 +590,23 @@
       grid.querySelectorAll(".btn-focus-map").forEach(btn => {
         btn.addEventListener("click", (e) => {
           const card = e.target.closest(".clinic-card");
+          const idx = Number(card.dataset.idx);
           const lat = Number(card.dataset.lat);
           const lng = Number(card.dataset.lng);
+          selectClinic(idx);
           if (map && Number.isFinite(lat) && Number.isFinite(lng)) {
-            map.setView([lat, lng], 12);
+            map.setView([lat, lng], 14);
           }
+        });
+      });
+
+      // Card action: get directions
+      grid.querySelectorAll(".btn-get-directions").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const card = e.target.closest(".clinic-card");
+          const idx = Number(card.dataset.idx);
+          selectClinic(idx);
+          getDirections(filtered[idx], idx);
         });
       });
     }
@@ -395,9 +633,11 @@
     }
 
     // ----- Location -----
-    function setStatus(msg) {
+    function setStatus(msg, isError = false) {
       const el = document.getElementById("loc-status");
-      if (el) el.textContent = msg;
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.toggle('status-error', isError);
     }
 
     function requestUserLocation() {
@@ -411,33 +651,63 @@
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setStatus("Location enabled. Showing clinics near you.");
+          const accuracyM = Math.round(pos.coords.accuracy);
+          const accuracyLabel = accuracyM < 100
+            ? `±${accuracyM} m (good)`
+            : accuracyM < 1000
+              ? `±${accuracyM} m (moderate - desktop Wi-Fi estimate)`
+              : `±${(accuracyM / 1000).toFixed(1)} km (rough - IP estimate only)`;
+          setStatus(`Location found · ${accuracyLabel}`);
 
-          // Center map on user
-          if (map) map.setView([userLocation.lat, userLocation.lng], 11);
+          // Draw accuracy circle so user can see how precise the estimate is
+          if (map) {
+            if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
+            userAccuracyCircle = L.circle([userLocation.lat, userLocation.lng], {
+              radius: pos.coords.accuracy,
+              color: '#7c4dff',
+              fillColor: '#7c4dff',
+              fillOpacity: 0.08,
+              weight: 1.5,
+            }).addTo(map);
+            map.setView([userLocation.lat, userLocation.lng], 11);
+          }
 
-          // Re-render to sort by distance + update markers
           renderClinics();
         },
-        () => {
-          setStatus("Location access denied. Use the parish filter above to find clinics in your area.");
-          const parishFilter = document.getElementById("filter-parish");
-          if (parishFilter) parishFilter.focus();
+        (err) => {
+          const msgs = {
+            1: "Location permission denied. Use 'Pin location on map' instead.",
+            2: "Location unavailable — check your browser settings.",
+            3: "Location request timed out. Try again or pin manually.",
+          };
+          setStatus(msgs[err.code] || "Could not get location.", true);
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
 
     // ----- Events -----
+    document.getElementById('search-clinics').addEventListener('input', function () {
+      searchQuery = this.value.trim().toLowerCase();
+      try {
+        renderClinics();
+      } catch (err) {
+        console.error('[Clinic search error]', err);
+      }
+    });
     document.getElementById('filter-parish').addEventListener('change', renderClinics);
     document.getElementById('filter-type').addEventListener('change', renderClinics);
     document.getElementById('filter-service').addEventListener('change', renderClinics);
     document.getElementById('btn-locate').addEventListener('click', requestUserLocation);
+    document.getElementById('btn-pin').addEventListener('click', togglePinMode);
+
 
     // ----- Init -----
    async function init() {
+      initMap(); // always init the map first so it renders regardless of data
+
       try {
-        const apiBase = window.BLOOM_API_BASE || 'http://localhost:4000';
+        const apiBase = window.BLOOM_API_BASE ?? '';
         const res = await fetch(`${apiBase}/catalog/clinics`);
 
         if (!res.ok) throw new Error(`Backend error: ${res.status}`);
@@ -447,14 +717,19 @@
         clinics = (data.clinics || []).map(attachCoords);
 
       } catch (e) {
-        console.warn('Backend fetch failed, falling back to local:', e);
+        console.warn('Backend fetch failed, trying local fallback:', e);
 
-        const res = await fetch('/data/clinics.json');
-        const data = await res.json();
-        clinics = (data.clinics || data || []).map(attachCoords);
+        try {
+          const res = await fetch('/data/clinics.json');
+          if (!res.ok) throw new Error('clinics.json not found');
+          const data = await res.json();
+          clinics = (data.clinics || data || []).map(attachCoords);
+        } catch (e2) {
+          console.warn('Local fallback also failed:', e2);
+          clinics = [];
+        }
       }
 
-      initMap();
       populateFilters();
       renderClinics();
 

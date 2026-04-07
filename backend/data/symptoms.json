@@ -30,7 +30,7 @@
     "key": "LARGE_CLOTS",
     "label": "Large clots",
     "category": "Bleeding",
-    "description": "Passing clots larger than a quarter — consider speaking to a provider",
+    "description": "Passing clots larger than a quarter - consider speaking to a provider",
     "teenSafe": true,
     "sensitive": false,
     "severityScale": { "min": 0, "max": 5 }
@@ -174,7 +174,7 @@
     "key": "DISCHARGE_EGGWHITE",
     "label": "Egg-white discharge",
     "category": "Discharge",
-    "description": "Clear, stretchy discharge — often a sign of ovulation",
+    "description": "Clear, stretchy discharge - often a sign of ovulation",
     "teenSafe": true,
     "sensitive": false,
     "severityScale": { "min": 0, "max": 5 }
@@ -264,7 +264,7 @@
     "key": "BBT_SHIFT",
     "label": "Basal temp shift",
     "category": "Temperature",
-    "description": "Slight rise in basal body temperature — often indicates ovulation has occurred",
+    "description": "Slight rise in basal body temperature - often indicates ovulation has occurred",
     "teenSafe": true,
     "sensitive": false,
     "severityScale": { "min": 0, "max": 5 }
@@ -444,7 +444,7 @@
     "key": "INCREASED_LIBIDO",
     "label": "Increased libido",
     "category": "Fertility",
-    "description": "Heightened sexual desire — common around ovulation",
+    "description": "Heightened sexual desire - common around ovulation",
     "teenSafe": false,
     "sensitive": true,
     "severityScale": { "min": 0, "max": 5 }

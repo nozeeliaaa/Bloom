@@ -61,7 +61,7 @@ function lastNDays(n) {
 
 /* ─── 1. PMS pattern detection ─────────────────────────────────────────────── */
 
-describe("detectSymptomPatternSignal — PMS pattern", () => {
+describe("detectSymptomPatternSignal - PMS pattern", () => {
   it("fires SYMPTOMS_MATCH_PMS_PATTERN in luteal phase with 3+ cluster symptoms", () => {
     const result = detectSymptomPatternSignal({
       loggedSymptoms: symptoms({
@@ -96,7 +96,7 @@ describe("detectSymptomPatternSignal — PMS pattern", () => {
 
 /* ─── 2. Menstrual pattern detection ───────────────────────────────────────── */
 
-describe("detectSymptomPatternSignal — menstrual pattern", () => {
+describe("detectSymptomPatternSignal - menstrual pattern", () => {
   it("fires SYMPTOMS_MATCH_MENSTRUAL_PATTERN with bleeding + cramps + fatigue", () => {
     const result = detectSymptomPatternSignal({
       loggedSymptoms: symptoms({ VAGINAL_BLEEDING: 3, CRAMPS: 3, FATIGUE: 2 }),
@@ -118,7 +118,7 @@ describe("detectSymptomPatternSignal — menstrual pattern", () => {
 
 /* ─── 3. Ovulation pattern detection ──────────────────────────────────────── */
 
-describe("detectSymptomPatternSignal — ovulation pattern", () => {
+describe("detectSymptomPatternSignal - ovulation pattern", () => {
   it("fires SYMPTOMS_MATCH_OVULATION_PATTERN with eggwhite + BBT shift + ovulation pain", () => {
     const result = detectSymptomPatternSignal({
       loggedSymptoms: symptoms({ DISCHARGE_EGGWHITE: 2, BBT_SHIFT: 1, OVULATION_PAIN: 2 }),
@@ -138,7 +138,7 @@ describe("detectSymptomPatternSignal — ovulation pattern", () => {
 
 /* ─── 4. Hormonal pattern detection ───────────────────────────────────────── */
 
-describe("detectSymptomPatternSignal — hormonal pattern", () => {
+describe("detectSymptomPatternSignal - hormonal pattern", () => {
   it("fires SYMPTOMS_MATCH_HORMONAL_PATTERN with acne + hair thinning + irregular + fatigue", () => {
     const result = detectSymptomPatternSignal({
       loggedSymptoms: symptoms({
@@ -160,9 +160,9 @@ describe("detectSymptomPatternSignal — hormonal pattern", () => {
   });
 });
 
-/* ─── 5. Safety escalation — heavy flow + fatigue ─────────────────────────── */
+/* ─── 5. Safety escalation - heavy flow + fatigue ─────────────────────────── */
 
-describe("detectSafetyEscalationSignal — heavy flow + fatigue", () => {
+describe("detectSafetyEscalationSignal - heavy flow + fatigue", () => {
   it("fires SEEK_URGENT_CARE when HEAVY_FLOW >= 4 and FATIGUE present", () => {
     const syms = symptoms({ HEAVY_FLOW: 4, FATIGUE: 2 });
     const result = detectSafetyEscalationSignal({
@@ -186,7 +186,7 @@ describe("detectSafetyEscalationSignal — heavy flow + fatigue", () => {
 
 /* ─── 6. Ectopic risk flag ─────────────────────────────────────────────────── */
 
-describe("detectSafetyEscalationSignal — ectopic risk", () => {
+describe("detectSafetyEscalationSignal - ectopic risk", () => {
   it("fires SEEK_URGENT_CARE for CRAMPS >= 4 + SPOTTING + MISSED_PERIOD", () => {
     const syms = symptoms({ CRAMPS: 4, SPOTTING: 2, MISSED_PERIOD: 1 });
     const result = detectSafetyEscalationSignal({
@@ -200,7 +200,7 @@ describe("detectSafetyEscalationSignal — ectopic risk", () => {
 
 /* ─── 7. Fever proxy ───────────────────────────────────────────────────────── */
 
-describe("detectSafetyEscalationSignal — fever proxy with pelvic symptoms", () => {
+describe("detectSafetyEscalationSignal - fever proxy with pelvic symptoms", () => {
   it("fires SEEK_URGENT_CARE for PELVIC_PAIN >= 4 + NIGHT_SWEATS + COLD_FLASHES", () => {
     const syms = symptoms({ PELVIC_PAIN: 4, NIGHT_SWEATS: 2, COLD_FLASHES: 2 });
     const result = detectSafetyEscalationSignal({
@@ -224,7 +224,7 @@ describe("detectSafetyEscalationSignal — fever proxy with pelvic symptoms", ()
 
 /* ─── 8. New symptom detection ─────────────────────────────────────────────── */
 
-describe("detectBaselineDeviationSignal — new symptom", () => {
+describe("detectBaselineDeviationSignal - new symptom", () => {
   it("fires NEW_SYMPTOM_DETECTED when code not seen in history", () => {
     const history = [
       historyEntry("2026-01-01", { CRAMPS: 2, FATIGUE: 2 }),
@@ -256,7 +256,7 @@ describe("detectBaselineDeviationSignal — new symptom", () => {
 
 /* ─── 9. Intensity deviation above personal baseline ──────────────────────── */
 
-describe("detectBaselineDeviationSignal — intensity deviation", () => {
+describe("detectBaselineDeviationSignal - intensity deviation", () => {
   it("fires SYMPTOMS_MORE_INTENSE_THAN_USUAL when severity is 2+ above baseline", () => {
     const history = [
       historyEntry("2026-01-01", { CRAMPS: 1 }),
@@ -302,7 +302,7 @@ describe("isSymptomPersistent", () => {
 
   it("returns false when there is a gap in the streak", () => {
     const days = lastNDays(4);
-    // Leave day 2 (index 2) empty — break the streak
+    // Leave day 2 (index 2) empty - break the streak
     const history = [
       historyEntry(days[0], { CRAMPS: 3 }),
       historyEntry(days[1], { CRAMPS: 3 }),
@@ -315,7 +315,7 @@ describe("isSymptomPersistent", () => {
 
 /* ─── 11. Phase mismatch detection ────────────────────────────────────────── */
 
-describe("detectReproductiveGuidanceSignal — cycle phase shift", () => {
+describe("detectReproductiveGuidanceSignal - cycle phase shift", () => {
   it("fires CYCLE_PHASE_SHIFT_POSSIBLE when DISCHARGE_EGGWHITE logged in luteal phase", () => {
     const result = detectReproductiveGuidanceSignal({
       loggedSymptoms: symptoms({ DISCHARGE_EGGWHITE: 2, BLOATING: 2 }),
@@ -338,7 +338,7 @@ describe("detectReproductiveGuidanceSignal — cycle phase shift", () => {
 
 /* ─── 12. Pregnancy test timing ───────────────────────────────────────────── */
 
-describe("detectReproductiveGuidanceSignal — pregnancy test timing", () => {
+describe("detectReproductiveGuidanceSignal - pregnancy test timing", () => {
   it("fires PREGNANCY_TEST_TIMING_RELEVANT for MISSED_PERIOD + NAUSEA + FATIGUE", () => {
     const result = detectReproductiveGuidanceSignal({
       loggedSymptoms: symptoms({ MISSED_PERIOD: 1, NAUSEA: 2, FATIGUE: 3 }),
@@ -360,7 +360,7 @@ describe("detectReproductiveGuidanceSignal — pregnancy test timing", () => {
 
 /* ─── 13. Perimenopause pattern ────────────────────────────────────────────── */
 
-describe("detectSymptomPatternSignal — perimenopause pattern", () => {
+describe("detectSymptomPatternSignal - perimenopause pattern", () => {
   it("fires SYMPTOMS_MATCH_PERIMENOPAUSE_PATTERN with 3+ cluster symptoms", () => {
     const result = detectSymptomPatternSignal({
       loggedSymptoms: symptoms({
@@ -375,7 +375,7 @@ describe("detectSymptomPatternSignal — perimenopause pattern", () => {
 
 /* ─── 14. Insufficient history suppresses baseline signals ─────────────────── */
 
-describe("detectBaselineDeviationSignal — insufficient history", () => {
+describe("detectBaselineDeviationSignal - insufficient history", () => {
   it("returns NOT_ENOUGH_HISTORY_FOR_BASELINE with show: false when cycleCount < 2", () => {
     const result = detectBaselineDeviationSignal({
       loggedSymptoms: symptoms({ CRAMPS: 4, FATIGUE: 3 }),
@@ -400,7 +400,7 @@ describe("detectBaselineDeviationSignal — insufficient history", () => {
 
 /* ─── 15. Logging gap detection ────────────────────────────────────────────── */
 
-describe("detectDataQualitySignal — logging gap", () => {
+describe("detectDataQualitySignal - logging gap", () => {
   it("fires SYMPTOM_LOGGING_GAP when last entry is 14+ days ago", () => {
     const staleDate = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000);
     const key = staleDate.toISOString().slice(0, 10);
@@ -426,7 +426,7 @@ describe("detectDataQualitySignal — logging gap", () => {
 
 /* ─── 16. All severity-0 entries → LOW_SEVERITY_DATA ──────────────────────── */
 
-describe("detectDataQualitySignal — low severity data", () => {
+describe("detectDataQualitySignal - low severity data", () => {
   it("returns LOW_SEVERITY_DATA with show: false when all severities are 0", () => {
     const today = new Date().toISOString().slice(0, 10);
     const result = detectDataQualitySignal({
@@ -439,9 +439,9 @@ describe("detectDataQualitySignal — low severity data", () => {
   });
 });
 
-/* ─── 17. getBloomieSymptomContext — urgent flag ───────────────────────────── */
+/* ─── 17. getBloomieSymptomContext - urgent flag ───────────────────────────── */
 
-describe("getBloomieSymptomContext — urgent flag", () => {
+describe("getBloomieSymptomContext - urgent flag", () => {
   it("sets hasUrgentSignal = true when any signal is high level", () => {
     const syms = symptoms({ HEAVY_FLOW: 4, FATIGUE: 2 });
     const signals = generateSymptomSignals({
@@ -466,9 +466,9 @@ describe("getBloomieSymptomContext — urgent flag", () => {
   });
 });
 
-/* ─── 18. getBloomieSymptomContext — bloomieInsight when pattern detected ──── */
+/* ─── 18. getBloomieSymptomContext - bloomieInsight when pattern detected ──── */
 
-describe("getBloomieSymptomContext — bloomieInsight", () => {
+describe("getBloomieSymptomContext - bloomieInsight", () => {
   it("returns a bloomieInsight string when a pattern is detected", () => {
     const signals = generateSymptomSignals({
       loggedSymptoms: symptoms({
@@ -498,7 +498,7 @@ describe("getBloomieSymptomContext — bloomieInsight", () => {
 
 /* ─── 19. Safety escalation takes priority in sorted results ──────────────── */
 
-describe("generateSymptomSignals — safety escalation priority", () => {
+describe("generateSymptomSignals - safety escalation priority", () => {
   it("places SEEK_URGENT_CARE first in the output array", () => {
     const syms = symptoms({
       HEAVY_FLOW: 4, FATIGUE: 2,
@@ -518,7 +518,7 @@ describe("generateSymptomSignals — safety escalation priority", () => {
 
 /* ─── 20. Multiple signals sorted correctly by level ──────────────────────── */
 
-describe("generateSymptomSignals — signal sort order", () => {
+describe("generateSymptomSignals - signal sort order", () => {
   it("sorts high > medium > low and all returned signals have show: true", () => {
     const signals = generateSymptomSignals({
       loggedSymptoms: symptoms({
@@ -542,7 +542,7 @@ describe("generateSymptomSignals — signal sort order", () => {
 
 /* ─── 21. Phase context match ──────────────────────────────────────────────── */
 
-describe("detectPhaseContextSignal — phase match", () => {
+describe("detectPhaseContextSignal - phase match", () => {
   it("fires SYMPTOMS_MATCH_PHASE for 3+ luteal expected symptoms in luteal phase", () => {
     const result = detectPhaseContextSignal({
       loggedSymptoms: symptoms({
@@ -557,7 +557,7 @@ describe("detectPhaseContextSignal — phase match", () => {
 
 /* ─── 22. Phase context unexpected ────────────────────────────────────────── */
 
-describe("detectPhaseContextSignal — unexpected symptoms", () => {
+describe("detectPhaseContextSignal - unexpected symptoms", () => {
   it("fires SYMPTOMS_UNEXPECTED_FOR_PHASE for 2+ unexpected symbols in menstrual phase", () => {
     const result = detectPhaseContextSignal({
       loggedSymptoms: symptoms({
@@ -635,7 +635,7 @@ describe("getHighestPrioritySymptomSignal", () => {
 
 /* ─── N1. SEEK_URGENT_CARE suppresses HEAVY_BLEEDING_FLAG ─────────────────── */
 
-describe("generateSymptomSignals — safety suppression", () => {
+describe("generateSymptomSignals - safety suppression", () => {
   it("SEEK_URGENT_CARE suppresses HEAVY_BLEEDING_FLAG in same output", () => {
     // HEAVY_FLOW >= 4 + FATIGUE triggers SEEK_URGENT_CARE
     // HEAVY_FLOW alone (if it were to show) would also trigger HEAVY_BLEEDING_FLAG
@@ -668,7 +668,7 @@ describe("generateSymptomSignals — safety suppression", () => {
 
 /* ─── N2. Low phase confidence softens language ───────────────────────────── */
 
-describe("detectPhaseContextSignal — phase confidence softening", () => {
+describe("detectPhaseContextSignal - phase confidence softening", () => {
   it("uses softened message when phaseConfidence is 'low'", () => {
     const result = detectPhaseContextSignal({
       loggedSymptoms: symptoms({ DISCHARGE_EGGWHITE: 2, INCREASED_LIBIDO: 2, CRAMPS: 2 }),
@@ -705,7 +705,7 @@ describe("detectPhaseContextSignal — phase confidence softening", () => {
 
 /* ─── N3. Phase map validation catches unknown code ───────────────────────── */
 
-describe("validatePhaseMapCodes — phase map validation", () => {
+describe("validatePhaseMapCodes - phase map validation", () => {
   it("throws when phase map contains an unknown code", () => {
     const badMap = {
       menstrual: { expected: ["CRAMPS", "TYPO_CODE_XYZ"], unexpected: [] },
@@ -722,7 +722,7 @@ describe("validatePhaseMapCodes — phase map validation", () => {
 
 /* ─── N4. Weighted baseline gives higher weight to recent entries ──────────── */
 
-describe("getBaselineSeverity — weighted baseline", () => {
+describe("getBaselineSeverity - weighted baseline", () => {
   it("gives more weight to recent entries when weightRecent=true", () => {
     // Older entry: severity 1; recent entry (within last 30 days): severity 5
     const recentKey = new Date().toISOString().slice(0, 10);
@@ -749,7 +749,7 @@ describe("getBaselineSeverity — weighted baseline", () => {
 
 /* ─── N5. generateIntegratedSignals elevates pregnancy signal ─────────────── */
 
-describe("generateIntegratedSignals — pregnancy signal elevation", () => {
+describe("generateIntegratedSignals - pregnancy signal elevation", () => {
   it("elevates PREGNANCY_TEST_TIMING_RELEVANT to high when cycle engine also fires MISSED_PERIOD", () => {
     // Use a lastPeriodStart far enough in the past to trigger MISSED_PERIOD in cycle engine
     const lastPeriodStart = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000); // 60 days ago
@@ -775,7 +775,7 @@ describe("generateIntegratedSignals — pregnancy signal elevation", () => {
 
 /* ─── N6. generateIntegratedSignals adds ectopic note ─────────────────────── */
 
-describe("generateIntegratedSignals — ectopic risk note", () => {
+describe("generateIntegratedSignals - ectopic risk note", () => {
   it("adds ectopic risk note to SEEK_URGENT_CARE message when MISSED_PERIOD fires in cycle engine", () => {
     const lastPeriodStart = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
     const expectedEnd     = new Date(Date.now() - 25 * 24 * 60 * 60 * 1000);
@@ -800,7 +800,7 @@ describe("generateIntegratedSignals — ectopic risk note", () => {
 
 /* ─── N7. Sporadic logger suppression ─────────────────────────────────────── */
 
-describe("detectDataQualitySignal — sporadic logger suppression", () => {
+describe("detectDataQualitySignal - sporadic logger suppression", () => {
   it("suppresses SYMPTOM_LOGGING_GAP when user is a sporadic logger with suppressLoggingGapIfSporadic", () => {
     // Build a history where entries are ~15 days apart (sporadic) and cycleCount > 3
     const gaps = [0, 15, 30, 45, 60, 75];
@@ -815,7 +815,7 @@ describe("detectDataQualitySignal — sporadic logger suppression", () => {
       cycleCount:      5,
       settings:        { suppressLoggingGapIfSporadic: true },
     });
-    // Should be suppressed — not SYMPTOM_LOGGING_GAP
+    // Should be suppressed - not SYMPTOM_LOGGING_GAP
     expect(result.code).not.toBe("SYMPTOM_LOGGING_GAP");
     expect(result.show).toBe(false);
   });
@@ -835,7 +835,7 @@ describe("detectDataQualitySignal — sporadic logger suppression", () => {
 
 /* ─── N8. Cross-validation note when both engines detect cycle shift ──────── */
 
-describe("generateIntegratedSignals — cycle shift cross-validation", () => {
+describe("generateIntegratedSignals - cycle shift cross-validation", () => {
   it("adds cross-validation note and elevates level when both engines detect cycle shift", () => {
     // cycleLengths showing a sudden shift (recent avg vs baseline avg > 5 days)
     const cycleLengths = [28, 28, 28, 35, 36, 37]; // recent cycles lengthened suddenly

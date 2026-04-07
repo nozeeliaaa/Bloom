@@ -1,8 +1,8 @@
 /**
  * src/routes/preferences.js
  *
- * GET  /preferences      — load user preferences from Firestore
- * PUT  /preferences      — save user preferences to Firestore
+ * GET  /preferences      - load user preferences from Firestore
+ * PUT  /preferences      - save user preferences to Firestore
  */
 
 import express from "express";
@@ -10,6 +10,7 @@ import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
+
 
 const router = express.Router();
 
@@ -39,8 +40,24 @@ router.put("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const body = req.body;
+    console.log(`[preferences] PUT from uid=${uid} body=`, JSON.stringify(body));
 
-    // Build a validated preferences object — never blindly store req.body
+    if (body.pregnancyMode !== undefined && req.user.ageBand === "10-17") {
+      // Run the consent check manually for this field only
+      const consentSnap = await db.collection("consents")
+        .where("teenUid", "==", req.user.uid)
+        .where("status", "==", "approved")
+        .limit(1)
+        .get();
+
+      if (consentSnap.empty || !consentSnap.docs[0].data().scope?.pregnancyMode) {
+        return res.status(403).json({
+          error: "Guardian consent is required to enable pregnancy mode.",
+          code: "PREGNANCY_CONSENT_REQUIRED",
+        });
+      }
+    }
+    // Build a validated preferences object - never blindly store req.body
     const prefs = {};
 
     if (body.theme !== undefined) {
