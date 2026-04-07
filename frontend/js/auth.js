@@ -262,6 +262,8 @@ export async function resendVerificationEmail(email, password) {
 const USER_LOCAL_KEYS = [
   "bloom_daily_logs",
   "bloom_assistant_session",
+  "bloomie_state_v2",
+  "bloomieMemory",
   "bloom_bloomie_memory",
   "bloom_avatar",
   "bloom_goal",

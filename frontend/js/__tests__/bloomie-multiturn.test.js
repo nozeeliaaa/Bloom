@@ -353,6 +353,32 @@ describe("multi-turn: MEDIUM confidence pending route", () => {
     expect(chat.getState().pendingRoute).toBeNull();
     expect(chat.getState().state).toBe("NARROWING");
   });
+
+  it("treats typed 'no' as confirmation response (not OOS)", () => {
+    buildGuidanceResponse.mockReturnValueOnce(null);
+    computeRouteConfidence.mockReturnValueOnce(MEDIUM_CONF);
+
+    sendMessage("late period cramps");
+    expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
+
+    sendMessage("no");
+    expect(chat.getState().pendingRoute).toBeNull();
+    expect(chat.getState().state).toBe("NARROWING");
+    expect(chat.getState().oosStreakCount).toBe(0);
+  });
+
+  it("treats typed 'ok' as affirmative response in binary confirmation", () => {
+    buildGuidanceResponse.mockReturnValueOnce(null);
+    computeRouteConfidence.mockReturnValueOnce(MEDIUM_CONF);
+
+    sendMessage("late period cramps");
+    expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
+
+    sendMessage("ok");
+    expect(chat.getState().pendingRoute).toBeNull();
+    expect(chat.getState().state).not.toBe("MEDIUM_CONFIRM");
+    expect(chat.getState().oosStreakCount).toBe(0);
+  });
 });
 
 // ── 9. Return to resolved topic ───────────────────────────────────────────────

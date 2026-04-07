@@ -556,6 +556,11 @@ export function scoreVagueHealth(text) {
 export function scoreSignals(t) {
   t = String(t || "").toLowerCase();
 
+  const PREGNANCY_KEYWORD_RE = /\b(pregnant|pregnancy|breed)\b/;
+  const PREGNANCY_TEST_PHRASE_RE = /\b(pregnancy\s+test|test\s+for\s+pregnancy|positive\s+test|negative\s+test|test\s+(?:was|is|came\s+back)\s+(?:positive|negative)|tested\s+(?:positive|negative))\b/;
+  const GENERIC_TEST_ACTION_RE = /\b(?:i\s+)?(?:just\s+)?(?:took|take|taking|taken|did|done|tested)\s+(?:a\s+)?test\b/;
+  const NON_PREG_TEST_CONTEXT_RE = /\b(?:blood|iron|urine|covid|flu|hiv|sti|std|thyroid|glucose|sugar|cholesterol|allergy|dna|opk|ovulation)\s+test\b|\btest\s+results?\b|\blet\s+me\s+test\b|\btest\s+something\b/;
+
   const sig = {
     late:        0,
     heavy:       0,
@@ -599,11 +604,16 @@ export function scoreSignals(t) {
   if (/discomfort|ache|sore/.test(t))                            sig.pelvic    += 1;
 
   // pregnancy signals
-  if (/pregnant|pregnancy|test|breed/.test(t))                   sig.pregnancy += 2;
+  const hasPregnancyKeyword = PREGNANCY_KEYWORD_RE.test(t);
+  const hasPregnancyTestPhrase = PREGNANCY_TEST_PHRASE_RE.test(t);
+  const hasGenericPregnancyTestAction = GENERIC_TEST_ACTION_RE.test(t) && !NON_PREG_TEST_CONTEXT_RE.test(t);
+  if (hasPregnancyKeyword || hasPregnancyTestPhrase || hasGenericPregnancyTestAction) sig.pregnancy += 2;
   if (/unprotected|missed.*period/.test(t))                      sig.pregnancy += 1;
 
   // discharge
   if (/discharge|odor|smell/.test(t))                            sig.discharge += 2;
+  if (/\b(?:down there|down deh|down below|private parts?|lady parts?|feminine area)\b.*\b(?:off|wrong|weird|not normal|funny|odd|strange|irritat|uncomfort)\b/.test(t)) sig.discharge += 2;
+  if (/\b(?:down there|down deh|down below)\b.*\b(?:hurt|pain|sore|burn|itch)\b/.test(t)) sig.pelvic += 1;
 
   // "is my period late?" - direct lateness question needing cycle math
   if (/is my period (late|overdue|due|coming)|has my period (come|arrived)/.test(t)) sig.late_check += 3;

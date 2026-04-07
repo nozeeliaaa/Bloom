@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { extractEntities, inferRoute } from "../bloomie-inference.js";
+import { extractEntities, inferRoute, detectAmbiguousInput, detectMissingContext } from "../bloomie-inference.js";
 
 // ─── extractEntities ──────────────────────────────────────────────────────────
 
@@ -52,6 +52,11 @@ describe("extractEntities — symptoms", () => {
 
   it("detects discharge", () => {
     const e = extractEntities("there is unusual discharge with odor");
+    expect(e.symptoms.discharge).toBe(true);
+  });
+
+  it("detects down-there 'off' phrasing as discharge-adjacent", () => {
+    const e = extractEntities("down there feel off");
     expect(e.symptoms.discharge).toBe(true);
   });
 });
@@ -351,5 +356,28 @@ describe("inferRoute — implicit late (no other symptoms)", () => {
     expect(route?.next).not.toBe("LATE_NO_GUIDANCE");
     expect(route?.next).not.toBe("LATE_YES_PREG");
     expect(route?.next).not.toBe("PREGNANCY_ENTRY");
+  });
+});
+
+describe("clarification helpers — ambiguity and missing context", () => {
+  it("asks targeted reproductive-health clarification for vague down-there wording", () => {
+    const text = "down there feel off";
+    const entities = extractEntities(text);
+    const q = detectAmbiguousInput(text, entities);
+    expect(q).toMatch(/discharge|irritation|down there/i);
+  });
+
+  it("treats broad stomach pain phrasing as ambiguous before pelvic explanation", () => {
+    const text = "my stomach hurt";
+    const entities = extractEntities(text);
+    const q = detectAmbiguousInput(text, entities);
+    expect(q).toMatch(/pelvis|stomach|belly/i);
+  });
+
+  it("missing-context probe also asks pelvis-vs-belly split for broad stomach phrasing", () => {
+    const text = "belly hurt";
+    const entities = extractEntities(text);
+    const q = detectMissingContext(entities, text);
+    expect(q).toMatch(/pelvic|belly|stomach/i);
   });
 });

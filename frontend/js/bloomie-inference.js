@@ -35,7 +35,7 @@ function extractSymptoms(t) {
     spotting:       /\b(spot|spotting|pink|brown.*discharge|blood.*between|between.*period)\b/.test(t),
     pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly|one.sided.*pain|one.side.*hurt|one side.*hurt|lower.*abdominal.*pain|side.*hurts)\b/.test(t),
     mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it|feel.*low|so low|feel low|feeling low|angry|anger|mad|vex|frustrated|frustration|annoyed|snappy|happy|happier|good mood|excited|calm|overwhelmed|don't feel like myself|dont feel like myself|not like myself)\b/.test(t),
-    discharge:      /\b(discharge|smell|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation)\b/.test(t),
+    discharge:      /\b(discharge|smell|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation|down.*there.*(?:off|wrong|weird|not normal|funny|odd|irritat|uncomfort)|(?:something|sumn).*(?:wrong|weird|off).*(?:down there|down deh|down below))\b/.test(t),
     nausea:         /\b(nausea|nauseous|vomit|sick to.*stomach|throw up|queasy)\b/.test(t),
     dizziness:      /\b(dizzy|dizziness|lightheaded|faint|head.*spin|head.*swim)\b/.test(t),
 
@@ -532,6 +532,22 @@ export function detectAmbiguousInput(text, entities) {
   const t   = String(text || "").toLowerCase().trim();
   const sym = entities?.symptoms || {};
   const words = t.split(/\s+/).filter(Boolean);
+  const hasDownThereVague =
+    /\b(?:down there|down deh|down below|private parts?|lady parts?|feminine area)\b/.test(t) &&
+    /\b(?:off|wrong|weird|not normal|funny|odd|strange|uncomfort)\b/.test(t) &&
+    !sym.heavy && !sym.late && !sym.dizziness;
+  const hasBroadBellyPain =
+    (/\b(stomach|belly)\b.*\b(hurt|hurts|hurting|ache|aches|pain|funny|off)\b/.test(t) ||
+      /\b(hurt|hurts|hurting|ache|aches|pain)\b.*\b(stomach|belly)\b/.test(t)) &&
+    !/\b(pelvic|lower\s+(?:belly|abdomen)|one.?sided|cramp|cramps|period pain)\b/.test(t);
+
+  if (hasDownThereVague) {
+    return "Got you 💗 Is it more like discharge, irritation, pain, or just a general off feeling down there?";
+  }
+
+  if (hasBroadBellyPain && !sym.heavy && !sym.late && !sym.discharge && !entities?.urgent && words.length <= 10) {
+    return "Got you 💗 Is it more like cramps low in your pelvis, or more your stomach/belly in general?";
+  }
 
   // "dizzy" or "dizziness" alone (short message, dizziness signal, no other anchor)
   if (
@@ -665,6 +681,16 @@ export function detectContradiction(text, _entities) {
 export function detectMissingContext(entities, text) {
   const t   = String(text || "").toLowerCase();
   const sym = entities?.symptoms || {};
+
+  // Broad belly/stomach pain phrasing is ambiguous; confirm before
+  // giving specific pelvic-cycle explanations.
+  if (
+    /\b(stomach|belly)\b.*\b(hurt|hurts|hurting|ache|aches|pain|funny|off)\b/.test(t) &&
+    !/\b(pelvic|lower\s+(?:belly|abdomen)|one.?sided|cramp|cramps)\b/.test(t) &&
+    !entities?.severity
+  ) {
+    return "Quick check: is this more crampy low-pelvic pain, or more general stomach/belly discomfort?";
+  }
 
   // Pain signal but no location and no pelvic/belly entity
   const hasPain = /\b(pain|hurt|hurts|hurting|ache|aches|sore)\b/.test(t);

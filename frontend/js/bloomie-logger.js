@@ -28,8 +28,51 @@
 
 import { getIdToken } from "./auth.js";
 import { isAccountMode } from "./mode.js";
+import { isBloomieDebugEnabled } from "./bloom-storage.js";
 
 const API_BASE = (typeof window !== "undefined" && window.BLOOM_API_BASE) || "";
+
+// ── Timeout constants ─────────────────────────────────────────────────────────
+// Safety log is given a slightly longer window; analytics is capped tighter.
+const SAFETY_LOG_TIMEOUT_MS  = 5000;
+const ANALYTICS_TIMEOUT_MS   = 2000;
+
+// ── fetchWithTimeout ──────────────────────────────────────────────────────────
+//
+// Wraps fetch() with a hard deadline that *actually cancels* the in-flight
+// request when the deadline fires.  The old Promise.race() approach let the
+// underlying connection continue to consume resources and hold a TCP slot open
+// even after the caller had already moved on — only the JS-side Promise was
+// settled, not the network request.
+//
+// How it works:
+//   1. An AbortController is created and its signal is passed to fetch().
+//   2. A setTimeout schedules controller.abort() at the deadline.
+//   3. .finally() always clears the timer — whether the fetch resolved,
+//      rejected, or was aborted — so no dangling timers outlive fast responses.
+//   4. If abort fires first, fetch() rejects with a DOMException whose
+//      .name === "AbortError".  All callers wrap calls in .catch(() => {})
+//      so this is silently swallowed — it never surfaces to the user.
+//
+// Failure taxonomy after this change:
+//   - Timeout:         AbortController fires → fetch rejects AbortError → caught
+//   - Network failure: fetch rejects TypeError → caught
+//   - HTTP non-2xx:    fetch resolves (response.ok === false) → handled per call
+//   - AbortController unavailable (ancient runtime): graceful degradation to
+//     plain fetch with no timeout — acceptable for best-effort logging.
+//
+function fetchWithTimeout(url, options, timeoutMs) {
+  let controller, timerId;
+  try {
+    controller = new AbortController();
+    timerId = setTimeout(() => controller.abort(), timeoutMs);
+  } catch {
+    // AbortController not available — fall back to plain fetch with no timeout.
+    return fetch(url, options);
+  }
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(timerId));
+}
 
 export function logSafetyEvent(type, payload = {}) {
   // Skip logging for anonymous users — no account, no record
@@ -48,14 +91,18 @@ async function _send(type, payload) {
     ...sanitize(payload),
   };
 
-  await fetch(`${API_BASE}/api/bloomie-safety-log`, {
-    method:  "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization:  `Bearer ${token}`,
+  await fetchWithTimeout(
+    `${API_BASE}/api/bloomie-safety-log`,
+    {
+      method:  "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization:  `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    SAFETY_LOG_TIMEOUT_MS,
+  );
 }
 
 function sanitize(payload) {
@@ -124,7 +171,8 @@ function sanitizeAnalytics(payload) {
 /**
  * Fire-and-forget analytics logger.
  * Auth is optional — anonymous users are tracked without a uid.
- * Applies a 2000 ms hard timeout so a slow network never blocks.
+ * Cancels the request via AbortController after ANALYTICS_TIMEOUT_MS (2000 ms)
+ * so a slow network never holds open a connection beyond that window.
  */
 export function logAnalyticsEvent(eventType, payload = {}, ctx = null) {
   _sendAnalytics(eventType, payload, ctx).catch(() => {});
@@ -150,7 +198,7 @@ export function logAnalyticsEvent(eventType, payload = {}, ctx = null) {
 
 const _DEBUG =
   typeof window !== "undefined" &&
-  window.localStorage?.getItem("BLOOMIE_DEBUG") === "true";
+  isBloomieDebugEnabled();
 
 const _CAT_STYLES = {
   route:            "color:#6366f1;font-weight:bold",  // indigo  — routing decision
@@ -256,14 +304,13 @@ async function _sendAnalytics(eventType, payload, ctx) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  await Promise.race([
-    fetch(`${API_BASE}/api/bloomie/analytics`, {
+  await fetchWithTimeout(
+    `${API_BASE}/api/bloomie/analytics`,
+    {
       method:  "POST",
       headers,
       body:    JSON.stringify(body),
-    }),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("analytics timeout")), 2000)
-    ),
-  ]);
+    },
+    ANALYTICS_TIMEOUT_MS,
+  );
 }

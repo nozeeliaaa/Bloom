@@ -88,6 +88,7 @@ export function createCtx() {
     cycleVariability:   null,       // range (max–min) across last 3 logged cycle lengths, null if unknown
     currentTone:        null,       // tone resolved for the current message ('distressed'|'angry'|…|'neutral')
     previousTone:       null,       // tone from the prior turn - used for session stability blending
+    toneRequestId:      0,          // monotonic token for in-flight async tone resolution; stale promises must not mutate ctx
     usedOpeners:        new Set(),  // opener strings already shown - prevents repetition within a session
     symptomSignals:     null,       // pre-computed SymptomSignal[] from bloom-symptom-engine, or null
     cumulativeRiskFlags:      new Set(),  // accumulates risk signal flags across conversation
@@ -115,6 +116,8 @@ export function createCtx() {
     narrowingCandidates:    null,          // [{ id, label, next }] for LOW tier NARROWING
     lastConfidence:         null,          // last full ConfidenceResult (including route/competitors/ambiguous)
     confidenceFallbackCount: 0,            // how many times CONFIDENCE_FALLBACK has been shown this session
+    narrowingAttemptCount:  0,             // consecutive disambiguation attempts (NARROWING/CONFIDENCE_FALLBACK)
+    lastNarrowingPrompt:    null,          // fingerprint of last narrowing prompt variant used
 
     // ── Conversation intelligence (Prompt 2) ───────────────────────────────
     conversationProfile: {
@@ -145,5 +148,8 @@ export function createCtx() {
     contentSuggestionsShown: new Set(),   // content IDs shown this session; seeded from bloomieMemory at mount
     declinedSuggestions:   new Set(),     // content IDs the user declined; seeded from bloomieMemory at mount
     lastUsedGreeting:      null,          // first line of buildIntro() used this session; flushed to memory on save
+    lastClarifierFingerprint: null,       // fingerprint of last clarifying follow-up question emitted
+    lastClarifierTurn:       -1,          // flowId when clarifying follow-up was last emitted
+    lastBotLineFingerprint:  null,        // fingerprint of most recently emitted bot line (live generation only)
   };
 }

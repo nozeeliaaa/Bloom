@@ -1,6 +1,6 @@
 import { normalizePatois, detectPatois, detectUserTone, fuzzyCorrect, collapseRepeatedLetters, expandShorthand } from "./bloomie-patois.js";
 import { resolveTone, applyToneToLines, applyToneToChoices } from "./bloomie-tone.js";
-import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext } from "./bloomie-inference.js";
+import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInput, detectContradiction, detectMissingContext, checkCumulativeRisk } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory, loadLocalBloomieMemory, saveLocalBloomieMemory, loadUserProfile } from "./db.js";
 import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion, detectReportedCondition, detectConditionManagementQuestion, detectConditionSymptomQuestion, CONDITION_META, CONDITION_ALIASES, extractConditionKey, scoreVagueHealth } from "./bloomie-routing.js";
@@ -14,6 +14,7 @@ import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhase
 import { createOOS } from "./bloomie-oos.js";
 import { createNodes } from "./bloomie-nodes.js";
 import { sanitizeInput, classifyInputSafety, sanitizeBotLine, authorizeHtmlPayload, isHtmlPayloadAuthorized } from "./bloomie-safety.js";
+import { isBloomieDebugEnabled } from "./bloom-storage.js";
 
 // ── Mood anomaly context ────────────────────────────────────────────────────
 // Combines cycle-timing anomaly (from bloom-anomaly-engine) with a
@@ -374,7 +375,7 @@ export function initBloomieChat({
   function phaseNudge() {
     if (ctx.adviceGiven.has("phase_nudge")) return null;
     ctx.adviceGiven.add("phase_nudge");
-    return "By the way - if you log your last period date in the dashboard I can give you more personalised insight based on where you are in your cycle 🩷";
+    return "By the way - if you log your last period date in the dashboard I can give more tailored cycle-timing context 🩷";
   }
 
   // Nodes where a phase insight must never appear regardless of other logic.
@@ -841,6 +842,29 @@ export function initBloomieChat({
     return false;
   }
 
+  // Short "yes/no/ok" replies should count as meaningful when Bloomie just
+  // asked a binary question. This prevents accidental low-info/OOS fallthrough.
+  function looksBinaryChoiceSet(choices = []) {
+    if (!Array.isArray(choices) || !choices.length) return false;
+    const hasAffirm = choices.some(c =>
+      /\b(yes|yeah|yep|yup|sure|okay|ok|correct|right)\b/i.test(c?.label || "") ||
+      /\b(yes|affirm|confirm)\b/i.test(c?.id || "")
+    );
+    const hasDeny = choices.some(c =>
+      /\b(no|nah|nope|not really|not now)\b/i.test(c?.label || "") ||
+      /\b(no|deny)\b/i.test(c?.id || "")
+    );
+    return hasAffirm && hasDeny;
+  }
+
+  function isContextualShortReply(text, pendingQuestion, choices = []) {
+    if (!pendingQuestion) return false;
+    const isBinary = pendingQuestion.type === "yes_no" || looksBinaryChoiceSet(choices);
+    if (!isBinary) return false;
+    const t = normalizePatois(text).toLowerCase().trim();
+    return /^(yes|yeah|yep|yup|yah|ya|no|nah|nope|ok|okay|k|kk|sure|alright|all right)\b/.test(t);
+  }
+
   // ── Input quality analyzer — runs before normalization or routing ────────────
   function analyzeInputQuality(text) {
     const trimmed = text.trim();
@@ -879,6 +903,10 @@ export function initBloomieChat({
 
       const text = sanitizeInput(($input.value || "").trim());
       $input.value = "";
+      const choicesAtTurnStart = resolveChoices(NODES[ctx.state]);
+      const pendingQuestionAtTurnStart = ctx.pendingQuestion
+        ? { ...ctx.pendingQuestion }
+        : null;
 
       // ── Safety classification — runs before any routing or quality checks ─
       // Blocks prompt-injection attempts, diagnosis demands, and unsafe
@@ -892,7 +920,7 @@ export function initBloomieChat({
       }
 
       // ── Low-information / gibberish guard — runs BEFORE quality check ────
-      if (isLowInformationInput(text)) {
+      if (isLowInformationInput(text) && !isContextualShortReply(text, pendingQuestionAtTurnStart, choicesAtTurnStart)) {
         pushMsg("user", text);
         if (ctx.lastWasLowInfo) {
           say(pick([
@@ -1168,10 +1196,6 @@ export function initBloomieChat({
       advanceFlow();
       pushMsg("user", text);
 
-      // Start AI tone detection early — runs in parallel with sync normalization.
-      // Awaited at Step 12 (before extractEntities) once pipeline is ready.
-      const _tonePromise = resolveTone(text, ctx);
-
       // ── Loop detection — track recent inputs ─────────────────────────────
       ctx.recentInputs = ctx.recentInputs || [];
       ctx.recentInputs.push(text);
@@ -1207,11 +1231,28 @@ export function initBloomieChat({
         return;
       }
 
+      // ── MEDIUM_CONFIRM typed short-answer binding ───────────────────────
+      // Keep short replies ("yes", "no", "ok") bound to the active
+      // confirmation question instead of falling through to OOS/fallback.
+      if (ctx.state === "MEDIUM_CONFIRM" && ctx.pendingRoute) {
+        const t = normalizePatois(text).toLowerCase().trim();
+        const isYes = /^(yes|yeah|yep|yup|yah|ya|ok|okay|k|kk|sure|correct|right|exactly)\b/.test(t);
+        const isNo  = /^(no|nah|nope|not really|different)\b/.test(t);
+        if (isYes) {
+          transition("_MEDIUM_YES");
+          return;
+        }
+        if (isNo) {
+          transition("_MEDIUM_NO");
+          return;
+        }
+      }
+
       // ── Pending route confirmation (MEDIUM confidence tier) ─────────────────
       // If Bloomie asked a soft confirmation question last turn, check whether
       // the user confirmed or corrected. Confirmed -> proceed to pending route.
       // Corrected -> clear pending and re-run full pipeline with correction.
-      if (ctx.pendingRoute) {
+      if (ctx.pendingRoute && ctx.state !== "MEDIUM_CONFIRM") {
         const confirmText = text.toLowerCase().trim();
         const YES_CONFIRM = ["yes", "yeah", "yep", "yah", "ya", "correct", "dat right", "that's right", "right", "sure", "ok", "okay", "exactly", "true", "yes that's it"];
         const isConfirm = YES_CONFIRM.some(w => confirmText === w || confirmText.startsWith(w + " ") || confirmText.startsWith(w + ","));
@@ -1290,22 +1331,25 @@ export function initBloomieChat({
         }
       }
 
+      // Canonical turn base (step 3): normalize the full effective input once.
+      // Downstream helpers should reuse this instead of re-normalizing text.
+      const _patoisNorm = normalizePatois(effectiveInput);
+
       // ── OOS follow-up context ────────────────────────────────────────────
-      // Pass normalizePatois(text) so Patois follow-up phrases resolve correctly.
-      const oosFollowUp = resolveOOSFollowUp(normalizePatois(text), ctx.lastOOS);
+      // Use canonical normalized turn text so follow-up parsing matches routing input.
+      const oosFollowUp = resolveOOSFollowUp(_patoisNorm, ctx.lastOOS);
       if (oosFollowUp) {
         ctx.lastOOS = null;
-        ctx.currentTone = detectUserTone(text);
+        ctx.currentTone = detectUserTone(_patoisNorm);
         transition(oosFollowUp);
         return;
       }
 
       // ── "I tested today" reactive detection ──────────────────────────────
       const testedToday = /(i tested|took a test|did a test|just tested|tested this morning|tested today|pregnancy test today)/.test(
-        normalizePatois(text).toLowerCase()
+        _patoisNorm.toLowerCase()
       );
       if (testedToday) {
-        pushMsg("user", text);
         const retestDate = addDays(new Date(), 3);
         say([
           `${ack()} Whatever the result, here's what to know 🩷`,
@@ -1328,7 +1372,7 @@ export function initBloomieChat({
       if (contextMatch) {
         // Tone detection runs even when a typed choice is matched so ctx.currentTone
         // stays current and toneOpeners apply correctly on the next node.
-        ctx.currentTone = detectUserTone(text);
+        ctx.currentTone = detectUserTone(_patoisNorm);
         const choice = contextMatch;
         if (NODES[ctx.state]?.question) recordAnswer(NODES[ctx.state].question, choice.label);
         if (choice.action === "OPEN_MAP")      onOpenCareMap();
@@ -1345,8 +1389,6 @@ export function initBloomieChat({
       }
 
       // ── Full input processing pipeline (steps 3–7) ───────────────────────
-      // Step 3: Patois → English phrase/word normalization
-      const _patoisNorm = normalizePatois(text);
       // Step 4: Medical spell correction - phonetic variants then Levenshtein token correction
       const _fuzzyText  = fuzzyCorrect(_patoisNorm) ?? _patoisNorm;
       // Step 5: Collapse repeated characters ("helpppppp" → "help")
@@ -1354,13 +1396,16 @@ export function initBloomieChat({
       // Step 6: Expand health/time shorthand ("ewcm", "bfp", "2wks", etc.)
       const normalizedText = expandShorthand(_collapsed);
 
-      // Step 12: Resolve tone — use synchronous detection immediately so the
-      // rest of the pipeline runs without suspension.  The async AI result
-      // (resolveTone) updates ctx when it resolves, so subsequent say() /
-      // render() calls (which run inside setTimeout) still benefit from it.
+      // Step 12: Resolve tone from the same canonical normalized text used by
+      // extraction/routing so tone and intent evaluate one representation.
+      // Keep synchronous fallback first; async AI tone refines when ready.
+      const _tonePromise = resolveTone(normalizedText, ctx);
+      const toneRequestId = (ctx.toneRequestId || 0) + 1;
+      ctx.toneRequestId = toneRequestId;
       ctx.previousTone = ctx.currentTone;
-      ctx.currentTone  = detectUserTone(text) ?? ctx.currentTone;
+      ctx.currentTone  = detectUserTone(normalizedText) ?? ctx.currentTone;
       _tonePromise.then(result => {
+        if (toneRequestId !== ctx.toneRequestId) return;
         ctx.currentTone = result.tone;
         ctx.toneResult  = result;
         logAnalyticsEvent("emotion_classified", { tone: result.tone, source: result.source }, ctx);
@@ -1370,10 +1415,19 @@ export function initBloomieChat({
       // Step 7: Extract entities (symptoms, duration, severity, timing, pregnancy, urgency)
       const entities = extractEntities(normalizedText);
 
-      // ── Cumulative risk flag accumulation ─────────────────────────────────
-      // Add flags as symptoms appear; check dangerous combinations every turn.
-      // This catches escalating patterns across multiple messages (e.g. heavy
-      // bleeding in message 1, dizziness in message 5).
+      // ── Late-flow continuity: reinforce active missed-period context ────
+      // If we are already in a late-period thread and the user replies with a
+      // short non-arrival paraphrase ("it still not here", "it nuh come yet"),
+      // carry forward late context so routing stays consistent.
+      if (!entities.urgent && isLateContextActive() && isLateArrivalFollowUp(normalizedText)) {
+        entities.symptoms.late = true;
+        entities.symptoms.implicit_late = true;
+      }
+
+      // ── Cumulative risk flag accumulation + shared escalation check ───────
+      // Keep per-flag telemetry on ctx, but use the shared checker
+      // (bloomie-inference.checkCumulativeRisk) as the single escalation
+      // authority so live chat and eval harness cannot drift.
       {
         const sym = entities.symptoms;
         if (sym.heavy || sym.large_clots)          ctx.cumulativeRiskFlags.add("heavy_bleeding");
@@ -1384,22 +1438,12 @@ export function initBloomieChat({
         if (sym.spotting)                           ctx.cumulativeRiskFlags.add("bleeding");
         if (sym.night_sweats)                       ctx.cumulativeRiskFlags.add("night_sweats");
         if (sym.cold_flashes)                       ctx.cumulativeRiskFlags.add("chills");
-        // one_sided_pain: detect from raw urgency text
+        // one_sided_pain: detect from normalized text
         if (/one.sided|one side/.test(normalizedText)) ctx.cumulativeRiskFlags.add("one_sided_pain");
 
-        const f = ctx.cumulativeRiskFlags;
-        const cumulativeUrgent =
-          (f.has("heavy_bleeding") && f.has("dizziness")) ||
-          (f.has("late_period")    && f.has("one_sided_pain")) ||
-          (f.has("positive_test")  && (f.has("pelvic_pain") || f.has("bleeding"))) ||
-          (f.has("night_sweats")   && f.has("chills") && f.has("pelvic_pain"));
-
-        if (cumulativeUrgent && !entities.urgent) {
-          const reason = f.has("heavy_bleeding") && f.has("dizziness")          ? "cumulative: heavy_bleeding+dizziness"
-                       : f.has("late_period")    && f.has("one_sided_pain")      ? "cumulative: late_period+one_sided_pain"
-                       : f.has("positive_test")  && f.has("pelvic_pain")         ? "cumulative: positive_test+pelvic_pain"
-                       : f.has("positive_test")  && f.has("bleeding")            ? "cumulative: positive_test+bleeding"
-                       : "cumulative: fever_proxy+pelvic_pain";
+        const cumulative = checkCumulativeRisk([...ctx.entityHistory.slice(-4), entities]);
+        if (cumulative.escalate && !entities.urgent) {
+          const reason = cumulative.reason || "cumulative: escalating multi-turn risk";
           ctx.urgency = true;
           logSafetyEvent("urgent_trigger", {
             input:     normalizedText,
@@ -1439,7 +1483,8 @@ export function initBloomieChat({
         const contradictionQ = detectContradiction(normalizedText, entities);
         if (contradictionQ && !entities.urgent) {
           ctx.pendingContradictionContext = { originalText: effectiveInput };
-          say([contradictionQ]);
+          const prompt = chooseClarifyingPrompt(contradictionQ, { kind: "contradiction", normalizedText });
+          say([prompt]);
           render();
           return;
         }
@@ -1450,7 +1495,8 @@ export function initBloomieChat({
         const ambiguityQ = detectAmbiguousInput(normalizedText, entities);
         if (ambiguityQ && !entities.urgent && !ctx.pendingContradictionContext) {
           ctx.pendingAmbiguityContext = { originalText: effectiveInput };
-          say([ambiguityQ]);
+          const prompt = chooseClarifyingPrompt(ambiguityQ, { kind: "ambiguity", normalizedText });
+          say([prompt]);
           render();
           return;
         }
@@ -1461,7 +1507,8 @@ export function initBloomieChat({
         const contextProbeQ = detectMissingContext(entities, normalizedText);
         if (contextProbeQ && !entities.urgent && !ctx.pendingContradictionContext && !ctx.pendingAmbiguityContext) {
           ctx.pendingContextProbe = { originalText: effectiveInput };
-          say([contextProbeQ]);
+          const prompt = chooseClarifyingPrompt(contextProbeQ, { kind: "missing_context", normalizedText });
+          say([prompt]);
           render();
           return;
         }
@@ -2083,19 +2130,24 @@ export function initBloomieChat({
             ctx.narrowingVague = !candidates.length && scoreVagueHealth(normalizedText) > 0;
             ctx.confidenceFallbackCount++;
             logAnalyticsEvent("route_no_match", { input: normalizedText, primaryIntent: conf.primaryIntent }, ctx);
-            transition("NARROWING");
+            // Give AI assist a brief chance to resolve before rendering NARROWING.
+            // This avoids "NARROWING flash then redirect" UX when AI returns quickly.
+            const assistFlowId = ctx.flowId;
+            const AI_ASSIST_GRACE_MS = 180;
+            let finalized = false;
+            const graceTimerId = setTimeout(() => {
+              if (finalized) return;
+              finalized = true;
+              if (ctx.flowId === assistFlowId) transition("NARROWING");
+            }, AI_ASSIST_GRACE_MS);
+            _intentAssistPromise.then((_aiIntent) => {
+              if (finalized) return;
+              if (ctx.flowId !== assistFlowId) {
+                finalized = true;
+                clearTimeout(graceTimerId);
+                return;
+              }
 
-            // ── AI intent assist (non-blocking) ──────────────────────────────
-            // _intentAssistPromise was fired above after confidence scoring.
-            // Settle via .then() so the submit handler is never suspended
-            // (same pattern as _tonePromise).  Two outcomes:
-            //
-            //   high confidence → clear NARROWING timers and route directly.
-            //   medium confidence → prepend AI candidate to narrowingCandidates
-            //     before NARROWING's choices() render (say timers still pending).
-            //
-            // ctx.state guard ensures we only act while still in NARROWING.
-            _intentAssistPromise.then(_aiIntent => {
               ctx.intentAssist = _aiIntent ?? null;
               if (!_aiIntent || _aiIntent.intent === "else") return;
 
@@ -2106,11 +2158,12 @@ export function initBloomieChat({
               });
 
               const aiCandidate = INTENT_TO_CANDIDATE[_aiIntent.intent];
-              if (!aiCandidate || ctx.state !== "NARROWING") return;
+              if (!aiCandidate) return;
 
-              if (_aiIntent.confidence === "high") {
-                // Upgrade: cancel NARROWING and route directly — reset streak.
-                clearTimers();
+              if (_aiIntent.confidence === "high" && _aiIntent.route) {
+                // High-confidence AI arrived within grace window: route directly.
+                finalized = true;
+                clearTimeout(graceTimerId);
                 ctx.confidenceFallbackCount = 0;
                 ctx.lastIntent = _aiIntent.route;
                 logAnalyticsEvent("route_matched", {
@@ -2118,14 +2171,17 @@ export function initBloomieChat({
                   reason: "ai_primary",
                 }, ctx);
                 transition(_aiIntent.route, {});
-              } else if (_aiIntent.confidence === "medium") {
-                // Refine: prepend AI candidate so it appears first in NARROWING.
+                return;
+              }
+
+              if (_aiIntent.confidence === "medium") {
                 const existing = ctx.narrowingCandidates ?? [];
                 if (!existing.some(c => c.id === aiCandidate.id)) {
                   ctx.narrowingCandidates = [aiCandidate, ...existing].slice(0, 3);
                 }
               }
             }).catch(() => {});
+            return;
           }
         } else if (conf && (conf.tier === "medium" || _isPair)) {
           // MEDIUM (or a clarification pair at HIGH): ask soft confirmation
@@ -2237,9 +2293,9 @@ export function initBloomieChat({
     if (ctx.state.includes("_URGENT")) return null;
     ctx.adviceGiven.add("anon_account_nudge");
     return pick([
-      "Creating a free account lets Bloomie remember your cycle so I can give you more personalised help 🩷",
-      "If you ever want more tailored guidance, a free Bloom account lets me track your cycle over time 🩷",
-      "Just so you know — signing up for free means I can remember your history and spot patterns for you 🩷",
+      "Creating a free account lets Bloomie keep your cycle logs together so guidance can stay more consistent over time 🩷",
+      "If you ever want more tailored guidance, a free Bloom account helps me use your logged cycle context across sessions 🩷",
+      "Just so you know — signing up for free helps Bloomie keep your history in one place, which makes follow-up support more coherent 🩷",
     ]);
   }
   function minorSafeFooter() {
@@ -2292,6 +2348,32 @@ export function initBloomieChat({
     const choiceAffirm = resolveChoiceByIntent(choices, "affirm");
     const choiceDeny   = resolveChoiceByIntent(choices, "deny");
     const choiceUnsure = resolveChoiceByIntent(choices, "unsure");
+    const isBinaryQuestion = ctx.pendingQuestion?.type === "yes_no" || looksBinaryChoiceSet(choices);
+    const inferByPolarity = (intent) => {
+      if (!isBinaryQuestion) return null;
+      if (intent === "affirm") {
+        return choices.find(c =>
+          /\b(yes|yeah|yep|yup|sure|okay|ok|correct|right)\b/i.test(c.label || "") ||
+          /\b(yes|affirm|confirm)\b/i.test(c.id || "")
+        ) || null;
+      }
+      if (intent === "deny") {
+        return choices.find(c =>
+          /\b(no|nah|nope|not really|not now)\b/i.test(c.label || "") ||
+          /\b(no|deny)\b/i.test(c.id || "")
+        ) || null;
+      }
+      if (intent === "unsure") {
+        return choices.find(c =>
+          /\b(not sure|unsure|maybe|hard to say|don'?t know|dont know)\b/i.test(c.label || "") ||
+          /\b(ns|unsure|maybe)\b/i.test(c.id || "")
+        ) || null;
+      }
+      return null;
+    };
+    const semanticAffirm = choiceAffirm || inferByPolarity("affirm");
+    const semanticDeny   = choiceDeny   || inferByPolarity("deny");
+    const semanticUnsure = choiceUnsure || inferByPolarity("unsure");
 
     // ── Typed phrase → intent word lists ─────────────────────────────────
     // Soft denials MUST be checked before soft affirmations so that
@@ -2324,17 +2406,22 @@ export function initBloomieChat({
     // ── Match order: soft denials → affirm → deny → unsure ───────────────
     // Soft denials are checked first to prevent "probably" from stealing
     // "probably not" before the deny path gets a chance to evaluate it.
-    if (choiceDeny && SOFT_DENY.some(w => t === w || t.startsWith(w + " "))) {
-      return choiceDeny;
+    if (semanticDeny && SOFT_DENY.some(w => t === w || t.startsWith(w + " "))) {
+      return semanticDeny;
     }
-    if (choiceAffirm && YES_WORDS.some(w => t === w || t.startsWith(w + " ") || t.endsWith(" " + w))) {
-      return choiceAffirm;
+    if (semanticAffirm && YES_WORDS.some(w => t === w || t.startsWith(w + " ") || t.endsWith(" " + w))) {
+      return semanticAffirm;
     }
-    if (choiceDeny && NO_WORDS.some(w => t === w || t.startsWith(w + " ") || t.endsWith(" " + w))) {
-      return choiceDeny;
+    if (semanticDeny && NO_WORDS.some(w => t === w || t.startsWith(w + " ") || t.endsWith(" " + w))) {
+      return semanticDeny;
     }
-    if (choiceUnsure && UNSURE_WORDS.some(w => t.includes(w))) {
-      return choiceUnsure;
+    if (semanticUnsure && UNSURE_WORDS.some(w => t.includes(w))) {
+      return semanticUnsure;
+    }
+
+    // In binary contexts, treat acknowledgement words as soft affirmations.
+    if (semanticAffirm && isBinaryQuestion && /^(ok|okay|k|kk|sure|alright|all right)\b/.test(t)) {
+      return semanticAffirm;
     }
 
     // ── Positive/negative phrasing on choice labels ───────────────────────
@@ -2414,9 +2501,9 @@ export function initBloomieChat({
         "i think that's right", "that describes it",
       ];
 
-      if (choiceDeny   && EXT_DENY.some(w => t === w || t.startsWith(w)))   return choiceDeny;
-      if (choiceUnsure && EXT_UNSURE.some(w => t === w || t.includes(w)))   return choiceUnsure;
-      if (choiceAffirm && EXT_AFFIRM.some(w => t === w || t.startsWith(w))) return choiceAffirm;
+      if (semanticDeny   && EXT_DENY.some(w => t === w || t.startsWith(w)))   return semanticDeny;
+      if (semanticUnsure && EXT_UNSURE.some(w => t === w || t.includes(w)))   return semanticUnsure;
+      if (semanticAffirm && EXT_AFFIRM.some(w => t === w || t.startsWith(w))) return semanticAffirm;
     }
 
     return null;
@@ -2440,12 +2527,91 @@ export function initBloomieChat({
     return symptomCount >= 3 || String(text).length > 200 || activeTopics >= 3;
   }
 
+  // ── Late-flow follow-up continuity helpers ───────────────────────────────
+  // When the current conversation is already in a late/missed-period context,
+  // short pronoun follow-ups like "it still not here" should reinforce that
+  // context instead of falling into generic narrowing.
+  const ACTIVE_LATE_STATES = new Set([
+    "LATE_INTRO", "LATE_NO_GUIDANCE", "LATE_IRREGULAR_GUIDANCE", "LATE_YES_PREG",
+    "LATE_TEST_Q", "LATE_TEST_SUGGEST", "LATE_TEST_RESULT", "LATE_POSITIVE",
+    "LATE_NEG_UNCLEAR", "LATE_CHANGES_Q", "LATE_CHANGES_EXPLAIN", "LATE_SYMPTOMS_Q",
+    "LATE_PATTERN_Q", "LATE_WRAP", "PREG_LATE_ROUTE",
+  ]);
+  function isLateContextActive() {
+    if (ACTIVE_LATE_STATES.has(ctx.state)) return true;
+    if (ctx.lastIntent === "late" || ctx.lastIntent === "LATE_INTRO" || ctx.lastIntent === "LATE_PERIOD_CHECK") return true;
+    return ctx.entityHistory.slice(-2).some(e => e?.symptoms?.late || e?.symptoms?.implicit_late);
+  }
+  function isLateArrivalFollowUp(text) {
+    const t = String(text || "").toLowerCase();
+    return (
+      /\b(?:my\s+)?period\s+(?:still\s+)?(?:hasn'?t|has not|haven'?t|have not|didn'?t|did not|nuh|nah|not|no)\s+(?:come|arriv(?:e|ed)|reach(?:ed)?|show(?:ed|ing)?(?:\s+up)?)\s*(?:yet)?\b/.test(t) ||
+      /\b(?:it|mine)\s+(?:still\s+)?(?:hasn'?t|has not|haven'?t|have not|didn'?t|did not|nuh|nah|not|no)\s+(?:come|arriv(?:e|ed)|reach(?:ed)?|show(?:ed|ing)?(?:\s+up)?)\s*(?:yet)?\b/.test(t) ||
+      /\bit\s+still\s+not\s+here\b/.test(t) ||
+      /\bit\s+no\s+show(?:ing)?\s+up(?:\s+yet)?\b/.test(t) ||
+      /\bstill\s+hasn'?t\s+come\b/.test(t)
+    );
+  }
+
+  function promptFingerprint(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function chooseClarifyingPrompt(prompt, { kind = "clarifier", normalizedText = "" } = {}) {
+    const original = String(prompt || "").trim();
+    if (!original) return original;
+    const fp = promptFingerprint(original);
+    const isRecentRepeat =
+      ctx.lastClarifierFingerprint === fp &&
+      typeof ctx.lastClarifierTurn === "number" &&
+      ctx.flowId - ctx.lastClarifierTurn <= 2;
+
+    let resolved = original;
+    if (isRecentRepeat) {
+      const VARIANTS = {
+        "is it more like nausea and stomach discomfort or do you feel generally unwell with things like chills or fever": [
+          "Would you say this feels more like nausea/stomach discomfort, or more like feeling generally unwell (for example chills or fever)?",
+          "Quick check so I can guide you better: is this mostly nausea/belly discomfort, or more an overall unwell feeling like chills/fever?",
+        ],
+        "where does the pain feel like it s coming from more in your belly lower pelvic area or somewhere else": [
+          "Could you help me pinpoint it: is the discomfort more lower-pelvic/crampy, or more your stomach/belly in general?",
+          "To make sure I stay on track, is the pain mostly low in the pelvis, or more in the stomach area?",
+        ],
+      };
+      const options = VARIANTS[fp];
+      if (options?.length) {
+        resolved = pick(options);
+      } else {
+        resolved = "I want to make sure I understand you right 🩷 Could you say the main symptom in a few words (for example: late period, cramps, discharge, mood)?";
+      }
+    }
+
+    // If we're in an active late-thread and the clarifier is pain-location related,
+    // carry forward that context without over-claiming causation.
+    if (
+      isLateContextActive() &&
+      /\b(pelvic|belly|stomach|pain)\b/.test(promptFingerprint(resolved)) &&
+      /\b(stomach|belly|hurt|ache|pain)\b/.test(String(normalizedText || "").toLowerCase())
+    ) {
+      resolved = "Got you 💗 Since your period still seems off, quick check: is it more crampy low-pelvic pain, or more stomach/belly discomfort?";
+    }
+
+    ctx.lastClarifierFingerprint = promptFingerprint(resolved);
+    ctx.lastClarifierTurn = ctx.flowId;
+    void kind;
+    return resolved;
+  }
+
   // ── Pipeline debug utility ────────────────────────────────────────────────
   // Activated only when localStorage.getItem("bloomie_debug") === "true".
   // Logs each stage of the processing pipeline for inspection.
   function debugPipeline(rawInput, normalizedInput, fuzzyInput, expandedInput, entities, tone, urgency, route) {
-    if (typeof localStorage === "undefined") return;
-    if (localStorage.getItem("bloomie_debug") !== "true") return;
+    if (!isBloomieDebugEnabled()) return;
     console.log(`[Bloomie Pipeline] Raw: ${rawInput}`);
     console.log(`[Bloomie Pipeline] After normalizePatois: ${normalizedInput}`);
     console.log(`[Bloomie Pipeline] After fuzzyCorrect: ${fuzzyInput}`);
@@ -2655,7 +2821,17 @@ export function initBloomieChat({
       acc += step;
       const id = setTimeout(() => {
         ctx.isTyping = false;  // hide indicator before each bubble appears
-        pushMsg("bot", sanitizeBotLine(t));
+        const botLine = sanitizeBotLine(t);
+        const fp = promptFingerprint(botLine);
+        const lastMsg = ctx.history[ctx.history.length - 1];
+        const isImmediateDuplicate =
+          lastMsg?.from === "bot" &&
+          promptFingerprint(lastMsg.text) === fp &&
+          ctx.lastBotLineFingerprint === fp;
+        if (!isImmediateDuplicate) {
+          pushMsg("bot", botLine);
+          ctx.lastBotLineFingerprint = fp;
+        }
         // Show indicator again between bubbles (not after the last one)
         if (idx < arr.length - 1) {
           ctx.isTyping = true;
@@ -2729,7 +2905,15 @@ export function initBloomieChat({
       const _DISAMBIGUATION  = new Set(["NARROWING", "CONFIDENCE_FALLBACK", "MEDIUM_CONFIRM"]);
       if (_STRUGGLE_STATES.has(ctx.state) && !_DISAMBIGUATION.has(nextState)) {
         ctx.confidenceFallbackCount = 0;
+        ctx.narrowingAttemptCount = 0;
+        ctx.lastNarrowingPrompt = null;
       }
+    }
+
+    // Track progressive narrowing attempts so repeated disambiguation can
+    // switch strategy instead of repeating the same menu prompt.
+    if (nextState === "NARROWING" || nextState === "CONFIDENCE_FALLBACK") {
+      ctx.narrowingAttemptCount = (ctx.narrowingAttemptCount || 0) + 1;
     }
 
     // ── END_CHAT sentinels ────────────────────────────────────────────────
@@ -2767,6 +2951,12 @@ export function initBloomieChat({
       ctx.closeConfirmationPending  = false;
       ctx.closeIntentDetected       = false;
       ctx.resolutionStatus          = null;
+      ctx.toneRequestId             = 0;
+      ctx.narrowingAttemptCount     = 0;
+      ctx.lastNarrowingPrompt       = null;
+      ctx.lastClarifierFingerprint  = null;
+      ctx.lastClarifierTurn         = -1;
+      ctx.lastBotLineFingerprint    = null;
       // Persist close-time fields before full reset
       const _closeMemory = loadLocalBloomieMemory() || {};
       const _closeUpdate = {
@@ -3510,6 +3700,8 @@ export function initBloomieChat({
     hasContentBeenDeclined, markContentDeclined,
     // Reported-condition support
     CONDITION_META, CONDITION_ALIASES, extractConditionKey,
+    // Internal helpers needed by node modules
+    pushMsg, smartTestTiming,
   };
   const NODES = createNodes(env);
   const { OOS, OOS_DEFAULT, HEALTH_OVERRIDE_PATTERNS, CYCLE_QUESTION_PATTERNS, routeUserText } = createOOS(env);
@@ -3525,6 +3717,12 @@ export function initBloomieChat({
       ctx.answers = [];
       ctx.multiDraft = null;
       ctx.locked = false;
+      ctx.toneRequestId = 0;
+      ctx.narrowingAttemptCount = 0;
+      ctx.lastNarrowingPrompt = null;
+      ctx.lastClarifierFingerprint = null;
+      ctx.lastClarifierTurn = -1;
+      ctx.lastBotLineFingerprint = null;
       transition("START");
     },
     getSummaryText: buildSummaryText,

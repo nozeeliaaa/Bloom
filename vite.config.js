@@ -36,6 +36,22 @@ export default defineConfig({
     outDir: "../dist",
     emptyOutDir: true,
     rollupOptions: {
+      output: {
+        // Named chunks for the two lazy-loaded Bloomie node banks.
+        //
+        // bloomie-nodes.js uses dynamic import() for these modules so the
+        // browser only fetches them after the initial paint. These manualChunks
+        // entries give the output files stable, cache-friendly names instead of
+        // Vite's default content-hash filenames.
+        //
+        // Do NOT add bloomie-nodes-core, -period, -mood, -pelvic, -pregnancy,
+        // or -general here — those are statically imported and must be present
+        // before the first user interaction.
+        manualChunks(id) {
+          if (id.includes("bloomie-nodes-education"))    return "bloomie-educ";
+          if (id.includes("bloomie-nodes-perimenopause")) return "bloomie-peri";
+        },
+      },
       input: {
         index: resolve(__dirname, "frontend/index.html"),
         dashboard: resolve(__dirname, "frontend/pages/dashboard.html"),

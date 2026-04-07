@@ -1,4 +1,4 @@
-import { pick, scoreSignals, resolveSignals, detectOutOfScope } from "./bloomie-routing.js";
+import { pick, scoreSignals, resolveSignals, detectOutOfScope, normalizeText } from "./bloomie-routing.js";
 import { extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
 import { getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 
@@ -861,8 +861,10 @@ export function createOOS(env) {
     /\b(when (should|can) i (take|do) a (pregnancy )?test|when (should|can) i test|best time to test|when to test|can i test (yet|now))\b/,
   ];
 
-  function routeUserText(t) {
-    t = String(t || "").toLowerCase();
+  function routeUserText(rawText) {
+    // Defensive normalization so scoreSignals/regex routing never runs on raw
+    // input if this helper is called outside assistant.js.
+    const t = normalizeText(rawText);
 
     // ── Urgency: always first ──────────────────────────────────────────────
     const urgentPhrases = [

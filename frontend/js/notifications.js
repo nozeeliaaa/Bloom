@@ -16,8 +16,8 @@
 import { getFirebaseMessaging } from "./firebase.js";
 import { getToken, onMessage }  from "firebase/messaging";
 import { getIdToken }           from "./auth.js";
+import { loadBloomPreferencesLocal } from "./bloom-storage.js";
  
-const PREFS_KEY    = "bloom_preferences";
 const NOTIFIED_KEY = "bloom_notified";
 const INBOX_KEY    = "bloom_notification_inbox";
 const INBOX_MAX    = 50;
@@ -59,8 +59,7 @@ function addToInbox(title, body, id) {
 // ─── Internal helpers ──────────────────────────────────────────────────────────
  
 function getPrefs() {
-  try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; }
-  catch { return {}; }
+  return loadBloomPreferencesLocal();
 }
  
 function getNotified() {

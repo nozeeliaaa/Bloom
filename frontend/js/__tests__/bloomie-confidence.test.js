@@ -409,6 +409,15 @@ describe("confidence router — LOW tier", () => {
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().lastConfidence?.ambiguous).toBe(true);
   });
+
+  it("second unresolved narrowing attempt switches to guided split wording", () => {
+    withConfidence("low", "late", []);
+    sendMessage(CANONICAL_INPUT);
+    withConfidence("low", "late", []);
+    sendMessage("i missed my period");
+    expect(chat.getState().state).toBe("NARROWING");
+    expect(getChatBoxText()).toMatch(/quick split|cycle timing feels off|pain\/physical/i);
+  });
 });
 
 
@@ -441,7 +450,7 @@ describe("confidence router — CONFIDENCE_FALLBACK after repeated LOW", () => {
     withConfidence("low", "late", []);
     sendMessage("i missed my period");
     expect(chat.getState().state).toBe("CONFIDENCE_FALLBACK");
-    expect(getChatBoxText()).toMatch(/hard time|pinpoint|main topics/i);
+    expect(getChatBoxText()).toMatch(/quick split|main thing|sticking with me|main topics/i);
   });
 
   it("confidenceFallbackCount keeps incrementing on each LOW/FALLBACK", () => {
