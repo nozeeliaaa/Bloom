@@ -101,6 +101,12 @@ export function createCtx() {
     pendingAmbiguityContext:  null,        // stored when ambiguity question was asked
     isMinor:                  false,
     isAnon:                   false,
+    ageGroup:                 "unknown",   // "adult" | "minor" | "unknown" (policy-derived)
+    hasGuardianConsent:       false,       // consent gate for minors
+    policySeed:               null,        // seed provided by assistant page/profile context
+    policyContext:            null,        // per-turn policy context object
+    policyAnonDisclosureShown: false,      // one-time anonymous disclosure guard
+    policyTrustedAdultNudgePending: false, // set by policy when minor medium/high risk
     userNickname:             null,
     lastNicknameUsedAtDepth:  null,
     preEndChatState:          null,   // state to restore if user cancels END_CHAT_CONFIRM

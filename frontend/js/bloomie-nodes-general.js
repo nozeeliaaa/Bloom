@@ -372,7 +372,7 @@ export function createGeneralNodes(env, helpers) {
         "What you're describing, especially the smell, colour, or irritation, is worth getting checked 🩷",
         "Unusual discharge with those qualities can sometimes signal a bacterial or yeast infection, or occasionally an STI, and those are all treatable.",
         "A healthcare provider or pharmacist can do a proper check. It's a quick visit and you deserve to know what's going on.",
-        "In the meantime, avoid scented products down there and wear breathable cotton underwear if you can.",
+        "In the meantime, avoid scented products or harsh home remedies down there, and wear breathable cotton underwear if you can.",
       ],
       choices: [
         { id: "map",  label: "Find care near me",  next: "START", action: "OPEN_MAP", primary: true },

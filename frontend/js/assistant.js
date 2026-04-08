@@ -12,10 +12,12 @@ import { getIdToken, getUser } from "./auth.js";
 import { generateIntegratedSignals, getBloomieSymptomContext } from "./algorithms/bloom-symptom-engine.js";
 import { generateAnomalySignals } from "./algorithms/bloom-anomaly-engine.js";
 import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhaseConfidence } from "./algorithms/bloom-date-utils.js";
+import { whenToTest as pregnancyWhenToTest, estimatedDueDate as pregnancyEstimatedDueDate } from "./algorithms/pregnancyAlgorithm.js";
 import { createOOS } from "./bloomie-oos.js";
 import { createNodes } from "./bloomie-nodes.js";
 import { sanitizeInput, classifyInputSafety, sanitizeBotLine, authorizeHtmlPayload, isHtmlPayloadAuthorized } from "./bloomie-safety.js";
 import { buildSignalBoard, scoreInterpretationBoard, scoreInterpretations, selectResponseStrategy } from "./bloomie-reasoning.js";
+import { buildPolicyContext, evaluatePolicyDecision, sanitizeMinorEnglishLine } from "./bloomie-policy.js";
 import { isBloomieDebugEnabled } from "./bloom-storage.js";
 
 // ── Mood anomaly context ────────────────────────────────────────────────────
@@ -122,14 +124,19 @@ export function Chat() {
   `;
 }
 
-export async function mountChat(user = null, cycleData = null, symptomHistory = null, { isMinor = false, isAnon = false } = {}) {
+export async function mountChat(
+  user = null,
+  cycleData = null,
+  symptomHistory = null,
+  { isMinor = false, isAnon = false, policySeed = null } = {}
+) {
   const box = document.getElementById("chat-box");
   if (!box) return;
 
   // Load persistent memory and user profile in parallel before mounting.
   const [bloomieMemory, profile] = await Promise.all([
-    loadBloomieMemory(),
-    loadUserProfile(),
+    isAnon ? Promise.resolve(null) : loadBloomieMemory(),
+    isAnon ? Promise.resolve({ nickname: null }) : loadUserProfile(),
   ]);
 
   initBloomieChat({
@@ -139,6 +146,7 @@ export async function mountChat(user = null, cycleData = null, symptomHistory = 
     bloomieMemory,
     isMinor,
     isAnon,
+    policySeed,
     profile,
     onSaveMemory: saveBloomieMemory,
     onOpenCareMap: () => {
@@ -209,6 +217,7 @@ export function initBloomieChat({
   onLogAction = (action, data) => console.log("Log action:", action, data),
   isMinor = false,
   isAnon = false,
+  policySeed = null,
   profile = null,
 } = {}) {
   const $box = document.getElementById(chatBoxId);
@@ -216,6 +225,181 @@ export function initBloomieChat({
   const $form = document.getElementById(formId);
 
   if (!$box) throw new Error(`Missing #${chatBoxId}`);
+
+  const CHAT_PREFS_KEY = "bloom_chat_prefs";
+  const BLOOMIE_REMINDERS_KEY = "bloomie_scheduled_reminders";
+  const REMINDER_POLL_MS = 30 * 1000;
+
+  function loadChatPrefs() {
+    try {
+      return JSON.parse(localStorage.getItem(CHAT_PREFS_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function isSoundEnabled() {
+    const p = loadChatPrefs();
+    return p.soundEnabled !== false;
+  }
+
+  function isVoicePlaybackEnabled() {
+    const p = loadChatPrefs();
+    return p.voicePlaybackEnabled === true;
+  }
+
+  function playChatCue() {
+    if (!isSoundEnabled()) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ac = new Ctx();
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = "sine";
+      o.frequency.value = 720;
+      g.gain.value = 0.00001;
+      o.connect(g);
+      g.connect(ac.destination);
+      const now = ac.currentTime;
+      g.gain.exponentialRampToValueAtTime(0.045, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.00001, now + 0.17);
+      o.start(now);
+      o.stop(now + 0.2);
+    } catch {
+      // best-effort only
+    }
+  }
+
+  function speakBotLine(text) {
+    if (!isVoicePlaybackEnabled()) return;
+    if (!("speechSynthesis" in window)) return;
+    const line = String(text || "").replace(/\s+/g, " ").trim();
+    if (!line) return;
+    try {
+      const utterance = new SpeechSynthesisUtterance(line);
+      const lang = loadChatPrefs().chatLanguage === "en-jm" ? "en-JM" : "en-US";
+      utterance.lang = lang;
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // best-effort only
+    }
+  }
+
+  function loadReminders() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(BLOOMIE_REMINDERS_KEY) || "[]");
+      return Array.isArray(raw) ? raw : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveReminders(reminders) {
+    localStorage.setItem(BLOOMIE_REMINDERS_KEY, JSON.stringify(reminders));
+  }
+
+  function parseReminderIntent(normalizedText) {
+    const t = String(normalizedText || "").toLowerCase();
+    if (!/\b(remind me|tell me later|remind us|reminder)\b/.test(t)) return null;
+
+    let scheduleAt = null;
+    let phrase = "";
+    const now = new Date();
+    const inDays = t.match(/\bin\s+(\d+)\s+days?\b/);
+    const inHours = t.match(/\bin\s+(\d+)\s+hours?\b/);
+    const inWeeks = t.match(/\bin\s+(\d+)\s+weeks?\b/);
+    const tomorrow = /\btomorrow\b/.test(t);
+    const nextWeek = /\bnext week\b/.test(t);
+    const onIso = t.match(/\bon\s+(\d{4}-\d{2}-\d{2})\b/);
+
+    if (inDays) {
+      scheduleAt = addDays(now, Number(inDays[1]));
+      phrase = `in ${inDays[1]} day${Number(inDays[1]) === 1 ? "" : "s"}`;
+    } else if (inHours) {
+      scheduleAt = new Date(now.getTime() + Number(inHours[1]) * 60 * 60 * 1000);
+      phrase = `in ${inHours[1]} hour${Number(inHours[1]) === 1 ? "" : "s"}`;
+    } else if (inWeeks) {
+      scheduleAt = addDays(now, Number(inWeeks[1]) * 7);
+      phrase = `in ${inWeeks[1]} week${Number(inWeeks[1]) === 1 ? "" : "s"}`;
+    } else if (tomorrow) {
+      scheduleAt = addDays(now, 1);
+      phrase = "tomorrow";
+    } else if (nextWeek) {
+      scheduleAt = addDays(now, 7);
+      phrase = "next week";
+    } else if (onIso) {
+      const parsed = new Date(`${onIso[1]}T09:00:00`);
+      if (!Number.isNaN(parsed.getTime())) {
+        scheduleAt = parsed;
+        phrase = `on ${onIso[1]}`;
+      }
+    }
+    if (!scheduleAt) return null;
+
+    let reminderText =
+      t.match(/\b(?:remind me|tell me later|set a reminder)\b(?:\s+(?:to|about))?\s+(.+)$/)?.[1] || "";
+    if (!reminderText) reminderText = "check in with Bloomie";
+    reminderText = reminderText
+      .replace(/\bin\s+\d+\s+(days?|hours?|weeks?)\b/g, "")
+      .replace(/\b(tomorrow|next week|on \d{4}-\d{2}-\d{2})\b/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!reminderText) reminderText = "check in with Bloomie";
+
+    return { scheduleAt, phrase, reminderText };
+  }
+
+  async function persistReminder(reminder) {
+    const existing = loadReminders();
+    const fp = `${reminder.userId || "anon"}|${reminder.scheduledTime}|${reminder.messageType}`;
+    if (existing.some((r) => r.fingerprint === fp)) return false;
+    const next = [...existing, { ...reminder, fingerprint: fp }];
+    saveReminders(next);
+
+    // Backend persistence is best-effort when signed in.
+    if (!ctx?.isAnon) {
+      try {
+        const token = await getIdToken();
+        if (token) {
+          await fetch(`${window.BLOOM_API_BASE || ""}/api/reminders`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(reminder),
+          });
+        }
+      } catch {
+        // local reminder remains source of truth
+      }
+    }
+    return true;
+  }
+
+  function popDueReminders() {
+    const all = loadReminders();
+    if (!all.length) return [];
+    const now = Date.now();
+    const due = [];
+    const keep = [];
+    for (const r of all) {
+      const ts = new Date(r.scheduledTime).getTime();
+      if (!Number.isNaN(ts) && ts <= now && !r.deliveredAt) {
+        due.push(r);
+      } else {
+        keep.push(r);
+      }
+    }
+    if (due.length) {
+      const delivered = due.map((r) => ({ ...r, deliveredAt: new Date().toISOString() }));
+      saveReminders([...keep, ...delivered]);
+    }
+    return due;
+  }
 
   // Stable random ID for this chat session - sent with every feedback event
   const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -582,6 +766,7 @@ export function initBloomieChat({
   // Safe to call fire-and-forget - saves to localStorage immediately,
   // Firestore sync happens in the background.
   function persistMemory(entities, reason, { sourceEntities = entities } = {}) {
+    if (ctx.isAnon) return;
     const activeSymptoms = getExplicitSymptomKeys(sourceEntities);
     if (!activeSymptoms.length) return;
     const activeTopics = [...new Set(activeSymptoms.map(symptomKeyToTopic).filter(Boolean))];
@@ -652,19 +837,62 @@ export function initBloomieChat({
     const lmp = effectiveLmp();
     if (!lmp) return null;
     const expectedPeriod = addDays(lmp, effectiveCycleLength());
-    const testDate = addDays(expectedPeriod, 1);
+    // Prefer the shared pregnancy algorithm for consistency with dashboard
+    // and pregnancy nodes; fallback preserves existing behavior.
+    const plan = pregnancyWhenToTest?.(new Date(), expectedPeriod);
+    const testDate = plan?.primaryTestDate ? new Date(plan.primaryTestDate) : addDays(expectedPeriod, 1);
     const today = new Date();
     const daysToTest = daysBetween(today, testDate);
     return { testDate, expectedPeriod, daysToTest, canTestNow: daysToTest <= 0 };
+  }
+
+  // Build a short extraction window for context-dependent follow-ups so
+  // "also nausea" can be interpreted together with prior "late period".
+  function shouldUseAccumulatedExtraction(text) {
+    const t = String(text || "").toLowerCase().trim();
+    if (!t) return false;
+    if (/^\s*(yes|no|nope|yep|not yet|still no|same|again|also|and)\b/.test(t)) return true;
+    if (/\b(also|as well|too|still|same|again|not yet|still no)\b/.test(t)) return true;
+    if (/\b(i|mi)\s+also\b/.test(t)) return true;
+    return false;
+  }
+
+  function buildAccumulatedExtractionText(currentText) {
+    const recentRaw = (Array.isArray(ctx.entityHistory) ? ctx.entityHistory : [])
+      .slice(-2)
+      .map((e) => String(e?.raw || "").trim())
+      .filter(Boolean);
+    if (!recentRaw.length) return currentText;
+    return [...recentRaw, currentText].join(" | ");
   }
 
   // ---------- State ----------
   const ctx = createCtx();
   ctx.isMinor      = isMinor;
   ctx.isAnon       = isAnon;
+  ctx.policySeed   = policySeed || {};
+  ctx.hasGuardianConsent = Boolean(policySeed?.hasGuardianConsent);
+  ctx.ageGroup = policySeed?.ageGroup || (isMinor ? "minor" : "unknown");
+  ctx.policyAnonDisclosureShown = false;
+  ctx.policyContext = null;
+  ctx.policyTrustedAdultNudgePending = false;
   ctx.userNickname = profile?.nickname ?? null;
-  const memory = loadLocalBloomieMemory();
+  const memory = ctx.isAnon ? null : loadLocalBloomieMemory();
   ctx.memory = memory ?? {};
+
+  function emitDueReminders() {
+    const due = popDueReminders();
+    if (!due.length) return;
+    for (const r of due) {
+      const line = `Reminder from your past self: ${r.messageType} 🩷`;
+      pushMsg("bot", line, { reminder: true });
+      playChatCue();
+      speakBotLine(line);
+    }
+  }
+  emitDueReminders();
+  const reminderPollId = setInterval(emitDueReminders, REMINDER_POLL_MS);
+  ctx.timers.add(reminderPollId);
 
   // ── Session end analytics ─────────────────────────────────────────────────
   // Fire-and-forget on tab close / navigation. No ctx teardown at this point
@@ -922,12 +1150,74 @@ export function initBloomieChat({
     { emoji: /😤|😠/, next: null },
   ];
 
+  const OFFLINE_KB = [
+    {
+      key: "period_basics",
+      patterns: [/\b(period|cycle|normal cycle|late period|missed period)\b/],
+      lines: [
+        "Cycles commonly vary, and many people fall somewhere around 21–35 days.",
+        "If your period is late, stress, illness, travel, and routine changes can all play a role.",
+      ],
+    },
+    {
+      key: "cramps",
+      patterns: [/\b(cramps?|pelvic pain|belly hurt|painful period)\b/],
+      lines: [
+        "Mild to moderate cramps can happen with periods and around ovulation.",
+        "If pain becomes severe, one-sided, or comes with faintness or fever, seek urgent care.",
+      ],
+    },
+    {
+      key: "contraception",
+      patterns: [/\b(contraception|birth control|condom|plan b|emergency contraception|pill|iud|implant)\b/],
+      lines: [
+        "Contraception can affect bleeding patterns, spotting, and cycle timing.",
+        "If you had unprotected sex recently, emergency contraception is time-sensitive.",
+      ],
+    },
+    {
+      key: "sti",
+      patterns: [/\b(sti|std|burning when i pee|discharge smell|itching|genital bump|bump after sex)\b/],
+      lines: [
+        "STI-like symptoms can overlap with other issues, so clinic testing is the safest way to know.",
+        "You deserve care without shame; getting checked early helps treatment.",
+      ],
+    },
+    {
+      key: "pregnancy_basics",
+      patterns: [/\b(pregnan|test negative|test positive|late but test negative|missed period)\b/],
+      lines: [
+        "A negative test can be too early; repeating in 48–72 hours can be clearer.",
+        "If severe pain, heavy bleeding, dizziness, or faintness appears, seek urgent care.",
+      ],
+    },
+  ];
+
+  function getOfflineFallback(normalizedText) {
+    const t = String(normalizedText || "").toLowerCase();
+    if (!t) return null;
+    const match = OFFLINE_KB.find((entry) => entry.patterns.some((rx) => rx.test(t)));
+    if (!match) return null;
+    return [
+      "You're in offline mode right now, but I can still help with basics 🩷",
+      ...match.lines,
+      "If you want, I can go deeper once you're back online.",
+    ];
+  }
+
   if ($form && $input) {
     $form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (ctx.locked) return;
 
-      const text = sanitizeInput(($input.value || "").trim());
+      const rawInput = String($input.value || "");
+      const text = sanitizeInput(rawInput.trim());
+      // Defensive no-op for empty submits (including accidental voice-event submits).
+      // This prevents false fallback/OOS prompts from blank or whitespace-only content.
+      if (!text) {
+        $input.value = "";
+        return;
+      }
       $input.value = "";
       const choicesAtTurnStart = resolveChoices(NODES[ctx.state]);
       const pendingQuestionAtTurnStart = ctx.pendingQuestion
@@ -1343,7 +1633,62 @@ export function initBloomieChat({
       // representation for routing/intent-sensitive phrase checks.
       const _fuzzyText  = fuzzyCorrect(_patoisNorm) ?? _patoisNorm;
       const _collapsed  = collapseRepeatedLetters(_fuzzyText);
-      const normalizedText = expandShorthand(_collapsed);
+      let normalizedText = expandShorthand(_collapsed);
+      normalizedText = contextualizeLowInfoReply(normalizedText);
+      const declaredAge = detectDeclaredAge(normalizedText);
+      if (declaredAge !== null) {
+        ctx.declaredAge = declaredAge;
+        if (declaredAge <= 17) ctx.isMinor = true;
+        ctx.ageGroup = declaredAge <= 17 ? "minor" : "adult";
+      }
+
+      // ── Future-self reminders ───────────────────────────────────────────
+      // Detect scheduling intent from canonical normalized text and store a
+      // structured reminder object. Local storage is the primary source of
+      // truth; backend persistence is best-effort for account mode.
+      {
+        const reminderIntent = parseReminderIntent(normalizedText);
+        if (reminderIntent) {
+          const reminder = {
+            userId: getUser()?.uid || null,
+            scheduledTime: reminderIntent.scheduleAt.toISOString(),
+            messageType: reminderIntent.reminderText,
+            contextData: {
+              topic: ctx.topic || null,
+              lastIntent: ctx.lastIntent || null,
+            },
+            deliveryMethod: "in-app",
+            createdAt: new Date().toISOString(),
+          };
+          const saved = await persistReminder(reminder);
+          const when = fmtDate(reminderIntent.scheduleAt);
+          if (saved) {
+            say([
+              `Perfect — I set that reminder for ${reminderIntent.phrase} (${when}) 🩷`,
+              `I'll remind you to: ${reminderIntent.reminderText}.`,
+            ]);
+          } else {
+            say([
+              "That reminder was already on your list 🩷",
+              `I still have it saved for ${when}.`,
+            ]);
+          }
+          render();
+          return;
+        }
+      }
+
+      // ── Offline-first fallback ──────────────────────────────────────────
+      // When offline, answer core reproductive-health basics from a local KB
+      // instead of pushing the request through full routing.
+      if (!navigator.onLine) {
+        const offlineLines = getOfflineFallback(normalizedText);
+        if (offlineLines) {
+          say(offlineLines);
+          render();
+          return;
+        }
+      }
 
       // ── Repair / clarification gate (canonical text) ────────────────────
       // Keep short frustration/confusion turns out of generic OOS handling.
@@ -1378,11 +1723,11 @@ export function initBloomieChat({
 
       // ── OOS follow-up context ────────────────────────────────────────────
       // Use canonical normalized turn text so follow-up parsing matches routing input.
-      const oosFollowUp = resolveOOSFollowUp(_patoisNorm, ctx.lastOOS);
+      const oosFollowUp = resolveOOSFollowUp(normalizedText, ctx.lastOOS);
       if (oosFollowUp) {
         ctx.lastOOS = null;
         ctx.oosStreakCount = 0;
-        ctx.currentTone = detectUserTone(_patoisNorm);
+        ctx.currentTone = detectUserTone(normalizedText);
         transition(oosFollowUp);
         return;
       }
@@ -1412,8 +1757,12 @@ export function initBloomieChat({
       if (contextMatch) {
         // Tone detection runs even when a typed choice is matched so ctx.currentTone
         // stays current and toneOpeners apply correctly on the next node.
-        ctx.currentTone = detectUserTone(_patoisNorm);
+        ctx.currentTone = detectUserTone(normalizedText);
         const choice = contextMatch;
+        if (isMinorPolicyBlocked()) {
+          transition("POLICY_MINOR_CONSENT_REQUIRED");
+          return;
+        }
         if (NODES[ctx.state]?.question) recordAnswer(NODES[ctx.state].question, choice.label);
         if (choice.action === "OPEN_MAP")      onOpenCareMap();
         if (choice.action === "REQUEST_PDF") {
@@ -1448,15 +1797,58 @@ export function initBloomieChat({
 
       // ── Inference layer ──────────────────────────────────────────────
       // Step 7: Extract entities (symptoms, duration, severity, timing, pregnancy, urgency)
-      const entities = extractEntities(normalizedText);
+      // For contextual follow-ups, run extraction on a short accumulated window
+      // (last 2 raw entity turns + current turn) for better continuity.
+      const useAccumulatedExtraction = shouldUseAccumulatedExtraction(normalizedText);
+      const extractionText = useAccumulatedExtraction
+        ? buildAccumulatedExtractionText(normalizedText)
+        : normalizedText;
+      const entities = extractEntities(extractionText);
+      if (useAccumulatedExtraction) entities.raw = normalizedText;
+
+      // Mark minor support nudge availability once a real symptom turn appears.
+      // This keeps minor-safe continuity even when routing stays in node flows.
+      if (
+        ctx.isMinor &&
+        !entities.urgent &&
+        !ctx.adviceGiven.has("minor_adult_nudge") &&
+        Object.values(entities?.symptoms || {}).some(Boolean)
+      ) {
+        ctx.adviceGiven.add("minor_adult_nudge");
+      }
 
       // ── Late-flow continuity: reinforce active missed-period context ────
       // If we are already in a late-period thread and the user replies with a
       // short non-arrival paraphrase ("it still not here", "it nuh come yet"),
       // carry forward late context so routing stays consistent.
-      if (!entities.urgent && isLateContextActive({ includePromptContext: true }) && isLateArrivalFollowUp(normalizedText)) {
+      if (
+        !entities.urgent &&
+        isLateContextActive({ includePromptContext: true }) &&
+        (isLateArrivalFollowUp(normalizedText) || isLateNegativeFollowUp(normalizedText))
+      ) {
         entities.symptoms.late = true;
         entities.symptoms.implicit_late = true;
+      }
+
+      // ── Vague-input triage router ───────────────────────────────────────
+      // Keeps "sumn off / mi nuh feel right" inside support flow rather than fallback.
+      if (isVagueTriageTrigger(normalizedText, entities)) {
+        transition("VAGUE_TRIAGE");
+        return;
+      }
+
+      // ── Structured anxiety flow (pregnancy concern + panic cues) ────────
+      if (isPregnancyAnxietyTrigger(normalizedText, entities)) {
+        transition("ANXIETY_TIMELINE");
+        return;
+      }
+
+      // ── Reassurance engine (safe reusable template) ─────────────────────
+      if (isReassuranceQuestion(normalizedText) && !entities.urgent) {
+        say(buildReassuranceLines(entities), { keepLocked: true });
+        const tid = setTimeout(() => transition("ELSE_NOT_SURE_ROUTE"), 1800);
+        ctx.timers.add(tid);
+        return;
       }
 
       // ── Cumulative risk flag accumulation + shared escalation check ───────
@@ -1654,6 +2046,46 @@ export function initBloomieChat({
       ctx.entityHistory = [...ctx.entityHistory.slice(-2), entities];
 
       console.log("[Bloomie inference]", summarizeEntities(mergedEntities));
+
+      // ── Policy context + decision layer (centralized guardrails) ─────────
+      // Uses canonical normalized text + merged entities + constrained tags.
+      // This runs before route selection so minor/consent/mode policy is
+      // deterministic and not scattered across node templates.
+      const policyRepair = classifyRepairClarification(normalizedText);
+      const policyTags = extractMultiIntentTags(normalizedText, mergedEntities, {
+        repair: policyRepair,
+      });
+      const policyCtx = buildPolicyContext({
+        ctx,
+        normalizedText,
+        entities: mergedEntities,
+        tags: policyTags.tags,
+        repair: policyRepair,
+        policySeed: ctx.policySeed,
+      });
+      ctx.policyContext = policyCtx;
+      ctx.ageGroup = policyCtx.ageGroup;
+      ctx.hasGuardianConsent = policyCtx.hasGuardianConsent;
+      ctx.policyTrustedAdultNudgePending = false;
+
+      const policyDecision = evaluatePolicyDecision(policyCtx);
+      if (policyDecision.trustedAdultNudge) {
+        ctx.policyTrustedAdultNudgePending = true;
+      }
+      if (policyDecision.action === "hard_block_unsafe_topic") {
+        say(policyDecision.reply);
+        if (policyDecision.next) {
+          transition(policyDecision.next);
+        } else {
+          render();
+        }
+        return;
+      }
+      if (policyDecision.action === "block_minor_no_consent") {
+        say(policyDecision.reply);
+        transition(policyDecision.next || "POLICY_MINOR_CONSENT_REQUIRED");
+        return;
+      }
 
       // ── Conversation intelligence: update profile on every exchange ──────────
       {
@@ -1879,10 +2311,8 @@ export function initBloomieChat({
         // Repair/clarification classification + multi-label tags are computed
         // from canonical normalized text only. Tags are advisory and feed the
         // reasoning layer; routing still falls back to existing inferRoute/OOS.
-        const repairClassification = classifyRepairClarification(normalizedText);
-        const tagResult = extractMultiIntentTags(normalizedText, mergedEntities, {
-          repair: repairClassification,
-        });
+        const repairClassification = policyRepair;
+        const tagResult = policyTags;
         ctx.turnIntentTags = tagResult.tags;
         ctx.turnIntentTagConfidence = tagResult.confidence;
         ctx.lastRepairClassification = repairClassification?.label || null;
@@ -1994,7 +2424,9 @@ export function initBloomieChat({
           ctx.currentTone && ctx.currentTone !== "neutral" && !EMERGENCY_NODES.has(inferred?.next)
             ? getToneOpener(ctx.currentTone)
             : "";
-        const guidanceLines = guidanceOpener ? [guidanceOpener, ...guidance.lines] : guidance.lines;
+        const patternLine = !EMERGENCY_NODES.has(inferred?.next) ? getPatternCatcherLine(mergedEntities) : null;
+        const guidanceCore = patternLine ? [patternLine, ...guidance.lines] : guidance.lines;
+        const guidanceLines = guidanceOpener ? [guidanceOpener, ...guidanceCore] : guidanceCore;
         const delay = estimateSayTime(guidanceLines);
         if (inferred) {
           say(guidanceLines, { keepLocked: true });
@@ -2458,14 +2890,26 @@ export function initBloomieChat({
   }
   function minorSafeFooter() {
     if (!ctx.isMinor) return [];
+    if (!ctx.hasGuardianConsent) return [];
     if (ctx.adviceGiven.has("minor_adult_nudge")) return [];
     if (ctx.urgency || ctx.state.includes("_URGENT")) return [];
     ctx.adviceGiven.add("minor_adult_nudge");
+    if (ctx.policyTrustedAdultNudgePending || ctx.policyContext?.riskLevel === "high" || ctx.policyContext?.riskLevel === "medium") {
+      ctx.policyTrustedAdultNudgePending = false;
+      return [pick([
+        "_You do not have to manage this alone — please tell a parent, guardian, school nurse, or another trusted adult._",
+        "_Because this can be important, it would help to involve a parent, guardian, school nurse, or trusted adult._",
+      ])];
+    }
     return [pick([
-      "_If you're ever unsure or worried, it's always okay to talk to a trusted adult or a doctor._",
-      "_Remember, a parent, guardian, or school nurse can also be a great support if you need one._",
-      "_You don't have to figure this out alone — a trusted adult or healthcare provider can help._",
+      "_If you're ever unsure or worried, it's okay to talk to a trusted adult or a doctor._",
+      "_A parent, guardian, school nurse, or trusted adult can support you if you need help._",
     ])];
+  }
+
+  function isMinorPolicyBlocked() {
+    const effectiveAgeGroup = ctx.policyContext?.ageGroup || ctx.ageGroup || (ctx.isMinor ? "minor" : "unknown");
+    return effectiveAgeGroup === "minor" && !ctx.hasGuardianConsent;
   }
 
 
@@ -2740,6 +3184,161 @@ export function initBloomieChat({
     );
   }
 
+  // Low-context negatives ("no", "not yet", "nope") are ambiguous by
+  // themselves. We only treat them as "still no period" when a valid late
+  // context is already active (checked at call site).
+  function isLateNegativeFollowUp(text) {
+    const t = String(text || "")
+      .toLowerCase()
+      .replace(/[^\w\s']/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return (
+      /^(?:no|nah|nope|still no|not yet|still not yet|haven't yet|have not yet)$/.test(t) ||
+      /^(?:still no period|no period|no period yet|period not yet)$/.test(t) ||
+      /^(?:it still no|it still nuh|it nuh yet)$/.test(t)
+    );
+  }
+
+  function getActiveTopicFromContext() {
+    const byState = String(ctx.state || "");
+    if (/^LATE_|^TEST_|^PREG_/.test(byState)) return "late";
+    if (/^HEAVY_/.test(byState)) return "heavy";
+    if (/^SPOT_/.test(byState)) return "spotting";
+    if (/^PELVIC_/.test(byState)) return "pelvic";
+    if (/^MOOD_/.test(byState)) return "mood";
+    if (/DISCHARGE/.test(byState)) return "discharge";
+
+    const byIntent = String(ctx.lastIntent || "");
+    if (/\blate\b|LATE_/.test(byIntent)) return "late";
+    if (/\bheavy\b|HEAVY_/.test(byIntent)) return "heavy";
+    if (/\bspot\b|SPOT_/.test(byIntent)) return "spotting";
+    if (/\bpelvic\b|PELVIC_/.test(byIntent)) return "pelvic";
+    if (/\bmood\b|MOOD_/.test(byIntent)) return "mood";
+    if (/discharge|DISCHARGE/.test(byIntent)) return "discharge";
+
+    const recent = ctx.entityHistory?.[ctx.entityHistory.length - 1]?.symptoms || {};
+    if (recent.late || recent.implicit_late) return "late";
+    if (recent.heavy || recent.large_clots) return "heavy";
+    if (recent.spotting) return "spotting";
+    if (recent.pelvic || recent.ovulation_pain) return "pelvic";
+    if (recent.mood || recent.anxiety || recent.depression || recent.irritability) return "mood";
+    if (recent.discharge || recent.unusual_discharge) return "discharge";
+    return null;
+  }
+
+  // Low-context replies should inherit active context when we can do so safely.
+  // This never invents history; it only maps against explicit active topic state.
+  function contextualizeLowInfoReply(text) {
+    const t = String(text || "").toLowerCase().trim();
+    if (!t) return text;
+
+    const isLowInfo = /^(no|nope|not yet|still no|same|same thing|still same)$/.test(t);
+    if (!isLowInfo) return text;
+
+    if (isLateContextActive({ includePromptContext: true }) && /^(no|nope|not yet|still no|same|same thing|still same)$/.test(t)) {
+      return `${t} period has not come yet`;
+    }
+
+    const activeTopic = getActiveTopicFromContext();
+    if (!activeTopic) return text;
+    if (/^(same|same thing|still same)$/.test(t)) {
+      if (activeTopic === "pelvic") return `${t} cramps pelvic pain`;
+      if (activeTopic === "heavy") return `${t} heavy bleeding`;
+      if (activeTopic === "spotting") return `${t} spotting`;
+      if (activeTopic === "discharge") return `${t} unusual discharge`;
+      if (activeTopic === "mood") return `${t} mood stress`;
+      if (activeTopic === "late") return `${t} period has not come yet`;
+    }
+    return text;
+  }
+
+  function isVagueTriageTrigger(normalizedText, entities) {
+    const t = String(normalizedText || "").toLowerCase();
+    const vaguePhrase =
+      /\b(sumn off|something off|something is off|something wrong|something is wrong|mi nuh feel right|me nuh feel right|i do not feel right|i don't feel right|i dont feel right)\b/.test(t);
+    if (!vaguePhrase) return false;
+    if (entities?.urgent) return false;
+    const symptomCount = Object.values(entities?.symptoms || {}).filter(Boolean).length;
+    return symptomCount <= 1;
+  }
+
+  function isPregnancyAnxietyTrigger(normalizedText, entities) {
+    const t = String(normalizedText || "").toLowerCase();
+    if (entities?.urgent) return false;
+    const strongPanicCue = /\b(scared|panic|panicking|freaking out|worried sick|terrified|frightened)\b/.test(t);
+    const mildAnxietyCue = /\b(anxious|worried)\b/.test(t);
+    const pregCue =
+      /\b(pregnan|pregnancy scare|condom broke|condom break|condom slipped|condom bruk|unprotected sex|late period|missed period)\b/.test(t) ||
+      entities?.pregnancy?.chance === true ||
+      entities?.symptoms?.late === true;
+    const overloadSignals = Object.values(entities?.symptoms || {}).filter(Boolean).length >= 3;
+    if (overloadSignals) return false;
+    return pregCue && (strongPanicCue || (mildAnxietyCue && /\b(pregnancy scare|might be pregnant|think i('?| a)m pregnant)\b/.test(t)));
+  }
+
+  function isReassuranceQuestion(normalizedText) {
+    const t = String(normalizedText || "").toLowerCase();
+    return /\b(is this normal|should i worry|am i okay|is this bad|should i be worried)\b/.test(t);
+  }
+
+  function buildReassuranceLines(entities) {
+    const symptomCount = Object.values(entities?.symptoms || {}).filter(Boolean).length;
+    const boundary = entities?.urgent
+      ? "I don't want you to wait if symptoms are severe."
+      : "It's not always a sign something is seriously wrong.";
+    const next = entities?.urgent
+      ? "Please seek urgent care now, especially if you're faint, in severe pain, or bleeding heavily."
+      : symptomCount > 0
+        ? "If this becomes severe, keeps happening, or feels worse than usual, it's worth getting checked."
+        : "If symptoms become persistent or severe, it's worth checking with a healthcare provider.";
+    return [
+      "A lot of people experience this, and you're not alone 🩷",
+      boundary,
+      next,
+    ];
+  }
+
+  function getPatternCatcherLine(entities) {
+    if (ctx.adviceGiven.has("pattern_catcher_line")) return null;
+    if (ctx.urgency || entities?.urgent) return null;
+    if ((ctx.conversationProfile?.sessionDepth ?? 0) < 2) return null;
+
+    const recent = [...ctx.entityHistory.slice(-4), entities];
+    const counts = {};
+    for (const e of recent) {
+      for (const [k, v] of Object.entries(e?.symptoms || {})) {
+        if (!v) continue;
+        counts[k] = (counts[k] || 0) + 1;
+      }
+    }
+    const repeatedSymptom = Object.values(counts).some((n) => n >= 2);
+
+    const hasSymptomEvidence = (ctx.integratedSignals?.symptomSignals || []).some((s) =>
+      s?.show && ["SYMPTOM_FREQUENCY_INCREASING", "SYMPTOMS_MORE_INTENSE_THAN_USUAL", "SYMPTOMS_PERSISTING_LONGER_THAN_USUAL"].includes(s.code)
+    );
+    const hasAnomalyEvidence = repeatedSymptom && (ctx.bloomieAnomalyCtx?.level === "medium" || ctx.bloomieAnomalyCtx?.level === "high");
+
+    const evidenceCount = [repeatedSymptom, hasSymptomEvidence, hasAnomalyEvidence].filter(Boolean).length;
+    if (evidenceCount < 1) return null;
+
+    ctx.adviceGiven.add("pattern_catcher_line");
+    return "I'm noticing this has come up more than once 🩷";
+  }
+
+  // Promote explicit in-chat age disclosure into session context so minor-safe
+  // guidance can activate even without profile age.
+  function detectDeclaredAge(text) {
+    const t = String(text || "").toLowerCase().trim();
+    const m =
+      t.match(/\b(?:i am|i'm|im|mi)\s+(\d{1,2})\s*(?:years?\s*old|yrs?\s*old|yo)\b/) ||
+      t.match(/\b(?:i am|i'm|im|mi)\s+(\d{1,2})\b/);
+    if (!m) return null;
+    const age = Number(m[1]);
+    if (!Number.isFinite(age) || age < 9 || age > 60) return null;
+    return age;
+  }
+
   function promptFingerprint(text) {
     return String(text || "")
       .toLowerCase()
@@ -2996,11 +3595,14 @@ export function initBloomieChat({
       ctx.inlineQuestion = null;
     }
     // Apply tone-aware line transforms (only when source ≠ rule_only AND depth ≥ 2)
-    const arr = applyToneToLines(
+    let arr = applyToneToLines(
       _rawArr,
       ctx.toneResult ?? null,
       ctx.conversationProfile?.sessionDepth ?? 0
     );
+    if (ctx.policyContext?.ageGroup === "minor" || (ctx.isMinor && ctx.hasGuardianConsent)) {
+      arr = arr.map((line) => sanitizeMinorEnglishLine(line));
+    }
     lockUI(true);
     // Show typing indicator immediately so the user sees Bloomie "thinking"
     ctx.isTyping = true;
@@ -3024,6 +3626,8 @@ export function initBloomieChat({
           ctx.lastBotLineFingerprint === fp;
         if (!isImmediateDuplicate) {
           pushMsg("bot", botLine);
+          playChatCue();
+          speakBotLine(botLine);
           ctx.lastBotLineFingerprint = fp;
         }
         // Show indicator again between bubbles (not after the last one)
@@ -3065,6 +3669,20 @@ export function initBloomieChat({
 
   function transition(nextState, payload = {}) {
     if (!nextState) return;
+    const policyBlockActive =
+      (ctx.policyContext?.ageGroup === "minor" || (ctx.isMinor && ctx.ageGroup === "minor")) &&
+      !ctx.hasGuardianConsent;
+    if (policyBlockActive) {
+      const POLICY_ALLOWLIST = new Set([
+        "POLICY_MINOR_CONSENT_REQUIRED",
+        "END_CHAT_CONFIRM",
+        "CLOSE",
+        "SUMMARY",
+      ]);
+      if (!POLICY_ALLOWLIST.has(nextState)) {
+        nextState = "POLICY_MINOR_CONSENT_REQUIRED";
+      }
+    }
 
     // ── MEDIUM confirm sentinel handlers ──────────────────────────────────
     if (nextState === "_MEDIUM_YES") {
@@ -3199,8 +3817,10 @@ export function initBloomieChat({
           ? ctx.reportedConditions[ctx.reportedConditions.length - 1]
           : null,
       };
-      saveLocalBloomieMemory(_closeUpdate);
-      if (onSaveMemory) onSaveMemory(_closeUpdate);
+      if (!ctx.isAnon) {
+        saveLocalBloomieMemory(_closeUpdate);
+        if (onSaveMemory) onSaveMemory(_closeUpdate);
+      }
       ctx.state                     = "START";
       // Polite goodbye before restarting
       say("Thanks for chatting with me 🩷 I'm always here if you need support.");
@@ -3638,11 +4258,14 @@ export function initBloomieChat({
     }
 
     const node = NODES[ctx.state];
-    const _choices = applyToneToChoices(
+    const tonedChoices = applyToneToChoices(
       resolveChoices(node),
       ctx.toneResult ?? null,
       ctx.conversationProfile?.sessionDepth ?? 0
     );
+    const _choices = (ctx.policyContext?.ageGroup === "minor" || (ctx.isMinor && ctx.hasGuardianConsent))
+      ? tonedChoices.map((c) => ({ ...c, label: sanitizeMinorEnglishLine(c.label) }))
+      : tonedChoices;
     // Snapshot the flow ID at render time so buttons can detect if they're stale.
     const renderedFlowId = ctx.flowId;
     if (_choices.length) {
@@ -3673,6 +4296,10 @@ export function initBloomieChat({
           const choiceId = btn.getAttribute("data-choice");
           const choice = _choices.find((x) => x.id === choiceId);
           if (!choice) return;
+          if (isMinorPolicyBlocked()) {
+            transition("POLICY_MINOR_CONSENT_REQUIRED");
+            return;
+          }
           advanceFlow();
           pushMsg("user", choice.label);
           // Refresh tone from the button label so downstream say/choices transforms
@@ -4028,6 +4655,10 @@ export function initBloomieChat({
     CONDITION_META, CONDITION_ALIASES, extractConditionKey,
     // Internal helpers needed by node modules
     pushMsg, smartTestTiming,
+    pregnancyAlgorithm: {
+      whenToTest: pregnancyWhenToTest,
+      estimatedDueDate: pregnancyEstimatedDueDate,
+    },
   };
   const NODES = createNodes(env);
   const { OOS, OOS_DEFAULT, HEALTH_OVERRIDE_PATTERNS, CYCLE_QUESTION_PATTERNS, routeUserText } = createOOS(env);

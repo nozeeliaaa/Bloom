@@ -240,6 +240,7 @@ export function createPregnancyNodes(env, helpers) {
       say(ctx) {
         const lines = [
           "Okay 🩷 The timing of a reliable test depends on how many days have passed since sex.",
+          "If pregnancy prevention is the immediate concern, emergency contraception works best as soon as possible and can still help up to 5 days after sex.",
           "Type the date of the unprotected sex like: 2026-02-08 (YYYY-MM-DD).",
         ];
         if (ctx.isMinor) lines.unshift("This is a safe space — I won't share anything you tell me 🩷");
@@ -268,8 +269,11 @@ export function createPregnancyNodes(env, helpers) {
         const sexDate = ctx.captureData?.sexDate ? new Date(ctx.captureData.sexDate) : null;
         const earlyDate = sexDate ? fmtDate(addDays(sexDate, 10)) : "10 days after sex";
         const reliableDate = sexDate ? fmtDate(addDays(sexDate, 21)) : "21 days after sex";
+        const daysSince = sexDate ? Math.floor((new Date() - sexDate) / 86400000) : null;
+        const ecWindowOpen = Number.isFinite(daysSince) && daysSince >= 0 && daysSince <= 5;
         return [
           "It's a little too early for a reliable result right now 🩷",
+          ...(ecWindowOpen ? ["You may still be within the emergency-contraception window (up to 5 days after sex), so same-day pharmacy or clinic support can help."] : []),
           "Pregnancy tests work by detecting a hormone (hCG) that builds up in your body after implantation. In the first 10 days it often isn't detectable yet.",
           `The **earliest** you could try an early detection test is around **${earlyDate}** but even then, a negative result could be a false negative.`,
           `For the most reliable result, wait until **${reliableDate}** (21 days after sex).`,

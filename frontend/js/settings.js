@@ -169,11 +169,14 @@ async function init() {
   let prefs = getLocalPrefs();
  
   if (isAccountMode()) {
+    showStatus("Loading saved preferences…");
     const cloudPrefs = await loadFromBackend();
     if (cloudPrefs) {
       // Cloud is source of truth - merge into local cache
       prefs = { ...prefs, ...cloudPrefs };
       setLocalPrefs(prefs);
+    } else {
+      showStatus("Using local settings for now.");
     }
   }
  

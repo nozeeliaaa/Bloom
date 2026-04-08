@@ -96,6 +96,16 @@ describe("extractEntities — symptoms", () => {
     expect(e.symptoms.discharge).toBe(true);
   });
 
+  it("detects late signal from 'period supposed to come' phrasing", () => {
+    const e = extractEntities("my period supposed to come but still no period");
+    expect(e.symptoms.late).toBe(true);
+  });
+
+  it("detects irregular cycle from 'all over the place' phrasing", () => {
+    const e = extractEntities("my cycle all over the place");
+    expect(e.symptoms.irregular).toBe(true);
+  });
+
   it("normalizes 'my boobs sore' to breast tenderness / pain signal", () => {
     const e = extractEntities("my boobs sore");
     expect(e.symptoms.breast_tender).toBe(true);
@@ -195,6 +205,16 @@ describe("extractEntities — pregnancy", () => {
     const e = extractEntities("i tested and it was negative");
     expect(e.pregnancy.testedYet).toBe(true);
     expect(e.pregnancy.result).toBe("negative");
+  });
+
+  it("detects pregnancy chance from condom failure phrasing", () => {
+    const e = extractEntities("condom broke and now i'm worried");
+    expect(e.pregnancy.chance).toBe(true);
+  });
+
+  it("detects pregnancy chance from precum question phrasing", () => {
+    const e = extractEntities("can precum get you pregnant");
+    expect(e.pregnancy.chance).toBe(true);
   });
 });
 

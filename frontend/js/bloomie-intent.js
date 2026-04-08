@@ -88,9 +88,13 @@ export function classifyRepairClarification(normalizedText) {
 
   const clarificationPatterns = [
     /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
+    /^\s*cho man\s*$/i,
+    /^\s*i am frustrated(?:\s+what)?\s*$/i,
+    /^\s*wait hold on\s*$/i,
+    /^\s*look yah(?:\s+nuh)?\s*$/i,
     /^\s*(what|huh)\s*\??\s*$/i,
     /\b(what are you saying|what you mean|what do you mean|seh that again|say that again|explain that|explain that again|explain simpler)\b/i,
-    /\b(mi|me)\s+nuh\s+(understand|get it)\b/i,
+    /\b(mi|me)\s+(nuh|no|don'?t|do not)\s+(understand|get it)\b/i,
     /\byou lost me\b/i,
     /\bnot what i mean\b/i,
   ];
@@ -102,6 +106,7 @@ export function classifyRepairClarification(normalizedText) {
     /\bnot what i asked\b/i,
     /\bthis (isn't|is not|not) what i asked\b/i,
     /\byou (don't|do not) understand\b/i,
+    /\b(kmt|cho man)\b/i,
   ];
   if (frustrationPatterns.some((rx) => rx.test(t))) {
     return { label: "frustration", confidence: 0.86 };

@@ -80,7 +80,7 @@ function getChatText() {
 }
 
 const FOOTER_PATTERN = /trusted adult|school nurse|healthcare provider/i;
-const NUDGE_PATTERN  = /free account|signing up for free|remember your cycle/i;
+const NUDGE_PATTERN  = /free account|free bloom account|signing up for free|remember your cycle/i;
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ afterEach(() => { vi.runAllTimers(); vi.useRealTimers(); vi.restoreAllMocks(); }
 
 describe("minor/anon flags on ctx", () => {
   it("sets ctx.isMinor = true when isMinor is passed", () => {
-    const chat = mountChat({ isMinor: true });
+    const chat = mountChat({ isMinor: true, policySeed: { ageGroup: "minor", hasGuardianConsent: true } });
     expect(chat.getState().isMinor).toBe(true);
   });
 
@@ -99,26 +99,39 @@ describe("minor/anon flags on ctx", () => {
     const chat = mountChat({ isAnon: true });
     expect(chat.getState().isAnon).toBe(true);
   });
+
+  it("promotes explicit in-chat age disclosure to minor-safe mode", () => {
+    const chat = mountChat({ isMinor: false });
+    sendMessage("mi 13 and my period irregular");
+    expect(chat.getState().isMinor).toBe(true);
+    expect(chat.getState().declaredAge).toBe(13);
+  });
 });
 
 describe("minor/anon greeting content", () => {
   it("shows minor-safe greeting when isMinor is true", () => {
-    mountChat({ isMinor: true });
+    mountChat({ isMinor: true, policySeed: { ageGroup: "minor", hasGuardianConsent: true } });
     const text = getChatText();
-    expect(text).toMatch(/safe space|okay to be here|share as much/i);
+    expect(text).toMatch(/help you understand|period questions|what's on your mind/i);
   });
 
   it("shows anon greeting when isAnon is true and isMinor is false", () => {
     mountChat({ isAnon: true, isMinor: false });
     const text = getChatText();
-    expect(text).toMatch(/not signed in|without.*account|cycle history/i);
+    expect(text).toMatch(/anonymous mode|not saved to your account|pdf export/i);
   });
 
   it("minor greeting takes priority when both isMinor and isAnon are true", () => {
-    mountChat({ isMinor: true, isAnon: true });
+    mountChat({ isMinor: true, isAnon: true, policySeed: { ageGroup: "minor", hasGuardianConsent: true } });
     const text = getChatText();
-    expect(text).toMatch(/safe space|okay to be here|share as much/i);
-    expect(text).not.toMatch(/not signed in/i);
+    expect(text).toMatch(/help you understand|period questions|what's on your mind/i);
+    expect(text).not.toMatch(/anonymous mode/i);
+  });
+
+  it("blocks minor chat when guardian consent is missing", () => {
+    mountChat({ isMinor: true, policySeed: { ageGroup: "minor", hasGuardianConsent: false } });
+    const text = getChatText();
+    expect(text).toMatch(/parent or guardian needs to complete consent|school nurse|trusted adult/i);
   });
 });
 
@@ -126,14 +139,14 @@ describe("minor/anon greeting content", () => {
 
 describe("minorSafeFooter", () => {
   it("records minor_adult_nudge in adviceGiven after first health guidance exchange", () => {
-    const chat = mountChat({ isMinor: true });
+    const chat = mountChat({ isMinor: true, policySeed: { ageGroup: "minor", hasGuardianConsent: true } });
     // A symptom-rich message is needed to reach buildGuidanceResponse.
     sendMessage("my period is late and I have cramps and feel nauseous");
     expect(chat.getState().adviceGiven.has("minor_adult_nudge")).toBe(true);
   });
 
   it("footer nudge appears at most once per session", () => {
-    mountChat({ isMinor: true });
+    mountChat({ isMinor: true, policySeed: { ageGroup: "minor", hasGuardianConsent: true } });
     sendMessage("my period is late and I have cramps and feel nauseous");
     sendMessage("I also feel really tired and low energy");
     const text = getChatText();
@@ -145,7 +158,7 @@ describe("minorSafeFooter", () => {
     // "soaking through" is in urgentPhrases → routes to EMERGENCY_REDIRECT
     // before buildGuidanceResponse is ever reached, so minorSafeFooter is
     // never called and the nudge is never added to adviceGiven.
-    const chat = mountChat({ isMinor: true });
+    const chat = mountChat({ isMinor: true, policySeed: { ageGroup: "minor", hasGuardianConsent: true } });
     sendMessage("I'm soaking through my pads and I feel faint");
     expect(chat.getState().adviceGiven.has("minor_adult_nudge")).toBe(false);
     expect(getChatText()).not.toMatch(FOOTER_PATTERN);

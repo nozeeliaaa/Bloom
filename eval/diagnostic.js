@@ -44,7 +44,8 @@ const HEALTH_OVERRIDE = [
 ];
 
 function pipelineNormalize(raw) {
-  const p1 = normalizePatois(raw);
+  const safeRaw = raw == null ? "" : String(raw);
+  const p1 = normalizePatois(safeRaw);
   const p2 = fuzzyCorrect(p1) ?? p1;
   const p3 = collapseRepeatedLetters(p2);
   const p4 = expandShorthand(p3);
@@ -52,21 +53,24 @@ function pipelineNormalize(raw) {
 }
 
 function checkOOS(raw, normalized) {
-  const oos = detectOutOfScope(raw, OOS_CATEGORIES, HEALTH_OVERRIDE);
+  const safeRaw = raw == null ? "" : String(raw);
+  const safeNorm = normalized == null ? "" : String(normalized);
+  const oos = detectOutOfScope(safeNorm || safeRaw, OOS_CATEGORIES, HEALTH_OVERRIDE);
   return oos ? oos.name : null;
 }
 
 function runDiag(raw) {
-  const normalized  = pipelineNormalize(raw);
+  const safeRaw = raw == null ? "" : String(raw);
+  const normalized  = pipelineNormalize(safeRaw);
   const entities    = extractEntities(normalized);
   const route       = inferRoute(entities);
   const { sig, has }= scoreSignals(normalized);
   const multiRoute  = resolveSignals(sig, has);
   const confidence  = computeRouteConfidence(sig, entities);
-  const toneResult  = detectToneWithConfidence(raw);
-  const isPatois    = detectPatois(raw);
+  const toneResult  = detectToneWithConfidence(safeRaw);
+  const isPatois    = detectPatois(safeRaw);
   const gibberish   = looksLikeGibberish(normalized);
-  const oosCategory = checkOOS(raw, normalized);
+  const oosCategory = checkOOS(safeRaw, normalized);
 
   const actualRoute = route?.next ?? (multiRoute?.next ?? null);
   const guidance    = actualRoute ? buildGuidanceResponse(entities, route?.payload?.reason) : null;
@@ -78,7 +82,7 @@ function runDiag(raw) {
     .map(([k]) => k);
 
   return {
-    input:          raw,
+    input:          safeRaw,
     normalized,
     isPatois,
     route:          actualRoute,
@@ -213,6 +217,7 @@ for (const group of GROUPS) {
     }
 
     const r = result;
+    const safeInputText = input == null ? "" : String(input);
     const routeStr    = r.route ?? "null";
     const oosStr      = r.oosCategory ?? "—";
     const toneStr     = `${r.tone}(${r.toneConfidence})`;
@@ -222,7 +227,7 @@ for (const group of GROUPS) {
     const symStr      = r.activeSymptoms.length ? r.activeSymptoms.join(",") : "none";
     const previewStr  = r.preview ? `"${String(r.preview).slice(0, 60)}"` : "—";
 
-    console.log(`   IN:  "${input || "(empty)"}"`);
+    console.log(`   IN:  "${safeInputText || "(empty)"}"`);
     console.log(`        route=${routeStr} | oos=${oosStr} | conf=${confStr} | tone=${toneStr}`);
     console.log(`        patois=${patoisStr} | gibberish=${gibStr} | symptoms=[${symStr}]`);
     console.log(`        preview=${previewStr}`);
@@ -252,7 +257,7 @@ for (const group of GROUPS) {
       }
       // Tone should be "frustrated" or "distressed" — if "neutral" on clearly frustrated inputs, flag
       const frustrationInputs = ["you cant help","this is useless","forget it","whatever","you dont understand","you r dumb","this app is trash"];
-      if (frustrationInputs.includes(input.toLowerCase()) && r.tone === "neutral") {
+      if (frustrationInputs.includes(safeInputText.toLowerCase()) && r.tone === "neutral") {
         bugs.tone_miss.push({ input, note: `tone=neutral on obvious frustration/dismissal`, tone: r.tone, ...r });
       }
     }

@@ -113,7 +113,22 @@ export function renderNav(activePage = "") {
   });
 
   linkContainer.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => linkContainer.classList.remove("open"));
+    a.addEventListener("click", () => {
+      linkContainer.classList.remove("open");
+      // Optional perf trace: records nav click timing for next page.
+      const perfOn =
+        localStorage.getItem("bloom_perf_debug") === "1" ||
+        new URLSearchParams(window.location.search).get("perf") === "1";
+      if (perfOn) {
+        try {
+          sessionStorage.setItem("bloom_nav_perf", JSON.stringify({
+            from: activePage || "unknown",
+            to: a.getAttribute("href") || "",
+            ts: Date.now(),
+          }));
+        } catch (_) {}
+      }
+    });
   });
 
   // ── Back button (inject for non-primary pages) ───────────────────────────

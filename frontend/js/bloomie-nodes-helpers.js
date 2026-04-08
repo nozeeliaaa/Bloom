@@ -11,6 +11,7 @@ export function buildNodeHelpers(env) {
     buildCyclePersonalisationLine, hasLmpData, cd, userMode, withNickname,
     pickAvoiding, wasNodeRecentlySeen, insightFor, buildSymptomPatternLine,
     buildSymptomInsightLine, buildCycleSignalLine, getNickname,
+    pregnancyAlgorithm,
   } = env;
 
   // ── computeTestPlan ──────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ export function buildNodeHelpers(env) {
     const sex = sexDate ? new Date(sexDate) : null;
     const validExp = exp && !Number.isNaN(exp.getTime());
     const validSex = sex && !Number.isNaN(sex.getTime());
+    const canUsePregAlgo = typeof pregnancyAlgorithm?.whenToTest === "function";
 
     const daysSinceSex = validSex ? Math.floor((today - sex) / 86400000) : null;
     const isTooEarly = validSex ? daysSinceSex < 10 : false;
@@ -30,8 +32,22 @@ export function buildNodeHelpers(env) {
     let _fromPeriod = null;
     let _fromSex = null;
 
-    if (validExp) _fromPeriod = addDays(exp, 1);
-    if (validSex) _fromSex = addDays(sex, 21);
+    if (validExp) {
+      if (canUsePregAlgo) {
+        const byPeriod = pregnancyAlgorithm.whenToTest(validSex ? sex : today, exp);
+        _fromPeriod = byPeriod?.primaryTestDate ? new Date(byPeriod.primaryTestDate) : addDays(exp, 1);
+      } else {
+        _fromPeriod = addDays(exp, 1);
+      }
+    }
+    if (validSex) {
+      if (canUsePregAlgo) {
+        const bySex = pregnancyAlgorithm.whenToTest(sex, null);
+        _fromSex = bySex?.primaryTestDate ? new Date(bySex.primaryTestDate) : addDays(sex, 21);
+      } else {
+        _fromSex = addDays(sex, 21);
+      }
+    }
 
     if (validExp && validSex) {
       bothDatesAvailable = true;
@@ -147,6 +163,11 @@ export function buildNodeHelpers(env) {
   // Build a fallback line from the last known intent when no symptom recall is available.
   function buildIntentFallbackLine() {
     if (ctx.isAnon) return null;
+    // Guard against speculative recall: only surface intent fallback when
+    // memory originated from explicit symptom extraction.
+    if (bloomieMemory?.lastSymptomsSource && bloomieMemory.lastSymptomsSource !== "explicit_entity") {
+      return null;
+    }
     const INTENT_LABELS = {
       LATE_INTRO:           "a late or missed period",
       HEAVY_INTRO:          "heavy bleeding",
@@ -315,7 +336,7 @@ export function buildNodeHelpers(env) {
     if (ctx.isMinor) {
       return r([
         introLine,
-        "I'm here to help you understand what's going on with your body 🩷 Everything you share with me stays between us.",
+        "I'm here to help you understand what's going on with your body 🩷",
         "I can help with period questions, cramps, mood changes, and more. What's on your mind?",
       ]);
     }
@@ -324,7 +345,8 @@ export function buildNodeHelpers(env) {
     if (ctx.isAnon) {
       return r([
         introLine,
-        "You're not signed in, so I won't be able to see your cycle history — but I can still help 🩷",
+        "Quick note: you're in anonymous mode, so this chat is not saved to your account and PDF export is unavailable in this mode 🩷",
+        "I can still help with reproductive health questions in this session.",
         "What's going on today?",
       ]);
     }
@@ -385,7 +407,12 @@ export function buildNodeHelpers(env) {
               `Based on your logged dates, your period is due in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
               `Your period window is getting close — around ${daysLeft} day${daysLeft === 1 ? "" : "s"} away 🌸`,
             ]);
-        return r([introLine, contextLine, combined?.followUp || "If you're already feeling symptoms, I can help. What's going on?"]);
+        return r([
+          introLine,
+          contextLine,
+          combined?.followUp || "If you're already feeling symptoms, I can help. What's going on?",
+          "If you want, you can ask: \"Remind me in 2 days to check my symptoms.\"",
+        ]);
       }
 
       // No urgency signal — use phase awareness for returning users

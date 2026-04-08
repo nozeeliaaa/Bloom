@@ -35,11 +35,45 @@ let algoPregnancy    = null;
 let algoCycleEngine  = null;
 let algoSymptomEngine = null;
 let algoAnomalyEngine = null;
+let _plotlyLoadPromise = null;
+
+const PERF_DEBUG =
+  localStorage.getItem("bloom_perf_debug") === "1" ||
+  new URLSearchParams(window.location.search).get("perf") === "1";
+
+function perfTime(label) {
+  if (!PERF_DEBUG) return;
+  try { console.time(label); } catch (_) {}
+}
+
+function perfTimeEnd(label) {
+  if (!PERF_DEBUG) return;
+  try { console.timeEnd(label); } catch (_) {}
+}
+
+function logNavTimingIfPresent() {
+  if (!PERF_DEBUG) return;
+  try {
+    const raw = sessionStorage.getItem("bloom_nav_perf");
+    if (!raw) return;
+    const nav = JSON.parse(raw);
+    // Only log fresh traces relevant to this dashboard load.
+    if (nav?.to?.includes("/pages/dashboard.html") && Date.now() - Number(nav.ts || 0) < 15000) {
+      console.log("[perf] nav transition", {
+        from: nav.from,
+        to: nav.to,
+        wallMs: Date.now() - Number(nav.ts || 0),
+      });
+    }
+    sessionStorage.removeItem("bloom_nav_perf");
+  } catch (_) {}
+}
 
 renderNav("dashboard");
 renderFooter();
 renderBloomieFab();
 renderModeBanner(document.getElementById("banner-area"));
+logNavTimingIfPresent();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -675,6 +709,8 @@ function renderPregnancyTools(goal, logsByDate) {
   const card = document.getElementById("pregnancy-tools");
   const body = document.getElementById("pregnancy-tools-body");
   const insightsZone = document.getElementById("pregnancy-insights");
+  const weekTipsBody = document.getElementById("pregnancy-week-tips-body");
+  const symptomBody = document.getElementById("pregnancy-symptom-body");
   if (!card || !body) return;
 
   const isPreg = goal === "pregnancy";
@@ -687,12 +723,36 @@ function renderPregnancyTools(goal, logsByDate) {
 
   const lmp = localStorage.getItem("bloom_lmp");
 
-  if (!lmp || !algoPregnancy) {
+  if (!lmp) {
     if (insightsZone) insightsZone.style.display = "none";
     body.innerHTML = `
       <p class="text-muted">Add your last menstrual period (LMP) date in your profile to see your due date, trimester, and weekly milestones.</p>
       <a class="btn btn-primary" href="/pages/profile-view.html" style="margin-top:0.75rem;display:inline-block;">Add LMP date</a>
     `;
+    return;
+  }
+
+  if (!algoPregnancy) {
+    // Polished placeholder while module loads; avoids a jarring "late card".
+    if (insightsZone) insightsZone.style.display = "grid";
+    body.innerHTML = `
+      <p class="text-muted">Getting your pregnancy timeline…</p>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line w-70"></div>
+    `;
+    if (weekTipsBody) {
+      weekTipsBody.innerHTML = `
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line w-80"></div>
+      `;
+    }
+    if (symptomBody) {
+      symptomBody.innerHTML = `
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+      `;
+    }
     return;
   }
 
@@ -724,7 +784,6 @@ function renderPregnancyTools(goal, logsByDate) {
   }
 
   // Week tips card
-  const weekTipsBody = document.getElementById("pregnancy-week-tips-body");
   if (weekTipsBody) {
     const tips = getPregnancyWeekTips(week);
     const weekBadge = week ? `<div class="preg-week-badge">Week ${week}</div>` : "";
@@ -1140,7 +1199,7 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
   // Marker colours: red if outside typical 21-35 day range
   const markerColors = cycleLengths.map((l) => (l < 21 || l > 35 ? "#e05c7a" : "#D4749A"));
 
-  Plotly.newPlot(canvas, [
+  const plotData = [
     // ── Typical range ribbon (21-35 days) ──
     {
       x: labels,
@@ -1185,7 +1244,8 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
       },
       hovertemplate: "<b>%{x}</b><br><b>%{y} days</b><extra></extra>",
     },
-  ], {
+  ];
+  const plotLayout = {
     paper_bgcolor: "transparent",
     plot_bgcolor: "transparent",
     margin: { t: 14, r: 16, b: 72, l: 48 },
@@ -1224,10 +1284,50 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
       font: { size: 10, color: "#B85C82", family: "Nunito, sans-serif" },
       yshift: 5,
     }],
-  }, {
+  };
+  const plotConfig = {
     responsive: true,
     displayModeBar: false,
+  };
+
+  // Lazy-load Plotly so Dashboard content can render immediately.
+  ensurePlotlyLoaded()
+    .then((PlotlyRef) => {
+      perfTime("dashboard:chart-render");
+      return PlotlyRef.newPlot(canvas, plotData, plotLayout, plotConfig);
+    })
+    .then(() => perfTimeEnd("dashboard:chart-render"))
+    .catch((err) => {
+      console.warn("[dashboard] chart load/render failed:", err?.message || err);
+      const frame = canvas.closest(".chart-frame");
+      if (frame) {
+        frame.innerHTML =
+          `<p class="text-muted" style="font-size:0.9rem;text-align:center;padding:1.25rem 0;">Chart unavailable right now. Cycle history is still visible above.</p>`;
+      }
+    });
+}
+
+function ensurePlotlyLoaded() {
+  if (window.Plotly) return Promise.resolve(window.Plotly);
+  if (_plotlyLoadPromise) return _plotlyLoadPromise;
+
+  _plotlyLoadPromise = new Promise((resolve, reject) => {
+    perfTime("dashboard:plotly-load");
+    const script = document.createElement("script");
+    script.src = "https://cdn.plot.ly/plotly-2.35.2.min.js";
+    script.async = true;
+    script.onload = () => {
+      perfTimeEnd("dashboard:plotly-load");
+      resolve(window.Plotly);
+    };
+    script.onerror = () => {
+      perfTimeEnd("dashboard:plotly-load");
+      reject(new Error("Failed to load Plotly CDN script"));
+    };
+    document.head.appendChild(script);
   });
+
+  return _plotlyLoadPromise;
 }
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
@@ -1392,6 +1492,7 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function loadDashboard() {
+  perfTime("dashboard:load-total");
   const goal = getUserGoal();
   // ── Age-lock gate ─────────────────────────────────────────────────────────────
   // Try to Conceive, Track Pregnancy, and Track Perimenopause are 18+ goals.
@@ -1425,14 +1526,18 @@ async function loadDashboard() {
   }
 
   // Load modules and logs in parallel so initial dashboard work starts sooner.
-  const moduleImportsPromise = Promise.all([
-    import("./algorithms/pregnancyAlgorithm.js").catch(() => null),
+  // Keep pregnancy module separate so pregnancy cards can hydrate without waiting
+  // for unrelated insight engines.
+  const pregnancyModulePromise = import("./algorithms/pregnancyAlgorithm.js").catch(() => null);
+  const insightModulesPromise = Promise.all([
     import("./algorithms/bloom-cycle-engine.js").catch(() => null),
     import("./algorithms/bloom-symptom-engine.js").catch(() => null),
     import("./algorithms/bloom-anomaly-engine.js").catch(() => null),
   ]);
 
+  perfTime("dashboard:getAllLogs");
   const logsByDate = await getAllLogs();
+  perfTimeEnd("dashboard:getAllLogs");
   const cycle = buildCycleBase(logsByDate);
 
   // Derived cycle history
@@ -1449,56 +1554,20 @@ async function loadDashboard() {
   // showing nothing when the backend is unavailable or the user is in anon mode.
   let predictedCycleLength = null;
   if (lastPeriodStart) {
+    perfTime("dashboard:fetchCycleState");
     _cycleStatePromise = fetchCycleState(logsByDate);
   } else {
     _cycleStatePromise = Promise.resolve(null);
   }
-
-  // Complete module loading while cycle state is being resolved.
-  [algoPregnancy, algoCycleEngine, algoSymptomEngine, algoAnomalyEngine] =
-    await moduleImportsPromise;
-
-  if (lastPeriodStart) {
-    const state = await _cycleStatePromise;
-    if (state?.ready) {
-      cycle.phase          = state.phase          ?? cycle.phase;
-      cycle.phaseLabel     = state.phaseLabel      ?? null;
-      cycle.source         = state.source          ?? "backend";
-      // confidence may be an object {level,message} (local) or a string (old path)
-      const confLevel = typeof state.confidence === "object"
-        ? state.confidence?.level?.toLowerCase()
-        : state.confidence;
-      cycle.confidence     = confLevel             ?? cycle.confidence;
-      cycle.dayInCycle     = state.dayInCycle      ?? cycle.dayInCycle;
-      cycle.avgCycleLength = state.avgCycleLength  ?? cycle.avgCycleLength;
-      predictedCycleLength = state.predictedCycleLength ?? null;
-      if (state.nextPeriodDate)     cycle.nextPeriodDate = state.nextPeriodDate;
-      if (state.ovulationDate)      cycle.ovulationDate  = state.ovulationDate;
-      if (state.fertileStart)       cycle.fertileStart   = state.fertileStart;
-      if (state.fertileEnd)         cycle.fertileEnd     = state.fertileEnd;
-      if (state.futureCycles?.length) cycle.futureCycles = state.futureCycles;
-      if (state.source === "local") {
-        console.log("[dashboard] using local fallback state = backend unavailable or anon mode");
-      }
-    }
-
-    // FutureCycles resolution is now handled centrally in cycle-state.js
-    // (_resolveFutureCycles runs on every fetchCycleState result before caching).
-  }
-
-  const allLogDates = Object.keys(logsByDate)
-    .filter(k => { const l = logsByDate[k]; return l?.flow || l?.symptoms?.length || l?.notes; })
-    .sort();
-  const lastLogDate = allLogDates.length ? allLogDates[allLogDates.length - 1] : null;
 
   const goalBadge = document.getElementById("goal-badge");
   const goalDescEl = document.getElementById("goal-desc");
   if (goalBadge) goalBadge.textContent = goalLabel(goal);
   if (goalDescEl) goalDescEl.textContent = goalDesc(goal);
 
-  // Cycle snapshot
-  const snapshotEl = document.getElementById("cycle-snapshot");
-  if (snapshotEl) {
+  function renderSnapshotCard() {
+    const snapshotEl = document.getElementById("cycle-snapshot");
+    if (!snapshotEl) return;
     if (cycle.dayInCycle) {
       const confNorm = (cycle.confidence || "low").toLowerCase();
       const confCls = confNorm === "high" ? "conf-high" : confNorm === "medium" ? "conf-medium" : "conf-low";
@@ -1521,13 +1590,88 @@ async function loadDashboard() {
   // Stamp goal class on body so CSS can hide/show TTC-specific elements
   document.body.classList.toggle("goal-ttc", goal === "ttc");
 
+  // First paint: render immediately from locally available data so cards stop
+  // showing "Loading..." while auth/network/chunks finish.
+  perfTime("dashboard:render-initial");
+  renderSnapshotCard();
   renderPhaseCard(cycle);
   renderGoalToolCard(goal, cycle);
   renderTtcTools(goal, cycle, logsByDate);
   renderFactsSlideshow(goal);
   renderPregnancyTools(goal, logsByDate);
-  renderSymptomTools(goal, logsByDate, cycle);
   renderCycleHistoryAndChart(cycle, logsByDate);
+  const initialPhaseKey = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
+  const initialTodaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
+  setTodayInsights(initialPhaseKey, goal, cycle.phaseLabel, initialTodaySymptoms);
+  perfTimeEnd("dashboard:render-initial");
+
+  // Pregnancy card refinement: hydrate it as soon as its own dependency is ready.
+  // This avoids waiting for cycle-state/network and other heavy engines.
+  pregnancyModulePromise
+    .then((pregMod) => {
+      if (pregMod) algoPregnancy = pregMod;
+      if (goal === "pregnancy") {
+        perfTime("dashboard:pregnancy-card-hydrate");
+        renderPregnancyTools(goal, logsByDate);
+        perfTimeEnd("dashboard:pregnancy-card-hydrate");
+      }
+    })
+    .catch((e) => console.warn("[dashboard] pregnancy module load failed:", e?.message || e));
+
+  // Resolve network/chunks in parallel, then hydrate richer data paths.
+  perfTime("dashboard:module-imports");
+  const [insightMods, state, pregnancyMod] = await Promise.all([
+    insightModulesPromise,
+    _cycleStatePromise,
+    pregnancyModulePromise,
+  ]);
+  [algoCycleEngine, algoSymptomEngine, algoAnomalyEngine] = insightMods;
+  if (pregnancyMod) algoPregnancy = pregnancyMod;
+  perfTimeEnd("dashboard:module-imports");
+
+  if (lastPeriodStart) {
+    perfTimeEnd("dashboard:fetchCycleState");
+  }
+  if (state?.ready) {
+    cycle.phase          = state.phase          ?? cycle.phase;
+    cycle.phaseLabel     = state.phaseLabel      ?? null;
+    cycle.source         = state.source          ?? "backend";
+    const confLevel = typeof state.confidence === "object"
+      ? state.confidence?.level?.toLowerCase()
+      : state.confidence;
+    cycle.confidence     = confLevel             ?? cycle.confidence;
+    cycle.dayInCycle     = state.dayInCycle      ?? cycle.dayInCycle;
+    cycle.avgCycleLength = state.avgCycleLength  ?? cycle.avgCycleLength;
+    predictedCycleLength = state.predictedCycleLength ?? null;
+    if (state.nextPeriodDate)       cycle.nextPeriodDate = state.nextPeriodDate;
+    if (state.ovulationDate)        cycle.ovulationDate  = state.ovulationDate;
+    if (state.fertileStart)         cycle.fertileStart   = state.fertileStart;
+    if (state.fertileEnd)           cycle.fertileEnd     = state.fertileEnd;
+    if (state.futureCycles?.length) cycle.futureCycles   = state.futureCycles;
+    if (state.source === "local") {
+      console.log("[dashboard] using local fallback state = backend unavailable or anon mode");
+    }
+  }
+
+  const allLogDates = Object.keys(logsByDate)
+    .filter(k => { const l = logsByDate[k]; return l?.flow || l?.symptoms?.length || l?.notes; })
+    .sort();
+  const lastLogDate = allLogDates.length ? allLogDates[allLogDates.length - 1] : null;
+
+  perfTime("dashboard:render-hydrated");
+  renderSnapshotCard();
+  renderPhaseCard(cycle);
+  renderGoalToolCard(goal, cycle);
+  renderTtcTools(goal, cycle, logsByDate);
+  renderFactsSlideshow(goal);
+  renderPregnancyTools(goal, logsByDate);
+  perfTime("dashboard:symptom-tools");
+  renderSymptomTools(goal, logsByDate, cycle);
+  perfTimeEnd("dashboard:symptom-tools");
+  const phaseKey = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
+  const todaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
+  setTodayInsights(phaseKey, goal, cycle.phaseLabel, todaySymptoms);
+  perfTimeEnd("dashboard:render-hydrated");
 
   // Append unified estimate note to the three top cards (always last)
 
@@ -1549,7 +1693,8 @@ async function loadDashboard() {
 
   // PDF export - generate and download directly without leaving the page
   const pdfBtn = document.getElementById("export-pdf");
-  if (pdfBtn) {
+  if (pdfBtn && !pdfBtn.dataset.boundExport) {
+    pdfBtn.dataset.boundExport = "1";
     pdfBtn.addEventListener("click", async () => {
       pdfBtn.disabled = true;
       const prev = pdfBtn.textContent;
@@ -1576,39 +1721,68 @@ async function loadDashboard() {
     });
   }
 
-  const phaseKey = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
-  const todaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
-  setTodayInsights(phaseKey, goal, cycle.phaseLabel, todaySymptoms);
-
   // Advanced insights (algorithm-powered, goal-gated)
+  perfTime("dashboard:advanced-insights");
   renderAdvancedInsights(document.getElementById("advanced-insights"), {
     cycle, cycleLengths, lastPeriodStart, lastLogDate,
     logsByDate,
     mlPredictedCycleLength: predictedCycleLength,
   });
+  perfTimeEnd("dashboard:advanced-insights");
+
+  // Notifications reuse this load's data and state promise to avoid duplicate
+  // fetch/state work during navigation hydration.
+  runNotificationsFromDashboardLoad(logsByDate, cycle).catch((e) => {
+    console.warn("[dashboard] notifications skipped:", e?.message || e);
+  });
+  perfTimeEnd("dashboard:load-total");
 }
 
 
 // Shared cycle-state promise = set by loadDashboard, consumed by notifications.
 // Avoids a second POST /api/cycles/state call on the same page load.
 let _cycleStatePromise = null;
+let _didAuthRefreshLoad = false;
+let _dashboardLoadInFlight = false;
+let _dashboardLoadQueued = false;
 
-onAuthChange(() => { loadDashboard(); });
+function runNotificationsFromDashboardLoad(logs, cycleFromLoad) {
+  if (isAnonMode()) return Promise.resolve();
+  const cycle = { ...(cycleFromLoad || buildCycleBase(logs)) };
+  return (_cycleStatePromise ?? fetchCycleState(logs))
+    .then((state) => {
+      if (state) {
+        if (state.nextPeriodDate) cycle.nextPeriodDate = state.nextPeriodDate;
+        if (state.fertileStart)   cycle.fertileStart   = state.fertileStart;
+        if (state.fertileEnd)     cycle.fertileEnd     = state.fertileEnd;
+      }
+      triggerNotifications(cycle, logs);
+    });
+}
 
-// Fire notifications using the same cycle state already fetched by loadDashboard.
-// getAllLogs() is cached in db.js so no extra network call there either.
-getAllLogs().then(async logs => {
-  const cycle = buildCycleBase(logs);
-
-  if (!isAnonMode() && (cycle.cycleStarts || []).length >= 1) {
-    // Reuse the in-flight or resolved promise from loadDashboard if available
-    const state = await (_cycleStatePromise ?? fetchCycleState(logs)).catch(() => null);
-    if (state) {
-      if (state.nextPeriodDate) cycle.nextPeriodDate = state.nextPeriodDate;
-      if (state.fertileStart)   cycle.fertileStart   = state.fertileStart;
-      if (state.fertileEnd)     cycle.fertileEnd     = state.fertileEnd;
-    }
+function runDashboardLoad() {
+  if (_dashboardLoadInFlight) {
+    _dashboardLoadQueued = true;
+    return;
   }
+  _dashboardLoadInFlight = true;
+  loadDashboard()
+    .catch((e) => console.warn("[dashboard] load failed:", e?.message || e))
+    .finally(() => {
+      _dashboardLoadInFlight = false;
+      if (_dashboardLoadQueued) {
+        _dashboardLoadQueued = false;
+        runDashboardLoad();
+      }
+    });
+}
 
-  triggerNotifications(cycle, logs);
+// Start immediately so dashboard doesn't wait for role-sync/auth callback latency.
+runDashboardLoad();
+// Refresh once after authenticated state resolves to ensure cloud-backed freshness.
+onAuthChange((user) => {
+  if (user && !_didAuthRefreshLoad) {
+    _didAuthRefreshLoad = true;
+    runDashboardLoad();
+  }
 });

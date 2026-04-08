@@ -41,7 +41,7 @@ export function createPeriodNodes(env, helpers) {
       },
       say: [
         "I hear you 🩷",
-        "Heavy flow can happen, but soaking every hour is a key signal we should check quickly.",
+        "Heavy flow can happen, but soaking every hour is a key signal we should check quickly; keep sipping fluids while we sort this.",
         "During your heaviest moments, are you soaking through a pad or tampon every hour for two or more hours in a row?",
       ],
       choices: [
@@ -399,8 +399,10 @@ export function createPeriodNodes(env, helpers) {
         const signalLine = buildCycleSignalLine("late");
         return [
           "That makes sense 🩷",
+          ...(ctx.isMinor ? ["If your periods started within the last 1–3 years, irregular timing is very common and you're not abnormal."] : []),
           signalLine || "With irregular cycles, 'late' is harder to define, and shifts can happen from stress, hormones, or body changes.",
           "Use rough tracking for a few cycles to spot your pattern, and flag anything that keeps getting more irregular.",
+          ...(ctx.isMinor ? ["If bleeding gets very heavy, pain is severe, or you feel worried, involve a trusted adult or school nurse."] : []),
           "Is there any chance of pregnancy this cycle?",
         ];
       },

@@ -84,6 +84,9 @@ const PHRASE_MAP = [
   ["pass clot",                     "passing clots"],
   ["a pass clot",                   "passing clots"],
   ["mi period late",                "my period is late"],
+  ["mi late",                       "my period is late"],
+  ["it nuh come yet",               "period has not come yet"],
+  ["period supposed to come",       "period is expected to come"],
   ["period nuh come",               "period hasn't come"],
   ["period nuh reach",              "period hasn't arrived"],
   ["period a play",                 "period is irregular"],
@@ -150,6 +153,8 @@ const PHRASE_MAP = [
 
   // ── Bleeding ──────────────────────────────────────────────────────────────
   ["bleeding bad",                  "bleeding heavily"],
+  ["period heavy like river",       "very heavy bleeding"],
+  ["mi period heavy like river",    "very heavy bleeding"],
   ["blood nuff",                    "a lot of blood"],
   ["bleed out",                     "bleeding heavily"],
   ["pad soaking",                   "soaking through pad"],
@@ -214,6 +219,7 @@ const PHRASE_MAP = [
   ["smell funny down deh",          "unusual odour"],
   ["smell off down there",          "unusual odour"],
   ["itchy down deh",                "vaginal itching"],
+  ["mi itching down deh",           "vaginal itching"],
   ["burning down deh",              "vaginal burning"],
   ["funny feeling down there",      "unusual vaginal sensation"],
 
@@ -225,6 +231,13 @@ const PHRASE_MAP = [
   ["mi feel off",                   "i feel off unwell"],
   ["mi sick",                       "i feel sick unwell"],
   ["mi nah feel right",             "i do not feel right"],
+  ["mi nuh feel right",             "i do not feel right"],
+  ["sumn off",                      "something is wrong with me unwell"],
+  ["cho man",                       "i am frustrated"],
+  ["mi a stress bad",               "i am very stressed anxious"],
+  ["wah going on wid me",           "what is going on with me i feel off unwell"],
+  ["wah gwan wid me",               "what is going on with me i feel off unwell"],
+  ["wah a gwaan wid me",            "what is going on with me i feel off unwell"],
 
   // ── Amenorrhea / missing periods (months) ─────────────────────────────────
   ["mi period nuh come fi months",      "my period has not come for months amenorrhea"],
@@ -258,6 +271,7 @@ const PHRASE_MAP = [
   // ── Postpartum ────────────────────────────────────────────────────────────
   ["mi just born baby",                 "i just gave birth postpartum"],
   ["mi just have baby",                 "i just had a baby postpartum"],
+  ["mi nuh feel happy after baby",      "i do not feel happy after baby postpartum low mood"],
   ["mi period nuh come back after baby","my period has not returned postpartum"],
   ["mi a breastfeed",                   "i am breastfeeding postpartum"],
   ["mi baby young still",               "my baby is young postpartum"],
@@ -270,6 +284,8 @@ const PHRASE_MAP = [
   ["mi have implant",                   "i have a birth control implant"],
   ["mi just start pill",                "i just started birth control pill"],
   ["mi stop take pill",                 "i stopped taking birth control pill"],
+  ["condom bruk",                       "condom broke unprotected sex"],
+  ["condom burst",                      "condom broke unprotected sex"],
 
   // ── Stress / lifestyle signals ────────────────────────────────────────────
   ["mi stress out bad",                 "i am very stressed lifestyle change"],
@@ -361,6 +377,13 @@ const PHRASE_MAP = [
   ["dat nuh make sense",                 "that doesn't make sense"],
   ["u confuse mi",                       "you're confusing me"],
   ["mi confuse",                         "i'm confused"],
+  ["look yah nuh",                       "wait hold on"],
+  ["look yah",                           "wait hold on"],
+  ["seh wah",                            "what do you mean"],
+  ["seh dat again",                      "say that again"],
+  ["kmt",                                "i am frustrated"],
+  ["kmt what",                           "what do you mean i am frustrated"],
+  ["cho man",                            "i am frustrated"],
 
   // ── Correction and disagreement ────────────────────────────────────────────
   ["dat nuh wah mi seh",                 "that's not what i said"],
@@ -373,6 +396,12 @@ const PHRASE_MAP = [
   ["mi nuh ask dat",                     "i didn't ask that"],
   ["u nuh answer mi question",           "you didn't answer my question"],
   ["answer mi question",                 "answer my question"],
+  ["mi scared fi tell mi mama",          "i am scared to tell my mom minor support"],
+  ["mi scared fi tell mommy",            "i am scared to tell my mom minor support"],
+  ["mi scared fi tell my mother",        "i am scared to tell my mother minor support"],
+  ["mi see bump after sex",              "i noticed genital bump after sex sti concern"],
+  ["mi see bump",                        "i noticed genital bump sti concern"],
+  ["trying 8 months no baby",            "trying to conceive for 8 months no pregnancy"],
   ["dat nuh helpful",                    "that's not helpful"],
   ["dat nuh help",                       "that doesn't help"],
 
@@ -486,6 +515,10 @@ const PHRASE_MAP = [
   ["something is coming out",      "unusual discharge"],
   ["sumn a come out",              "unusual discharge"],
   ["sumn coming out",              "unusual discharge"],
+  ["discharge weird",              "unusual discharge"],
+  ["smell off",                    "discharge with odor unusual odour"],
+  ["back a hurt me",               "my lower back is hurting pelvic pain"],
+  ["belly a hurt me",              "i have stomach pain cramps"],
   ["it won't stop",                "bleeding won't stop continuing"],
   ["it nuh stop",                  "bleeding won't stop continuing"],
   ["i don't feel like myself",     "i feel sad low mood emotional"],
@@ -640,6 +673,7 @@ const WORD_MAP = [
   // Medication-related tokens (residual after phrase-level processing)
   ["wah",       "what"],
   ["tek",       "take"],
+  ["kmt",       "frustrated"],
 
   // ── Health shorthand abbreviations ───────────────────────────────────────────
   ["bfp",       "positive pregnancy test"],

@@ -4,18 +4,34 @@
  * All outputs are educational estimates, not medical predictions.
  */
 
+function toValidDate(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const d = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function sanitizePositiveNumbers(values = []) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v > 0);
+}
 
 // Converts period start dates into cycle lengths in days
 export function deriveCycleLengths(periodStartDates) {
-  if (!periodStartDates || periodStartDates.length < 2) return [];
+  if (!Array.isArray(periodStartDates) || periodStartDates.length < 2) return [];
 
-  const sorted  = [...periodStartDates].sort((a, b) => a - b);
+  const sorted = periodStartDates
+    .map((d) => toValidDate(d))
+    .filter(Boolean)
+    .sort((a, b) => a.getTime() - b.getTime());
+  if (sorted.length < 2) return [];
   const lengths = [];
 
   for (let i = 1; i < sorted.length; i++) {
-    const diffMs   = sorted[i] - sorted[i - 1];
+    const diffMs   = sorted[i].getTime() - sorted[i - 1].getTime();
     const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-    lengths.push(diffDays);
+    if (Number.isFinite(diffDays) && diffDays > 0) lengths.push(diffDays);
   }
 
   return lengths;
@@ -24,11 +40,12 @@ export function deriveCycleLengths(periodStartDates) {
 
 // Standard OLS - treats all cycles equally, used as baseline comparison
 export function trainLinearRegression(cycleLengths) {
-  const n = cycleLengths.length;
+  const safeLengths = sanitizePositiveNumbers(cycleLengths);
+  const n = safeLengths.length;
   if (n < 3) throw new Error("Need at least 3 cycle lengths to train.");
 
   const x = Array.from({ length: n }, (_, i) => i + 1);
-  const y = cycleLengths;
+  const y = safeLengths;
 
   const sumX  = x.reduce((a, v) => a + v, 0);
   const sumY  = y.reduce((a, v) => a + v, 0);
@@ -46,11 +63,12 @@ export function trainLinearRegression(cycleLengths) {
 // Weighted OLS - recent cycles get higher weights than older ones
 // weightMode: "linear" (default) | "exponential" | "equal"
 export function trainWeightedLinearRegression(cycleLengths, weightMode = "linear") {
-  const n = cycleLengths.length;
+  const safeLengths = sanitizePositiveNumbers(cycleLengths);
+  const n = safeLengths.length;
   if (n < 3) throw new Error("Need at least 3 cycle lengths to train.");
 
   const x = Array.from({ length: n }, (_, i) => i + 1);
-  const y = cycleLengths;
+  const y = safeLengths;
 
   let weights;
 
@@ -84,25 +102,41 @@ export function trainWeightedLinearRegression(cycleLengths, weightMode = "linear
 
 // Predicts the next single cycle length
 export function predictNextCycleLength(slope, intercept, cycleCount) {
-  return clampCycleLength(slope * (cycleCount + 1) + intercept);
+  const safeSlope = Number.isFinite(Number(slope)) ? Number(slope) : 0;
+  const safeIntercept = Number.isFinite(Number(intercept)) ? Number(intercept) : 28;
+  const safeCount = Number.isFinite(Number(cycleCount)) ? Number(cycleCount) : 0;
+  return clampCycleLength(safeSlope * (safeCount + 1) + safeIntercept);
 }
 
 
 // Predicts the next n cycle lengths
 export function predictMultipleCycles(slope, intercept, cycleCount, n = 3) {
-  return Array.from({ length: n }, (_, i) =>
-    clampCycleLength(slope * (cycleCount + i + 1) + intercept)
+  const safeN = Math.max(1, Number.isFinite(Number(n)) ? Math.floor(Number(n)) : 3);
+  const safeSlope = Number.isFinite(Number(slope)) ? Number(slope) : 0;
+  const safeIntercept = Number.isFinite(Number(intercept)) ? Number(intercept) : 28;
+  const safeCount = Number.isFinite(Number(cycleCount)) ? Number(cycleCount) : 0;
+  return Array.from({ length: safeN }, (_, i) =>
+    clampCycleLength(safeSlope * (safeCount + i + 1) + safeIntercept)
   );
 }
 
 
 // Scores prediction reliability based on how consistent past cycles have been
 export function getConfidenceLevel(cycleLengths) {
-  const n        = cycleLengths.length;
-  const mean     = cycleLengths.reduce((a, b) => a + b, 0) / n;
-  const variance = cycleLengths.reduce((a, v) => a + Math.pow(v - mean, 2), 0) / n;
+  const safeLengths = sanitizePositiveNumbers(cycleLengths);
+  const n = safeLengths.length;
+  if (n === 0) {
+    return {
+      level: "Low",
+      windowDays: 5,
+      stdDev: null,
+      message: "Not enough history yet. Showing a wider estimate window.",
+    };
+  }
+  const mean     = safeLengths.reduce((a, b) => a + b, 0) / n;
+  const variance = safeLengths.reduce((a, v) => a + Math.pow(v - mean, 2), 0) / n;
   const stdDev   = Math.sqrt(variance);
-  const range    = Math.max(...cycleLengths) - Math.min(...cycleLengths);
+  const range    = Math.max(...safeLengths) - Math.min(...safeLengths);
 
   let level, windowDays, message;
 
@@ -123,8 +157,10 @@ export function getConfidenceLevel(cycleLengths) {
 
 // Calculates all phase dates from a predicted cycle length
 const addDays = (date, days) => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
+  const base = toValidDate(date) || new Date();
+  const safeDays = Number.isFinite(Number(days)) ? Number(days) : 0;
+  const d = new Date(base.getTime());
+  d.setDate(d.getDate() + safeDays);
   return d;
 };
 
@@ -134,10 +170,12 @@ export function calculatePhases(
   periodDuration    = 5,
   lutealPhaseLength = 14  // biologically fixed at ~14 days
 ) {
-  const cycle           = Math.round(predictedCycleLength);
+  const safePeriodDuration = Math.max(1, Number.isFinite(Number(periodDuration)) ? Math.round(Number(periodDuration)) : 5);
+  const safeLutealLength = Math.max(1, Number.isFinite(Number(lutealPhaseLength)) ? Math.round(Number(lutealPhaseLength)) : 14);
+  const cycle = clampCycleLength(predictedCycleLength);
   const nextPeriodStart = addDays(lastPeriodStart, cycle);
-  const nextPeriodEnd   = addDays(nextPeriodStart, periodDuration - 1);
-  const ovulationDay    = addDays(nextPeriodStart, -lutealPhaseLength);
+  const nextPeriodEnd   = addDays(nextPeriodStart, safePeriodDuration - 1);
+  const ovulationDay    = addDays(nextPeriodStart, -safeLutealLength);
 
   return {
     nextPeriodStart,
@@ -158,17 +196,31 @@ export function calculatePhases(
 
 // Returns the user's personal luteal phase length, falls back to 14 if not enough data
 export function getPersonalLutealPhase(lutealHistory = []) {
-  if (!lutealHistory || lutealHistory.length < 3) return 14;
-  return Math.round(lutealHistory.reduce((a, b) => a + b, 0) / lutealHistory.length);
+  const safe = sanitizePositiveNumbers(lutealHistory);
+  if (safe.length < 3) return 14;
+  return Math.max(1, Math.round(safe.reduce((a, b) => a + b, 0) / safe.length));
 }
 
 
 // Returns which phase the user is currently in
 export function getCurrentPhase(today, lastPeriodStart, lastPeriodEnd, phases) {
-  if (today >= lastPeriodStart && today <= lastPeriodEnd) return "menstrual";
-  if (today >= phases.follicular.start && today <= phases.follicular.end) return "follicular";
-  if (today >= phases.ovulatory.start  && today <= phases.ovulatory.end)  return "ovulatory";
-  if (today >= phases.luteal.start     && today <= phases.luteal.end)     return "luteal";
+  const t = toValidDate(today);
+  const pStart = toValidDate(lastPeriodStart);
+  const pEnd = toValidDate(lastPeriodEnd);
+  const fStart = toValidDate(phases?.follicular?.start);
+  const fEnd = toValidDate(phases?.follicular?.end);
+  const oStart = toValidDate(phases?.ovulatory?.start);
+  const oEnd = toValidDate(phases?.ovulatory?.end);
+  const lStart = toValidDate(phases?.luteal?.start);
+  const lEnd = toValidDate(phases?.luteal?.end);
+
+  if (!t || !pStart || !pEnd || !fStart || !fEnd || !oStart || !oEnd || !lStart || !lEnd) {
+    return "unknown";
+  }
+  if (t >= pStart && t <= pEnd) return "menstrual";
+  if (t >= fStart && t <= fEnd) return "follicular";
+  if (t >= oStart && t <= oEnd) return "ovulatory";
+  if (t >= lStart && t <= lEnd) return "luteal";
   return "unknown";
 }
 
@@ -196,7 +248,7 @@ export function runFullPrediction(
   userTypicalCycleLength = 28,
   weightMode             = "linear"
 ) {
-  if (!periodStartDates || periodStartDates.length < 1) {
+  if (!Array.isArray(periodStartDates) || periodStartDates.length < 1) {
     return {
       ready:        false,
       cyclesLogged: 0,
@@ -204,11 +256,16 @@ export function runFullPrediction(
     };
   }
 
+  const safeLastPeriodStart = toValidDate(lastPeriodStart) || toValidDate(periodStartDates[periodStartDates.length - 1]) || new Date();
+  const safeLastPeriodEnd = toValidDate(lastPeriodEnd) || safeLastPeriodStart;
+  const safeMonthsAhead = Math.max(1, Number.isFinite(Number(monthsAhead)) ? Math.floor(Number(monthsAhead)) : 3);
+  const safeTypicalCycleLength = clampCycleLength(userTypicalCycleLength);
   const cycleLengths = deriveCycleLengths(periodStartDates);
 
-  const periodDuration = Math.round(
-    (lastPeriodEnd - lastPeriodStart) / (1000 * 60 * 60 * 24)
+  const rawPeriodDuration = Math.round(
+    (safeLastPeriodEnd.getTime() - safeLastPeriodStart.getTime()) / (1000 * 60 * 60 * 24)
   ) + 1;
+  const periodDuration = Math.max(1, Number.isFinite(rawPeriodDuration) ? rawPeriodDuration : 5);
 
   const confidence = cycleLengths.length < 3
     ? { level: "Low", windowDays: 5, stdDev: null,
@@ -221,7 +278,7 @@ export function runFullPrediction(
   const ruleBasedLength = clampCycleLength(
     cycleLengths.length > 0
       ? cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length
-      : userTypicalCycleLength
+      : safeTypicalCycleLength
   );
 
   // Standard OLS for comparison
@@ -242,17 +299,17 @@ export function runFullPrediction(
       weighted.slope,
       weighted.intercept,
       weighted.cycleCount,
-      monthsAhead
+      safeMonthsAhead
     );
     weightsUsed    = weighted.weights;
     weightModeUsed = weighted.weightMode;
   } else {
-    predictedLengths = Array.from({ length: monthsAhead }, () => ruleBasedLength);
+    predictedLengths = Array.from({ length: safeMonthsAhead }, () => ruleBasedLength);
   }
 
   // Chain predictions - each cycle starts where the previous one ends
   const futureCycles = [];
-  let   chainStart   = lastPeriodStart;
+  let   chainStart   = safeLastPeriodStart;
 
   for (let i = 0; i < predictedLengths.length; i++) {
     const cycleLength  = predictedLengths[i];
@@ -277,8 +334,18 @@ export function runFullPrediction(
 
   const today        = new Date();
   const currentPhase = getCurrentPhase(
-    today, lastPeriodStart, lastPeriodEnd, futureCycles[0].phases
+    today, safeLastPeriodStart, safeLastPeriodEnd, futureCycles[0]?.phases || {}
   );
+
+  if (!futureCycles.length) {
+    return {
+      ready: false,
+      cyclesLogged: periodStartDates.length,
+      message: "Bloom could not generate predictions from the current data.",
+      confidence,
+      disclaimer: "This is an educational estimate, not a medical prediction. Consult a healthcare provider for medical advice.",
+    };
+  }
 
   return {
     ready:         true,

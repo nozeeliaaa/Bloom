@@ -193,6 +193,35 @@ describe("multi-turn: topic interrupt clears entity history", () => {
   });
 });
 
+// ── 3b. Accumulated extraction for low-context follow-ups ───────────────────
+
+describe("multi-turn: accumulated extraction window", () => {
+  it("keeps prior late-period signal when follow-up is low-context ('also')", () => {
+    sendMessage("my period is late");
+    sendMessage("also");
+
+    const state = chat.getState();
+    const latest = state.entityHistory[state.entityHistory.length - 1];
+    expect(!!latest?.symptoms?.late || !!latest?.symptoms?.implicit_late).toBe(true);
+  });
+
+  it("interprets 'still no' as late-context follow-up when already in late flow", () => {
+    sendMessage("my period is late");
+    sendMessage("still no");
+    const state = chat.getState();
+    const latest = state.entityHistory[state.entityHistory.length - 1];
+    expect(!!latest?.symptoms?.late || !!latest?.symptoms?.implicit_late).toBe(true);
+  });
+
+  it("interprets 'same thing' as continuity in an active late thread", () => {
+    sendMessage("my period is late");
+    sendMessage("same thing");
+    const state = chat.getState();
+    const latest = state.entityHistory[state.entityHistory.length - 1];
+    expect(!!latest?.symptoms?.late || !!latest?.symptoms?.implicit_late).toBe(true);
+  });
+});
+
 // ── 4. Overload triage — 3+ topics in one message ────────────────────────────
 
 describe("multi-turn: overload detection", () => {

@@ -67,6 +67,57 @@ describe("bloomie OOS routing - false-positive guards", () => {
     expect(routed.payload?.oos).toBeUndefined();
     expect(routed.next).not.toBe("START_MENU");
   });
+
+  it("keeps core Jamaican conversational cases in-scope", () => {
+    const { routeUserText } = makeRouter();
+    const inputs = [
+      "it nuh come yet",
+      "still no",
+      "kmt",
+      "mi nuh feel right",
+      "condom bruk",
+      "brown blood",
+      "my cycle all over the place",
+      "this normal?",
+      "same thing",
+      "mi a stress bad",
+    ];
+    for (const input of inputs) {
+      const routed = routeUserText(input);
+      expect(routed.payload?.oos).not.toBe("default");
+    }
+  });
+
+  it("routes condom-break phrasing to recent sex test timing flow", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("condom broke last night");
+    expect(routed.next).toBe("TEST_RECENT_SEX_INTRO");
+  });
+
+  it("routes heavy-flow metaphor phrasing to heavy flow triage", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("mi period heavy like river");
+    expect(routed.next).toBe("HEAVY_INTRO");
+  });
+
+  it("routes postpartum low mood phrasing to mood safety path", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("mi nuh feel happy after baby");
+    expect(routed.next).toBe("MOOD_SAFETY_CHECK");
+  });
+
+  it("routes TTC duration concern to TTC intro", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("trying 8 months no baby");
+    expect(routed.next).toBe("TTC_INTRO");
+  });
+
+  it("routes fear-of-telling-mom phrasing to minor support node", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("mi scared fi tell mi mama");
+    expect(routed.next).toBe("MINOR_TRUSTED_ADULT_SUPPORT");
+    expect(routed.payload?.oos).toBe("minor_trusted_support");
+  });
 });
 
 describe("bloomie OOS routing - true positives and warm fallback", () => {
@@ -105,7 +156,7 @@ describe("bloomie OOS routing - true positives and warm fallback", () => {
     expect(routed.next).toBe("START_MENU");
     expect(routed.payload?.oos).toBe("default");
     expect(Array.isArray(routed.reply)).toBe(true);
-    expect(routed.reply.join(" ")).toMatch(/outside my lane|not sure i caught|best with period/i);
+    expect(routed.reply.join(" ")).toMatch(/missing something|tell me a little more|cycle|symptom/i);
   });
 
   it("routes 'kmt what?' to clarification repair instead of default OOS", () => {
@@ -127,10 +178,37 @@ describe("bloomie OOS routing - true positives and warm fallback", () => {
     expect(routed.payload?.oos).toBe("clarification_repair");
   });
 
+  it("routes 'look yah nuh' to clarification repair", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("look yah nuh");
+    expect(routed.payload?.oos).toBe("clarification_repair");
+  });
+
+  it("routes 'seh wah' to clarification repair", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("seh wah");
+    expect(routed.payload?.oos).toBe("clarification_repair");
+  });
+
   it("clarification repair uses late-context wording when period is overdue", () => {
     const { routeUserText } = makeRouter({ daysUntilNextPeriod: () => -16 });
     const routed = routeUserText("kmt what?");
     expect(routed.payload?.oos).toBe("clarification_repair");
     expect(routed.reply.join(" ")).toMatch(/later than expected|16 day/i);
+  });
+
+  it("uses soft clarification route for vague health phrasing before hard OOS", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("wah going on wid me");
+    expect(routed.next).toBe("ELSE_NOT_SURE_ROUTE");
+    expect(routed.payload?.oos).toBeUndefined();
+    expect(routed.payload?.reason).toBe("soft_clarify");
+  });
+
+  it("routes reassurance phrasing to in-scope check path", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("this normal?");
+    expect(routed.next).toBe("ELSE_NOT_SURE_ROUTE");
+    expect(routed.payload?.oos).toBeUndefined();
   });
 });

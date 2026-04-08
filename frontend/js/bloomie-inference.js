@@ -187,7 +187,7 @@ export function extractEntities(text) {
 function extractSymptoms(t) {
   return {
     // ── ORIGINAL 8 (kept exactly — inferRoute depends on these names) ────────
-    late:           /\b(late|missed|no period|period.*not come|period.*nuh come|period.*hasn't|period.*didn't|period skipped|period skip|period is missing|haven't seen.*my period|haven't had.*period|period hasn't arrived|period hasn't come)\b/.test(t),
+    late:           /\b(late|missed|no period|still no period|period.*not come|period.*nuh come|period.*hasn't|period.*didn't|period skipped|period skip|period is missing|period.*supposed to come|haven't seen.*my period|haven't had.*period|period hasn't arrived|period hasn't come)\b/.test(t),
     // Implicit late: pronoun-based references without naming "period" directly.
     // Only treated as late in inferRoute when no other symptom entities are present.
     implicit_late:  (
@@ -202,7 +202,7 @@ function extractSymptoms(t) {
     spotting:       /\b(spot|spotting|pink|brown.*discharge|blood.*between|between.*period)\b/.test(t),
     pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly|one.sided.*pain|one.side.*hurt|one side.*hurt|lower.*abdominal.*pain|side.*hurts|sharp.*pelvic|back.*hurting|my back hurting)\b/.test(t),
     mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it|feel.*low|so low|feel low|feeling low|angry|anger|mad|vex|frustrated|frustration|annoyed|snappy|happy|happier|good mood|excited|calm|overwhelmed|don't feel like myself|dont feel like myself|not like myself)\b/.test(t),
-    discharge:      /\b(discharge|smell|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation|down.*there.*(?:off|wrong|weird|not normal|funny|odd|irritat|uncomfort)|(?:something|sumn).*(?:wrong|weird|off).*(?:down there|down deh|down below))\b/.test(t),
+    discharge:      /\b(discharge|discharge.*weird|smell off|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation|down.*there.*(?:off|wrong|weird|not normal|funny|odd|irritat|uncomfort)|(?:something|sumn).*(?:wrong|weird|off).*(?:down there|down deh|down below))\b/.test(t),
     nausea:         /\b(nausea|nauseous|vomit|vomiting|sick to.*stomach|throw up|queasy|feel sick)\b/.test(t),
     dizziness:      /\b(dizzy|dizziness|lightheaded|faint|head.*spin|head.*swim)\b/.test(t),
 
@@ -269,7 +269,7 @@ function extractSymptoms(t) {
     pain_during_sex:/\b(pain.*sex|sex.*hurt|sex.*painful|painful.*sex|hurt.*during.*sex|intercourse.*hurt)\b/.test(t),
 
     // ── CYCLE IRREGULARITY ───────────────────────────────────────────────────
-    irregular:      /\b(irregular|unpredictable.*period|period.*unpredictable|never.*same|different.*every.*month|skip.*month)\b/.test(t),
+    irregular:      /\b(irregular|unpredictable.*period|period.*unpredictable|never.*same|different.*every.*month|skip.*month|cycle.*all over the place|period.*all over the place)\b/.test(t),
     fluid_retention:/\b(water.*retention|retain.*water|swollen|swelling|puffy.*feet|puffy.*hands|fluid.*retention|bloat.*water)\b/.test(t),
 
     // ── URINARY / OTHER ──────────────────────────────────────────────────────
@@ -486,7 +486,7 @@ function extractTiming(t) {
 
 // ── 1e. Pregnancy signals ─────────────────────────────────────────────────────
 function extractPregnancy(t) {
-  const chance = /\b(sex|slept with|unprotected|might be pregnant|could be pregnant|think.*pregnant|pregnant|breed|catch belly|belly catch|pickney deh)\b/.test(t);
+  const chance = /\b(sex|slept with|unprotected|condom.*(broke|break|burst|pop|tear|bruk)|precum|pre.?cum|might be pregnant|could be pregnant|think.*pregnant|pregnant|breed|catch belly|belly catch|pickney deh)\b/.test(t);
   const testedYet = /\b(took.*test|took a test|tested|pregnancy test|test.*positive|test.*negative|test result|test come back)\b/.test(t);
   let result = null;
   if (/\b(positive|two lines|two line|it positive|bfp|positive pregnancy test|positive test)\b/.test(t)) result = "positive";

@@ -14,7 +14,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { normalizePatois } from "./bloomie-patois.js";
+import { normalizePatois, fuzzyCorrect, collapseRepeatedLetters, expandShorthand } from "./bloomie-patois.js";
 
 
 // ─── 1. STRING UTILITIES ──────────────────────────────────────────────────────
@@ -24,7 +24,11 @@ export function pick(arr) {
 }
 
 export function normalizeText(s) {
-  return String(s || "")
+  const patoisNorm = normalizePatois(String(s || ""));
+  const fuzzyNorm = fuzzyCorrect(patoisNorm) ?? patoisNorm;
+  const collapsed = collapseRepeatedLetters(fuzzyNorm);
+  const expanded = expandShorthand(collapsed);
+  return String(expanded || "")
     .toLowerCase()
     .replace(/[^\w\s'']/g, " ")
     .replace(/\s+/g, " ")

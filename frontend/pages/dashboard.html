@@ -154,6 +154,22 @@
       font-size: 0.92rem;
     }
 
+    /* Lightweight loading polish for cards that hydrate asynchronously */
+    .skeleton-line {
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(212,116,154,0.10) 0%, rgba(212,116,154,0.22) 50%, rgba(212,116,154,0.10) 100%);
+      background-size: 200% 100%;
+      animation: skeleton-shimmer 1.2s ease-in-out infinite;
+      margin-top: 0.45rem;
+    }
+    .skeleton-line.w-80 { width: 80%; }
+    .skeleton-line.w-70 { width: 70%; }
+    @keyframes skeleton-shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
     /* Phase badge */
     .phase-badge {
       display: inline-flex;
@@ -910,7 +926,6 @@
     </div>
   </main>
 
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script type="module" src="/js/dashboard.js"></script>
   <script type="module">
     import { renderMythFab } from "/js/mythFab.js";

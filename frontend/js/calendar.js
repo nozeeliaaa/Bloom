@@ -53,6 +53,7 @@ let currentYear, currentMonth;
 let allLogs = {};
 let cycleData = null;
 let predResult = null;
+let predictionPanelState = { status: "idle", errorMessage: "" };
 
 let selectedDate = "";
 let selectedFlow = "none";
@@ -63,12 +64,24 @@ const today = new Date();
 currentYear = today.getFullYear();
 currentMonth = today.getMonth();
 
+function setPredictionPanelState(status, errorMessage = "") {
+  predictionPanelState = { status, errorMessage };
+}
+
 // ── Load & compute ─────────────────────────────────────────────────────────
 
 async function recomputeCycleData() {
   const baseline = { predictedPeriodDays: [], phase: "unknown", dayInCycle: null, avgCycleLength: null };
 
-  const state = await fetchCycleState(allLogs);
+  let state = null;
+  try {
+    state = await fetchCycleState(allLogs);
+  } catch (err) {
+    predResult = null;
+    cycleData = baseline;
+    throw err;
+  }
+
   if (!state?.ready) {
     predResult = null;
     cycleData  = baseline;
@@ -573,8 +586,15 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
   // the updated cycleData (e.g. clears old predicted window when new period logged).
   saveDailyLog(dateKey, data)
     .then(() => recomputeCycleData())
-    .then(() => { renderCalendar(); renderPredictionPanel(); })
-    .catch(() => renderPredictionPanel());
+    .then(() => {
+      setPredictionPanelState("ready");
+      renderCalendar();
+      renderPredictionPanel();
+    })
+    .catch(() => {
+      setPredictionPanelState("error", "Your log was saved, but predictions could not be refreshed.");
+      renderPredictionPanel();
+    });
 });
 
 // ── Delete single log ──────────────────────────────────────────────────────
@@ -593,8 +613,14 @@ document.getElementById("delete-log-btn").addEventListener("click", () => {
   // Persist deletion + recompute in background = render panel only after recompute finishes
   deleteDailyLog(dateKey)
     .then(() => recomputeCycleData())
-    .then(() => renderPredictionPanel())
-    .catch(() => renderPredictionPanel());
+    .then(() => {
+      setPredictionPanelState("ready");
+      renderPredictionPanel();
+    })
+    .catch(() => {
+      setPredictionPanelState("error", "Log deleted, but prediction refresh failed.");
+      renderPredictionPanel();
+    });
 });
 
 // ── Clear all logs ─────────────────────────────────────────────────────────
@@ -603,7 +629,12 @@ document.getElementById("clear-all-logs-btn").addEventListener("click", async ()
   if (!confirm("Clear ALL logs?\n\nThis will permanently delete every period and symptom entry. This cannot be undone.")) return;
   await clearAllLogs();
   allLogs = {};
-  await recomputeCycleData();
+  try {
+    await recomputeCycleData();
+    setPredictionPanelState("ready");
+  } catch (_) {
+    setPredictionPanelState("error", "Logs were cleared, but predictions could not be refreshed.");
+  }
   renderCalendar();
   renderPredictionPanel();
   showToast("All logs cleared.", "info");
@@ -658,6 +689,40 @@ function renderPredictionPanel() {
   const goal = getUserGoal();
   if (!["period", "ttc", "perimenopause", "no_period"].includes(goal)) {
     panel.innerHTML = "";
+    return;
+  }
+
+  if (predictionPanelState.status === "loading") {
+    panel.innerHTML = `
+      <section class="card" style="text-align:center;padding:1.25rem 1rem;color:var(--color-text-muted);font-size:0.92rem;">
+        Loading your cycle predictions…
+      </section>`;
+    return;
+  }
+
+  if (predictionPanelState.status === "error") {
+    panel.innerHTML = `
+      <section class="card" style="text-align:center;padding:1.25rem 1rem;">
+        <p class="text-muted" style="margin:0 0 0.75rem;">
+          ${predictionPanelState.errorMessage || "We couldn't load your predictions right now."}
+        </p>
+        <button id="retry-prediction-load" class="btn btn-outline btn-sm" type="button">Try again</button>
+      </section>`;
+    const retryBtn = document.getElementById("retry-prediction-load");
+    if (retryBtn) {
+      retryBtn.onclick = async () => {
+        setPredictionPanelState("loading");
+        renderPredictionPanel();
+        try {
+          await recomputeCycleData();
+          setPredictionPanelState("ready");
+        } catch (_) {
+          setPredictionPanelState("error", "Still having trouble loading predictions. Please try again in a moment.");
+        }
+        renderCalendar();
+        renderPredictionPanel();
+      };
+    }
     return;
   }
 
@@ -736,15 +801,29 @@ let _initDone = false;
 
 async function init() {
   buildSymptomUI();
+  setPredictionPanelState("loading");
+  renderPredictionPanel();
   // Render calendar shell immediately with logged days (no predictions yet)
-  allLogs = await getAllLogs();
+  try {
+    allLogs = await getAllLogs();
+  } catch (_) {
+    allLogs = {};
+    setPredictionPanelState("error", "We couldn't load your calendar logs right now.");
+  }
   renderCalendar();
   // Auth state may not have resolved yet; wait for it before fetching cycle state
   // onAuthChange fires once on load regardless of sign-in state
   onAuthChange(async () => {
     if (_initDone) return; // fire only once per page load
     _initDone = true;
-    await recomputeCycleData();
+    setPredictionPanelState("loading");
+    renderPredictionPanel();
+    try {
+      await recomputeCycleData();
+      setPredictionPanelState("ready");
+    } catch (_) {
+      setPredictionPanelState("error", "We couldn't refresh your cycle predictions.");
+    }
     renderCalendar();
     renderPredictionPanel();
   });
