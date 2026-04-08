@@ -1,147 +1,114 @@
 /**
- * phase.js - Cycle Phase Calculation Module
- *
- * Computes the current menstrual cycle phase based on logged period data.
- * Phases: Menstrual (days 1-5), Follicular (days 6-13),
- *         Ovulation (day 14), Luteal (days 15-28).
- *
- * Uses average cycle length derived from cycle start dates.
- * Returns low-confidence result when insufficient data is available.
- *
- * COMP3901: This is educational estimation only, not medical prediction.
+ * phase.js
+ * Shared local cycle phase computation.
+ * Mirrors the rule-based fallback logic in dashboard.js / calendar.js.
+ * Used by report.js, fertility.js, and any module that needs a cycle state
+ * without hitting the backend.
  */
+
+import { toDateKey } from "./utils.js";
+
+function _addDays(dateStr, n) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function _daysBetween(a, b) {
+  return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+}
 
 /**
- * Compute cycle analysis from all logs.
- * @param {Object} logs - All daily logs keyed by date string YYYY-MM-DD
- * @returns {Object} { phase, dayInCycle, avgCycleLength, confidence, cycleStarts, nextPeriodDate, ovulationDate, fertileStart, fertileEnd }
+ * Compute local rule-based cycle state from a logsByDate map.
+ * Returns the same shape as the backend /api/cycles/state response so callers
+ * can use either source interchangeably.
+ *
+ * @param {Object} logs  - { "YYYY-MM-DD": { flow, symptoms, notes, ... } }
+ * @returns {Object} cycle state
  */
 export function computeCyclePhase(logs) {
-  const entries = Object.entries(logs).sort(([a], [b]) => a.localeCompare(b));
+  const EMPTY = {
+    ready: false, phase: "unknown", phaseLabel: "Unknown",
+    dayInCycle: null, avgCycleLength: null, predictedCycleLength: null,
+    confidence: { level: "Low", windowDays: 5, message: "Log your first period to see predictions." },
+    nextPeriodDate: null, ovulationDate: null, fertileStart: null, fertileEnd: null,
+    cyclesLogged: 0, source: "local",
+  };
 
-  // Gather period days (flow != 'none') sorted ascending
-  const periodDays = entries
-    .filter(([, d]) => d.flow && d.flow !== 'none')
-    .map(([date]) => date)
+  const periodDays = Object.keys(logs || {})
+    .filter(k => { const l = logs[k]; return l && l.flow && l.flow !== "none"; })
     .sort();
 
-  // Identify distinct cycle starts (period day that is >3 days after previous period day)
-  const cycleStarts = [];
-  let prevDate = null;
-  for (const day of periodDays) {
-    if (!prevDate || daysBetween(prevDate, day) > 3) {
-      cycleStarts.push(day);
+  if (!periodDays.length) return EMPTY;
+
+  // Cluster period days (gap > 3 days = new cycle)
+  const cStarts = [], cEnds = [];
+  let cs = periodDays[0], ce = periodDays[0];
+  for (let i = 1; i < periodDays.length; i++) {
+    if (_daysBetween(periodDays[i - 1], periodDays[i]) > 3) {
+      cStarts.push(cs); cEnds.push(ce); cs = periodDays[i];
     }
-    prevDate = day;
+    ce = periodDays[i];
+  }
+  cStarts.push(cs); cEnds.push(ce);
+
+  const lastStart = cStarts[cStarts.length - 1];
+
+  // Cycle lengths from cluster start intervals
+  const cycleLengths = [];
+  for (let i = 1; i < cStarts.length; i++) {
+    cycleLengths.push(_daysBetween(cStarts[i - 1], cStarts[i]));
   }
 
-  // Not enough data
-  if (cycleStarts.length < 2) {
-    return {
-      phase: 'unknown',
-      phaseLabel: 'Unknown',
-      dayInCycle: null,
-      avgCycleLength: null,
-      confidence: 'low',
-      message: 'Not enough data. Log more period days to see your predicted phase.',
-      cycleStarts,
-      nextPeriodDate: null,
-      ovulationDate: null,
-      fertileStart: null,
-      fertileEnd: null,
-      predictedPeriodDays: []
-    };
+  const avgCycleLength = cycleLengths.length
+    ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+    : 28;
+
+  // Weighted-average predicted length (recent cycles count more)
+  let predictedCycleLength = avgCycleLength;
+  if (cycleLengths.length > 0) {
+    const n = cycleLengths.length;
+    const weights = Array.from({ length: n }, (_, i) => i + 1);
+    const sumW = weights.reduce((a, w) => a + w, 0);
+    predictedCycleLength = Math.max(21, Math.min(45, Math.round(
+      weights.reduce((a, w, i) => a + w * cycleLengths[i], 0) / sumW
+    )));
   }
 
-  // Calculate average cycle length
-  const lengths = [];
-  for (let i = 1; i < cycleStarts.length; i++) {
-    lengths.push(daysBetween(cycleStarts[i - 1], cycleStarts[i]));
-  }
-  const avgCycleLength = Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length);
-
-  // Calculate current day in cycle from last cycle start
-  const lastStart = cycleStarts[cycleStarts.length - 1];
+  // Day in cycle + phase
   const todayKey = toDateKey(new Date());
-  const dayInCycle = daysBetween(lastStart, todayKey) + 1; // Day 1 = first period day
-
-  // Determine phase based on day in cycle (using standard 28-day model scaled)
-  const menstrualEnd = Math.round(avgCycleLength * 5 / 28);       // ~days 1-5
-  const follicularEnd = Math.round(avgCycleLength * 13 / 28);     // ~days 6-13
-  const ovulationDay = Math.round(avgCycleLength * 14 / 28);      // ~day 14
-  const ovulationEnd = Math.round(avgCycleLength * 16 / 28);      // ~days 14-16
+  const dayInCycle = _daysBetween(lastStart, todayKey) + 1;
+  const folEnd = Math.round(predictedCycleLength * 13 / 28);
+  const ovDay  = Math.round(predictedCycleLength * 14 / 28);
+  const ovEnd  = Math.round(predictedCycleLength * 16 / 28);
 
   let phase, phaseLabel;
-  if (dayInCycle <= menstrualEnd) {
-    phase = 'menstrual';
-    phaseLabel = 'Menstrual';
-  } else if (dayInCycle <= follicularEnd) {
-    phase = 'follicular';
-    phaseLabel = 'Follicular';
-  } else if (dayInCycle <= ovulationEnd) {
-    phase = 'ovulation';
-    phaseLabel = 'Ovulation';
-  } else if (dayInCycle <= avgCycleLength) {
-    phase = 'luteal';
-    phaseLabel = 'Luteal';
-  } else {
-    // Past expected cycle length - period may be late
-    phase = 'luteal';
-    phaseLabel = 'Late Luteal';
-  }
+  if (periodDays.includes(todayKey))            { phase = "menstrual";  phaseLabel = "Menstrual";  }
+  else if (dayInCycle <= folEnd)                { phase = "follicular"; phaseLabel = "Follicular"; }
+  else if (dayInCycle <= ovEnd)                 { phase = "ovulatory";  phaseLabel = "Ovulatory";  }
+  else if (dayInCycle <= predictedCycleLength)  { phase = "luteal";     phaseLabel = "Luteal";     }
+  else                                          { phase = "luteal";     phaseLabel = "Late Luteal"; }
 
-  // Predicted next period date
-  const nextPeriodDate = addDays(lastStart, avgCycleLength);
+  const nextPeriodDate  = _addDays(lastStart, predictedCycleLength);
+  const ovulationDate   = _addDays(lastStart, ovDay - 1);
+  const fertileStart    = _addDays(lastStart, ovDay - 5);
+  const fertileEnd      = ovulationDate;
 
-  // Ovulation date (approx day 14 of cycle scaled)
-  const ovulationDate = addDays(lastStart, ovulationDay - 1);
-
-  // Fertile window: 5 days before ovulation to 1 day after
-  const fertileStart = addDays(lastStart, ovulationDay - 6);
-  const fertileEnd = addDays(lastStart, ovulationDay);
-
-  // Predicted period days for calendar (next predicted period, ~5 days)
-  const predictedPeriodDays = [];
-  for (let i = 0; i < menstrualEnd; i++) {
-    predictedPeriodDays.push(addDays(lastStart, avgCycleLength + i));
-  }
-
-  // Confidence based on number of cycles tracked
-  const confidence = lengths.length >= 3 ? 'high' : 'medium';
+  const confLevel = cycleLengths.length >= 3 ? "Medium" : cycleLengths.length >= 1 ? "Low" : "Low";
 
   return {
+    ready: true,
     phase,
     phaseLabel,
     dayInCycle,
     avgCycleLength,
-    confidence,
-    message: null,
-    cycleStarts,
+    predictedCycleLength,
+    confidence: { level: confLevel, windowDays: 3, message: "Rule-based estimate from your logged history." },
     nextPeriodDate,
     ovulationDate,
     fertileStart,
     fertileEnd,
-    predictedPeriodDays
+    cyclesLogged: cStarts.length,
+    source: "local",
   };
-}
-
-/* ===== Helper functions ===== */
-
-function daysBetween(a, b) {
-  const d1 = new Date(a + 'T00:00:00');
-  const d2 = new Date(b + 'T00:00:00');
-  return Math.round((d2 - d1) / 86400000);
-}
-
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return toDateKey(d);
-}
-
-function toDateKey(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
 }

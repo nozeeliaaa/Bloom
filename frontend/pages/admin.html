@@ -3,206 +3,418 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bloomie - Bloom</title>
+  <title>Admin — Bloom</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="/css/main.css" />
-
-  <style>
-    .bloomie-page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .bloomie-shell {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 0 0 2rem;
-    }
-
-    .bloomie-card {
-      display: flex;
-      flex-direction: column;
-      min-height: calc(100vh - 260px);
-    }
-
-    .chat-box {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem 0;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      min-height: 420px;
-    }
-
-    .msg {
-      display: flex;
-    }
-
-    .msg.bot {
-      justify-content: flex-start;
-    }
-
-    .msg.user {
-      justify-content: flex-end;
-    }
-
-    .bubble {
-      max-width: 80%;
-      padding: 0.75rem 1rem;
-      border-radius: 16px;
-      background: var(--color-bg-soft);
-      font-size: 0.95rem;
-      line-height: 1.45;
-      border: 1px solid var(--color-border);
-    }
-
-    .msg.user .bubble {
-      background: var(--color-primary);
-      color: white;
-      border-color: var(--color-primary);
-    }
-
-    .chat-form {
-      display: flex;
-      gap: 0.5rem;
-      border-top: 1px solid var(--color-border);
-      padding-top: 0.9rem;
-      margin-top: 0.25rem;
-    }
-
-    .chat-input {
-      flex: 1;
-      padding: 0.75rem 0.9rem;
-      border-radius: 10px;
-      border: 1px solid var(--color-border);
-      background: var(--color-bg);
-      font: inherit;
-    }
-
-    .chat-input:focus {
-      outline: none;
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
-    }
-
-    .choices {
-      margin-top: 0.75rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .reply {
-      border-radius: 999px;
-      padding: 0.45rem 0.95rem;
-      border: 1px solid var(--color-border);
-      background: var(--color-bg);
-      cursor: pointer;
-      font-weight: 700;
-      font-family: inherit;
-    }
-
-    .reply:hover {
-      transform: translateY(-1px);
-    }
-
-    .reply--primary {
-      background: var(--color-primary);
-      color: white;
-      border-color: var(--color-primary);
-    }
-
-    .tiny-note {
-      font-size: 0.78rem;
-      text-align: center;
-      color: var(--color-text-muted);
-      margin-top: 0.9rem;
-    }
-
-    @media (max-width: 640px) {
-      .bubble {
-        max-width: 90%;
-      }
-
-      .bloomie-page-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .bloomie-card {
-        min-height: calc(100vh - 220px);
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="/css/admin.css" />
 </head>
 
 <body>
-  <main>
-    <div id="banner-area"></div>
+  <div id="banner-area"></div>
 
-    <div class="bloomie-shell">
-      <div class="page-header bloomie-page-header">
+  <main>
+    <div style="max-width:1200px;margin:0 auto;padding:0 1rem 3rem;">
+
+      <div class="page-header admin-page-header">
         <div>
-          <h1>Bloomie Chat</h1>
-          <p class="text-muted">
-            Ask a question, describe a symptom, or use the quick replies 🩷
-          </p>
+          <h1>Admin Dashboard</h1>
+          <p id="admin-subtitle" class="text-muted">Loading…</p>
+        </div>
+        <div class="admin-header-actions">
+          <a href="/pages/admin-safety.html" class="btn btn-outline btn-sm">Safety Log</a>
+          <button class="btn btn-sm" id="admin-refresh-btn" type="button">Refresh</button>
         </div>
       </div>
 
-      <section class="card bloomie-card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Chat Assistant</div>
-            <div class="card-subtitle">
-              Educational support for cycle, symptom, and reproductive health questions
+      <!-- ── Tabs ─────────────────────────────────────────────────────────── -->
+      <div class="admin-tabs" role="tablist">
+        <button class="admin-tab active" role="tab" data-tab="overview"  aria-selected="true"  type="button">Overview</button>
+        <button class="admin-tab"         role="tab" data-tab="users"    aria-selected="false" type="button">Users</button>
+        <button class="admin-tab"         role="tab" data-tab="pamphlets" aria-selected="false" type="button">Pamphlets</button>
+        <button class="admin-tab"         role="tab" data-tab="clinics"  aria-selected="false" type="button">Clinics</button>
+        <button class="admin-tab"         role="tab" data-tab="support"  aria-selected="false" type="button">Support</button>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           TAB: OVERVIEW
+      ══════════════════════════════════════════════════════════════════ -->
+      <div id="tab-overview" class="admin-tab-panel">
+
+        <!-- KPI grid -->
+        <div class="admin-grid" style="margin-bottom:1.25rem;">
+          <section class="card">
+            <div class="card-body">
+              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Total Users</div>
+              <div class="admin-metric" id="stat-users">—</div>
+            </div>
+          </section>
+          <section class="card">
+            <div class="card-body">
+              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">New This Week</div>
+              <div class="admin-metric" id="stat-new-users">—</div>
+            </div>
+          </section>
+          <section class="card">
+            <div class="card-body">
+              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Cycle Logs</div>
+              <div class="admin-metric" id="stat-cycle-logs">—</div>
+            </div>
+          </section>
+          <section class="card">
+            <div class="card-body">
+              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Symptom Logs</div>
+              <div class="admin-metric" id="stat-symptom-logs">—</div>
+            </div>
+          </section>
+          <section class="card">
+            <div class="card-body">
+              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Pamphlets</div>
+              <div class="admin-metric" id="stat-pamphlets">—</div>
+            </div>
+          </section>
+          <section class="card">
+            <div class="card-body">
+              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Clinics</div>
+              <div class="admin-metric" id="stat-clinics">—</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Goal distribution -->
+        <section class="card" style="margin-bottom:1.25rem;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">User Goals</div>
+              <div class="card-subtitle">Distribution of selected health goals</div>
             </div>
           </div>
+          <div class="card-body">
+            <div id="goal-distribution" class="admin-list">
+              <p class="text-muted">Loading…</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Bloomie Analytics card ──────────────────────────────────── -->
+        <section class="card" id="ba-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Bloomie Analytics <span style="font-weight:400;font-size:.85rem;color:var(--color-text-muted);">(last 30 days)</span></div>
+              <div class="card-subtitle">Analytics are anonymised. No message content is stored.</div>
+            </div>
+            <div>
+              <button class="btn btn-outline btn-sm" id="ba-refresh-btn" type="button">Refresh</button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <p id="ba-status" class="text-muted" style="margin-bottom:1rem;">Loading…</p>
+
+            <!-- KPI row -->
+            <div class="admin-grid" style="margin-bottom:1.25rem;">
+              <div class="admin-item">
+                <div class="admin-item-meta">Confidence Fallbacks</div>
+                <div class="admin-metric" id="ba-fallbacks">—</div>
+              </div>
+              <div class="admin-item">
+                <div class="admin-item-meta">No-Match Events</div>
+                <div class="admin-metric" id="ba-no-match">—</div>
+              </div>
+              <div class="admin-item">
+                <div class="admin-item-meta">Urgency Escalations</div>
+                <div class="admin-metric" id="ba-urgency">—</div>
+              </div>
+              <div class="admin-item">
+                <div class="admin-item-meta">OOS Events</div>
+                <div class="admin-metric" id="ba-oos">—</div>
+              </div>
+              <div class="admin-item">
+                <div class="admin-item-meta">Avg Session Depth</div>
+                <div class="admin-metric" id="ba-avg-depth">—</div>
+              </div>
+            </div>
+
+            <!-- Three columns: routes | confidence | tone/source -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;flex-wrap:wrap;">
+
+              <!-- Route distribution (top 10) -->
+              <div>
+                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-bottom:.6rem;">Top Routes</div>
+                <div id="ba-route-list" class="admin-list" style="gap:.4rem;">
+                  <p class="text-muted" style="font-size:.85rem;">—</p>
+                </div>
+              </div>
+
+              <!-- Confidence tiers -->
+              <div>
+                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-bottom:.6rem;">Confidence Tiers</div>
+                <div class="admin-list" style="gap:.4rem;">
+                  <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span>HIGH</span>
+                    <span class="admin-badge admin-badge--primary" id="ba-confidence-high">—</span>
+                  </div>
+                  <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span>MEDIUM</span>
+                    <span class="admin-badge admin-badge--warning" id="ba-confidence-medium">—</span>
+                  </div>
+                  <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span>LOW</span>
+                    <span class="admin-badge admin-badge--danger" id="ba-confidence-low">—</span>
+                  </div>
+                </div>
+
+                <!-- Tone distribution -->
+                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-top:1rem;margin-bottom:.6rem;">Tone</div>
+                <div id="ba-tone-list" class="admin-list" style="gap:.4rem;">
+                  <p class="text-muted" style="font-size:.85rem;">—</p>
+                </div>
+              </div>
+
+              <!-- Emotion source + top no-match phrases -->
+              <div>
+                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-bottom:.6rem;">Emotion Source</div>
+                <div id="ba-source-list" class="admin-list" style="gap:.4rem;">
+                  <p class="text-muted" style="font-size:.85rem;">—</p>
+                </div>
+
+                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-top:1rem;margin-bottom:.6rem;">Top No-Match Phrases</div>
+                <div id="ba-no-match-phrases" class="admin-list" style="gap:.4rem;">
+                  <p class="text-muted" style="font-size:.85rem;">—</p>
+                </div>
+              </div>
+
+            </div><!-- /3-col grid -->
+          </div><!-- /card-body -->
+        </section><!-- /#ba-card -->
+
+      </div><!-- /#tab-overview -->
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           TAB: USERS
+      ══════════════════════════════════════════════════════════════════ -->
+      <div id="tab-users" class="admin-tab-panel" hidden>
+        <div class="admin-row" style="margin-bottom:1rem;">
+          <h2 style="margin:0;">Users</h2>
+          <button class="btn btn-outline btn-sm" id="users-refresh" type="button">Refresh</button>
         </div>
+        <section class="card">
+          <div class="card-body">
+            <div id="users-list" class="admin-list">
+              <p class="text-muted">Click "Users" tab to load.</p>
+            </div>
+            <div id="users-pagination" class="admin-pagination"></div>
+          </div>
+        </section>
+      </div>
 
-        <div class="card-body">
-          <!-- Must match existing Bloomie engine -->
-          <div class="chat-box" id="chat-box" aria-live="polite"></div>
-
-          <form class="chat-form" id="chat-form">
-            <input
-              class="chat-input"
-              id="chat-input"
-              type="text"
-              placeholder="Type here or use the buttons…"
-              autocomplete="off"
-              maxlength="240"
-            />
-          </form>
-
-          <p class="tiny-note">
-            Bloomie provides educational information only. This is not medical advice.
-            Always consult a healthcare provider.
-          </p>
+      <!-- ══════════════════════════════════════════════════════════════════
+           TAB: PAMPHLETS
+      ══════════════════════════════════════════════════════════════════ -->
+      <div id="tab-pamphlets" class="admin-tab-panel" hidden>
+        <div class="admin-row" style="margin-bottom:1rem;">
+          <h2 style="margin:0;">Pamphlets</h2>
+          <button class="btn btn-sm" id="pamphlet-add-btn" type="button">+ Add Pamphlet</button>
         </div>
-      </section>
-    </div>
+        <section class="card">
+          <div class="card-body">
+            <div id="pamphlets-list" class="admin-list">
+              <p class="text-muted">Click "Pamphlets" tab to load.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           TAB: CLINICS
+      ══════════════════════════════════════════════════════════════════ -->
+      <div id="tab-clinics" class="admin-tab-panel" hidden>
+        <div class="admin-row" style="margin-bottom:1rem;">
+          <h2 style="margin:0;">Clinics</h2>
+          <button class="btn btn-sm" id="clinic-add-btn" type="button">+ Add Clinic</button>
+        </div>
+        <section class="card">
+          <div class="card-body">
+            <div id="clinics-list" class="admin-list">
+              <p class="text-muted">Click "Clinics" tab to load.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           TAB: SUPPORT
+      ══════════════════════════════════════════════════════════════════ -->
+      <div id="tab-support" class="admin-tab-panel" hidden>
+        <div class="admin-row" style="margin-bottom:1rem;">
+          <h2 style="margin:0;">Support Requests</h2>
+          <div class="admin-tab-header-actions">
+            <select id="support-status-filter" class="admin-select">
+              <option value="">All statuses</option>
+              <option value="new">New</option>
+              <option value="open">Open</option>
+              <option value="resolved">Resolved</option>
+            </select>
+            <button class="btn btn-outline btn-sm" id="support-refresh-btn" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="admin-list" id="support-list">
+          <p class="text-muted">Select the Support tab to load.</p>
+        </div>
+      </div>
+
+    </div><!-- /shell -->
   </main>
 
-  <script type="module">
-    import { initBloomieChat } from "/js/assistant.js";
+  <!-- ══════════════════════════════════════════════════════════════════════
+       PAMPHLET MODAL
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div class="admin-modal-overlay" id="pamphlet-modal" hidden>
+    <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="pamphlet-modal-title">
+      <div class="admin-modal-header">
+        <h2 id="pamphlet-modal-title">New Pamphlet</h2>
+        <button class="admin-modal-close" data-close="pamphlet-modal" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal-body">
+        <input type="hidden" id="pamphlet-id" />
+        <div class="form-grid">
+          <div>
+            <label class="form-label" for="pamphlet-title">Title <span class="req">*</span></label>
+            <input class="form-control" id="pamphlet-title" type="text" maxlength="120" />
+          </div>
+          <div>
+            <label class="form-label" for="pamphlet-category">Category <span class="req">*</span></label>
+            <input class="form-control" id="pamphlet-category" type="text" maxlength="60" />
+          </div>
+          <div>
+            <label class="form-label" for="pamphlet-summary">Summary</label>
+            <input class="form-control" id="pamphlet-summary" type="text" maxlength="200" />
+          </div>
+          <div>
+            <label class="form-label" for="pamphlet-readtime">Read time</label>
+            <input class="form-control" id="pamphlet-readtime" type="text" maxlength="20" placeholder="e.g. 3 min" />
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <input type="checkbox" id="pamphlet-sensitive" />
+            <label for="pamphlet-sensitive">Mark as sensitive</label>
+          </div>
+          <div>
+            <label class="form-label" for="pamphlet-pdf-file">PDF file (optional — upload replaces current)</label>
+            <input class="form-control" id="pamphlet-pdf-file" type="file" accept="application/pdf" />
+            <p class="pamphlet-pdf-status" id="pamphlet-pdf-status"></p>
+          </div>
+          <div>
+            <label class="form-label" for="pamphlet-pdf-url">PDF URL (auto-filled after upload, or paste an external link)</label>
+            <input class="form-control" id="pamphlet-pdf-url" type="url" placeholder="https://…" />
+          </div>
+          <div>
+            <label class="form-label" for="pamphlet-content">Content (HTML) <span class="req">*</span></label>
+            <textarea class="form-control admin-content-editor" id="pamphlet-content" rows="10"></textarea>
+          </div>
+        </div>
+        <p class="admin-error" id="pamphlet-modal-error" hidden></p>
+      </div>
+      <div class="admin-modal-footer">
+        <button class="btn btn-outline" data-close="pamphlet-modal" type="button">Cancel</button>
+        <button class="btn" id="pamphlet-save-btn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
 
-    initBloomieChat({
-      onOpenCareMap: () => {
-        location.href = "/pages/clinics.html";
-      },
-      onRequestPdf: (summary) => {
-        console.log(summary);
-        alert("PDF export coming soon 📄");
-      }
-    });
-  </script>
+  <!-- ══════════════════════════════════════════════════════════════════════
+       CLINIC MODAL
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div class="admin-modal-overlay" id="clinic-modal" hidden>
+    <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="clinic-modal-title">
+      <div class="admin-modal-header">
+        <h2 id="clinic-modal-title">New Clinic</h2>
+        <button class="admin-modal-close" data-close="clinic-modal" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal-body">
+        <input type="hidden" id="clinic-id" />
+        <div class="form-grid">
+          <div>
+            <label class="form-label" for="clinic-name">Name <span class="req">*</span></label>
+            <input class="form-control" id="clinic-name" type="text" maxlength="120" />
+          </div>
+          <div>
+            <label class="form-label" for="clinic-country">Country <span class="req">*</span></label>
+            <input class="form-control" id="clinic-country" type="text" value="Jamaica" maxlength="80" />
+          </div>
+          <div>
+            <label class="form-label" for="clinic-parish">Parish / Region</label>
+            <input class="form-control" id="clinic-parish" type="text" maxlength="80" />
+          </div>
+          <div>
+            <label class="form-label" for="clinic-address">Address</label>
+            <input class="form-control" id="clinic-address" type="text" maxlength="200" />
+          </div>
+          <div>
+            <label class="form-label" for="clinic-type">Type</label>
+            <select class="form-control" id="clinic-type">
+              <option value="">— select —</option>
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+              <option value="ngo">NGO / Non-profit</option>
+              <option value="pharmacy">Pharmacy</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="clinic-phone">Phone</label>
+            <input class="form-control" id="clinic-phone" type="text" maxlength="40" />
+          </div>
+          <div>
+            <label class="form-label" for="clinic-hours">Hours</label>
+            <input class="form-control" id="clinic-hours" type="text" maxlength="100" placeholder="e.g. Mon–Fri 8am–5pm" />
+          </div>
+          <div>
+            <label class="form-label" for="clinic-services">Services <span style="font-weight:400;">(comma-separated)</span></label>
+            <input class="form-control" id="clinic-services" type="text" maxlength="300" placeholder="e.g. STI testing, Family planning" />
+          </div>
+        </div>
+        <p class="admin-error" id="clinic-modal-error" hidden></p>
+      </div>
+      <div class="admin-modal-footer">
+        <button class="btn btn-outline" data-close="clinic-modal" type="button">Cancel</button>
+        <button class="btn" id="clinic-save-btn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       USER MODAL
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div class="admin-modal-overlay admin-modal--sm" id="user-modal" hidden>
+    <div class="admin-modal admin-modal--sm" role="dialog" aria-modal="true" aria-labelledby="user-modal-heading">
+      <div class="admin-modal-header">
+        <h2 id="user-modal-heading">Manage User</h2>
+        <button class="admin-modal-close" data-close="user-modal" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal-body">
+        <input type="hidden" id="user-modal-uid" />
+        <p style="margin-bottom:.85rem;font-weight:700;" id="user-modal-email"></p>
+        <div class="form-grid">
+          <div>
+            <label class="form-label" for="user-modal-role">Role</label>
+            <select class="form-control" id="user-modal-role">
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+        </div>
+        <p class="admin-error" id="user-modal-error" hidden></p>
+      </div>
+      <div class="admin-modal-footer">
+        <button class="btn btn-outline" id="user-disable-btn" type="button" style="margin-right:auto;">Disable Account</button>
+        <button class="btn btn-outline" id="user-enable-btn"  type="button" style="margin-right:auto;display:none;">Enable Account</button>
+        <button class="btn btn-outline" data-close="user-modal" type="button">Cancel</button>
+        <button class="btn" id="user-save-btn" type="button">Save Role</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/admin.js"></script>
 </body>
 </html>

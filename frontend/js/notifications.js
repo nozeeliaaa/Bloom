@@ -7,8 +7,8 @@
  *   - Fertile window alert: fires when fertile window starts or starts tomorrow
  *
  * FCM (when app is closed):
- *   - registerFCMToken()   — requests permission, gets FCM token, saves to backend
- *   - unregisterFCMToken() — removes FCM token from backend
+ *   - registerFCMToken()   - requests permission, gets FCM token, saves to backend
+ *   - unregisterFCMToken() - removes FCM token from backend
  *
  * In-app inbox: persistent notification history in localStorage
  */
@@ -16,8 +16,8 @@
 import { getFirebaseMessaging } from "./firebase.js";
 import { getToken, onMessage }  from "firebase/messaging";
 import { getIdToken }           from "./auth.js";
+import { loadBloomPreferencesLocal } from "./bloom-storage.js";
  
-const PREFS_KEY    = "bloom_preferences";
 const NOTIFIED_KEY = "bloom_notified";
 const INBOX_KEY    = "bloom_notification_inbox";
 const INBOX_MAX    = 50;
@@ -59,8 +59,7 @@ function addToInbox(title, body, id) {
 // ─── Internal helpers ──────────────────────────────────────────────────────────
  
 function getPrefs() {
-  try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; }
-  catch { return {}; }
+  return loadBloomPreferencesLocal();
 }
  
 function getNotified() {
@@ -147,7 +146,7 @@ export async function registerFCMToken() {
     // Save token to backend
     const idToken = await getIdToken();
     if (idToken) {
-      await fetch(`${API_BASE}/notifications/token`, {
+      await fetch(`${API_BASE}/api/notifications/token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -182,7 +181,7 @@ export async function unregisterFCMToken() {
     const idToken = await getIdToken();
     if (!idToken) return;
  
-    await fetch(`${API_BASE}/notifications/token`, {
+    await fetch(`${API_BASE}/api/notifications/token`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${idToken}` },
     });
@@ -209,11 +208,12 @@ export async function triggerNotifications(cycle, logsByDate) {
   if (!prefs.periodReminder && !prefs.reminders && !prefs.fertileAlert) return;
  
   await requestPermission();
- 
-  const notified = getNotified();
-  const today    = todayKey();
- 
-  // ─── Period Reminder ────────────────────────────────────────────────────────
+
+  const notified  = getNotified();
+  const today     = todayKey();
+  const discreet  = !!(prefs.reminders?.discreetCopy ?? prefs.discreetNotif);
+
+  // ─── Period Reminder ──────────────────────────────────────────────────────
   if (prefs.periodReminder && cycle.nextPeriodDate) {
     const daysUntil = diffDays(today, cycle.nextPeriodDate);
     const id        = `period-${cycle.nextPeriodDate}`;
@@ -222,6 +222,7 @@ export async function triggerNotifications(cycle, logsByDate) {
       const body = daysUntil === 0
         ? `Your period may start today (${friendlyDate(cycle.nextPeriodDate)}). Take care of yourself.`
         : `Your period is expected in ${daysUntil} day${daysUntil !== 1 ? "s" : ""} on ${friendlyDate(cycle.nextPeriodDate)}.`;
+
       sendNotification("Period coming up", body, id);
       markNotified(notified, id);
     }
@@ -231,13 +232,34 @@ export async function triggerNotifications(cycle, logsByDate) {
   if (prefs.reminders) {
     const id             = `log-${today}`;
     const hasLoggedToday = !!(logsByDate[today]?.flow || logsByDate[today]?.symptoms?.length);
- 
+
     if (!hasLoggedToday && !hasNotifiedToday(notified, id)) {
-      sendNotification(
-        "Don't forget to log today",
-        "Take a moment to record your flow and symptoms in Bloom.",
-        id
-      );
+      const title = discreet ? "Bloom reminder" : "Don't forget to log today";
+      const body  = discreet
+        ? "You have a reminder in Bloom. Open the app to view details."
+        : "Take a moment to record your flow and symptoms in Bloom.";
+
+      sendNotification(title, body, id);
+      markNotified(notified, id);
+    }
+  }
+
+  // ─── Period Started? Log it ───────────────────────────────────────────────
+  // Fires when the expected period date has arrived or just passed and no flow logged
+  if (prefs.periodReminder && cycle.nextPeriodDate) {
+    const daysOverdue = diffDays(cycle.nextPeriodDate, today);
+    const hasLoggedToday = !!(logsByDate[today]?.flow && logsByDate[today].flow !== "none");
+    const id = `log-period-${cycle.nextPeriodDate}`;
+
+    if (daysOverdue >= 0 && daysOverdue <= 5 && !hasLoggedToday && !hasNotifiedToday(notified, id)) {
+      const title = discreet ? "Bloom reminder" : "Did your period start?";
+      const body  = discreet
+        ? "You have a reminder in Bloom. Open the app to view details."
+        : daysOverdue === 0
+          ? "Your period is expected today. Open Bloom to log your flow."
+          : `Your period was expected ${daysOverdue} day${daysOverdue !== 1 ? "s" : ""} ago. Don't forget to log it in Bloom.`;
+
+      sendNotification(title, body, id);
       markNotified(notified, id);
     }
   }
@@ -251,8 +273,42 @@ export async function triggerNotifications(cycle, logsByDate) {
       const body = daysToFertile === 0
         ? `Your fertile window starts today! It runs until ${friendlyDate(cycle.fertileEnd)}.`
         : `Your fertile window begins tomorrow (${friendlyDate(cycle.fertileStart)}).`;
+
       sendNotification("Fertile window", body, id);
       markNotified(notified, id);
+    }
+  }
+
+  // ─── Late / Missed Period Alert ───────────────────────────────────────────
+  // Fires independently of prefs (health-relevant) once the period is overdue > 5 days
+  if (cycle.nextPeriodDate) {
+    const daysLate = diffDays(cycle.nextPeriodDate, today);
+    const hasFlowSinceExpected = Object.entries(logsByDate).some(([dk, l]) =>
+      dk >= cycle.nextPeriodDate && l?.flow && l.flow !== "none"
+    );
+
+    if (!hasFlowSinceExpected) {
+      if (daysLate >= 7 && daysLate < 14) {
+        const id = `late-period-${cycle.nextPeriodDate}`;
+        if (!hasNotifiedToday(notified, id)) {
+          const title = discreet ? "Bloom reminder" : "Period is late";
+          const body  = discreet
+            ? "You have a health reminder in Bloom. Open the app to view details."
+            : `Your period is ${daysLate} days late. Open Bloom to log your flow or check your cycle details.`;
+          sendNotification(title, body, id);
+          markNotified(notified, id);
+        }
+      } else if (daysLate >= 14) {
+        const id = `missed-period-${cycle.nextPeriodDate}`;
+        if (!hasNotifiedToday(notified, id)) {
+          const title = discreet ? "Bloom reminder" : "Missed period";
+          const body  = discreet
+            ? "You have a health reminder in Bloom. Open the app to view details."
+            : `Your period appears to be ${daysLate} days late. Consider logging any changes and speaking with a healthcare provider if needed.`;
+          sendNotification(title, body, id);
+          markNotified(notified, id);
+        }
+      }
     }
   }
 }

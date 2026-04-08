@@ -1,21 +1,56 @@
-import { pick, scoreSignals, resolveSignals, detectOutOfScope } from "./bloomie-routing.js";
+import { pick, scoreSignals, resolveSignals, detectOutOfScope, normalizeText } from "./bloomie-routing.js";
 import { extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
 import { getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 
 export function createOOS(env) {
-  const { ctx, consent, getCurrentPhase, phaseNudge, insightFor, pickPriorityConcern } = env;
+  const { ctx, consent, getCurrentPhase, phaseNudge, insightFor, pickPriorityConcern, bloomieMemory } = env;
 
   const OOS_DEFAULT = [
-    () => pick([
-      "I'm not sure I caught that 🩷 I focus on period and cycle concerns — tap a button below or tell me what's going on.",
-      "Hmm, I'm not sure how to help with that one 🩷 I'm best with period, cycle, spotting, cramps, or mood changes.",
-      "That one's a bit outside my lane 🩷 What's going on with your cycle?",
-    ]),
+    () => {
+      // Returning users with 5+ prior OOS interactions get a shorter, more
+      // direct redirect instead of the full explanatory reply.
+      const oosCount = (bloomieMemory?.oosCount ?? 0) + (ctx.oosStreakCount ?? 0);
+      if (oosCount >= 5) {
+        return pick([
+          "I can only help with period and cycle health 🩷 Try: \"late period\", \"spotting\", \"cramps\", or \"mood changes\".",
+          "I'm focused on reproductive health — what's going on with your cycle? 🩷",
+        ]);
+      }
+      return pick([
+        "I'm not sure I caught that 🩷 I focus on period and cycle concerns — tap a button below or tell me what's going on.",
+        "Hmm, I'm not sure how to help with that one 🩷 I'm best with period, cycle, spotting, cramps, or mood changes.",
+        "That one's a bit outside my lane 🩷 What's going on with your cycle?",
+      ]);
+    },
   ];
 
   // looksLikeGibberish → imported from bloomie-routing.js
 
   const OOS = [
+    // ── About Bloom / Bloomie identity ───────────────────────────────────
+    // Catches questions about what the platform is and what the chatbot does.
+    // Must sit before app_help so "how do i use this" → ABOUT_BLOOM (identity)
+    // rather than APP_HELP (logging tutorial).
+    {
+      name: "about_bloom",
+      patterns: [
+        // "what is bloom" / "what is bloomie" / "what's bloomie"
+        /\b(what (is|are|'?s) bloom(?:ie)?|what does bloom(?:ie)? (do|mean|help with))\b/,
+        // "what can you help with" / "what can you do" / "what do you know about"
+        /\b(what can (you|bloomie?) (help (me |with)?|do|tell me|talk about|discuss))\b/,
+        /\b(what (are|do) you (good for|help with|know about|cover|handle))\b/,
+        // "how do i use this / the chat" (identity questions, not logging how-tos)
+        /\b(how (do i|to|can i) use (this|this chat|the chat|this app|bloomie?))\b/,
+        /\b(how does (this|this chat|bloomie?|it) work)\b/,
+        // "who are you" / "tell me about yourself / bloom / bloomie"
+        /\b(who are you|tell me about (yourself|bloomie?|bloom|this chat))\b/,
+        // "what is this" / "what am i using" / "who am i talking to"
+        /\b(what is this (app|chat|tool|bot|assistant)?|what am i (using|talking to)|who am i talking to)\b/,
+      ],
+      replies: [],
+      forceNext: "ABOUT_BLOOM",
+    },
+
     // ── App help / how to log ─────────────────────────────────────────────
     {
       name: "app_help",
@@ -39,6 +74,60 @@ export function createOOS(env) {
       ],
       replies: [],
       forceNext: "SEE_DOCTOR_GUIDE",
+    },
+
+    // ── Educational: what is a period ─────────────────────────────────────
+    // Specific before broad — wins over symptom_education for identity questions.
+    {
+      name: "educ_what_period",
+      patterns: [
+        /\b(what is (a )?period|what are periods|what is menstruation|what happens during (a )?period)\b/,
+        /\b(why do (i|we|people|women|girls) (get|have) (a )?period|why does (a )?period happen|what causes (a )?period)\b/,
+        /\b(explain (what |a )?(a )?period|tell me (about |what is )(a )?period)\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_PERIOD",
+    },
+
+    // ── Educational: what is ovulation ────────────────────────────────────
+    {
+      name: "educ_what_ovulation",
+      patterns: [
+        /\b(what is ovulation|how does ovulation work|what happens during ovulation)\b/,
+        /\b(what is (the )?ovulation (phase|window|period|process))\b/,
+        /\b(explain ovulation|tell me about ovulation)\b/,
+        /\b(when does (the )?egg (drop|release|get released)|what is (an? )?egg release)\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_OVULATION",
+    },
+
+    // ── Educational: what is the menstrual cycle ──────────────────────────
+    {
+      name: "educ_what_cycle",
+      patterns: [
+        /\b(what is (the )?menstrual cycle|how (long|does) (a|the) (menstrual )?cycle (last|work))\b/,
+        /\b(explain (the )?menstrual cycle|tell me about (the )?menstrual cycle|how does (a|the) cycle work)\b/,
+        /\b(what are (the )?cycle phases|what is (the )?luteal phase|what is (the )?follicular phase|what are (the )?phases of (my |the )?cycle)\b/,
+        /\b(what is (a |the )?normal cycle|explain (the )?cycle phases|how does (the )?cycle (go|work|progress))\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_CYCLE_BASICS",
+    },
+
+    // ── Educational: broad / deep-dive requests → summary + learn link ────
+    // Catches "tell me everything about", "explain fully", "deep dive" etc.
+    // Gives a short summary then directs to pamphlets for depth.
+    {
+      name: "educ_broad",
+      patterns: [
+        /\b(tell me everything about|explain (everything about|fully|in detail|in depth|thoroughly)|give me (a )?full (explanation|overview|breakdown) of)\b/,
+        /\b(everything (about|on) (hormones?|fertility|reproduction|the (menstrual )?cycle|periods?|ovulation|reproductive health))\b/,
+        /\b(deep.?dive (into|on|about)|in.?depth (on|about|into)|comprehensive (guide|overview|explanation) (of|about|on))\b/,
+        /\b(all about (hormones?|fertility|periods?|ovulation|the cycle|my cycle|pcos|endometriosis|reproductive health))\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_BROAD",
     },
 
     // ── Symptom education ─────────────────────────────────────────────────
@@ -132,7 +221,15 @@ export function createOOS(env) {
     // ── Greetings ─────────────────────────────────────────────────────────
     {
       name: "greeting",
-      patterns: [/^(hi|hello|hey|yo|sup|hiya|morning|afternoon|evening)$/, /^\b(hi|hello|hey|yo|sup|hiya)\b\s*$/, /\b(wah gwaan|wagwaan|wha gwan|howdy)\b/],
+      patterns: [
+        /^(hi|hello|hey|yo|sup|hiya|morning|afternoon|evening)$/,
+        /^\b(hi|hello|hey|yo|sup|hiya)\b\s*$/,
+        /\b(wah gwaan|wagwaan|wha gwan|howdy)\b/,
+        /^h+i+[!.\s]*$/i,      // hii, hiii, hiiii…
+        /^h+e+y+[!.\s]*$/i,    // heyy, heyyy…
+        /^h+e+l+o+[!.\s]*$/i,  // helloo, helloooo…
+        /^y+o+[!.\s]*$/i,      // yoo, yooo…
+      ],
       replies: [
         () => ctx.greeted
           ? pick([
@@ -724,8 +821,23 @@ export function createOOS(env) {
 
   // Health signals that should ALWAYS beat OOS pattern matches.
   // e.g. "me bleed thru me pants lol" has "lol" but the health signal wins.
+  //
+  // Pattern 1 — explicit clinical / menstrual keywords (original, unchanged).
+  // Patterns 2–4 — vague / indirect reproductive-health phrases that should
+  //   keep the user in-scope even when no clinical keyword is present.
+  //   These match the same phrasing added to HEALTH_GATE in bloomie-intent.js.
   const HEALTH_OVERRIDE_PATTERNS = [
-    /\b(bleed|bleeding|blood|period|cramp|pain|spot|spotting|late|missed|discharge|pregnant|pregnancy|nausea|dizzy|faint|heavy|clot|pelvic|mood|tired|fatigue|cycle|ovulat)\b/,
+    // Explicit clinical / menstrual keywords
+    /\b(bleed|bleeding|blood|period|cramp|pain|spot|spotting|late|missed|discharge|pregnant|pregnancy|nausea|dizzy|faint|heavy|clot|pelvic|mood|tired|fatigue|cycle|ovulat|sad|angry|mad|vex|frustrated|happy|excited|emotional|anxious|energy)\b/,
+    // Location anchors implying reproductive concern
+    /down there|down below|lady parts?|private parts?|feminine area|mi body/i,
+    // Wrongness / off signals that imply a body concern without clinical words
+    /something(?:'s)?\s+(?:wrong|off|not right|not normal|strange)|sumn\s+(?:wrong|off)/i,
+    /not feel(?:ing)?\s+right|feel(?:ing)?\s+(?:off|weird|strange)|nuh feel right|mi nuh feel|mi feel off/i,
+    /off lately|been off|not myself|not like myself|nuh feel like mi/i,
+    // Indirect cycle / timing hints
+    /hasn.?t come yet|not here yet|still waiting (?:for it|on it)/i,
+    /sumn wrong with (?:my|mi)\s+(?:cycle|body|period|flow)/i,
   ];
 
   // Cycle question patterns — checked FIRST before health override
@@ -738,8 +850,10 @@ export function createOOS(env) {
     /\b(when (should|can) i (take|do) a (pregnancy )?test|when (should|can) i test|best time to test|when to test|can i test (yet|now))\b/,
   ];
 
-  function routeUserText(t) {
-    t = String(t || "").toLowerCase();
+  function routeUserText(rawText) {
+    // Defensive normalization so scoreSignals/regex routing never runs on raw
+    // input if this helper is called outside assistant.js.
+    const t = normalizeText(rawText);
 
     // ── Urgency: always first ──────────────────────────────────────────────
     const urgentPhrases = [

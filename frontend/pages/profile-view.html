@@ -10,28 +10,18 @@
   <link rel="stylesheet" href="/css/main.css" />
 
   <style>
-    .profile-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-    @media (min-width: 900px) {
-      .profile-layout { grid-template-columns: 1.2fr 0.8fr; align-items: start; }
-    }
     .avatar-card {
       display: flex; flex-direction: column;
       align-items: center; gap: 1rem;
-      text-align: center; padding: 1.25rem;
+      text-align: center; padding: 1.5rem;
     }
     .avatar-big {
-      width: 120px; height: 120px; border-radius: 50%;
+      width: 150px; height: 150px; border-radius: 50%;
       display: grid; place-items: center;
       border: 2px solid var(--color-border);
       background: var(--color-primary-lightest);
-      font-size: 52px; -webkit-user-select: none; user-select: none;
+      font-size: 66px; -webkit-user-select: none; user-select: none;
     }
-    .profile-right-col { display: flex; flex-direction: column; gap: 1rem; }
-    .form-hint-mt { margin-top: 0.25rem; }
     .avatar-picker { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
     .avatar-btn {
       width: 44px; height: 44px; border-radius: 50%;
@@ -41,21 +31,55 @@
       transition: border-color 0.15s;
     }
     .avatar-btn.active { border-color: var(--color-primary); background: var(--color-primary-lightest); }
-    .form-grid { display: grid; gap: 0.85rem; }
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 700px) {
+      .details-grid { grid-template-columns: 1fr 1fr; align-items: stretch; }
+    }
+    .details-card {
+      display: flex; flex-direction: column;
+    }
+    .details-card .form-grid { flex: 1; }
+    .details-card .row-actions { margin-top: auto; padding-top: 1rem; }
+    [hidden] { display: none !important; }
+    .form-grid { display: grid; gap: 0.5rem; }
     .section-label {
       font-size: 0.78rem; font-weight: 800;
       text-transform: uppercase; letter-spacing: 0.06em;
       color: var(--color-text-muted); margin: 0 0 0.6rem;
     }
     .danger-zone {
-      border: 1px solid rgba(192,0,60,0.2);
+      border: 1px solid rgba(192,0,60,0.25);
       background: rgba(192,0,60,0.03);
-      grid-column: 1 / -1;
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 1.5rem;
+      flex-wrap: wrap;
     }
+    .danger-zone-text h3 {
+      margin: 0 0 0.25rem; color: #c0003c; font-size: 1rem; font-weight: 800;
+    }
+    .danger-zone-text p {
+      margin: 0; font-size: 0.85rem; color: var(--color-text-muted);
+    }
+    .btn-danger {
+      background: #c0003c; color: #fff; border: none;
+      padding: 0.55rem 1.25rem; border-radius: var(--radius);
+      font-weight: 700; cursor: pointer; white-space: nowrap;
+      font-size: 0.9rem; transition: opacity 0.15s;
+    }
+    .btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-danger:not(:disabled):hover { opacity: 0.88; }
     .row-actions {
       display: flex; flex-wrap: wrap; gap: 0.75rem;
       align-items: center; justify-content: flex-end;
       margin-top: 0.75rem;
+    }
+    .save-row {
+      display: flex; justify-content: flex-end;
+      margin: 0.25rem 0 0.5rem;
     }
     .status {
       padding: 0.75rem 1rem; border-radius: var(--radius);
@@ -67,6 +91,17 @@
     .lmp-field { display: none; }
     .lmp-field.visible { display: block; }
     .tiny { font-size: 0.88rem; color: var(--color-text-muted); }
+    #yob-locked-note { color: var(--color-text-muted); font-style: italic; }
+    #yob-display { margin: 0; padding: 0.5rem 0.75rem; background: var(--color-bg-subtle, #f5f0f3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 1rem; color: var(--color-text); }
+    .weight-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; }
+    .weight-label-row .form-label { margin: 0; }
+    .unit-toggle { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+    .unit-btn { padding: 0.2rem 0.65rem; font-size: 0.78rem; font-weight: 700; border: none; background: var(--color-bg); color: var(--color-text-muted); cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .unit-btn.active { background: var(--color-primary); color: #fff; }
+    .height-imperial { display: flex; gap: 0.5rem; }
+    .height-imperial .form-input { flex: 1; }
+    .form-hint-mt { margin-top: 0.25rem; }
+    .details-spacer { margin-bottom: 2rem; }
   </style>
 </head>
 
@@ -84,84 +119,104 @@
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
 
-    <div class="profile-layout">
+    <!-- Avatar (centered, full width) -->
+    <section class="card avatar-card" style="margin-bottom:1rem;">
+      <div id="avatar-big" class="avatar-big">👤</div>
+      <p class="tiny">Tap an avatar to change your profile picture.</p>
+      <div class="avatar-picker" id="avatar-picker"></div>
+      <div class="tiny" id="account-line">Checking account…</div>
+    </section>
 
-      <!-- LEFT: Avatar -->
-      <section class="card avatar-card">
-        <div id="avatar-big" class="avatar-big">👤</div>
-        <p class="tiny">Tap an avatar to change your profile picture.</p>
-        <div class="avatar-picker" id="avatar-picker"></div>
-        <div class="tiny" id="account-line">Checking account…</div>
+    <!-- Details + Lifestyle side by side -->
+    <div class="details-grid" style="margin-bottom:1rem;">
+
+      <section class="card details-card">
+        <p class="section-label">Your details</p>
+        <div class="form-grid">
+          <label class="form-label">
+            Nickname
+            <input class="form-input" id="nickname" type="text" placeholder="e.g., Jane" maxlength="40" autocomplete="off" />
+          </label>
+          <div>
+            <label class="form-label" for="yob">Year of Birth</label>
+            <select class="form-input" id="yob">
+              <option value="">- Select year -</option>
+            </select>
+            <p id="yob-display" hidden></p>
+            <p class="form-hint form-hint-mt" id="yob-hint">Your year of birth helps us age-appropriate your content. You can only set this once.</p>
+            <p class="form-hint form-hint-mt" id="yob-locked-note" hidden>Contact support to change your year of birth.</p>
+          </div>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-primary" id="save-btn" type="button">Save profile</button>
+        </div>
       </section>
 
-      <!-- RIGHT: Details + Lifestyle stacked -->
-      <div class="profile-right-col">
-
-        <section class="card">
-          <p class="section-label">Your details</p>
-          <div class="form-grid">
-            <label class="form-label">
-              Nickname
-              <input class="form-input" id="nickname" type="text" placeholder="e.g.,Jane" maxlength="40" autocomplete="off" />
-            </label>
-            <label class="form-label">
-              Year of Birth
-              <input class="form-input" id="yob" type="number" placeholder="e.g., 2006" min="1900" max="2100" />
-            </label>
+      <section class="card">
+        <p class="section-label">Lifestyle &amp; tracking</p>
+        <div class="form-grid">
+          <label class="form-label">
+            Average cycle length (days)
+            <input class="form-input" id="avg-cycle" type="number" placeholder="e.g., 28" min="15" max="60" />
+          </label>
+          <label class="form-label">
+            Typical period duration (days)
+            <input class="form-input" id="period-duration" type="number" placeholder="e.g., 5" min="1" max="14" />
+          </label>
+          <div>
+            <div class="weight-label-row">
+              <label class="form-label" for="weight">Weight</label>
+              <div class="unit-toggle" id="weight-unit-toggle" role="group" aria-label="Weight unit">
+                <button type="button" class="unit-btn active" data-unit="kg">kg</button>
+                <button type="button" class="unit-btn" data-unit="lb">lb</button>
+              </div>
+            </div>
+            <input class="form-input" id="weight" type="number" placeholder="e.g., 60" min="20" max="700" step="0.1" />
           </div>
-          <div class="row-actions">
-            <button class="btn btn-primary" id="save-btn" type="button">Save</button>
-            <button class="btn btn-outline" id="logout-btn" type="button">Log out</button>
-          </div>
-        </section>
-
-        <section class="card">
-          <p class="section-label">Lifestyle &amp; tracking</p>
-          <div class="form-grid">
-            <label class="form-label">
-              Average cycle length (days)
-              <input class="form-input" id="avg-cycle" type="number" placeholder="e.g., 28" min="15" max="60" />
-            </label>
-            <label class="form-label">
-              Typical period duration (days)
-              <input class="form-input" id="period-duration" type="number" placeholder="e.g., 5" min="1" max="14" />
-            </label>
-            <div class="lmp-field" id="lmp-field">
-              <label class="form-label">
-                Last Menstrual Period (LMP) date
-                <input class="form-input" id="lmp-date" type="date" />
-              </label>
-              <p class="form-hint form-hint-mt">Used to calculate your estimated due date. Educational only.</p>
+          <div>
+            <div class="weight-label-row">
+              <label class="form-label" for="height-cm">Height</label>
+              <div class="unit-toggle" id="height-unit-toggle" role="group" aria-label="Height unit">
+                <button type="button" class="unit-btn active" data-unit="cm">cm</button>
+                <button type="button" class="unit-btn" data-unit="ft">ft</button>
+              </div>
+            </div>
+            <input class="form-input" id="height-cm" type="number" placeholder="e.g., 165" min="50" max="272" step="0.1" />
+            <div class="height-imperial" id="height-imperial" hidden>
+              <input class="form-input" id="height-ft" type="number" placeholder="ft" min="1" max="8" step="1" />
+              <input class="form-input" id="height-in" type="number" placeholder="in" min="0" max="11" step="1" />
             </div>
           </div>
-          <div class="row-actions">
-            <button class="btn btn-primary" id="save-lifestyle-btn" type="button">Save lifestyle</button>
+          <div class="lmp-field" id="lmp-field">
+            <label class="form-label">
+              Last Menstrual Period (LMP) date
+              <input class="form-input" id="lmp-date" type="date" />
+            </label>
+            <p class="form-hint form-hint-mt">Used to calculate your estimated due date. Educational only.</p>
           </div>
-        </section>
-
-      </div>
-
-      <!-- Danger Zone (full width) -->
-      <section class="card danger-zone">
-        <h2 style="margin-top:0;color:#c0003c;">Danger Zone</h2>
-        <p class="tiny" style="margin-top:0.25rem;">
-          Deleting your account removes your Firebase account access and cannot be undone.
-        </p>
-        <div class="row-actions" style="justify-content:space-between;">
-          <div class="tiny" id="delete-hint">You must be logged in to delete your account.</div>
-          <button class="btn" id="delete-btn" type="button"
-            style="background:#c0003c;color:white;border:none;" disabled>
-            Delete Account
-          </button>
         </div>
       </section>
 
     </div>
+    <div class="details-spacer"></div>
+
+
+    <!-- Danger Zone -->
+    <section class="card danger-zone">
+      <div class="danger-zone-text">
+        <h3>Delete account</h3>
+        <p id="delete-hint">You must be logged in to delete your account.</p>
+      </div>
+      <button class="btn-danger" id="delete-btn" type="button" disabled>
+        Delete Account
+      </button>
+    </section>
+
   </main>
 
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner } from "/js/utils.js";
-    import { logout, onAuthChange, getUser } from "/js/auth.js";
+    import { onAuthChange, getUser, getIdToken } from "/js/auth.js";
     import { setMode } from "/js/mode.js";
     import { getFirebaseAuth, isFirebaseConfigured } from "/js/firebase.js";
     import { getUserGoal } from "/js/goals.js";
@@ -170,9 +225,12 @@
     renderFooter();
     renderModeBanner(document.getElementById("banner-area"));
 
-    const LS_PROFILE = "bloom_profile";
-    const LS_AVATAR  = "bloom_avatar";
-    const LS_LMP     = "bloom_lmp";
+    const LS_PROFILE     = "bloom_profile";
+    const LS_AVATAR      = "bloom_avatar";
+    const LS_LMP         = "bloom_lmp";
+    const LS_YOB_LOCKED  = "bloom_yob_locked";
+    const LS_WEIGHT_UNIT = "bloom_weight_unit";
+    const LS_HEIGHT_UNIT = "bloom_height_unit";
 
     const statusEl         = document.getElementById("status");
     const avatarBig        = document.getElementById("avatar-big");
@@ -183,12 +241,88 @@
     const periodDurEl      = document.getElementById("period-duration");
     const lmpFieldEl       = document.getElementById("lmp-field");
     const lmpDateEl        = document.getElementById("lmp-date");
+    const yobLockedNote    = document.getElementById("yob-locked-note");
+    const yobDisplay       = document.getElementById("yob-display");
+    const yobHint          = document.getElementById("yob-hint");
     const saveBtn          = document.getElementById("save-btn");
-    const saveLifestyleBtn = document.getElementById("save-lifestyle-btn");
-    const logoutBtn        = document.getElementById("logout-btn");
+    const weightEl         = document.getElementById("weight");
+    const weightUnitToggle = document.getElementById("weight-unit-toggle");
+    const heightCmEl       = document.getElementById("height-cm");
+    const heightFtEl       = document.getElementById("height-ft");
+    const heightInEl       = document.getElementById("height-in");
+    const heightImperial   = document.getElementById("height-imperial");
+    const heightUnitToggle = document.getElementById("height-unit-toggle");
     const deleteBtn        = document.getElementById("delete-btn");
     const deleteHint       = document.getElementById("delete-hint");
     const accountLine      = document.getElementById("account-line");
+
+    let weightUnit = localStorage.getItem(LS_WEIGHT_UNIT) || "kg";
+    let heightUnit = localStorage.getItem(LS_HEIGHT_UNIT) || "cm";
+    // Track currently selected avatar (may differ from saved until Save is clicked)
+    let selectedAvatar = localStorage.getItem(LS_AVATAR) || "👤";
+
+    function kgToLb(kg) { return +(kg * 2.20462).toFixed(1); }
+    function lbToKg(lb) { return +(lb / 2.20462).toFixed(1); }
+
+    function cmToFtIn(cm) {
+      const totalIn = cm / 2.54;
+      return { ft: Math.floor(totalIn / 12), in: Math.round(totalIn % 12) };
+    }
+    function ftInToCm(ft, inches) { return +((ft * 30.48) + (inches * 2.54)).toFixed(1); }
+
+    function setHeightUnit(unit) {
+      heightUnit = unit;
+      localStorage.setItem(LS_HEIGHT_UNIT, unit);
+      heightUnitToggle.querySelectorAll(".unit-btn").forEach(b =>
+        b.classList.toggle("active", b.dataset.unit === unit)
+      );
+      if (unit === "ft") {
+        heightCmEl.hidden = true;
+        heightImperial.hidden = false;
+        const cm = parseFloat(heightCmEl.value);
+        if (!isNaN(cm)) {
+          const { ft, in: ins } = cmToFtIn(cm);
+          heightFtEl.value = ft;
+          heightInEl.value = ins;
+        }
+      } else {
+        heightImperial.hidden = true;
+        heightCmEl.hidden = false;
+        const ft = parseFloat(heightFtEl.value);
+        const ins = parseFloat(heightInEl.value) || 0;
+        if (!isNaN(ft)) heightCmEl.value = ftInToCm(ft, ins);
+      }
+    }
+
+    function setWeightUnit(unit) {
+      const prev = weightUnit;
+      weightUnit = unit;
+      localStorage.setItem(LS_WEIGHT_UNIT, unit);
+      weightUnitToggle.querySelectorAll(".unit-btn").forEach(b =>
+        b.classList.toggle("active", b.dataset.unit === unit)
+      );
+      const val = parseFloat(weightEl.value);
+      if (!isNaN(val)) {
+        weightEl.value = unit === "lb" && prev === "kg" ? kgToLb(val) : lbToKg(val);
+      }
+      weightEl.placeholder = unit === "kg" ? "e.g., 60" : "e.g., 132";
+    }
+
+    function lockYobUI(year) {
+      yobEl.hidden = true;
+      if (yobHint) yobHint.hidden = true;
+      if (yobDisplay) { yobDisplay.textContent = year; yobDisplay.hidden = false; }
+      if (yobLockedNote) yobLockedNote.hidden = false;
+    }
+
+    function populateYobSelect() {
+      const currentYear = new Date().getFullYear();
+      const opts = ['<option value="">- Select year -</option>'];
+      for (let y = currentYear; y >= 1930; y--) {
+        opts.push(`<option value="${y}">${y}</option>`);
+      }
+      yobEl.innerHTML = opts.join("");
+    }
 
     function showStatus(msg) {
       statusEl.textContent = msg;
@@ -201,8 +335,8 @@
       catch { return {}; }
     }
 
-    function setAvatar(emoji) {
-      localStorage.setItem(LS_AVATAR, emoji);
+    function selectAvatar(emoji) {
+      selectedAvatar = emoji;
       avatarBig.textContent = emoji;
       document.querySelectorAll(".avatar-btn").forEach(b =>
         b.classList.toggle("active", b.dataset.avatar === emoji)
@@ -212,13 +346,14 @@
     function initAvatarPicker() {
       const options = ["🌸","👤","😊","🧸","🌺","✨","🌙","🦋","🍓","🩷"];
       const current = localStorage.getItem(LS_AVATAR) || "👤";
+      selectedAvatar = current;
       avatarBig.textContent = current;
       avatarPicker.innerHTML = options.map(a =>
         `<button class="avatar-btn${a === current ? " active" : ""}" type="button"
           data-avatar="${a}" aria-label="Avatar ${a}">${a}</button>`
       ).join("");
       avatarPicker.querySelectorAll(".avatar-btn").forEach(btn =>
-        btn.addEventListener("click", () => setAvatar(btn.dataset.avatar))
+        btn.addEventListener("click", () => selectAvatar(btn.dataset.avatar))
       );
     }
 
@@ -230,16 +365,42 @@
       periodDurEl.value = p.periodDuration || "";
       const lmp = localStorage.getItem(LS_LMP);
       if (lmp) lmpDateEl.value = lmp;
+
+      setWeightUnit(weightUnit);
+      if (p.weightKg) {
+        weightEl.value = weightUnit === "kg" ? p.weightKg : kgToLb(p.weightKg);
+      }
+
+      setHeightUnit(heightUnit);
+      if (p.heightCm) {
+        if (heightUnit === "cm") {
+          heightCmEl.value = p.heightCm;
+        } else {
+          const { ft, in: ins } = cmToFtIn(p.heightCm);
+          heightFtEl.value = ft;
+          heightInEl.value = ins;
+        }
+      }
+
+      if (p.yob || localStorage.getItem(LS_YOB_LOCKED)) {
+        localStorage.setItem(LS_YOB_LOCKED, "true");
+        lockYobUI(p.yob || "");
+      }
     }
 
     function toggleLmpField() {
       lmpFieldEl.classList.toggle("visible", getUserGoal() === "pregnancy");
     }
 
-    // Save personal details
+    // Single save handler - saves everything: avatar + details + lifestyle
     saveBtn.addEventListener("click", async () => {
-      const nickname = nicknameEl.value.trim();
-      const yob      = yobEl.value.trim();
+      const nickname  = nicknameEl.value.trim();
+      const yob       = yobEl.value.trim();
+      const wasLocked = !!localStorage.getItem(LS_YOB_LOCKED);
+      const avgCycle  = avgCycleEl.value.trim();
+      const periodDur = periodDurEl.value.trim();
+      const lmp       = lmpDateEl.value;
+      const weightRaw = parseFloat(weightEl.value);
 
       if (yob) {
         const n = Number(yob);
@@ -247,56 +408,77 @@
           showStatus("Year of Birth must be between 1900 and 2100.");
           return;
         }
-
-        // Send YOB to backend if signed in
-        const user = getUser();
-        if (user) {
-          try {
-            const token = await user.getIdToken();
-            await fetch(`${window.BLOOM_API_BASE || ""}/api/user/profile`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ yearOfBirth: Number(yob) }),
-            });
-          } catch (e) {
-            showStatus("Could not sync year of birth to server. Saved locally only.");
-          }
-        }
       }
-      
-      const profile = { ...loadProfile(), nickname, yob: yob ? Number(yob) : "" };
-      localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
-      showStatus("Profile saved ✓");
-    });
 
-    // Save lifestyle details
-    saveLifestyleBtn.addEventListener("click", () => {
-      const avgCycle  = avgCycleEl.value.trim();
-      const periodDur = periodDurEl.value.trim();
-      const lmp       = lmpDateEl.value;
-      const profile   = {
+      const weightKg = isNaN(weightRaw)
+        ? null
+        : (weightUnit === "kg" ? weightRaw : lbToKg(weightRaw));
+
+      let heightCm = null;
+      if (heightUnit === "cm") {
+        const cmValue = parseFloat(heightCmEl.value);
+        if (!isNaN(cmValue)) heightCm = cmValue;
+      } else {
+        const ft = parseFloat(heightFtEl.value);
+        const inches = parseFloat(heightInEl.value) || 0;
+        if (!isNaN(ft)) heightCm = ftInToCm(ft, inches);
+      }
+
+      // Save avatar to localStorage
+      localStorage.setItem(LS_AVATAR, selectedAvatar);
+
+      // Save all profile fields to localStorage
+      const profile = {
         ...loadProfile(),
-        avgCycleLength: avgCycle  ? Number(avgCycle)  : "",
-        periodDuration: periodDur ? Number(periodDur) : "",
+        nickname,
+        yob: yob ? Number(yob) : "",
+        avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
+        periodDuration: periodDur ? Number(periodDur) : null,
+        weightKg,
+        heightCm,
       };
       localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+
+      if (yob && !wasLocked) {
+        localStorage.setItem(LS_YOB_LOCKED, "true");
+        lockYobUI(yob);
+      }
+
       if (getUserGoal() === "pregnancy" && lmp) {
         localStorage.setItem(LS_LMP, lmp);
-      } else if (getUserGoal() !== "pregnancy") {
-        // Clear LMP if not on pregnancy goal
+      } else {
         localStorage.removeItem(LS_LMP);
       }
-      showStatus("Lifestyle details saved ✓");
-    });
 
-    // Logout
-    logoutBtn.addEventListener("click", async () => {
-      await logout();
-      setMode("anon");
-      window.location.href = "/index.html";
+      // Persist everything to backend if signed in
+      if (getUser()) {
+        try {
+          const token = await getIdToken();
+          const apiBase = window.BLOOM_API_BASE ?? '';
+          const payload = {
+            nickname,
+            avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
+            periodDuration: periodDur ? Number(periodDur) : null,
+            weightKg:  weightKg  ?? null,
+            heightCm:  heightCm  ?? null,
+            avatar:    selectedAvatar,
+          };
+          if (yob) payload.yearOfBirth = Number(yob);
+          const r = await fetch(`${apiBase}/api/user/profile`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify(payload),
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            console.error("[Bloom] profile save failed:", r.status, err);
+          } else {
+            console.log("[Bloom] profile saved to backend ✓");
+          }
+        } catch (e) { console.error("[Bloom] profile save error:", e); }
+      }
+
+      showStatus("Profile saved ✓");
     });
 
     // Delete account
@@ -336,9 +518,43 @@
       }
     });
 
+    weightUnitToggle.querySelectorAll(".unit-btn").forEach(btn =>
+      btn.addEventListener("click", () => setWeightUnit(btn.dataset.unit))
+    );
+    heightUnitToggle.querySelectorAll(".unit-btn").forEach(btn =>
+      btn.addEventListener("click", () => setHeightUnit(btn.dataset.unit))
+    );
+
     initAvatarPicker();
+    populateYobSelect();
     fillFields();
     toggleLmpField();
+
+    // Background sync on page load
+    (async () => {
+      if (!getUser()) return;
+      try {
+        const token = await getIdToken();
+        if (!token) return;
+        const p = loadProfile();
+        const avatar = localStorage.getItem(LS_AVATAR);
+        const payload = {};
+        if (p.nickname)       payload.nickname       = p.nickname;
+        if (p.yob)            payload.yearOfBirth    = Number(p.yob);
+        if (p.avgCycleLength) payload.avgCycleLength = Number(p.avgCycleLength);
+        if (p.periodDuration) payload.periodDuration = Number(p.periodDuration);
+        if (p.weightKg)       payload.weightKg       = Number(p.weightKg);
+        if (p.heightCm)       payload.heightCm       = Number(p.heightCm);
+        if (avatar && avatar !== "👤") payload.avatar = avatar;
+        if (Object.keys(payload).length === 0) return;
+        const apiBase = window.BLOOM_API_BASE ?? '';
+        await fetch(`${apiBase}/api/user/profile`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+      } catch (_) {}
+    })();
   </script>
 </body>
 </html>

@@ -49,7 +49,7 @@
       text-decoration: none;
       margin-bottom: 1.5rem;
     }
-    .brand-link svg { width: 24px; height: 24px; }
+    .brand-link img { height: 72px; width: auto; }
 
     .forgot-link {
       font-size: 0.85rem;
@@ -67,15 +67,7 @@
   <main class="auth-page">
     <div class="card auth-card">
       <a href="/pages/login.html" class="brand-link" aria-label="Bloom home">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 2c1.5 0 3 1.5 3 4s-1.5 4-3 4-3-1.5-3-4 1.5-4 3-4z" />
-          <path d="M22 12c0 1.5-1.5 3-4 3s-4-1.5-4-3 1.5-3 4-3 4 1.5 4 3z" />
-          <path d="M12 22c-1.5 0-3-1.5-3-4s1.5-4 3-4 3 1.5 3 4-1.5 4-3 4z" />
-          <path d="M2 12c0-1.5 1.5-3 4-3s4 1.5 4 3-1.5 3-4 3-4-1.5-4-3z" />
-        </svg>
-        Bloom
+        <img src="/assets/bloom-logo.png" alt="Bloom" />
       </a>
 
       <!-- ── Login panel ── -->
@@ -115,7 +107,7 @@
         </form>
 
         <div class="auth-links">
-          <p>Don't have an account? <a href="/pages/register.html">Create one (18+)</a></p>
+          <p>Don't have an account? <a href="/pages/register.html">Create one</a></p>
           <p style="margin-top:0.75rem;">
             <a href="#" id="btn-anon">Continue anonymously instead</a>
           </p>
@@ -149,10 +141,11 @@
 
   <script type="module">
     import { showBloomLoader, runBloomLoader } from "/js/loadingOverlay.js";
-    import { login, sendPasswordReset, resendVerificationEmail } from '/js/auth.js';
+    import { login, sendPasswordReset, resendVerificationEmail, getIdToken } from '/js/auth.js';
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
+    import { setUserGoal } from '/js/goals.js';
 
     renderFooter();
 
@@ -183,6 +176,62 @@
     }
 
     const goPostAuth = async () => {
+      // Restore profile + preferences from backend so returning users skip the survey
+      try {
+        const token = await getIdToken();
+        if (token) {
+          const apiBase = window.BLOOM_API_BASE ?? '';
+          const headers = { Authorization: `Bearer ${token}` };
+
+          // Fetch profile and preferences in parallel
+          const [profileRes, prefsRes] = await Promise.all([
+            fetch(`${apiBase}/api/user/profile`, { headers }),
+            fetch(`${apiBase}/api/preferences`, { headers }),
+          ]);
+
+          // ── Restore profile ──
+          if (profileRes.ok) {
+            const data = await profileRes.json();
+            const profile = data?.profile || data;
+            if (profile) {
+              localStorage.setItem('bloom_onboarded', '1');
+              const realGoal = (profile.goal === "track_cycle" || !profile.goal) ? "period" : profile.goal;
+              setUserGoal(realGoal);
+              const restored = {};
+              if (profile.nickname)       restored.nickname       = profile.nickname;
+              if (profile.yearOfBirth)    restored.yob            = profile.yearOfBirth;
+              if (profile.avgCycleLength) restored.avgCycleLength = profile.avgCycleLength;
+              if (profile.periodDuration) restored.periodDuration = profile.periodDuration;
+              if (profile.weightKg)       restored.weightKg       = profile.weightKg;
+              if (profile.heightCm)       restored.heightCm       = profile.heightCm;
+              if (profile.avatar)         localStorage.setItem('bloom_avatar', profile.avatar);
+              localStorage.setItem('bloom_profile', JSON.stringify(restored));
+            }
+          } else {
+            console.error("[Bloom] profile fetch failed:", profileRes.status);
+          }
+
+          // ── Restore preferences ──
+          if (prefsRes.ok) {
+            const prefsData = await prefsRes.json();
+            const prefs = prefsData?.preferences;
+            if (prefs) {
+              // Flatten backend prefs shape into local storage shape
+              const local = {
+                hideSensitive:  !!prefs.hideSensitive,
+                compact:        !!prefs.compact,
+                reminders:      !!(prefs.reminders?.enabled),
+                periodReminder: !!(prefs.reminders?.types?.includes('PERIOD_SOON')),
+                fertileAlert:   !!(prefs.reminders?.types?.includes('FERTILE_WINDOW')),
+                discreetNotif:  !!(prefs.reminders?.discreetCopy),
+              };
+              if (prefs.theme) local.theme = prefs.theme;
+              localStorage.setItem('bloom_preferences', JSON.stringify(local));
+            }
+          }
+        }
+      } catch (e) { console.error("[Bloom] login restore error:", e); }
+
       const onboarded = localStorage.getItem('bloom_onboarded') === '1';
       const target = onboarded ? '/pages/dashboard.html' : '/pages/survey.html';
       showBloomLoader({ message: "Preparing Bloom", sub: "Syncing your experience…" });

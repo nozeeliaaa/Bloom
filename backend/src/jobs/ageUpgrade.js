@@ -49,7 +49,7 @@ export async function runAgeUpgradeJob() {
           ageBand: "18+",
         });
 
-        // Revoke any active consents — they're now an adult
+        // Revoke any active consents - they're now an adult
         const consentSnap = await db.collection("consents")
           .where("teenUid", "==", uid)
           .where("status", "==", "approved")

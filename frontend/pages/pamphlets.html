@@ -226,11 +226,28 @@
     let searchQuery = '';
 
     async function init() {
-      const res = await fetch('/data/pamphlets.json');
-      pamphlets = await res.json();
-
       const sensitiveEnabled = localStorage.getItem('bloom_sensitive_enabled') === 'true';
-      if (!sensitiveEnabled) pamphlets = pamphlets.filter(p => !p.sensitive);
+
+      // Show spinner while loading
+      document.getElementById('pamphlet-grid').innerHTML = '<div class="spinner"></div>';
+
+      try {
+        const res = await fetch(`/catalog/pamphlets?sensitive=${sensitiveEnabled}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        pamphlets = json.pamphlets ?? [];
+      } catch (_) {
+        // Fallback to static file if backend is unavailable
+        try {
+          const res = await fetch('/data/pamphlets.json');
+          const all = await res.json();
+          pamphlets = sensitiveEnabled ? all : all.filter(p => !p.sensitive);
+        } catch (_2) {
+          document.getElementById('pamphlet-grid').innerHTML =
+            '<p class="text-muted no-results">Could not load pamphlets. Please try again later.</p>';
+          return;
+        }
+      }
 
       buildCategoryFilters();
       renderGrid();
@@ -238,7 +255,10 @@
       if (window.location.hash) {
         const id = window.location.hash.slice(1);
         const pamphlet = pamphlets.find(p => p.id === id);
-        if (pamphlet && !pamphlet.pdf) openReader(pamphlet);
+        if (pamphlet) {
+          if (pamphlet.pdf) window.open(pamphlet.pdf, '_blank', 'noopener');
+          else openReader(pamphlet);
+        }
       }
 
       document.getElementById('pamphlet-search').addEventListener('input', (e) => {
@@ -300,18 +320,18 @@
       }
 
       grid.innerHTML = filtered.map(p => `
-        <div class="book-card${p.pdf ? ' is-pdf' : ''}" role="button" tabindex="0" data-id="${p.id}" aria-label="Open pamphlet ${p.title}">
+        <div class="book-card${p.pdf ? ' is-pdf' : ''}" role="button" tabindex="0" data-id="${p.id}" aria-label="Open pamphlet: ${p.title}">
           <span class="book-spine" aria-hidden="true"></span>
 
           <div class="book-top">
             <h3 class="book-title">${p.title}</h3>
-            <p class="book-summary">${p.summary}</p>
+            <p class="book-summary">${p.summary || ''}</p>
           </div>
 
           <div class="book-meta">
             <span class="badge badge-primary">${p.category}</span>
-            <span>${p.readTime} read</span>
-            ${p.pdf ? '<span class="badge">PDF</span>' : ''}
+            ${p.readTime ? `<span>${p.readTime} read</span>` : ''}
+            ${p.pdf ? '<span class="badge" title="PDF available">&#128196; PDF</span>' : ''}
             ${p.sensitive ? '<span class="badge badge-warning">Sensitive</span>' : ''}
           </div>
         </div>
@@ -346,9 +366,10 @@
       document.getElementById('reader-title').textContent = pamphlet.title;
       document.getElementById('reader-meta').innerHTML = `
         <span class="badge badge-primary">${pamphlet.category}</span>
-        <span>${pamphlet.readTime} read</span>
+        ${pamphlet.readTime ? `<span>${pamphlet.readTime} read</span>` : ''}
+        ${pamphlet.pdf ? `<a href="${pamphlet.pdf}" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="margin-left:0.5rem;">&#128196; Download PDF</a>` : ''}
       `;
-      document.getElementById('reader-content').innerHTML = pamphlet.content;
+      document.getElementById('reader-content').innerHTML = pamphlet.content || '';
 
       window.location.hash = pamphlet.id;
       window.scrollTo(0, 0);

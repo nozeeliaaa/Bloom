@@ -5,20 +5,20 @@
  *
  * POST /api/feedback
  *   Stores one feedback event in the bloomieFeedback Firestore collection.
- *   Auth is optional — logged-in users are identified by uid; anonymous users
+ *   Auth is optional - logged-in users are identified by uid; anonymous users
  *   are stored with userId: "anonymous".
  *
  * Collection: bloomieFeedback
  * Fields:
- *   sessionId          — random ID for the chat session
- *   userId             — Firebase uid, or "anonymous"
- *   nodeId             — ctx.state when the reaction was given
- *   flowName           — ctx.topic at that moment
- *   messageText        — the bot message text being reacted to
- *   feedbackType       — "thumbs_up" | "thumbs_down"
- *   comment            — optional free-text comment (omitted if empty)
- *   conversationSlice  — last 3 messages [{ from, text }] for context
- *   createdAt          — server timestamp
+ *   sessionId          - random ID for the chat session
+ *   userId             - Firebase uid, or "anonymous"
+ *   nodeId             - ctx.state when the reaction was given
+ *   flowName           - ctx.topic at that moment
+ *   messageText        - the bot message text being reacted to
+ *   feedbackType       - "thumbs_up" | "thumbs_down"
+ *   comment            - optional free-text comment (omitted if empty)
+ *   conversationSlice  - last 3 messages [{ from, text }] for context
+ *   createdAt          - server timestamp
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -33,7 +33,7 @@ const VALID_FEEDBACK_TYPES = new Set(["thumbs_up", "thumbs_down"]);
 // POST /api/feedback
 router.post("/", async (req, res) => {
   try {
-    // Optional auth — attempt to verify token if present; proceed as anonymous
+    // Optional auth - attempt to verify token if present; proceed as anonymous
     // if the header is absent or the token is invalid.
     let uid = null;
     const authHeader = req.headers.authorization;
@@ -42,7 +42,7 @@ router.post("/", async (req, res) => {
         const decoded = await admin.auth().verifyIdToken(authHeader.split(" ")[1]);
         uid = decoded.uid;
       } catch (_) {
-        // Expired or invalid token — treat as anonymous rather than rejecting
+        // Expired or invalid token - treat as anonymous rather than rejecting
       }
     }
 
@@ -61,7 +61,7 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Invalid feedbackType. Must be thumbs_up or thumbs_down." });
     }
 
-    // Build the document — every field is explicitly whitelisted and bounded
+    // Build the document - every field is explicitly whitelisted and bounded
     const docData = {
       userId:      uid || "anonymous",
       feedbackType,

@@ -7,7 +7,8 @@
  * For production, use environment variables or a build step to inject these.
  * This file should be in .gitignore for security.
  */
-window.BLOOM_API_BASE = "http://localhost:4000";
+// Empty string = use Vite proxy (/api → http://localhost:4000). Avoids CORS entirely.
+window.BLOOM_API_BASE = "";
 
 export const firebaseConfig = {
   apiKey:            "AIzaSyCoY7010ONRgfc9ic6orCefKgSFAbAaOtg",

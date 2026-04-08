@@ -23,7 +23,10 @@ function initAdmin() {
     credential = admin.credential.applicationDefault();
   }
 
-  admin.initializeApp({ credential });
+  admin.initializeApp({
+    credential,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "bloom-8401a.firebasestorage.app",
+  });
   return admin.app();
 }
 

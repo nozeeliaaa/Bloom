@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css" />
- 
+
   <style>
     .auth-page {
       display: flex;
@@ -16,10 +16,7 @@
       min-height: calc(100vh - 120px);
       padding: 2rem 1rem;
     }
-    .auth-card {
-      width: 100%;
-      max-width: 420px;
-    }
+    .auth-card { width: 100%; max-width: 420px; }
     .auth-card h1 {
       text-align: center;
       color: var(--color-primary-dark);
@@ -31,275 +28,310 @@
       font-size: 0.95rem;
       margin-bottom: 1.5rem;
     }
-    .auth-links {
-      text-align: center;
-      margin-top: 1.25rem;
-      font-size: 0.9rem;
-    }
+    .auth-links { text-align: center; margin-top: 1.25rem; font-size: 0.9rem; }
     .auth-links a { font-weight: 600; }
     .brand-link {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.4rem;
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--color-primary);
+      margin-bottom: 1.25rem;
       text-decoration: none;
-      margin-bottom: 1.5rem;
     }
-    .brand-link svg { width: 24px; height: 24px; }
-    .age-notice {
-      font-size: 0.82rem;
-      color: var(--color-text-muted);
-      text-align: center;
-      margin-top: 0.5rem;
-    }
- 
-    /* Password strength bar */
+    .brand-link img { width: 64px; height: 64px; object-fit: contain; }
+
+    /* Password strength */
     .pw-strength-bar {
-      height: 5px;
-      border-radius: 4px;
+      height: 5px; border-radius: 4px;
       background: var(--color-border);
-      margin-top: 0.4rem;
-      overflow: hidden;
+      margin-top: 0.4rem; overflow: hidden;
     }
     .pw-strength-fill {
-      height: 100%;
-      width: 0%;
+      height: 100%; width: 0%;
       border-radius: 4px;
       transition: width 0.3s, background 0.3s;
     }
-    .pw-strength-label {
-      font-size: 0.78rem;
-      margin-top: 0.25rem;
-      font-weight: 600;
-    }
+    .pw-strength-label { font-size: 0.78rem; margin-top: 0.25rem; font-weight: 600; }
     .pw-rules {
-      font-size: 0.8rem;
-      color: var(--color-text-muted);
-      margin-top: 0.4rem;
-      padding-left: 0.1rem;
+      font-size: 0.8rem; color: var(--color-text-muted);
+      margin-top: 0.4rem; padding-left: 0.1rem;
+      display: none;
     }
-    .pw-rules li {
-      list-style: none;
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      margin-bottom: 0.15rem;
-    }
+    .pw-rules.visible { display: block; }
+    .pw-rules li { list-style: none; display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.15rem; }
     .pw-rules li.pass { color: #27ae60; }
     .pw-rules li.fail { color: var(--color-text-muted); }
- 
-    /* Verification success panel */
-    #verify-panel { display: none; text-align: center; }
-    #verify-panel .verify-icon { font-size: 3rem; margin-bottom: 1rem; }
-    #verify-panel h2 { color: var(--color-primary-dark); margin-bottom: 0.5rem; }
-    #verify-panel p { color: var(--color-text-muted); font-size: 0.95rem; margin-bottom: 1.25rem; }
-    #verify-panel .spam-note {
-      font-size: 0.82rem;
+
+    /* Age states */
+    .age-block-msg {
+      display: none;
+      font-size: 0.84rem;
       color: var(--color-text-muted);
-      margin-top: 0.75rem;
+      background: var(--color-bg-subtle, #f8f4f7);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.85rem;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+    .age-block-msg.visible { display: block; }
+
+    /* Guardian section */
+    .guardian-section {
+      display: none;
+      background: var(--color-primary-lightest, #fce4ec);
+      border-radius: var(--radius);
+      padding: 1rem 1rem 0.75rem;
+      margin-top: 1rem;
+      border: 1px solid rgba(181,0,110,0.15);
+    }
+    .guardian-section.visible { display: block; }
+    .guardian-section-title {
+      font-size: 0.88rem; font-weight: 800;
+      color: var(--color-primary-dark); margin-bottom: 0.25rem;
+    }
+    .guardian-section-desc {
+      font-size: 0.83rem; color: var(--color-text-muted);
+      line-height: 1.55; margin-bottom: 0.85rem;
     }
   </style>
 </head>
- 
+
 <body>
   <main class="auth-page">
     <div class="card auth-card">
+
       <a href="/pages/home.html" class="brand-link">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M12 2c1.5 0 3 1.5 3 4s-1.5 4-3 4-3-1.5-3-4 1.5-4 3-4z"/>
-          <path d="M22 12c0 1.5-1.5 3-4 3s-4-1.5-4-3 1.5-3 4-3 4 1.5 4 3z"/>
-          <path d="M12 22c-1.5 0-3-1.5-3-4s1.5-4 3-4 3 1.5 3 4-1.5 4-3 4z"/>
-          <path d="M2 12c0-1.5 1.5-3 4-3s4 1.5 4 3-1.5 3-4 3-4-1.5-4-3z"/>
-        </svg>
-        Bloom
+        <img src="/assets/bloom-logo.png" alt="Bloom" />
       </a>
- 
-      <!-- ── Registration form ── -->
-      <div id="form-panel">
-        <h1>Create Your Account</h1>
-        <p class="subtitle">Unlock cloud sync, advanced insights, and data export.</p>
- 
-        <div id="error-msg" class="banner banner-warning hidden" role="alert"></div>
- 
-        <form id="register-form">
-          <div class="form-group">
-            <label class="form-label" for="email">Email</label>
-            <input class="form-input" type="email" id="email" name="email" required
-              autocomplete="email" placeholder="you@example.com">
-          </div>
- 
-          <div class="form-group">
-            <label class="form-label" for="password">Password</label>
-            <input class="form-input" type="password" id="password" name="password" required
-              autocomplete="new-password" placeholder="Min 8 chars, uppercase, number, symbol">
- 
-            <div class="pw-strength-bar">
-              <div class="pw-strength-fill" id="pw-strength-fill"></div>
-            </div>
-            <div class="pw-strength-label" id="pw-strength-label"></div>
- 
-            <ul class="pw-rules" id="pw-rules">
-              <li id="rule-length" class="fail">✗ At least 8 characters</li>
-              <li id="rule-upper"  class="fail">✗ At least one uppercase letter</li>
-              <li id="rule-number" class="fail">✗ At least one number</li>
-              <li id="rule-symbol" class="fail">✗ At least one special character (!, @, #…)</li>
-            </ul>
-          </div>
- 
-          <div class="form-group">
-            <label class="form-label" for="confirm-password">Confirm Password</label>
-            <input class="form-input" type="password" id="confirm-password" name="confirm-password"
-              required autocomplete="new-password" placeholder="Re-enter your password">
-          </div>
- 
-          <div class="form-group">
-            <label class="form-check">
-              <input type="checkbox" id="age-confirm" required>
-              <span>I confirm that I am <strong>18 years or older</strong></span>
-            </label>
-          </div>
- 
-          <button type="submit" class="btn btn-primary btn-block btn-lg" id="register-btn">
-            Create Account
-          </button>
-        </form>
- 
-        <p class="age-notice">You must be 18 or older to create an account.</p>
- 
-        <div class="auth-links">
-          <p>Already have an account? <a href="/pages/login.html">Log in</a></p>
-          <p style="margin-top:0.75rem;">
-            <a href="/pages/survey.html" id="btn-anon">Continue anonymously instead</a>
-          </p>
+
+      <h1>Create Your Account</h1>
+      <p class="subtitle">Unlock cloud sync, advanced insights, and data export.</p>
+
+      <div id="error-msg" class="banner banner-warning hidden" role="alert"></div>
+      <div id="success-msg" class="banner banner-success hidden" role="status"></div>
+
+      <form id="register-form">
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <input class="form-input" type="email" id="email" name="email" required
+            autocomplete="email" placeholder="you@example.com">
         </div>
-      </div>
- 
-      <!-- ── Verification sent panel (shown after successful registration) ── -->
-      <div id="verify-panel">
-        <div class="verify-icon">📬</div>
-        <h2>Check your inbox!</h2>
-        <p id="verify-email-msg">We've sent a verification link to your email. Click it to activate your account, then log in.</p>
- 
-        <div id="resend-msg" class="banner banner-warning hidden" role="alert"></div>
-        <div id="resend-ok"  class="banner banner-success hidden" role="status"></div>
- 
-        <button class="btn btn-outline btn-block" id="btn-resend" type="button">
-          Resend verification email
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input class="form-input" type="password" id="password" name="password" required
+            autocomplete="new-password" placeholder="Min 8 chars, uppercase, number, symbol">
+          <div class="pw-strength-bar">
+            <div class="pw-strength-fill" id="pw-strength-fill"></div>
+          </div>
+          <div class="pw-strength-label" id="pw-strength-label"></div>
+          <ul class="pw-rules" id="pw-rules">
+            <li id="rule-length" class="fail">✗ At least 8 characters</li>
+            <li id="rule-upper"  class="fail">✗ At least one uppercase letter</li>
+            <li id="rule-number" class="fail">✗ At least one number</li>
+            <li id="rule-symbol" class="fail">✗ At least one special character (!, @, #…)</li>
+          </ul>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="confirm-password">Confirm Password</label>
+          <input class="form-input" type="password" id="confirm-password" name="confirm-password"
+            required autocomplete="new-password" placeholder="Re-enter your password">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="yob">Year of Birth</label>
+          <select class="form-input" id="yob" required>
+            <option value="">- Select year -</option>
+          </select>
+
+          <!-- Under 18: guardian consent required -->
+          <div class="guardian-section" id="guardian-section">
+            <p class="guardian-section-title" id="guardian-title">Parental / Guardian Consent Required</p>
+            <p class="guardian-section-desc" id="guardian-desc">
+              Because you are under 18, a parent or guardian must approve your account before you can use Bloom.
+              Enter their email address below - they will receive a consent request to approve or deny your access.
+            </p>
+            <label class="form-label" for="guardian-email">Guardian's Email</label>
+            <input class="form-input" type="email" id="guardian-email"
+              placeholder="parent@example.com" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" id="terms-confirm" required>
+            <span>I agree to the <a href="/pages/terms.html" target="_blank">Terms &amp; Conditions</a> and <a href="/pages/privacy.html" target="_blank">Privacy Policy</a></span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="register-btn">
+          Create Account
         </button>
- 
-        <p class="spam-note"> Don't see it? Check your <strong>spam or junk folder</strong>.</p>
- 
-        <div class="auth-links" style="margin-top:1.5rem;">
-          <a href="/pages/login.html" class="btn btn-primary btn-block">Go to Login</a>
-        </div>
+      </form>
+
+      <div class="auth-links">
+        <p>Already have an account? <a href="/pages/login.html">Log in</a></p>
+        <p style="margin-top:0.75rem;">
+          <a href="/pages/survey.html" id="btn-anon">Continue anonymously instead</a>
+        </p>
       </div>
     </div>
   </main>
- 
+
   <script type="module">
-    import { register, getPasswordStrength, validatePassword, resendVerificationEmail } from '/js/auth.js';
+    import { register, getPasswordStrength, validatePassword } from '/js/auth.js';
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
- 
+
     renderFooter();
- 
-    const formPanel    = document.getElementById('form-panel');
-    const verifyPanel  = document.getElementById('verify-panel');
-    const form         = document.getElementById('register-form');
-    const errorMsg     = document.getElementById('error-msg');
-    const registerBtn  = document.getElementById('register-btn');
-    const pwInput      = document.getElementById('password');
-    const strengthFill = document.getElementById('pw-strength-fill');
-    const strengthLabel = document.getElementById('pw-strength-label');
- 
-    // Stored after registration so resend doesn't need re-entry
-    let _registeredEmail    = null;
-    let _registeredPassword = null;
- 
-    // ── Live password strength feedback ──
+
+    const form            = document.getElementById('register-form');
+    const errorMsg        = document.getElementById('error-msg');
+    const successMsg      = document.getElementById('success-msg');
+    const registerBtn     = document.getElementById('register-btn');
+    const pwInput         = document.getElementById('password');
+    const strengthFill    = document.getElementById('pw-strength-fill');
+    const strengthLabel   = document.getElementById('pw-strength-label');
+    const pwRules         = document.getElementById('pw-rules');
+    const yobEl           = document.getElementById('yob');
+    const guardianSection = document.getElementById('guardian-section');
+    const guardianTitle   = document.getElementById('guardian-title');
+    const guardianDesc    = document.getElementById('guardian-desc');
+    const guardianEmail   = document.getElementById('guardian-email');
+    const termsConfirm    = document.getElementById('terms-confirm');
+
+    // Populate YOB dropdown
+    const currentYear = new Date().getFullYear();
+    const opts = ['<option value="">- Select year -</option>'];
+    for (let y = currentYear; y >= 1930; y--) {
+      opts.push(`<option value="${y}">${y}</option>`);
+    }
+    yobEl.innerHTML = opts.join('');
+
+    // Age logic on YOB change
+    let userAge = null;
+    yobEl.addEventListener('change', () => {
+      const yob = Number(yobEl.value);
+      if (!yob) { userAge = null; guardianSection.classList.remove('visible'); return; }
+      userAge = currentYear - yob;
+
+      const isMinor = userAge < 18;
+      guardianSection.classList.toggle('visible', isMinor);
+      guardianEmail.required = isMinor;
+
+      if (userAge < 13) {
+        guardianTitle.textContent = 'Parent Approval Required';
+        guardianDesc.textContent =
+          'Users under 13 need a parent or guardian to approve their Bloom account. ' +
+          'Enter their email below - they\'ll receive a request to approve or deny your access.';
+      } else {
+        guardianTitle.textContent = 'Parental / Guardian Consent Required';
+        guardianDesc.textContent =
+          'Because you are under 18, a parent or guardian must approve your account before you can use Bloom. ' +
+          'Enter their email address below - they will receive a consent request to approve or deny your access.';
+      }
+    });
+
+    // Show password rules only when user starts typing
+    pwInput.addEventListener('focus', () => pwRules.classList.add('visible'));
+
     pwInput.addEventListener('input', () => {
       const val = pwInput.value;
       const { score, label, color } = getPasswordStrength(val);
- 
+
       strengthFill.style.width = `${(score / 4) * 100}%`;
       strengthFill.style.background = color;
       strengthLabel.textContent = val.length ? label : '';
       strengthLabel.style.color = color;
- 
+
       setRule('rule-length', val.length >= 8);
       setRule('rule-upper',  /[A-Z]/.test(val));
       setRule('rule-number', /[0-9]/.test(val));
       setRule('rule-symbol', /[^A-Za-z0-9]/.test(val));
     });
- 
+
     function setRule(id, passing) {
       const el = document.getElementById(id);
       if (!el) return;
       const text = el.textContent.replace(/^[✓✗] /, '');
       el.textContent = (passing ? '✓ ' : '✗ ') + text;
-      el.className = passing ? 'pass' : 'fail';
+      el.className   = passing ? 'pass' : 'fail';
     }
- 
+
     function showError(msg) {
-      errorMsg.textContent = msg;
+      errorMsg.innerHTML = msg;
       errorMsg.classList.remove('hidden');
+      successMsg.classList.add('hidden');
     }
- 
-    function showVerifyPanel(email) {
-      document.getElementById('verify-email-msg').textContent =
-        `We've sent a verification link to ${email}. Click it to activate your account, then log in.`;
-      formPanel.style.display  = 'none';
-      verifyPanel.style.display = 'block';
+
+    function showSuccess(msg) {
+      successMsg.textContent = msg;
+      successMsg.classList.remove('hidden');
+      errorMsg.classList.add('hidden');
     }
- 
-    // ── Form submit ──
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.classList.add('hidden');
- 
+      successMsg.classList.add('hidden');
+
       if (!isFirebaseConfigured()) {
         showError('Firebase is not configured. Please continue anonymously.');
         return;
       }
- 
+
       const email           = document.getElementById('email').value.trim();
-      const password        = document.getElementById('password').value;
+      const password        = pwInput.value;
       const confirmPassword = document.getElementById('confirm-password').value;
-      const ageConfirm      = document.getElementById('age-confirm').checked;
- 
+      const yob             = Number(yobEl.value);
+
       if (!email || !password) { showError('Please fill in all fields.'); return; }
- 
+      if (!yob)                { showError('Please select your year of birth.'); return; }
+
+      userAge = currentYear - yob;
+
+      if (userAge < 18 && !guardianEmail.value.trim()) {
+        showError('Please enter your guardian\'s email address.');
+        return;
+      }
+
       const { valid, errors } = validatePassword(password);
-      if (!valid) { showError('Password requirements not met: ' + errors.join(', ') + '.'); return; }
- 
+      if (!valid) {
+        showError('Password requirements not met: ' + errors.join(', ') + '.');
+        return;
+      }
+
       if (password !== confirmPassword) { showError('Passwords do not match.'); return; }
- 
-      if (!ageConfirm) { showError('You must confirm that you are 18 or older.'); return; }
- 
+      if (!termsConfirm.checked) { showError('Please agree to the Terms & Conditions to continue.'); return; }
+
       registerBtn.disabled = true;
       registerBtn.textContent = 'Creating account...';
- 
+
       try {
         await register(email, password);
- 
-        // Store credentials so resend works without asking again
-        _registeredEmail    = email;
-        _registeredPassword = password;
- 
-        showVerifyPanel(email);
- 
+
+        // If minor, redirect to guardian consent pending page
+        if (userAge < 18) {
+          sessionStorage.setItem('bloom_guardian_email', guardianEmail.value.trim());
+          sessionStorage.setItem('bloom_user_yob', yob);
+          window.location.href = '/pages/consent-pending.html';
+          return;
+        }
+
+        form.style.display = 'none';
+        showSuccess(
+          `✅ Account created! A verification email has been sent to ${email}. ` +
+          `Please check your inbox and verify before logging in.`
+        );
+        registerBtn.style.display = 'none';
+
       } catch (err) {
         let msg = 'Registration failed. Please try again.';
         if (err.code === 'auth/email-already-in-use') {
           msg = 'An account with this email already exists. <a href="/pages/login.html">Log in instead?</a>';
-          errorMsg.innerHTML = msg;
-          errorMsg.classList.remove('hidden');
-          return;
         } else if (err.code === 'auth/weak-password' || err.code === 'auth/weak-password-custom') {
           msg = err.errors
             ? 'Password requirements not met: ' + err.errors.join(', ') + '.'
@@ -310,35 +342,12 @@
         showError(msg);
       } finally {
         registerBtn.disabled = false;
-        registerBtn.textContent = 'Create Account';
+        if (registerBtn.style.display !== 'none') {
+          registerBtn.textContent = 'Create Account';
+        }
       }
     });
- 
-    // ── Resend verification ──
-    document.getElementById('btn-resend').addEventListener('click', async () => {
-      const btn      = document.getElementById('btn-resend');
-      const resendMsg = document.getElementById('resend-msg');
-      const resendOk  = document.getElementById('resend-ok');
- 
-      resendMsg.classList.add('hidden');
-      resendOk.classList.add('hidden');
- 
-      btn.disabled = true;
-      btn.textContent = 'Sending…';
- 
-      try {
-        await resendVerificationEmail(_registeredEmail, _registeredPassword);
-        resendOk.textContent = `Verification email resent to ${_registeredEmail}. Check your inbox and spam folder.`;
-        resendOk.classList.remove('hidden');
-        btn.style.display = 'none';
-      } catch (e) {
-        resendMsg.textContent = 'Could not resend. Please try again shortly.';
-        resendMsg.classList.remove('hidden');
-        btn.disabled = false;
-        btn.textContent = 'Resend verification email';
-      }
-    });
- 
+
     document.getElementById('btn-anon')?.addEventListener('click', () => {
       setMode('anon');
     });

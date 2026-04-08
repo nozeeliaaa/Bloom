@@ -123,6 +123,36 @@ describe("scoreSignals — pregnancy", () => {
     const { has } = scoreSignals("i had unprotected sex last week");
     expect(has("pregnancy")).toBe(true);
   });
+
+  it("scores pregnancy-test phrasing without explicit 'pregnancy' keyword", () => {
+    const triggerPhrases = [
+      "pregnancy test",
+      "positive test",
+      "negative test",
+      "i took a test",
+      "i took a pregnancy test",
+      "my test came back positive",
+      "my test came back negative",
+    ];
+    triggerPhrases.forEach((phrase) => {
+      const { has } = scoreSignals(phrase);
+      expect(has("pregnancy")).toBe(true);
+    });
+  });
+
+  it("does not score non-pregnancy 'test' language", () => {
+    const nonPregnancyPhrases = [
+      "blood test",
+      "iron test",
+      "urine test",
+      "let me test something",
+      "test results",
+    ];
+    nonPregnancyPhrases.forEach((phrase) => {
+      const { has } = scoreSignals(phrase);
+      expect(has("pregnancy")).toBe(false);
+    });
+  });
 });
 
 // ─── resolveSignals — SAFETY CRITICAL combos ─────────────────────────────────

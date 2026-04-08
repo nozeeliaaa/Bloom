@@ -1,6 +1,5 @@
 // src/routes/cycleLogs.js
 import express from "express";
-import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateCycleLog } from "../validators/validateCycleLog.js";
@@ -10,31 +9,6 @@ const router = express.Router();
 // --- helpers ---
 function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
-}
-
-async function ensureParentDoc(collectionName, uid) {
-  const ref = db.collection(collectionName).doc(uid);
-  const snap = await ref.get();
-  const now = admin.firestore.FieldValue.serverTimestamp();
-
-  if (!snap.exists) {
-    await ref.set(
-      {
-        uid,
-        createdAt: now,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
-    return;
-  }
-
-  await ref.set(
-    {
-      updatedAt: now,
-    },
-    { merge: true }
-  );
 }
 
 // Collection path: cycleLogs/{uid}/entries/{dateKey}
@@ -68,16 +42,13 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       hadSex: req.body.hadSex ?? false,
       contraceptionUsed: req.body.contraceptionUsed ?? false,
       notes: typeof req.body.notes === "string" ? req.body.notes.trim() : "",
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: new Date(),
     };
 
     const snap = await docRef.get();
-    if (!snap.exists) payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    if (!snap.exists) payload.createdAt = new Date();
 
     await docRef.set(payload, { merge: true });
-
-    // Ensure parent doc exists
-    await ensureParentDoc("cycleLogs", uid);
 
     return res.json({ ok: true, entry: payload });
   } catch (err) {
@@ -133,7 +104,7 @@ router.get("/", requireAuth, async (req, res) => {
     if (start) q = q.where("dateKey", ">=", start);
     if (end) q = q.where("dateKey", "<=", end);
 
-    // Only apply a cap when filtering by range — not on full history fetch
+    // Only apply a cap when filtering by range - not on full history fetch
     if (start || end) q = q.limit(3650);
 
     const snap = await q.get();
@@ -146,7 +117,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/logs — bulk delete all cycle logs for user
+// DELETE /api/logs - bulk delete all cycle logs for user
 router.delete("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -158,7 +129,7 @@ router.delete("/", requireAuth, async (req, res) => {
 
     if (snap.empty) return res.json({ ok: true, deleted: 0 });
 
-    // Firestore batch max 500 ops — chunk if needed
+    // Firestore batch max 500 ops - chunk if needed
     const BATCH_SIZE = 500;
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += BATCH_SIZE) {
@@ -166,7 +137,6 @@ router.delete("/", requireAuth, async (req, res) => {
       docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
       await batch.commit();
     }
-    await ensureParentDoc("cycleLogs", uid);
 
     return res.json({ ok: true, deleted: docs.length });
   } catch (err) {
@@ -191,8 +161,6 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey)
       .delete();
-
-    await ensureParentDoc("cycleLogs", uid);
 
     return res.json({ ok: true });
   } catch (err) {

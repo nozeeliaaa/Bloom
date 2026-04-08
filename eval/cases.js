@@ -1,27 +1,27 @@
 /**
  * eval/cases.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Bloomie evaluation prompt corpus — 142 labeled cases.
+ * Bloomie evaluation prompt corpus - 142 labeled cases.
  *
  * Case schema:
- *   id          — unique identifier (prefix = category shorthand)
- *   input       — raw user text as typed
- *   category    — "red_flag" | "routing" | "fallback" | "edge"
- *   expected    — what the pipeline should produce
- *     .urgent      boolean   — extractEntities().urgent
- *     .route       string    — inferRoute().next  (null = no inference)
- *     .scenario    string    — buildGuidanceResponse().scenario
- *     .gibberish   boolean   — looksLikeGibberish() result
- *     .noRoute     boolean   — inferRoute() should return null
- *   tags        — searchable labels
- *   notes       — why this case is included / what it guards against
+ *   id          - unique identifier (prefix = category shorthand)
+ *   input       - raw user text as typed
+ *   category    - "red_flag" | "routing" | "fallback" | "edge"
+ *   expected    - what the pipeline should produce
+ *     .urgent      boolean   - extractEntities().urgent
+ *     .route       string    - inferRoute().next  (null = no inference)
+ *     .scenario    string    - buildGuidanceResponse().scenario
+ *     .gibberish   boolean   - looksLikeGibberish() result
+ *     .noRoute     boolean   - inferRoute() should return null
+ *   tags        - searchable labels
+ *   notes       - why this case is included / what it guards against
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 export const cases = [
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  RED FLAG — must ALWAYS be caught as urgent (guards red-flag recall = 100%)
+  //  RED FLAG - must ALWAYS be caught as urgent (guards red-flag recall = 100%)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -29,14 +29,14 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["faint", "heavy", "english"],
-    notes: "Classic urgency — syncope + heavy bleeding",
+    notes: "Classic urgency - syncope + heavy bleeding",
   },
   {
     id: "RF002", input: "i bleed through my pants and i can't stand",
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["bleed_through", "weakness", "english"],
-    notes: "Bleed-through + can't stand — dual urgency flags",
+    notes: "Bleed-through + can't stand - dual urgency flags",
   },
   {
     id: "RF003", input: "soaking through a pad every hour and i feel faint",
@@ -50,14 +50,14 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["one_sided", "ectopic_risk", "english"],
-    notes: "Ectopic risk indicator — must never be downplayed",
+    notes: "Ectopic risk indicator - must never be downplayed",
   },
   {
     id: "RF005", input: "sharp pain on one side and heavy bleeding",
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["one_sided", "ectopic_risk", "english"],
-    notes: "Ectopic risk — sharp one-sided pain variant",
+    notes: "Ectopic risk - sharp one-sided pain variant",
   },
   {
     id: "RF006", input: "i cant breathe properly and i have heavy flow",
@@ -106,7 +106,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["patois", "faint", "heavy"],
-    notes: "Patois: passed out — urgency must still fire",
+    notes: "Patois: passed out - urgency must still fire",
   },
   {
     id: "RF013", input: "mi bleed through mi pants and cant stand up",
@@ -134,7 +134,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["bleed_through", "faint", "english"],
-    notes: "Repeated syncope — critical",
+    notes: "Repeated syncope - critical",
   },
   {
     id: "RF017", input: "i have sharp one-sided pain and i think i might be pregnant",
@@ -162,7 +162,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["emergency", "heavy", "english"],
-    notes: "Emergency keyword — urgency flag must fire",
+    notes: "Emergency keyword - urgency flag must fire",
   },
   {
     id: "RF021", input: "blood soaked through my clothes, i need urgent help",
@@ -218,7 +218,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["one_sided", "ectopic_risk", "english"],
-    notes: "One-sided sharp pain — ectopic flag",
+    notes: "One-sided sharp pain - ectopic flag",
   },
   {
     id: "RF029", input: "me cant stand up the pain one side too bad",
@@ -237,10 +237,10 @@ export const cases = [
 
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  ROUTING — English, expected inferRoute node
+  //  ROUTING - English, expected inferRoute node
   // ══════════════════════════════════════════════════════════════════════════
 
-  // — Late period —
+  // - Late period -
   {
     id: "RT001", input: "my period is late and i had unprotected sex",
     category: "routing",
@@ -302,7 +302,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true },
     tags: ["late", "english", "no_duration"],
-    notes: "Late with no extra signals — late_only fallback → LATE_INTRO",
+    notes: "Late with no extra signals - late_only fallback → LATE_INTRO",
   },
   {
     id: "RT010", input: "i'm a week late and i think i might be pregnant and i took a test it was negative",
@@ -312,7 +312,7 @@ export const cases = [
     notes: "Late + negative test overrides pregnancy chance",
   },
 
-  // — Heavy bleeding —
+  // - Heavy bleeding -
   {
     id: "RT011", input: "i have heavy bleeding for a week",
     category: "routing",
@@ -339,7 +339,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true },
     tags: ["heavy", "clots", "english"],
-    notes: "Heavy + clots without duration or severity — heavy_only fallback → HEAVY_INTRO",
+    notes: "Heavy + clots without duration or severity - heavy_only fallback → HEAVY_INTRO",
   },
   {
     id: "RT015", input: "heavy bleeding and i feel dizzy and lightheaded",
@@ -349,7 +349,7 @@ export const cases = [
     notes: "Heavy + dizziness → urgent (anaemia/blood loss)",
   },
 
-  // — Spotting —
+  // - Spotting -
   {
     id: "RT016", input: "light spotting in the middle of my cycle",
     category: "routing",
@@ -386,7 +386,7 @@ export const cases = [
     notes: "Pink + between periods + sex recently → pregnancy.chance=true (\\bsex\\b triggers chance); SPOT_PREG_INFO fires before SPOT_MIDCYCLE_NOTE",
   },
 
-  // — Pelvic pain —
+  // - Pelvic pain -
   {
     id: "RT021", input: "i have cramps after sex",
     category: "routing",
@@ -406,14 +406,14 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true },
     tags: ["pelvic", "mild", "before_period", "english"],
-    notes: "Mild cramps alone — falls through to keyword router",
+    notes: "Mild cramps alone - falls through to keyword router",
   },
   {
     id: "RT024", input: "bad cramps and heavy bleeding at the same time",
     category: "routing",
     expected: { urgent: false },
     tags: ["pelvic", "heavy", "english"],
-    notes: "Pelvic + heavy combo — resolveSignals handles in scoreSignals layer",
+    notes: "Pelvic + heavy combo - resolveSignals handles in scoreSignals layer",
   },
   {
     id: "RT025", input: "my lower abdomen hurts during sex",
@@ -423,7 +423,7 @@ export const cases = [
     notes: "during_sex timing maps to after_sex pathway",
   },
 
-  // — Mood / PMS —
+  // - Mood / PMS -
   {
     id: "RT026", input: "i feel very anxious and tired a few days before my period",
     category: "routing",
@@ -443,7 +443,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true },
     tags: ["mood", "general", "english"],
-    notes: "General mood without timing — mood_only fallback → MOOD_SAFETY_CHECK",
+    notes: "General mood without timing - mood_only fallback → MOOD_SAFETY_CHECK",
   },
   {
     id: "RT029", input: "irritable and crying a lot a week before my period starts",
@@ -457,10 +457,10 @@ export const cases = [
     category: "routing",
     expected: { route: "MOOD_SEVERITY" },
     tags: ["mood", "before_period", "english"],
-    notes: "Fatigue + drained before period — 'exhausted' misses regex (\bexhaust\b fails on 'exhausted'), use 'tired'/'drained'",
+    notes: "Fatigue + drained before period - 'exhausted' misses regex (\bexhaust\b fails on 'exhausted'), use 'tired'/'drained'",
   },
 
-  // — Discharge —
+  // - Discharge -
   {
     id: "RT031", input: "i have unusual discharge with a smell",
     category: "routing",
@@ -477,7 +477,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  ROUTING — Patois / Jamaican dialect
+  //  ROUTING - Patois / Jamaican dialect
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -485,7 +485,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true },
     tags: ["patois", "late"],
-    notes: "Patois: period not come — sym.late=true; late_only fallback → LATE_INTRO",
+    notes: "Patois: period not come - sym.late=true; late_only fallback → LATE_INTRO",
   },
   {
     id: "PA002", input: "me period nuh come and me sleep wid someone",
@@ -506,7 +506,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true },
     tags: ["patois", "pelvic", "severity_gap"],
-    notes: "Patois: 'stomach a hurt' misses pelvic regex (needs 'stomach.*hurt'), 'bad bad' misses severity regex — known patois gap",
+    notes: "Patois: 'stomach a hurt' misses pelvic regex (needs 'stomach.*hurt'), 'bad bad' misses severity regex - known patois gap",
   },
   {
     id: "PA005", input: "me feel dizzy and me bleed nuff",
@@ -541,7 +541,7 @@ export const cases = [
     category: "routing",
     expected: { route: "SPOT_MIDCYCLE_NOTE" },
     tags: ["patois", "spotting"],
-    notes: "Patois: likkle blood (spotting) — sym.spotting=true; spotting_only fallback → SPOT_INTRO",
+    notes: "Patois: likkle blood (spotting) - sym.spotting=true; spotting_only fallback → SPOT_INTRO",
   },
   {
     id: "PA010", input: "mi period late and mi tek a test it come back negative",
@@ -611,18 +611,18 @@ export const cases = [
     category: "routing",
     expected: { route: "LATE_POSITIVE" },
     tags: ["patois", "late", "test_positive"],
-    notes: "Patois: late + positive test — test result overrides duration",
+    notes: "Patois: late + positive test - test result overrides duration",
   },
   {
     id: "PA020", input: "me have cramps and heavy bleeding together",
     category: "routing",
     expected: { urgent: false },
     tags: ["patois", "pelvic", "heavy"],
-    notes: "Patois: cramps + heavy — no urgency unless severity is extreme",
+    notes: "Patois: cramps + heavy - no urgency unless severity is extreme",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  FALLBACK — OOS, gibberish, no health signal
+  //  FALLBACK - OOS, gibberish, no health signal
   // ══════════════════════════════════════════════════════════════════════════
 
   // Gibberish
@@ -645,7 +645,7 @@ export const cases = [
     category: "fallback",
     expected: { gibberish: false, noRoute: true },
     tags: ["gibberish", "known_gap", "short"],
-    notes: "xyz: 3 chars, 100% letters, not in SHORT_REAL_WORDS but passes ratio check — known gap (only length ≤2 auto-rejects)",
+    notes: "xyz: 3 chars, 100% letters, not in SHORT_REAL_WORDS but passes ratio check - known gap (only length ≤2 auto-rejects)",
   },
   {
     id: "FB004", input: "111111111",
@@ -659,7 +659,7 @@ export const cases = [
     category: "fallback",
     expected: { gibberish: false, noRoute: true },
     tags: ["short_real_word"],
-    notes: "hi is in SHORT_REAL_WORDS — must NOT be gibberish",
+    notes: "hi is in SHORT_REAL_WORDS - must NOT be gibberish",
   },
   {
     id: "FB006", input: "ok",
@@ -690,34 +690,34 @@ export const cases = [
     notes: "Symbols only",
   },
 
-  // Out of scope — no health route should fire
+  // Out of scope - no health route should fire
   {
     id: "FB010", input: "what should i eat for dinner",
     category: "fallback",
     expected: { noRoute: true, urgent: false },
     tags: ["oos", "food"],
-    notes: "Food topic — no reproductive health signal",
+    notes: "Food topic - no reproductive health signal",
   },
   {
     id: "FB011", input: "i'm stressed about my exam tomorrow",
     category: "fallback",
     expected: { noRoute: true, urgent: false },
     tags: ["oos", "school"],
-    notes: "School stress — no reproductive health signal",
+    notes: "School stress - no reproductive health signal",
   },
   {
     id: "FB012", input: "my boyfriend broke up with me",
     category: "fallback",
     expected: { noRoute: true, urgent: false },
     tags: ["oos", "relationships"],
-    notes: "Relationship topic — no health signal",
+    notes: "Relationship topic - no health signal",
   },
   {
     id: "FB013", input: "i need money to pay my bills",
     category: "fallback",
     expected: { noRoute: true, urgent: false },
     tags: ["oos", "money"],
-    notes: "Financial topic — no health signal",
+    notes: "Financial topic - no health signal",
   },
   {
     id: "FB014", input: "what is the weather like today",
@@ -752,7 +752,7 @@ export const cases = [
     category: "fallback",
     expected: { noRoute: true, urgent: false },
     tags: ["oos", "body_image"],
-    notes: "Body image + sad — mood_only fallback → MOOD_SAFETY_CHECK",
+    notes: "Body image + sad - mood_only fallback → MOOD_SAFETY_CHECK",
   },
   {
     id: "FB019", input: "i can't sleep lately",
@@ -771,7 +771,7 @@ export const cases = [
 
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  EDGE CASES — boundary conditions, mixed signals, tricky inputs
+  //  EDGE CASES - boundary conditions, mixed signals, tricky inputs
   // ══════════════════════════════════════════════════════════════════════════
 
   // Legitimate short health messages (must not be flagged as gibberish)
@@ -780,14 +780,14 @@ export const cases = [
     category: "routing",
     expected: { gibberish: false, noRoute: true },
     tags: ["short", "single_word"],
-    notes: "Single valid health word — not gibberish; no combo rule → inferRoute null; routeUserText handles in chat",
+    notes: "Single valid health word - not gibberish; no combo rule → inferRoute null; routeUserText handles in chat",
   },
   {
     id: "EG002", input: "late",
     category: "edge",
     expected: { gibberish: false, noRoute: true },
     tags: ["short", "single_word"],
-    notes: "Single word 'late' — sym.late=true; no combo rule → inferRoute null; routeUserText handles in chat",
+    notes: "Single word 'late' - sym.late=true; no combo rule → inferRoute null; routeUserText handles in chat",
   },
   {
     id: "EG003", input: "cramps",
@@ -797,7 +797,7 @@ export const cases = [
     notes: "Single word health complaint",
   },
 
-  // False reassurance guards — these SHOULD produce a non-null route (not silently ignored)
+  // False reassurance guards - these SHOULD produce a non-null route (not silently ignored)
   {
     id: "EG004", input: "my period is 2 weeks late and i had sex",
     category: "edge",
@@ -810,34 +810,34 @@ export const cases = [
     category: "edge",
     expected: { route: "LATE_POSITIVE" },
     tags: ["late", "test_positive"],
-    notes: "Positive test — must route to positive node",
+    notes: "Positive test - must route to positive node",
   },
 
-  // OOS with embedded health word (tricky — should NOT false-positive as health)
+  // OOS with embedded health word (tricky - should NOT false-positive as health)
   {
     id: "EG006", input: "i love period dramas like bridgerton",
     category: "edge",
     expected: { noRoute: true },
     tags: ["oos_embedded_word", "period_drama"],
-    notes: "Period in non-health context — should not trigger late signal",
+    notes: "Period in non-health context - should not trigger late signal",
   },
 
-  // Ambiguous — contains health words but no clear intent
+  // Ambiguous - contains health words but no clear intent
   {
     id: "EG007", input: "bleeding edge technology is so cool",
     category: "edge",
     expected: { noRoute: true },
     tags: ["false_positive_guard", "bleeding"],
-    notes: "Bleeding in non-health context — heavy should not fire",
+    notes: "Bleeding in non-health context - heavy should not fire",
   },
 
-  // Multi-symptom without urgency — should route, not urgent
+  // Multi-symptom without urgency - should route, not urgent
   {
     id: "EG008", input: "i have spotting, cramps, and mood swings before my period",
     category: "edge",
     expected: { urgent: false },
     tags: ["multi_symptom", "before_period"],
-    notes: "Multiple PMS symptoms — not urgent",
+    notes: "Multiple PMS symptoms - not urgent",
   },
 
   // Urgency word in safe context
@@ -865,7 +865,7 @@ export const cases = [
     category: "edge",
     expected: { route: "PREGNANCY_ENTRY" },
     tags: ["caps", "late", "pregnancy"],
-    notes: "Uppercase input — normalization must handle; routes to PREGNANCY_ENTRY",
+    notes: "Uppercase input - normalization must handle; routes to PREGNANCY_ENTRY",
   },
 
   // Ellipsis / punctuation heavy
@@ -874,7 +874,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true },
     tags: ["punctuation", "multi_symptom"],
-    notes: "Fragmented ellipsis input — sym.late=true, sym.spotting=true, no pregnancy.chance → late_only fallback → LATE_INTRO",
+    notes: "Fragmented ellipsis input - sym.late=true, sym.spotting=true, no pregnancy.chance → late_only fallback → LATE_INTRO",
   },
 
   // Repeated words (user emphasis)
@@ -883,7 +883,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true },
     tags: ["emphasis", "late"],
-    notes: "Repeated emphasis — sym.late=true, no secondary signal; late_only fallback → LATE_INTRO",
+    notes: "Repeated emphasis - sym.late=true, no secondary signal; late_only fallback → LATE_INTRO",
   },
 
   // Emoji-heavy
@@ -892,7 +892,7 @@ export const cases = [
     category: "edge",
     expected: { route: "PREGNANCY_ENTRY" },
     tags: ["emoji", "late", "pregnancy"],
-    notes: "Emojis should be stripped — core signal still fires; routes to PREGNANCY_ENTRY",
+    notes: "Emojis should be stripped - core signal still fires; routes to PREGNANCY_ENTRY",
   },
 
   // Contradictory signals
@@ -901,7 +901,7 @@ export const cases = [
     category: "edge",
     expected: { route: "LATE_POSITIVE" },
     tags: ["contradictory", "late", "test_positive"],
-    notes: "Conflicting signals — positive test should win",
+    notes: "Conflicting signals - positive test should win",
   },
 
   // Direct question phrasing
@@ -910,7 +910,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true },
     tags: ["question", "late"],
-    notes: "Direct question — sym.late=true; late_only fallback → LATE_INTRO",
+    notes: "Direct question - sym.late=true; late_only fallback → LATE_INTRO",
   },
 
   // Colloquial phrasing
@@ -919,10 +919,10 @@ export const cases = [
     category: "edge",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["colloquial", "heavy", "soaking"],
-    notes: "Colloquial soaking-through — urgency must still fire",
+    notes: "Colloquial soaking-through - urgency must still fire",
   },
 
-  // Discharge without other symptoms — should route quietly
+  // Discharge without other symptoms - should route quietly
   {
     id: "EG018", input: "white discharge coming out",
     category: "edge",
@@ -931,13 +931,13 @@ export const cases = [
     notes: "Discharge alone with minimal phrasing",
   },
 
-  // Safe case — should NOT route to urgent
+  // Safe case - should NOT route to urgent
   {
     id: "EG019", input: "mild spotting a few days before my period, just a little",
     category: "edge",
     expected: { urgent: false, noRoute: true },
     tags: ["spotting", "mild", "before_period", "not_urgent"],
-    notes: "Mild pre-period spotting — not urgent; spotting_only fallback → SPOT_INTRO",
+    notes: "Mild pre-period spotting - not urgent; spotting_only fallback → SPOT_INTRO",
   },
 
   // Nausea alone
@@ -946,34 +946,34 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["nausea", "no_late"],
-    notes: "Nausea without late period — should not infer pregnancy pathway",
+    notes: "Nausea without late period - should not infer pregnancy pathway",
   },
 
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  EDUCATION ROUTES — PCOS, Endo, Contraception
+  //  EDUCATION ROUTES - PCOS, Endo, Contraception
   //
   //  NOTE: These routes are handled by routeUserText() keyword patterns in
   //  assistant.js, NOT by inferRoute() in bloomie-inference.js. The harness
   //  only runs the inference pipeline, so actualRoute will always be null for
-  //  these inputs. Cases assert noRoute: true + urgent: false — confirming the
+  //  these inputs. Cases assert noRoute: true + urgent: false - confirming the
   //  inference layer correctly passes them through without misfiring urgency.
   // ══════════════════════════════════════════════════════════════════════════
 
-  // — EDUC_PCOS —
+  // - EDUC_PCOS -
   {
     id: "ED001", input: "i have pcos and i want to understand what it means",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["pcos", "education", "english"],
-    notes: "Explicit PCOS mention — routeUserText /\\bpcos\\b/ → EDUC_PCOS; inferRoute returns null",
+    notes: "Explicit PCOS mention - routeUserText /\\bpcos\\b/ → EDUC_PCOS; inferRoute returns null",
   },
   {
     id: "ED002", input: "i was told i have polycystic ovary syndrome",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["pcos", "education", "english", "polycystic"],
-    notes: "polycystic keyword — routeUserText routes to EDUC_PCOS; not an inference signal",
+    notes: "polycystic keyword - routeUserText routes to EDUC_PCOS; not an inference signal",
   },
   {
     id: "ED003", input: "i have irregular periods and really bad acne, could i have pcos?",
@@ -994,10 +994,10 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["pcos", "education", "patois"],
-    notes: "Patois: irregular + PCOS keyword — pcos is language-neutral, routeUserText fires after normalize",
+    notes: "Patois: irregular + PCOS keyword - pcos is language-neutral, routeUserText fires after normalize",
   },
 
-  // — EDUC_ENDO —
+  // - EDUC_ENDO -
   {
     id: "ED006", input: "i think i might have endometriosis, what is it?",
     category: "routing",
@@ -1031,10 +1031,10 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["endo", "education", "patois", "pain_every_period"],
-    notes: "Patois: 'pain every period' phrase survives normalization — routeUserText routes to EDUC_ENDO",
+    notes: "Patois: 'pain every period' phrase survives normalization - routeUserText routes to EDUC_ENDO",
   },
 
-  // — EDUC_CONTRACEPTION —
+  // - EDUC_CONTRACEPTION -
   {
     id: "ED011", input: "what are my contraception options",
     category: "routing",
@@ -1073,7 +1073,7 @@ export const cases = [
 
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  NARROWING — health-word intercept should fire, NOT fall through to OOS
+  //  NARROWING - health-word intercept should fire, NOT fall through to OOS
   //
   //  These inputs contain words from the NARROWING pattern
   //  /\b(period|bleed|pain|cramp|discharge|pregnant|cycle|mood|tired|sick|hurt)\b/
@@ -1091,39 +1091,39 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["narrowing", "tired", "sick", "ambiguous"],
-    notes: "tired + sick — sym.mood=true (tired/fatigue match); mood_only fallback → MOOD_SAFETY_CHECK",
+    notes: "tired + sick - sym.mood=true (tired/fatigue match); mood_only fallback → MOOD_SAFETY_CHECK",
   },
   {
     id: "NR002", input: "something feels off with my cycle but i can't explain it",
     category: "edge",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["narrowing", "cycle", "ambiguous"],
-    notes: "cycle keyword in vague context — NARROWING should intercept in chat handler; inferRoute returns null",
+    notes: "cycle keyword in vague context - NARROWING should intercept in chat handler; inferRoute returns null",
   },
   {
     id: "NR003", input: "my mood has been all over the place lately",
     category: "edge",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["narrowing", "mood", "ambiguous"],
-    notes: "mood without before_period timing — sym.mood=true; mood_only fallback → MOOD_SAFETY_CHECK",
+    notes: "mood without before_period timing - sym.mood=true; mood_only fallback → MOOD_SAFETY_CHECK",
   },
   {
     id: "NR004", input: "i hurt down there and i'm not sure what it is",
     category: "edge",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["narrowing", "hurt", "pain", "ambiguous"],
-    notes: "hurt + vague location — pelvic signal may score but not reach route threshold; NARROWING intercepts",
+    notes: "hurt + vague location - pelvic signal may score but not reach route threshold; NARROWING intercepts",
   },
   {
     id: "NR005", input: "i just feel unwell, something to do with my period maybe",
     category: "edge",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["narrowing", "period", "sick", "ambiguous"],
-    notes: "period + sick in uncertain framing — no secondary signal; NARROWING should ask clarifying question rather than OOS",
+    notes: "period + sick in uncertain framing - no secondary signal; NARROWING should ask clarifying question rather than OOS",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  PREGNANCY TEST FLOW — new multi-entry route cases
+  //  PREGNANCY TEST FLOW - new multi-entry route cases
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -1187,14 +1187,14 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["test_flow", "irregular_cycle", "english"],
-    notes: "Irregular cycle mention — no route from inferRoute but routeUserText shouldn't misfire as urgent",
+    notes: "Irregular cycle mention - no route from inferRoute but routeUserText shouldn't misfire as urgent",
   },
   {
     id: "PT010", input: "i have severe one-sided pain and i tested positive",
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["test_flow", "urgent", "ectopic_risk", "english"],
-    notes: "Severe one-sided pain in test context — ectopic risk, must route HEAVY_URGENT",
+    notes: "Severe one-sided pain in test context - ectopic risk, must route HEAVY_URGENT",
   },
   {
     id: "PT011", input: "i took a pregnancy test and it was positive but i feel faint and have bad pain on one side",
@@ -1208,7 +1208,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["test_flow", "recent_sex", "too_early", "english"],
-    notes: "pregnancy.chance=true; testedYet=true (wants to test); pregnancy_chance_only fallback fires (testedYet=false check — 'want to test' ≠ testedYet) → PREGNANCY_ENTRY",
+    notes: "pregnancy.chance=true; testedYet=true (wants to test); pregnancy_chance_only fallback fires (testedYet=false check - 'want to test' ≠ testedYet) → PREGNANCY_ENTRY",
   },
   {
     id: "PT013", input: "negative test two days ago, period is 10 days late, should i test again",
@@ -1219,7 +1219,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  HEAVY BLEEDING FLOW — multi-entry route cases
+  //  HEAVY BLEEDING FLOW - multi-entry route cases
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -1227,7 +1227,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["heavy", "soaking_through", "route_a", "urgent", "english"],
-    notes: "'soaking through' matches urgency phrase — must route HEAVY_URGENT directly (urgentPhrases check)",
+    notes: "'soaking through' matches urgency phrase - must route HEAVY_URGENT directly (urgentPhrases check)",
   },
   {
     id: "HV002", input: "i'm soaking my pad really fast, changing every hour",
@@ -1269,7 +1269,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["heavy", "faint", "urgent", "english"],
-    notes: "'passed out' in urgentPhrases — direct HEAVY_URGENT, bypasses all route detection",
+    notes: "'passed out' in urgentPhrases - direct HEAVY_URGENT, bypasses all route detection",
   },
   {
     id: "HV008", input: "mi period nuh stop a week now",
@@ -1304,7 +1304,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["heavy", "clots", "duration", "route_b", "english"],
-    notes: "heavy + clots + 8 days — inferRoute returns null; routeUserText '8 days' matches Route B → HEAVY_ROUTE_B",
+    notes: "heavy + clots + 8 days - inferRoute returns null; routeUserText '8 days' matches Route B → HEAVY_ROUTE_B",
   },
   {
     id: "HV013", input: "i have heavy bleeding and it's not more than usual",
@@ -1329,7 +1329,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  PREGNANCY INTENT FLOW — covers new PREGNANCY_ENTRY and sub-routes
+  //  PREGNANCY INTENT FLOW - covers new PREGNANCY_ENTRY and sub-routes
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -1414,20 +1414,20 @@ export const cases = [
     category: "routing",
     expected: { route: "LATE_NEG_UNCLEAR", urgent: false },
     tags: ["pregnancy_entry", "tested_negative", "late", "no_major_changes_early", "english"],
-    notes: "Tested negative + late → inferRoute fires LATE_NEG_UNCLEAR; major changes question appears AFTER negative result — correct placement",
+    notes: "Tested negative + late → inferRoute fires LATE_NEG_UNCLEAR; major changes question appears AFTER negative result - correct placement",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  ELSE SECTION — discharge, body changes, not-sure routing, ELSE_INTRO
+  //  ELSE SECTION - discharge, body changes, not-sure routing, ELSE_INTRO
   //
   //  Inference layer (inferRoute) routes discharge-only to ELSE_DISCHARGE.
   //  Node-level routing inside assistant.js then fans out to DISCHARGE_*
-  //  and ELSE_BODY_ENTRY sub-nodes — those paths are not testable here.
+  //  and ELSE_BODY_ENTRY sub-nodes - those paths are not testable here.
   //  Cases with noRoute: true guard that inferRoute does NOT misfire urgency
   //  or a wrong route for these inputs.
   // ══════════════════════════════════════════════════════════════════════════
 
-  // — Discharge with odour → DISCHARGE_PROVIDER_SOON (node level) —
+  // - Discharge with odour → DISCHARGE_PROVIDER_SOON (node level) -
   {
     id: "EL001", input: "i have unusual discharge with a strong smell and itching",
     category: "routing",
@@ -1443,16 +1443,16 @@ export const cases = [
     notes: "Bad smell + burning → ELSE_DISCHARGE; node-level → DISCHARGE_PROVIDER_SOON via ELSE_DISCHARGE_ENTRY",
   },
 
-  // — Discharge with fever → DISCHARGE_URGENT (node level) —
+  // - Discharge with fever → DISCHARGE_URGENT (node level) -
   {
     id: "EL003", input: "i have discharge and fever and my lower belly hurts",
     category: "routing",
     expected: { route: "ELSE_DISCHARGE", urgent: false },
     tags: ["discharge", "fever", "pelvic", "else_section", "english"],
-    notes: "Discharge + fever: 'belly hurts' misses pelvic regex (requires 'belly.*hurt\\b', 'hurts' fails \\b), so sym.pelvic=false — inferRoute returns ELSE_DISCHARGE; node-level user picks 'fever or pelvic pain' → DISCHARGE_URGENT",
+    notes: "Discharge + fever: 'belly hurts' misses pelvic regex (requires 'belly.*hurt\\b', 'hurts' fails \\b), so sym.pelvic=false - inferRoute returns ELSE_DISCHARGE; node-level user picks 'fever or pelvic pain' → DISCHARGE_URGENT",
   },
 
-  // — Normal increased discharge → DISCHARGE_MONITOR (node level) —
+  // - Normal increased discharge → DISCHARGE_MONITOR (node level) -
   {
     id: "EL004", input: "i have more discharge than usual but no smell or colour change",
     category: "routing",
@@ -1461,7 +1461,7 @@ export const cases = [
     notes: "Discharge alone with no pelvic/spot → ELSE_DISCHARGE; node-level user picks 'just more than usual' → DISCHARGE_MONITOR",
   },
 
-  // — Body changes → BODY_HORMONAL_ROUTE (node level) —
+  // - Body changes → BODY_HORMONAL_ROUTE (node level) -
   {
     id: "EL005", input: "my skin keeps breaking out and my hair is thinning, could it be hormonal",
     category: "routing",
@@ -1474,19 +1474,19 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["body_changes", "hormonal", "else_section", "english"],
-    notes: "Weight + acne without health signal keywords — inferRoute returns null; node-level → BODY_HORMONAL_ROUTE",
+    notes: "Weight + acne without health signal keywords - inferRoute returns null; node-level → BODY_HORMONAL_ROUTE",
   },
 
-  // — Sleep issues → BODY_SLEEP_ROUTE (node level) —
+  // - Sleep issues → BODY_SLEEP_ROUTE (node level) -
   {
     id: "EL007", input: "i have not been sleeping well for the past few weeks, maybe something hormonal",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["sleep", "body_changes", "else_section", "english"],
-    notes: "Sleep complaint without cycle-specific signal — inferRoute null; node-level ELSE_BODY_ENTRY → BODY_SLEEP_ROUTE",
+    notes: "Sleep complaint without cycle-specific signal - inferRoute null; node-level ELSE_BODY_ENTRY → BODY_SLEEP_ROUTE",
   },
 
-  // — Urgent check with severe pain → HEAVY_URGENT —
+  // - Urgent check with severe pain → HEAVY_URGENT -
   {
     id: "EL008", input: "i am having severe abdominal pain and heavy bleeding and i feel faint",
     category: "red_flag",
@@ -1495,16 +1495,16 @@ export const cases = [
     notes: "Severe pain + heavy bleeding + faint → HEAVY_URGENT; ELSE_URGENT_CHECK 'Yes' path also routes here",
   },
 
-  // — Not sure → ELSE_NOT_SURE_ROUTE (node level) —
+  // - Not sure → ELSE_NOT_SURE_ROUTE (node level) -
   {
     id: "EL009", input: "something just feels off but i cannot explain what it is",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["not_sure", "vague", "else_section", "english"],
-    notes: "Vague complaint, no specific signal — inferRoute null; chat handler NARROWING intercept or ELSE_NOT_SURE_ROUTE via ELSE_INTRO",
+    notes: "Vague complaint, no specific signal - inferRoute null; chat handler NARROWING intercept or ELSE_NOT_SURE_ROUTE via ELSE_INTRO",
   },
 
-  // — Patois input landing in correct ELSE sub-route —
+  // - Patois input landing in correct ELSE sub-route -
   {
     id: "EL010", input: "me discharge smell like something off, a scratch down there too",
     category: "routing",
@@ -1517,16 +1517,16 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["body_changes", "patois", "else_section"],
-    notes: "Patois: skin + hair changes — no inferRoute signal; node-level ELSE_BODY_ENTRY → BODY_HORMONAL_ROUTE",
+    notes: "Patois: skin + hair changes - no inferRoute signal; node-level ELSE_BODY_ENTRY → BODY_HORMONAL_ROUTE",
   },
 
-  // — ELSE_CHANGE_TYPE handing off to existing nodes —
+  // - ELSE_CHANGE_TYPE handing off to existing nodes -
   {
     id: "EL012", input: "my cycle timing feels different this month",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["cycle_timing", "else_section", "english"],
-    notes: "Vague cycle timing without 'late'/'missed' keywords — inferRoute null; ELSE_CHANGE_TYPE 'cycle timing' choice → LATE_INTRO",
+    notes: "Vague cycle timing without 'late'/'missed' keywords - inferRoute null; ELSE_CHANGE_TYPE 'cycle timing' choice → LATE_INTRO",
   },
   {
     id: "EL013", input: "i have some spotting between periods and not sure why",
@@ -1536,22 +1536,22 @@ export const cases = [
     notes: "Spotting + 'between periods' phrase → inferRoute returns SPOT_MIDCYCLE_NOTE; ELSE_CHANGE_TYPE 'spotting' choice routes to SPOT_INTRO from ELSE_INTRO path",
   },
 
-  // — ELSE_TALK_THROUGH does not crash on free text input —
+  // - ELSE_TALK_THROUGH does not crash on free text input -
   {
     id: "EL014", input: "i dont even know how to explain it i just feel wrong lately",
     category: "edge",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["free_text", "else_section", "talk_through", "english"],
-    notes: "Free-text emotional input — not gibberish; no inferRoute signal; ELSE_TALK_THROUGH accepts this and waits for intent router",
+    notes: "Free-text emotional input - not gibberish; no inferRoute signal; ELSE_TALK_THROUGH accepts this and waits for intent router",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  PELVIC PAIN MULTI-ROUTE FLOW — new entry system cases
+  //  PELVIC PAIN MULTI-ROUTE FLOW - new entry system cases
   //
   //  inferRoute handles: pelvic+after_sex → PELVIC_SEX_INTRO,
   //                      pelvic+severe    → PELVIC_PERSISTENT.
   //  Node-level routing (PELVIC_SAFETY_CHECK, PELVIC_ENTRY, route sub-nodes)
-  //  is triggered by routeUserText/buttons — these test noRoute:true from
+  //  is triggered by routeUserText/buttons - these test noRoute:true from
   //  inferRoute while guarding urgency and signal correctness.
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -1662,7 +1662,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  MOOD — new intent-first system (safety check, routes, Patois)
+  //  MOOD - new intent-first system (safety check, routes, Patois)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -1691,56 +1691,56 @@ export const cases = [
     category: "routing",
     expected: { route: "MOOD_SAFETY_ROUTE", urgent: false },
     tags: ["patois", "mood", "safety"],
-    notes: "Patois 'mi cyan cope' — after normalizeText stays as 'mi cyan cope'; inferRoute self-harm pattern catches 'cyan cope' → MOOD_SAFETY_ROUTE",
+    notes: "Patois 'mi cyan cope' - after normalizeText stays as 'mi cyan cope'; inferRoute self-harm pattern catches 'cyan cope' → MOOD_SAFETY_ROUTE",
   },
   {
     id: "MO005", input: "i feel very anxious all the time",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["mood", "anxiety", "english"],
-    notes: "General anxiety without before_period — inferRoute null; routeUserText mood signal → MOOD_SAFETY_CHECK via chat flow",
+    notes: "General anxiety without before_period - inferRoute null; routeUserText mood signal → MOOD_SAFETY_CHECK via chat flow",
   },
   {
     id: "MO006", input: "i have low mood and i've been crying a lot",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["mood", "low", "english"],
-    notes: "Low mood without cycle timing — inferRoute null; mood signal routes to MOOD_SAFETY_CHECK in chat",
+    notes: "Low mood without cycle timing - inferRoute null; mood signal routes to MOOD_SAFETY_CHECK in chat",
   },
   {
     id: "MO007", input: "i'm irritable and snapping at everyone lately",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["mood", "irritable", "english"],
-    notes: "Irritability without timing — inferRoute null; routeUserText mood → MOOD_SAFETY_CHECK",
+    notes: "Irritability without timing - inferRoute null; routeUserText mood → MOOD_SAFETY_CHECK",
   },
   {
     id: "MO008", input: "i can't sleep even when i try, for weeks now",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["mood", "fatigue", "insomnia", "english"],
-    notes: "Insomnia/fatigue without cycle context — inferRoute null; MOOD_FATIGUE_ROUTE insomnia choice applies in chat flow",
+    notes: "Insomnia/fatigue without cycle context - inferRoute null; MOOD_FATIGUE_ROUTE insomnia choice applies in chat flow",
   },
   {
     id: "MO009", input: "mi feel off lately",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["patois", "mood"],
-    notes: "Patois 'mi feel off' — inferRoute null; routeUserText Patois mood pattern → MOOD_SAFETY_CHECK in chat",
+    notes: "Patois 'mi feel off' - inferRoute null; routeUserText Patois mood pattern → MOOD_SAFETY_CHECK in chat",
   },
   {
     id: "MO010", input: "mi sad fi no reason",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["patois", "mood", "low"],
-    notes: "Patois 'mi sad fi no reason' — inferRoute null; routeUserText Patois pattern → MOOD_SAFETY_CHECK",
+    notes: "Patois 'mi sad fi no reason' - inferRoute null; routeUserText Patois pattern → MOOD_SAFETY_CHECK",
   },
   {
     id: "MO011", input: "everything a get to me and mi nuh have no energy fi nothing",
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["patois", "mood", "fatigue"],
-    notes: "Patois emotional exhaustion — inferRoute null; routeUserText Patois pattern → MOOD_SAFETY_CHECK",
+    notes: "Patois emotional exhaustion - inferRoute null; routeUserText Patois pattern → MOOD_SAFETY_CHECK",
   },
   {
     id: "MO012", input: "i cant cope with being around my baby i dont want to be here",
@@ -1772,7 +1772,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  PERIMENOPAUSE / MENOPAUSE — covers new nodes and symptom detection
+  //  PERIMENOPAUSE / MENOPAUSE - covers new nodes and symptom detection
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -1821,7 +1821,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["vaginal_dryness", "perimenopause", "english"],
-    notes: "Vaginal dryness detected by extractSymptoms; inferRoute null (no vaginal dryness inference rule); routeUserText returns null too — falls to chat flow where provider routes to PERI_VAGINAL_ROUTE",
+    notes: "Vaginal dryness detected by extractSymptoms; inferRoute null (no vaginal dryness inference rule); routeUserText returns null too - falls to chat flow where provider routes to PERI_VAGINAL_ROUTE",
   },
   {
     id: "PERI007",
@@ -1829,7 +1829,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["mood_rage", "perimenopause", "english"],
-    notes: "mood_rage pattern (/\\b(rage|...)\\b/) fires correctly; inferRoute null; no urgency — mood_rage alone does not trigger MOOD_SAFETY_ROUTE",
+    notes: "mood_rage pattern (/\\b(rage|...)\\b/) fires correctly; inferRoute null; no urgency - mood_rage alone does not trigger MOOD_SAFETY_ROUTE",
   },
   {
     id: "PERI008",
@@ -1865,7 +1865,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  INPUT EDGE — ugly/ambiguous input that the pipeline must handle gracefully
+  //  INPUT EDGE - ugly/ambiguous input that the pipeline must handle gracefully
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -1874,7 +1874,7 @@ export const cases = [
     category: "edge",
     expected: { gibberish: true, urgent: false, noRoute: true },
     tags: ["input_edge"],
-    notes: "Blank message — looksLikeGibberish returns true for empty string; pipeline must not crash",
+    notes: "Blank message - looksLikeGibberish returns true for empty string; pipeline must not crash",
   },
   {
     id: "IE002",
@@ -1882,7 +1882,7 @@ export const cases = [
     category: "edge",
     expected: { gibberish: true, urgent: false, noRoute: true },
     tags: ["input_edge"],
-    notes: "Emoji-only input — normalizeText strips all non-word chars leaving blank; gibberish=true",
+    notes: "Emoji-only input - normalizeText strips all non-word chars leaving blank; gibberish=true",
   },
   {
     id: "IE003",
@@ -1890,7 +1890,7 @@ export const cases = [
     category: "edge",
     expected: { gibberish: true, urgent: false, noRoute: true },
     tags: ["input_edge"],
-    notes: "Keyboard smash — all letters so letter-ratio check passes; looksLikeGibberish currently returns false. BUG: gibberish detector should catch random key-mashing with no vowel-consonant structure",
+    notes: "Keyboard smash - all letters so letter-ratio check passes; looksLikeGibberish currently returns false. BUG: gibberish detector should catch random key-mashing with no vowel-consonant structure",
   },
   {
     id: "IE004",
@@ -1898,7 +1898,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false, scenario: "late_period" },
     tags: ["input_edge", "one_word"],
-    notes: "Single health word 'late' — inferRoute null but resolveScenario entity-based fires late_period; not gibberish",
+    notes: "Single health word 'late' - inferRoute null but resolveScenario entity-based fires late_period; not gibberish",
   },
   {
     id: "IE005",
@@ -1906,7 +1906,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge", "one_word"],
-    notes: "Single word 'pain' — pelvic not matched by bare 'pain' in extractSymptoms (requires cramp/pelvic/belly etc.); inferRoute null; no scenario",
+    notes: "Single word 'pain' - pelvic not matched by bare 'pain' in extractSymptoms (requires cramp/pelvic/belly etc.); inferRoute null; no scenario",
   },
   {
     id: "IE006",
@@ -1914,7 +1914,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge", "one_word"],
-    notes: "Single word 'help' — no medical signal; inferRoute null; pipeline must not crash or route to urgency",
+    notes: "Single word 'help' - no medical signal; inferRoute null; pipeline must not crash or route to urgency",
   },
   {
     id: "IE007",
@@ -1922,7 +1922,7 @@ export const cases = [
     category: "edge",
     expected: { gibberish: false, noRoute: true, urgent: false },
     tags: ["input_edge"],
-    notes: "Repeated trailing letters — not detected as gibberish (not uniform repeated char); inferRoute null; NARROWING expected in chat flow but not testable via harness",
+    notes: "Repeated trailing letters - not detected as gibberish (not uniform repeated char); inferRoute null; NARROWING expected in chat flow but not testable via harness",
   },
   {
     id: "IE008",
@@ -1938,7 +1938,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge"],
-    notes: "Decontextualised 'is this normal' — no symptoms extracted; inferRoute null; chat should prompt for context",
+    notes: "Decontextualised 'is this normal' - no symptoms extracted; inferRoute null; chat should prompt for context",
   },
   {
     id: "IE010",
@@ -1946,7 +1946,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge"],
-    notes: "Vague complaint with no specific symptom — no extractSymptoms hits; inferRoute null",
+    notes: "Vague complaint with no specific symptom - no extractSymptoms hits; inferRoute null",
   },
   {
     id: "IE011",
@@ -1954,7 +1954,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge"],
-    notes: "No location given — 'hurts' alone does not match pelvic/cramp/belly patterns; inferRoute null",
+    notes: "No location given - 'hurts' alone does not match pelvic/cramp/belly patterns; inferRoute null",
   },
   {
     id: "IE012",
@@ -1962,7 +1962,7 @@ export const cases = [
     category: "routing",
     expected: { route: "LATE_YES_PREG", urgent: false, scenario: "late_long_duration" },
     tags: ["input_edge", "shorthand", "duration"],
-    notes: "Shorthand '2wks late' — extractDuration shorthand patterns match '2wks' → weeks=2; sym.late + duration.weeks>=2 → LATE_YES_PREG",
+    notes: "Shorthand '2wks late' - extractDuration shorthand patterns match '2wks' → weeks=2; sym.late + duration.weeks>=2 → LATE_YES_PREG",
   },
   {
     id: "IE013",
@@ -1970,7 +1970,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge", "shorthand"],
-    notes: "Shorthand 'bc pill' — routeUserText catches /\\bpill\\b/ → EDUC_CONTRACEPTION; inferRoute null (no cycle symptom)",
+    notes: "Shorthand 'bc pill' - routeUserText catches /\\bpill\\b/ → EDUC_CONTRACEPTION; inferRoute null (no cycle symptom)",
   },
   {
     id: "IE014",
@@ -1978,7 +1978,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge", "shorthand"],
-    notes: "Truncated word 'ovul' — does not match ovulation_pain or any pattern with \\b boundary; inferRoute null; chat should prompt for more info",
+    notes: "Truncated word 'ovul' - does not match ovulation_pain or any pattern with \\b boundary; inferRoute null; chat should prompt for more info",
   },
   {
     id: "IE015",
@@ -1986,7 +1986,7 @@ export const cases = [
     category: "edge",
     expected: { route: "LATE_YES_PREG", urgent: false },
     tags: ["input_edge", "contradictory"],
-    notes: "Contradictory — 'started yesterday' is ignored; '2 weeks late' wins: sym.late + duration >= 2 weeks → LATE_YES_PREG",
+    notes: "Contradictory - 'started yesterday' is ignored; '2 weeks late' wins: sym.late + duration >= 2 weeks → LATE_YES_PREG",
   },
   {
     id: "IE016",
@@ -1994,7 +1994,7 @@ export const cases = [
     category: "edge",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["input_edge", "overloaded"],
-    notes: "Overloaded multi-symptom paragraph — heavy+dizziness combo triggers HEAVY_URGENT; pipeline must handle gracefully",
+    notes: "Overloaded multi-symptom paragraph - heavy+dizziness combo triggers HEAVY_URGENT; pipeline must handle gracefully",
   },
   {
     id: "IE017",
@@ -2002,7 +2002,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false, scenario: "pelvic_mild" },
     tags: ["input_edge", "copy_paste"],
-    notes: "Copy-pasted medical definition — 'cramps' matches pelvic; severity null → resolveScenario → pelvic_mild; inferRoute null (no severity/timing)",
+    notes: "Copy-pasted medical definition - 'cramps' matches pelvic; severity null → resolveScenario → pelvic_mild; inferRoute null (no severity/timing)",
   },
   {
     id: "IE018",
@@ -2010,7 +2010,7 @@ export const cases = [
     category: "edge",
     expected: { route: "PELVIC_PERSISTENT", urgent: false },
     tags: ["input_edge", "patois_english_mix"],
-    notes: "Mixed Patois + English — 'really bad' → severity: severe; pelvic + severe → PELVIC_PERSISTENT even though late is also present (pelvic+severe fires before late+pelvic+severe combo)",
+    notes: "Mixed Patois + English - 'really bad' → severity: severe; pelvic + severe → PELVIC_PERSISTENT even though late is also present (pelvic+severe fires before late+pelvic+severe combo)",
   },
   {
     id: "IE019",
@@ -2018,7 +2018,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge", "shorthand"],
-    notes: "Shorthand phrase — ovulation_pain extracted; timing: mid_cycle; but mid_cycle + spotting rule requires spotting; no combo fires; inferRoute null",
+    notes: "Shorthand phrase - ovulation_pain extracted; timing: mid_cycle; but mid_cycle + spotting rule requires spotting; no combo fires; inferRoute null",
   },
   {
     id: "IE020",
@@ -2026,11 +2026,11 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["input_edge", "one_word"],
-    notes: "Single health word 'spotting' — sym.spotting true; resolveScenario fallback → spotting_midcycle; inferRoute null (no timing or combo)",
+    notes: "Single health word 'spotting' - sym.spotting true; resolveScenario fallback → spotting_midcycle; inferRoute null (no timing or combo)",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  SAFETY EDGE — downplayed or atypically-phrased emergencies
+  //  SAFETY EDGE - downplayed or atypically-phrased emergencies
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -2039,7 +2039,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true },
     tags: ["safety_edge", "downplayed"],
-    notes: "Downplayed emergency — 'bleeding a lot' does NOT match sym.heavy (pattern requires heavy/soaking/flooding/clot etc.); 'dizzy' matches dizziness. BUG: heavy+dizzy combo fails because 'bleeding a lot' misses the heavy regex. urgent should be true",
+    notes: "Downplayed emergency - 'bleeding a lot' does NOT match sym.heavy (pattern requires heavy/soaking/flooding/clot etc.); 'dizzy' matches dizziness. BUG: heavy+dizzy combo fails because 'bleeding a lot' misses the heavy regex. urgent should be true",
   },
   {
     id: "SE002",
@@ -2047,7 +2047,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["safety_edge", "downplayed"],
-    notes: "Mild-labelled but functionally severe — 'mild' suppresses severity; 'cannot move' is not in urgency flags; inferRoute null. Chat should probe further but harness can only verify no false urgency triggered",
+    notes: "Mild-labelled but functionally severe - 'mild' suppresses severity; 'cannot move' is not in urgency flags; inferRoute null. Chat should probe further but harness can only verify no false urgency triggered",
   },
   {
     id: "SE003",
@@ -2063,7 +2063,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["safety_edge", "ectopic_risk"],
-    notes: "Late + positive test + one-sided pain — ectopic risk pattern; one-sided pain matches urgency flag → HEAVY_URGENT",
+    notes: "Late + positive test + one-sided pain - ectopic risk pattern; one-sided pain matches urgency flag → HEAVY_URGENT",
   },
   {
     id: "SE005",
@@ -2071,7 +2071,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false, scenario: "pelvic_mild" },
     tags: ["safety_edge", "fever_proxy"],
-    notes: "Fever-proxy cluster — night sweats + cold flashes + pelvic; not triggered as urgent; scenario: pelvic_mild from entity detection. Concerning cluster but not a defined urgency trigger in current pipeline",
+    notes: "Fever-proxy cluster - night sweats + cold flashes + pelvic; not triggered as urgent; scenario: pelvic_mild from entity detection. Concerning cluster but not a defined urgency trigger in current pipeline",
   },
   {
     id: "SE006",
@@ -2079,7 +2079,7 @@ export const cases = [
     category: "routing",
     expected: { route: "MOOD_SAFETY_ROUTE", urgent: false },
     tags: ["safety_edge", "self_harm"],
-    notes: "Self-harm language mid pain complaint — 'hurt myself' → MOOD_SAFETY_ROUTE always fires before urgency; takes priority correctly",
+    notes: "Self-harm language mid pain complaint - 'hurt myself' → MOOD_SAFETY_ROUTE always fires before urgency; takes priority correctly",
   },
   {
     id: "SE007",
@@ -2087,7 +2087,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["safety_edge", "assault"],
-    notes: "Assault disclosure mid-flow — 'bleeding' alone does not match heavy symptom (requires soaking/heavy/flooding); no self-harm pattern; pipeline returns null. Chat UI must handle disclosure with sensitivity; urgency not auto-triggered",
+    notes: "Assault disclosure mid-flow - 'bleeding' alone does not match heavy symptom (requires soaking/heavy/flooding); no self-harm pattern; pipeline returns null. Chat UI must handle disclosure with sensitivity; urgency not auto-triggered",
   },
   {
     id: "SE008",
@@ -2095,7 +2095,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["safety_edge", "positive_faint"],
-    notes: "Positive test + fainting — 'faint' matches extractUrgency → HEAVY_URGENT; correctly caught as urgent regardless of test result",
+    notes: "Positive test + fainting - 'faint' matches extractUrgency → HEAVY_URGENT; correctly caught as urgent regardless of test result",
   },
   {
     id: "SE009",
@@ -2103,7 +2103,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["safety_edge", "im_fine", "downplayed"],
-    notes: "'I'm fine' framing does not suppress urgency — 'bleeding through' and 'passed out' both match extractUrgency flags → HEAVY_URGENT",
+    notes: "'I'm fine' framing does not suppress urgency - 'bleeding through' and 'passed out' both match extractUrgency flags → HEAVY_URGENT",
   },
   {
     id: "SE010",
@@ -2127,7 +2127,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["safety_edge", "downplayed"],
-    notes: "Minimised 10-day bleed — '10 days' matches duration.days=10 but sym.heavy is false (no 'heavy'/'soaking'); inferRoute heavy+7days requires sym.heavy; no route fires. BUG: long-duration bleeding alone should route to HEAVY_LONGER_THAN_WEEK",
+    notes: "Minimised 10-day bleed - '10 days' matches duration.days=10 but sym.heavy is false (no 'heavy'/'soaking'); inferRoute heavy+7days requires sym.heavy; no route fires. BUG: long-duration bleeding alone should route to HEAVY_LONGER_THAN_WEEK",
   },
   {
     id: "SE013",
@@ -2143,7 +2143,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true },
     tags: ["safety_edge", "downplayed"],
-    notes: "'bleeding heavily' — 'heavily' does not match \\bheavy\\b (word boundary stops before 'l' in 'heavily'); BUG: sym.heavy=false despite clear heavy bleeding; heavy+dizzy combo fails; urgent should be true",
+    notes: "'bleeding heavily' - 'heavily' does not match \\bheavy\\b (word boundary stops before 'l' in 'heavily'); BUG: sym.heavy=false despite clear heavy bleeding; heavy+dizzy combo fails; urgent should be true",
   },
   {
     id: "SE015",
@@ -2159,7 +2159,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["safety_edge", "self_harm"],
-    notes: "'hate myself' does not match self-harm detection regex (requires 'hurt myself', 'harm myself', etc.); inferRoute null. This is a gap — 'hate myself' in context of pain should be assessed but pipeline doesn't catch it",
+    notes: "'hate myself' does not match self-harm detection regex (requires 'hurt myself', 'harm myself', etc.); inferRoute null. This is a gap - 'hate myself' in context of pain should be assessed but pipeline doesn't catch it",
   },
   {
     id: "SE017",
@@ -2167,7 +2167,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true },
     tags: ["safety_edge", "pregnant_bleed_dizzy"],
-    notes: "Pregnant + heavy bleed + dizzy — 'bleeding heavily' does not match \\bheavy\\b; sym.heavy=false; BUG: pregnant+heavy+dizzy should be urgent. Currently urgent=false",
+    notes: "Pregnant + heavy bleed + dizzy - 'bleeding heavily' does not match \\bheavy\\b; sym.heavy=false; BUG: pregnant+heavy+dizzy should be urgent. Currently urgent=false",
   },
   {
     id: "SE018",
@@ -2175,7 +2175,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["safety_edge", "assault"],
-    notes: "Assault + internal bleeding concern — 'bleeding inside' not matched by any urgency/heavy pattern; inferRoute null. Chat must handle with sensitivity; recommend care urgently",
+    notes: "Assault + internal bleeding concern - 'bleeding inside' not matched by any urgency/heavy pattern; inferRoute null. Chat must handle with sensitivity; recommend care urgently",
   },
   {
     id: "SE019",
@@ -2183,7 +2183,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["safety_edge", "downplayed", "faint"],
-    notes: "'fainting' matches extractUrgency → urgent true despite 'i think it is fine' minimisation — correctly caught",
+    notes: "'fainting' matches extractUrgency → urgent true despite 'i think it is fine' minimisation - correctly caught",
   },
   {
     id: "SE020",
@@ -2195,7 +2195,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  DATE EDGE — invalid or ambiguous dates must be handled gracefully
+  //  DATE EDGE - invalid or ambiguous dates must be handled gracefully
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -2204,7 +2204,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Invalid calendar date (Feb 30) typed as text — pipeline does not validate dates; no symptom extracted; graceful null return with no crash",
+    notes: "Invalid calendar date (Feb 30) typed as text - pipeline does not validate dates; no symptom extracted; graceful null return with no crash",
   },
   {
     id: "DE002",
@@ -2212,7 +2212,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Vague duration — 'last month' not matched by extractDuration patterns; no symptom signal; gracefully returns null",
+    notes: "Vague duration - 'last month' not matched by extractDuration patterns; no symptom signal; gracefully returns null",
   },
   {
     id: "DE003",
@@ -2220,7 +2220,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "User can't recall LMP — 'forgot' does not trigger memory_issues symptom here (no \\b boundary mismatch); no cycle signal; graceful null",
+    notes: "User can't recall LMP - 'forgot' does not trigger memory_issues symptom here (no \\b boundary mismatch); no cycle signal; graceful null",
   },
   {
     id: "DE004",
@@ -2228,7 +2228,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "'2 weeks' matches extractDuration (days:14, weeks:2) but no health symptom; sym.late is false; inferRoute null — duration alone does not route",
+    notes: "'2 weeks' matches extractDuration (days:14, weeks:2) but no health symptom; sym.late is false; inferRoute null - duration alone does not route",
   },
   {
     id: "DE005",
@@ -2236,7 +2236,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Cycle length 0 — no medical symptom; extractDuration gets days:0 from pattern or null; pipeline does not crash; graceful null return",
+    notes: "Cycle length 0 - no medical symptom; extractDuration gets days:0 from pattern or null; pipeline does not crash; graceful null return",
   },
   {
     id: "DE006",
@@ -2244,7 +2244,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Implausibly long cycle — no urgency signal; no symptom; inferRoute null; pipeline must not attempt routing on cycle-length info alone",
+    notes: "Implausibly long cycle - no urgency signal; no symptom; inferRoute null; pipeline must not attempt routing on cycle-length info alone",
   },
   {
     id: "DE007",
@@ -2252,7 +2252,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Period duration longer than cycle — logically impossible input; no urgency signal in text; inferRoute null; pipeline must not crash",
+    notes: "Period duration longer than cycle - logically impossible input; no urgency signal in text; inferRoute null; pipeline must not crash",
   },
   {
     id: "DE008",
@@ -2260,7 +2260,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Month name without year — 'early february' not parsed by extractDuration; no symptom; graceful null",
+    notes: "Month name without year - 'early february' not parsed by extractDuration; no symptom; graceful null",
   },
   {
     id: "DE009",
@@ -2276,7 +2276,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Duplicate period entries in same message — contradictory dates; no urgency signal; pipeline processes as plain text and returns null gracefully",
+    notes: "Duplicate period entries in same message - contradictory dates; no urgency signal; pipeline processes as plain text and returns null gracefully",
   },
   {
     id: "DE011",
@@ -2284,7 +2284,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Logically reversed dates — pipeline has no date-ordering validation; treats as plain text; no symptom; inferRoute null",
+    notes: "Logically reversed dates - pipeline has no date-ordering validation; treats as plain text; no symptom; inferRoute null",
   },
   {
     id: "DE012",
@@ -2300,7 +2300,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Irregular-width cycle described — '21' and '45 days' could match duration patterns but no symptom anchor; inferRoute null",
+    notes: "Irregular-width cycle described - '21' and '45 days' could match duration patterns but no symptom anchor; inferRoute null",
   },
   {
     id: "DE014",
@@ -2308,7 +2308,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Future LMP typed as text — pipeline does not validate future dates; no symptom; inferRoute null; no crash",
+    notes: "Future LMP typed as text - pipeline does not validate future dates; no symptom; inferRoute null; no crash",
   },
   {
     id: "DE015",
@@ -2316,11 +2316,11 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["date_edge"],
-    notes: "Duplicate entry described — no medical symptom; pipeline returns null; deduplication is a UI/storage concern not inference",
+    notes: "Duplicate entry described - no medical symptom; pipeline returns null; deduplication is a UI/storage concern not inference",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  PREGNANCY EDGE — fringe pregnancy signals and false positives
+  //  PREGNANCY EDGE - fringe pregnancy signals and false positives
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -2329,7 +2329,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Too early to test (5 days post-sex) — 'sex' triggers pregnancy.chance; 'test' sets testedYet=true but result=null; no late signal → inferRoute null",
+    notes: "Too early to test (5 days post-sex) - 'sex' triggers pregnancy.chance; 'test' sets testedYet=true but result=null; no late signal → inferRoute null",
   },
   {
     id: "PE002",
@@ -2337,7 +2337,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "'pregnant' triggers pregnancy.chance; no 'late' signal; inferRoute null — only routes when late + pregnancy_chance without test",
+    notes: "'pregnant' triggers pregnancy.chance; no 'late' signal; inferRoute null - only routes when late + pregnancy_chance without test",
   },
   {
     id: "PE003",
@@ -2345,7 +2345,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false, scenario: "late_period" },
     tags: ["pregnancy_edge"],
-    notes: "Withdrawal method — 'withdrawal' not in pregnancy.chance patterns; sym.late true; no pregnancy.chance → resolveScenario → late_period only",
+    notes: "Withdrawal method - 'withdrawal' not in pregnancy.chance patterns; sym.late true; no pregnancy.chance → resolveScenario → late_period only",
   },
   {
     id: "PE004",
@@ -2353,7 +2353,7 @@ export const cases = [
     category: "edge",
     expected: { urgent: false, noRoute: true },
     tags: ["pregnancy_edge"],
-    notes: "Emergency contraception — 'emergency' word matches extractUrgency regex. BUG: false positive; 'emergency contraception' should not trigger urgent=true. Currently urgent=true",
+    notes: "Emergency contraception - 'emergency' word matches extractUrgency regex. BUG: false positive; 'emergency contraception' should not trigger urgent=true. Currently urgent=true",
   },
   {
     id: "PE005",
@@ -2361,7 +2361,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Repeated negatives + missed period — 'negative' sets result='negative'; 'have not had a period' doesn't match late patterns; no late signal → inferRoute null",
+    notes: "Repeated negatives + missed period - 'negative' sets result='negative'; 'have not had a period' doesn't match late patterns; no late signal → inferRoute null",
   },
   {
     id: "PE006",
@@ -2369,7 +2369,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Plea for reassurance — pipeline must not falsely reassure; 'pregnant' triggers pregnancy.chance; no late → inferRoute null; no false confirmation given",
+    notes: "Plea for reassurance - pipeline must not falsely reassure; 'pregnant' triggers pregnancy.chance; no late → inferRoute null; no false confirmation given",
   },
   {
     id: "PE007",
@@ -2377,7 +2377,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Positive test with no pain — pregnancy.result=positive; no sym.late → LATE_POSITIVE requires late+positive; inferRoute null; no urgency correctly",
+    notes: "Positive test with no pain - pregnancy.result=positive; no sym.late → LATE_POSITIVE requires late+positive; inferRoute null; no urgency correctly",
   },
   {
     id: "PE008",
@@ -2385,7 +2385,7 @@ export const cases = [
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["pregnancy_edge", "ectopic_risk"],
-    notes: "Positive test + severe one-sided pain — ectopic risk; 'one sided pain' matches extractUrgency → HEAVY_URGENT; correctly caught",
+    notes: "Positive test + severe one-sided pain - ectopic risk; 'one sided pain' matches extractUrgency → HEAVY_URGENT; correctly caught",
   },
   {
     id: "PE009",
@@ -2393,7 +2393,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Test before period is due — 'test' sets testedYet=true; no late; result null; inferRoute null; pipeline should guide that early testing is less reliable",
+    notes: "Test before period is due - 'test' sets testedYet=true; no late; result null; inferRoute null; pipeline should guide that early testing is less reliable",
   },
   {
     id: "PE010",
@@ -2401,7 +2401,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Repeated negatives + vague concern — result='negative'; no late signal; inferRoute null; pipeline correctly returns null without falsely alarming",
+    notes: "Repeated negatives + vague concern - result='negative'; no late signal; inferRoute null; pipeline correctly returns null without falsely alarming",
   },
   {
     id: "PE011",
@@ -2409,7 +2409,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "'unprotected sex' triggers pregnancy.chance; no late signal; inferRoute null — correctly doesn't route to pregnancy concern for distant past exposure",
+    notes: "'unprotected sex' triggers pregnancy.chance; no late signal; inferRoute null - correctly doesn't route to pregnancy concern for distant past exposure",
   },
   {
     id: "PE012",
@@ -2417,7 +2417,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Positive test, no pain, no late — pregnancy.result=positive; no sym.late; LATE_POSITIVE requires sym.late; inferRoute null; no urgency",
+    notes: "Positive test, no pain, no late - pregnancy.result=positive; no sym.late; LATE_POSITIVE requires sym.late; inferRoute null; no urgency",
   },
   {
     id: "PE013",
@@ -2425,7 +2425,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "'sex' triggers pregnancy.chance; no late; testedYet=false; inferRoute null — correctly does not route to pregnancy concern (too early, no late period)",
+    notes: "'sex' triggers pregnancy.chance; no late; testedYet=false; inferRoute null - correctly does not route to pregnancy concern (too early, no late period)",
   },
   {
     id: "PE014",
@@ -2433,7 +2433,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Negative test + recent unprotected sex — result='negative'; no late; inferRoute null. routeUserText TEST_NEGATIVE_INTRO fires in chat but not in harness",
+    notes: "Negative test + recent unprotected sex - result='negative'; no late; inferRoute null. routeUserText TEST_NEGATIVE_INTRO fires in chat but not in harness",
   },
   {
     id: "PE015",
@@ -2441,11 +2441,11 @@ export const cases = [
     category: "routing",
     expected: { route: "LATE_NEG_UNCLEAR", urgent: false },
     tags: ["pregnancy_edge"],
-    notes: "Negative test + long-late period — result='negative'; sym.late=true → LATE_NEG_UNCLEAR (late+negative_test rule); not urgent",
+    notes: "Negative test + long-late period - result='negative'; sym.late=true → LATE_NEG_UNCLEAR (late+negative_test rule); not urgent",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  ROUTING EDGE — navigation and multi-intent inputs
+  //  ROUTING EDGE - navigation and multi-intent inputs
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -2454,7 +2454,7 @@ export const cases = [
     category: "fallback",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["routing_edge"],
-    notes: "Mid-flow OOS request — no medical signal; inferRoute null; routeUserText returns null; OOS detection routes to fallback in chat",
+    notes: "Mid-flow OOS request - no medical signal; inferRoute null; routeUserText returns null; OOS detection routes to fallback in chat",
   },
   {
     id: "RE002",
@@ -2462,7 +2462,7 @@ export const cases = [
     category: "fallback",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["routing_edge"],
-    notes: "User rejects all choices — no medical signal; inferRoute null; chat should offer free-text prompt or back-to-menu",
+    notes: "User rejects all choices - no medical signal; inferRoute null; chat should offer free-text prompt or back-to-menu",
   },
   {
     id: "RE003",
@@ -2470,7 +2470,7 @@ export const cases = [
     category: "routing",
     expected: { route: "PREGNANCY_ENTRY", urgent: false },
     tags: ["routing_edge", "multi_intent"],
-    notes: "Three questions in one — late + pregnant combo fires resolveSignals → PREGNANCY_ENTRY; takes priority over spotting alone",
+    notes: "Three questions in one - late + pregnant combo fires resolveSignals → PREGNANCY_ENTRY; takes priority over spotting alone",
   },
   {
     id: "RE004",
@@ -2478,7 +2478,7 @@ export const cases = [
     category: "fallback",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["routing_edge"],
-    notes: "'Done for now' mid-flow — no medical signal; pipeline returns null; chat UI must not close or discard active safety flow when this appears",
+    notes: "'Done for now' mid-flow - no medical signal; pipeline returns null; chat UI must not close or discard active safety flow when this appears",
   },
   {
     id: "RE005",
@@ -2486,7 +2486,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["routing_edge"],
-    notes: "Repeated 'is this normal' — no extractSymptoms hits; inferRoute null; chat should prompt for symptom context",
+    notes: "Repeated 'is this normal' - no extractSymptoms hits; inferRoute null; chat should prompt for symptom context",
   },
   {
     id: "RE006",
@@ -2494,7 +2494,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["routing_edge", "narrowing"],
-    notes: "Single health word — sym.late not fired by bare 'period'; inferRoute null; routeUserText NARROWING pattern fires in chat flow (not testable in harness)",
+    notes: "Single health word - sym.late not fired by bare 'period'; inferRoute null; routeUserText NARROWING pattern fires in chat flow (not testable in harness)",
   },
   {
     id: "RE007",
@@ -2502,7 +2502,7 @@ export const cases = [
     category: "fallback",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["routing_edge"],
-    notes: "Free text yes/no when button expected — no medical signal; inferRoute null; resolveOOSFollowUp handles this in chat context",
+    notes: "Free text yes/no when button expected - no medical signal; inferRoute null; resolveOOSFollowUp handles this in chat context",
   },
   {
     id: "RE008",
@@ -2510,7 +2510,7 @@ export const cases = [
     category: "fallback",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["routing_edge"],
-    notes: "Reference to UI button by description — no medical signal; inferRoute null; chat should re-show choices",
+    notes: "Reference to UI button by description - no medical signal; inferRoute null; chat should re-show choices",
   },
   {
     id: "RE009",
@@ -2518,7 +2518,7 @@ export const cases = [
     category: "fallback",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["routing_edge"],
-    notes: "Navigation word 'back' — no medical signal; not gibberish (short real word adjacent); inferRoute null; chat UI handles navigation",
+    notes: "Navigation word 'back' - no medical signal; not gibberish (short real word adjacent); inferRoute null; chat UI handles navigation",
   },
   {
     id: "RE010",
@@ -2526,11 +2526,11 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false },
     tags: ["routing_edge"],
-    notes: "Mid-flow correction — 'unprotected sex' triggers pregnancy.chance; no late → inferRoute null; routeUserText TEST_RECENT_SEX_INTRO fires in chat (not harness)",
+    notes: "Mid-flow correction - 'unprotected sex' triggers pregnancy.chance; no late → inferRoute null; routeUserText TEST_RECENT_SEX_INTRO fires in chat (not harness)",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  SAFETY CUMULATIVE & SIGNAL QUALITY — persistent re-check, downplaying,
+  //  SAFETY CUMULATIVE & SIGNAL QUALITY - persistent re-check, downplaying,
   //  ambiguity, contradiction, missing context (safety upgrade)
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -2542,7 +2542,7 @@ export const cases = [
     category: "red_flag",
     expected: { cumulativeEscalation: true },
     tags: ["cumulative", "heavy_bleeding", "dizziness"],
-    notes: "Dizziness following heavy bleeding in prior message — checkCumulativeRisk fires on combined history",
+    notes: "Dizziness following heavy bleeding in prior message - checkCumulativeRisk fires on combined history",
   },
 
   // 2. Late period + one-sided pain across turns → ectopic escalation
@@ -2553,7 +2553,7 @@ export const cases = [
     category: "red_flag",
     expected: { cumulativeEscalation: true },
     tags: ["cumulative", "late_period", "one_sided", "ectopic_risk"],
-    notes: "One-sided pain after late period — cumulative ectopic-risk pattern fires",
+    notes: "One-sided pain after late period - cumulative ectopic-risk pattern fires",
   },
 
   // 3. Contradiction: heavy + spotting in same message (urgency wins)
@@ -2573,37 +2573,37 @@ export const cases = [
     category: "edge",
     expected: { downplaying: true },
     tags: ["downplaying", "pelvic_pain"],
-    notes: "'kinda' + \"i think i'm okay\" — minimising language alongside pelvic pain entity",
+    notes: "'kinda' + \"i think i'm okay\" - minimising language alongside pelvic pain entity",
   },
 
-  // 5. "dizzy" alone — ambiguity question fires, not OOS
+  // 5. "dizzy" alone - ambiguity question fires, not OOS
   {
     id: "SQ005",
     input: "dizzy",
     category: "edge",
     expected: { ambiguous: true, noRoute: true, urgent: false },
     tags: ["ambiguous", "dizziness", "single_word"],
-    notes: "'dizzy' alone — detectAmbiguousInput fires clarifying question; no urgency without bleeding context",
+    notes: "'dizzy' alone - detectAmbiguousInput fires clarifying question; no urgency without bleeding context",
   },
 
-  // 6. "i have pain" alone — ambiguity question asking location and severity
+  // 6. "i have pain" alone - ambiguity question asking location and severity
   {
     id: "SQ006",
     input: "i have pain",
     category: "edge",
     expected: { ambiguous: true, noRoute: true, urgent: false },
     tags: ["ambiguous", "pain", "short_message"],
-    notes: "Generic pain, short message, no location or severity — detectAmbiguousInput fires",
+    notes: "Generic pain, short message, no location or severity - detectAmbiguousInput fires",
   },
 
-  // 7. "feeling sick" alone — ambiguity question fires
+  // 7. "feeling sick" alone - ambiguity question fires
   {
     id: "SQ007",
     input: "feeling sick",
     category: "edge",
     expected: { ambiguous: true, noRoute: true, urgent: false },
     tags: ["ambiguous", "nausea", "vague"],
-    notes: "'feeling sick' alone — ambiguity question distinguishes nausea from general illness",
+    notes: "'feeling sick' alone - ambiguity question distinguishes nausea from general illness",
   },
 
   // 8. Positive test + pain 3 messages later → cumulative flag catches it
@@ -2618,7 +2618,7 @@ export const cases = [
     category: "red_flag",
     expected: { cumulativeEscalation: true },
     tags: ["cumulative", "positive_test", "pain"],
-    notes: "Positive test 3 messages ago — cumulative check catches positive_test + pelvic_pain combination",
+    notes: "Positive test 3 messages ago - cumulative check catches positive_test + pelvic_pain combination",
   },
 
   // 9. Contradiction: not sexually active + had sex last week
@@ -2628,7 +2628,7 @@ export const cases = [
     category: "edge",
     expected: { contradiction: true, urgent: false },
     tags: ["contradiction", "sexual_activity"],
-    notes: "Contradictory sexual activity — detectContradiction fires, routing paused for clarification",
+    notes: "Contradictory sexual activity - detectContradiction fires, routing paused for clarification",
   },
 
   // 10. Contradiction: negative and positive test in same message
@@ -2638,7 +2638,7 @@ export const cases = [
     category: "edge",
     expected: { contradiction: true, urgent: false },
     tags: ["contradiction", "test_result"],
-    notes: "Both test results in same message — contradiction clarification fires before routing",
+    notes: "Both test results in same message - contradiction clarification fires before routing",
   },
 
   // 11. Patois downplaying + heavy bleeding
@@ -2648,17 +2648,17 @@ export const cases = [
     category: "edge",
     expected: { downplaying: true },
     tags: ["patois", "downplaying", "heavy_bleeding"],
-    notes: "Patois minimising ('a nuh nutten', 'mi aight') with heavy bleeding — downplaying IS detected after normalization",
+    notes: "Patois minimising ('a nuh nutten', 'mi aight') with heavy bleeding - downplaying IS detected after normalization",
   },
 
-  // 12. Red flag appearing in message 5 — persistent re-check catches it
+  // 12. Red flag appearing in message 5 - persistent re-check catches it
   {
     id: "SQ012",
     input: "i started to feel faint from all this bleeding",
     category: "red_flag",
     expected: { urgent: true, route: "HEAVY_URGENT" },
     tags: ["persistent_check", "red_flag_late", "faint"],
-    notes: "Faint keyword in message 5 — single-message urgency check still fires; guards persistent re-check behaviour",
+    notes: "Faint keyword in message 5 - single-message urgency check still fires; guards persistent re-check behaviour",
   },
 
   // 13. "i think i'm okay" + faint → downplaying + urgency = escalation overrides
@@ -2678,22 +2678,22 @@ export const cases = [
     category: "edge",
     expected: { missingContext: true, noRoute: true, urgent: false },
     tags: ["missing_context", "pain", "vague"],
-    notes: "'it hurts' — generic pain with no location; detectMissingContext fires asking where",
+    notes: "'it hurts' - generic pain with no location; detectMissingContext fires asking where",
   },
 
-  // 15. Contradictory period status — late but also started
+  // 15. Contradictory period status - late but also started
   {
     id: "SQ015",
     input: "my period is late but it actually started yesterday",
     category: "edge",
     expected: { contradiction: true, urgent: false },
     tags: ["contradiction", "period_status"],
-    notes: "Period described as both late AND started — contradiction fires before routing continues",
+    notes: "Period described as both late AND started - contradiction fires before routing continues",
   },
 
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  MEDICATION ROUTING — must reach medication_dosage OOS, not fall through
+  //  MEDICATION ROUTING - must reach medication_dosage OOS, not fall through
   //
   //  These cases verify: (a) inferRoute returns null (no wrong health route),
   //  (b) not flagged as urgent, (c) not treated as gibberish.
@@ -2755,7 +2755,7 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["medication", "english", "panadol", "standalone"],
-    notes: "Single brand name — must NOT fall through to OOS/gibberish; brand-name pattern fires medication_dosage regardless of context",
+    notes: "Single brand name - must NOT fall through to OOS/gibberish; brand-name pattern fires medication_dosage regardless of context",
   },
   {
     id: "MED008",
@@ -2787,7 +2787,7 @@ export const cases = [
     category: "routing",
     expected: { urgent: false, gibberish: false },
     tags: ["medication", "patois", "cramps", "pain_detection"],
-    notes: "Patois: 'cramp a kill mi' → cramps + severity=severe via inferRoute; chat pre-check fires medication_dosage BEFORE inferRoute in full handler. Harness tests inferRoute directly — no route assertion to avoid collision with PELVIC_PERSISTENT from cramp+severe combo.",
+    notes: "Patois: 'cramp a kill mi' → cramps + severity=severe via inferRoute; chat pre-check fires medication_dosage BEFORE inferRoute in full handler. Harness tests inferRoute directly - no route assertion to avoid collision with PELVIC_PERSISTENT from cramp+severe combo.",
   },
   {
     id: "MED012",
@@ -2795,11 +2795,11 @@ export const cases = [
     category: "routing",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["medication", "english", "ponstan", "standalone"],
-    notes: "Single brand name (mefenamic acid brand) — must NOT fall to OOS; 'ponstan' matches brand-name pattern → medication_dosage; inferRoute returns null",
+    notes: "Single brand name (mefenamic acid brand) - must NOT fall to OOS; 'ponstan' matches brand-name pattern → medication_dosage; inferRoute returns null",
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  EDGE CASES — input quality, normalization, single-word routing (EC001–EC025)
+  //  EDGE CASES - input quality, normalization, single-word routing (EC001–EC025)
   //  Parts 1–7 of the comprehensive edge case spec.
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -2810,7 +2810,7 @@ export const cases = [
     category: "edge",
     expected: { gibberish: true, urgent: false },
     tags: ["empty", "blank", "input_quality"],
-    notes: "Blank input — looksLikeGibberish returns true for empty string",
+    notes: "Blank input - looksLikeGibberish returns true for empty string",
   },
 
   // 2. Punctuation only → normalizeText strips to empty → gibberish
@@ -2820,27 +2820,27 @@ export const cases = [
     category: "edge",
     expected: { gibberish: true, urgent: false },
     tags: ["punctuation_only", "input_quality"],
-    notes: "Punctuation-only — normalizeText strips to empty → looksLikeGibberish=true",
+    notes: "Punctuation-only - normalizeText strips to empty → looksLikeGibberish=true",
   },
 
-  // 3. Keyboard smash — vowel ratio heuristic detects it
+  // 3. Keyboard smash - vowel ratio heuristic detects it
   {
     id: "EC003",
     input: "asdfjkl",
     category: "edge",
     expected: { gibberish: true, urgent: false },
     tags: ["keyboard_smash", "gibberish", "input_quality"],
-    notes: "Keyboard smash — unique vowels/unique chars < 0.15 → gibberish",
+    notes: "Keyboard smash - unique vowels/unique chars < 0.15 → gibberish",
   },
 
-  // 4. Repeated letters — not gibberish (passes vowel check), no route
+  // 4. Repeated letters - not gibberish (passes vowel check), no route
   {
     id: "EC004",
     input: "helpppppp",
     category: "edge",
     expected: { gibberish: false, noRoute: true, urgent: false },
     tags: ["repeated_letters", "input_quality"],
-    notes: "'helpppppp' — has vowels, passes gibberish check; no health entities; normalizePatois collapses to 'help'",
+    notes: "'helpppppp' - has vowels, passes gibberish check; no health entities; normalizePatois collapses to 'help'",
   },
 
   // 5. Single word "late" → LATE_INTRO via new inferRoute single-symptom fallback
@@ -2850,7 +2850,7 @@ export const cases = [
     category: "edge",
     expected: { noRoute: true, urgent: false, gibberish: false },
     tags: ["single_word", "late", "input_quality"],
-    notes: "'late' → sym.late=true, no other signals — inferRoute null; routeUserText handles in chat",
+    notes: "'late' → sym.late=true, no other signals - inferRoute null; routeUserText handles in chat",
   },
 
   // 6. Single word "pain" → ambiguity probe fires (bare pain, no location)
@@ -2860,7 +2860,7 @@ export const cases = [
     category: "edge",
     expected: { ambiguous: true, noRoute: true, urgent: false },
     tags: ["single_word", "ambiguous", "pain"],
-    notes: "'pain' alone — detectAmbiguousInput fires asking location + severity",
+    notes: "'pain' alone - detectAmbiguousInput fires asking location + severity",
   },
 
   // 7. Single word "help" → not gibberish, no health entities
@@ -2870,7 +2870,7 @@ export const cases = [
     category: "edge",
     expected: { gibberish: false, noRoute: true, urgent: false },
     tags: ["single_word", "help", "input_quality"],
-    notes: "'help' — not gibberish; no health entities → inferRoute null; full handler routes to START_MENU",
+    notes: "'help' - not gibberish; no health entities → inferRoute null; full handler routes to START_MENU",
   },
 
   // 8. Single word "idk" → not gibberish, no route
@@ -2910,7 +2910,7 @@ export const cases = [
     category: "edge",
     expected: { gibberish: false, noRoute: true, urgent: false },
     tags: ["vague", "indirect", "input_quality"],
-    notes: "Vague concern — no specific entity; falls through to noRoute in harness; full handler → ELSE_NOT_SURE_ROUTE",
+    notes: "Vague concern - no specific entity; falls through to noRoute in harness; full handler → ELSE_NOT_SURE_ROUTE",
   },
 
   // 12. "is this normal" → seeking reassurance → ambiguity probe
@@ -2930,7 +2930,7 @@ export const cases = [
     category: "edge",
     expected: { gibberish: false, urgent: false },
     tags: ["indirect", "pelvic", "normalization"],
-    notes: "'it hurts there' — bare pain triggers ambiguity probe; pelvic extracted via PHRASE_MAP in normalizePatois",
+    notes: "'it hurts there' - bare pain triggers ambiguity probe; pelvic extracted via PHRASE_MAP in normalizePatois",
   },
 
   // 14. Period contradiction: late + started
@@ -2940,7 +2940,7 @@ export const cases = [
     category: "edge",
     expected: { contradiction: true, urgent: false },
     tags: ["contradiction", "period_status", "timing"],
-    notes: "Late + period started — detectContradiction fires period-status probe",
+    notes: "Late + period started - detectContradiction fires period-status probe",
   },
 
   // 15. Pain contradiction: "no pain" + "severe"
@@ -2953,14 +2953,14 @@ export const cases = [
     notes: "'no pain' + 'severe' → existing detectContradiction pain pair fires",
   },
 
-  // 16. Long multi-symptom input — not urgent, not gibberish
+  // 16. Long multi-symptom input - not urgent, not gibberish
   {
     id: "EC016",
     input: "i have been dealing with so much lately, my period is 3 weeks late and i have really bad cramps and mood swings and i've been spotting and feeling nauseous every morning, i don't know what's going on",
     category: "routing",
     expected: { urgent: false, gibberish: false },
     tags: ["overload", "multi_symptom", "complex"],
-    notes: "Multiple symptoms — overload fires in full handler; harness just verifies not urgent and not gibberish",
+    notes: "Multiple symptoms - overload fires in full handler; harness just verifies not urgent and not gibberish",
   },
 
   // 17. All-caps → normalizeText lowercases → routes correctly
@@ -3023,14 +3023,14 @@ export const cases = [
     notes: "'mood' → sym.mood=true but no before_period timing → inferRoute null; full handler routes via routeUserText keyword",
   },
 
-  // 23. Copy-pasted medical text — not gibberish, not urgent
+  // 23. Copy-pasted medical text - not gibberish, not urgent
   {
     id: "EC023",
     input: "Dysmenorrhea is characterized by cramping pain in the lower abdomen occurring just before or during menstruation. The pain may radiate to the thighs and lower back. Primary dysmenorrhea refers to common menstrual cramps.",
     category: "edge",
     expected: { gibberish: false, urgent: false },
     tags: ["copy_paste", "medical_text", "input_quality"],
-    notes: "Copy-pasted text — long, letter-dense, no urgency; verifies it doesn't spuriously escalate",
+    notes: "Copy-pasted text - long, letter-dense, no urgency; verifies it doesn't spuriously escalate",
   },
 
   // 24. Test result contradiction: negative + positive
@@ -3040,7 +3040,7 @@ export const cases = [
     category: "edge",
     expected: { contradiction: true, urgent: false },
     tags: ["contradiction", "test_result", "pregnancy"],
-    notes: "Both negative and positive mentioned — detectContradiction fires conflicting-test probe",
+    notes: "Both negative and positive mentioned - detectContradiction fires conflicting-test probe",
   },
 
   // 25. Single word "pregnant" → PREGNANCY_ENTRY via new inferRoute fallback
@@ -3054,7 +3054,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  PIPELINE CONSISTENCY — new cases (Parts 2, 3, 7, 8 coverage)
+  //  PIPELINE CONSISTENCY - new cases (Parts 2, 3, 7, 8 coverage)
   // ══════════════════════════════════════════════════════════════════════════
 
   // PP001. "mi breed" → pregnancy.chance → PREGNANCY_ENTRY
@@ -3310,10 +3310,10 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  CONFIDENCE TIER — tests computeRouteConfidence() tier assignment
+  //  CONFIDENCE TIER - tests computeRouteConfidence() tier assignment
   // ══════════════════════════════════════════════════════════════════════════
 
-  // CF001. Rule R1 — urgent always HIGH
+  // CF001. Rule R1 - urgent always HIGH
   {
     id: "CF001", input: "i passed out from all this bleeding please help",
     category: "red_flag",
@@ -3322,7 +3322,7 @@ export const cases = [
     notes: "entities.urgent → computeRouteConfidence tier always = high (Rule R1)",
   },
 
-  // CF002. Rule R6/R7 — dominant late signal, single topic → HIGH
+  // CF002. Rule R6/R7 - dominant late signal, single topic → HIGH
   {
     id: "CF002", input: "my period is 3 weeks late and i keep testing negative",
     category: "routing",
@@ -3331,7 +3331,7 @@ export const cases = [
     notes: "Strong late signal, no competitor within 2 pts → HIGH confidence",
   },
 
-  // CF003. Rule R6/R7 — dominant heavy signal → HIGH
+  // CF003. Rule R6/R7 - dominant heavy signal → HIGH
   {
     id: "CF003", input: "i have been bleeding heavily for days soaking through pads every few hours",
     category: "routing",
@@ -3340,7 +3340,7 @@ export const cases = [
     notes: "Heavy bleeding keywords dominate scoreSignals → HIGH confidence",
   },
 
-  // CF004. Rule R6/R7 — dominant mood signal → HIGH
+  // CF004. Rule R6/R7 - dominant mood signal → HIGH
   {
     id: "CF004", input: "i cry every day i feel so depressed and anxious right before my period",
     category: "routing",
@@ -3349,7 +3349,7 @@ export const cases = [
     notes: "Mood keywords dominate with no competing signals → HIGH",
   },
 
-  // CF005. Rule R5 — pelvic + late, high score → MEDIUM
+  // CF005. Rule R5 - pelvic + late, high score → MEDIUM
   {
     id: "CF005", input: "my period is very late and i have a lot of pelvic pain",
     category: "routing",
@@ -3358,7 +3358,7 @@ export const cases = [
     notes: "Both pelvic and late signals present at high score → MEDIUM (Rule R5)",
   },
 
-  // CF006. Rule R4 — two competing signals within 2 points → MEDIUM
+  // CF006. Rule R4 - two competing signals within 2 points → MEDIUM
   {
     id: "CF006", input: "i think i might be spotting or maybe my period is just starting late",
     category: "routing",
@@ -3367,7 +3367,7 @@ export const cases = [
     notes: "Spotting + late signals compete closely → MEDIUM (Rule R4)",
   },
 
-  // CF007. Rule R2 — very vague input, topScore < 4 → LOW
+  // CF007. Rule R2 - very vague input, topScore < 4 → LOW
   {
     id: "CF007", input: "i feel a bit off lately",
     category: "edge",
@@ -3376,7 +3376,7 @@ export const cases = [
     notes: "Minimal keyword matches → topScore < 4 → LOW confidence",
   },
 
-  // CF008. Rule R2 — generic discomfort, no strong signals → LOW
+  // CF008. Rule R2 - generic discomfort, no strong signals → LOW
   {
     id: "CF008", input: "something feels strange with my body",
     category: "edge",
@@ -3385,7 +3385,7 @@ export const cases = [
     notes: "No clear health-topic keywords → LOW confidence",
   },
 
-  // CF009. Rule R3 — many signals all mildly present → LOW or MEDIUM
+  // CF009. Rule R3 - many signals all mildly present → LOW or MEDIUM
   {
     id: "CF009", input: "a bit of spotting some cramps maybe late period and mood swings",
     category: "edge",
@@ -3394,7 +3394,7 @@ export const cases = [
     notes: "4 signals (spot, late, mood, pelvic) fire at similar scores → 3+ within 2 pts → LOW",
   },
 
-  // CF010. Rule R1 — Patois urgent → HIGH (urgency overrides everything)
+  // CF010. Rule R1 - Patois urgent → HIGH (urgency overrides everything)
   {
     id: "CF010", input: "mi feel like mi ago dead from di bleeding",
     category: "red_flag",
@@ -3403,7 +3403,7 @@ export const cases = [
     notes: "Patois 'dead' + bleeding → urgent entity → HIGH confidence regardless of scores",
   },
 
-  // CF011. Rule R6/R7 — clear dominant pregnancy + late signal → HIGH
+  // CF011. Rule R6/R7 - clear dominant pregnancy + late signal → HIGH
   {
     id: "CF011", input: "my period is 6 weeks late and my pregnancy test was positive",
     category: "routing",
@@ -3413,7 +3413,7 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  CONVERSATION INTELLIGENCE — guards CI features from Prompt 2
+  //  CONVERSATION INTELLIGENCE - guards CI features from Prompt 2
   // ══════════════════════════════════════════════════════════════════════════
 
   // CI001. English recall phrase → routeUserText handles, inferRoute null
@@ -3461,7 +3461,7 @@ export const cases = [
     notes: "Patois 'remind mi' → summary routing in routeUserText; inferRoute null",
   },
 
-  // CI006. OOS: food question — no accidental routing
+  // CI006. OOS: food question - no accidental routing
   {
     id: "CI006", input: "what should i eat for breakfast",
     category: "edge",
@@ -3488,7 +3488,7 @@ export const cases = [
     notes: "Political question is OOS; inferRoute null",
   },
 
-  // CI009. Return to late-period topic — inferRoute still routes correctly
+  // CI009. Return to late-period topic - inferRoute still routes correctly
   {
     id: "CI009", input: "actually i want to go back to my late period",
     category: "edge",
@@ -3497,7 +3497,7 @@ export const cases = [
     notes: "User returning to late-period topic; sym.late=true but no pregnancy result → inferRoute null; assistant.js detects returnedTopic via context",
   },
 
-  // CI010. Acknowledgement — no health content → noRoute
+  // CI010. Acknowledgement - no health content → noRoute
   {
     id: "CI010", input: "ok that helps thank you",
     category: "edge",
@@ -3506,7 +3506,7 @@ export const cases = [
     notes: "Acknowledgement with no health content; inferRoute null; conversationProfile.userEngagementLevel tracked",
   },
 
-  // CI011. Very short input — not gibberish, no route
+  // CI011. Very short input - not gibberish, no route
   {
     id: "CI011", input: "ok",
     category: "fallback",
@@ -3515,7 +3515,7 @@ export const cases = [
     notes: "'ok' is in SHORT_REAL_WORDS → not gibberish; no route",
   },
 
-  // CI012. Multi-symptom message — heavy dominates, sessionSymptoms accumulates all
+  // CI012. Multi-symptom message - heavy dominates, sessionSymptoms accumulates all
   {
     id: "CI012", input: "i have heavy bleeding and also mood swings and pelvic cramps",
     category: "edge",
@@ -3524,7 +3524,7 @@ export const cases = [
     notes: "Multiple symptoms; heavy+pelvic+mood but no severity/duration/dizziness combo → inferRoute null; assistant.js adds all to sessionSymptoms Set for context",
   },
 
-  // CI013. Patois clarification phrase — inferRoute null
+  // CI013. Patois clarification phrase - inferRoute null
   {
     id: "CI013", input: "mi nuh understand wah yuh seh",
     category: "edge",
@@ -3533,7 +3533,7 @@ export const cases = [
     notes: "Patois clarification; inferRoute null; routeUserText may handle as summary probe",
   },
 
-  // CI014. Generic follow-up phrase — no route
+  // CI014. Generic follow-up phrase - no route
   {
     id: "CI014", input: "tell me more about that",
     category: "edge",
@@ -3542,7 +3542,7 @@ export const cases = [
     notes: "Generic follow-up; no routing signal; engagement tracked in conversationProfile",
   },
 
-  // CI015. Long detailed spotting message — routes correctly, verbosity triggers detailed mode
+  // CI015. Long detailed spotting message - routes correctly, verbosity triggers detailed mode
   {
     id: "CI015",
     input: "i have been tracking my cycle for 6 months and i notice that every month around day 20 to 22 i get spotting that lasts about 2 days and i also have some mild cramping",
@@ -3552,7 +3552,7 @@ export const cases = [
     notes: "Long detailed input → sessionDepth increment + detailed verbosity in assistant.js; spotting mid-cycle routes correctly",
   },
 
-  // CI016. Patois "wah yuh mean" — no route (general clarification)
+  // CI016. Patois "wah yuh mean" - no route (general clarification)
   {
     id: "CI016", input: "wah yuh mean by that",
     category: "edge",
@@ -3561,7 +3561,7 @@ export const cases = [
     notes: "Patois clarification with no health keywords; inferRoute null",
   },
 
-  // CI017. Re-asking about doctor — inferRoute null (advice dedup handled in assistant.js)
+  // CI017. Re-asking about doctor - inferRoute null (advice dedup handled in assistant.js)
   {
     id: "CI017", input: "do i really need to see a doctor",
     category: "edge",

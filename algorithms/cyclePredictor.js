@@ -1,5 +1,5 @@
 /**
- * Bloom — Cycle Prediction Algorithm
+ * Bloom - Cycle Prediction Algorithm
  * Weighted OLS Linear Regression with hybrid fallback
  * All outputs are educational estimates, not medical predictions.
  */
@@ -22,7 +22,7 @@ export function deriveCycleLengths(periodStartDates) {
 }
 
 
-// Standard OLS — treats all cycles equally, used as baseline comparison
+// Standard OLS - treats all cycles equally, used as baseline comparison
 export function trainLinearRegression(cycleLengths) {
   const n = cycleLengths.length;
   if (n < 3) throw new Error("Need at least 3 cycle lengths to train.");
@@ -43,7 +43,7 @@ export function trainLinearRegression(cycleLengths) {
 }
 
 
-// Weighted OLS — recent cycles get higher weights than older ones
+// Weighted OLS - recent cycles get higher weights than older ones
 // weightMode: "linear" (default) | "exponential" | "equal"
 export function trainWeightedLinearRegression(cycleLengths, weightMode = "linear") {
   const n = cycleLengths.length;
@@ -64,7 +64,7 @@ export function trainWeightedLinearRegression(cycleLengths, weightMode = "linear
     weights = Array.from({ length: n }, (_, i) => Math.pow(decay, n - 1 - i));
 
   } else {
-    // equal weights — same result as standard OLS
+    // equal weights - same result as standard OLS
     weights = Array.from({ length: n }, () => 1);
   }
 
@@ -174,7 +174,7 @@ export function getCurrentPhase(today, lastPeriodStart, lastPeriodEnd, phases) {
 
 
 /**
- * Main function — call this from any component.
+ * Main function - call this from any component.
  *
  * Hybrid strategy:
  *   0 periods    → ready: false
@@ -231,7 +231,7 @@ export function runFullPrediction(
     standardOLSLength = predictNextCycleLength(slope, intercept, cycleCount);
   }
 
-  // Weighted OLS — primary prediction
+  // Weighted OLS - primary prediction
   let predictedLengths;
   let weightsUsed    = null;
   let weightModeUsed = "rule-based";
@@ -250,7 +250,7 @@ export function runFullPrediction(
     predictedLengths = Array.from({ length: monthsAhead }, () => ruleBasedLength);
   }
 
-  // Chain predictions — each cycle starts where the previous one ends
+  // Chain predictions - each cycle starts where the previous one ends
   const futureCycles = [];
   let   chainStart   = lastPeriodStart;
 

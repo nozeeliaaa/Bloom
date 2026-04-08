@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { extractEntities, inferRoute } from "../bloomie-inference.js";
+import { extractEntities, inferRoute, detectAmbiguousInput, detectMissingContext } from "../bloomie-inference.js";
 
 // ─── extractEntities ──────────────────────────────────────────────────────────
 
@@ -52,6 +52,11 @@ describe("extractEntities — symptoms", () => {
 
   it("detects discharge", () => {
     const e = extractEntities("there is unusual discharge with odor");
+    expect(e.symptoms.discharge).toBe(true);
+  });
+
+  it("detects down-there 'off' phrasing as discharge-adjacent", () => {
+    const e = extractEntities("down there feel off");
     expect(e.symptoms.discharge).toBe(true);
   });
 });
@@ -161,10 +166,10 @@ describe("inferRoute — urgent routes (highest priority)", () => {
 });
 
 describe("inferRoute — late period routes", () => {
-  it("late + pregnancy chance + no test → LATE_TEST_SUGGEST", () => {
+  it("late + pregnancy chance + no test → PREGNANCY_ENTRY", () => {
     const e = extractEntities("my period is late and i had unprotected sex");
     const route = inferRoute(e);
-    expect(route.next).toBe("LATE_TEST_SUGGEST");
+    expect(route.next).toBe("PREGNANCY_ENTRY");
     expect(route.payload.reason).toBe("late+pregnancy_chance+no_test");
   });
 
@@ -286,5 +291,93 @@ describe("inferRoute — no match", () => {
     const e = extractEntities("i like flowers");
     const route = inferRoute(e);
     expect(route).toBeNull();
+  });
+});
+
+// ─── implicit_late extraction ─────────────────────────────────────────────────
+
+describe("extractEntities — implicit_late", () => {
+  it("detects 'it hasn't come'", () => {
+    expect(extractEntities("it hasn't come").symptoms.implicit_late).toBe(true);
+  });
+
+  it("detects 'it still hasn't come'", () => {
+    expect(extractEntities("it still hasn't come").symptoms.implicit_late).toBe(true);
+  });
+
+  it("detects 'hasn't arrived'", () => {
+    expect(extractEntities("hasn't arrived").symptoms.implicit_late).toBe(true);
+  });
+
+  it("detects 'still waiting'", () => {
+    expect(extractEntities("still waiting").symptoms.implicit_late).toBe(true);
+  });
+
+  it("detects 'not here yet'", () => {
+    expect(extractEntities("not here yet").symptoms.implicit_late).toBe(true);
+  });
+
+  it("does NOT fire on unrelated text", () => {
+    expect(extractEntities("i have heavy bleeding").symptoms.implicit_late).toBe(false);
+    expect(extractEntities("i like flowers").symptoms.implicit_late).toBe(false);
+  });
+});
+
+// ─── implicit_late routing (effectiveLate guard) ──────────────────────────────
+
+describe("inferRoute — implicit late (no other symptoms)", () => {
+  it("'it hasn't come' + 3 days → LATE_NO_GUIDANCE", () => {
+    const e = extractEntities("it hasn't come, it's been 3 days");
+    const route = inferRoute(e);
+    expect(route?.next).toBe("LATE_NO_GUIDANCE");
+  });
+
+  it("'not here yet' + 2 weeks → LATE_YES_PREG", () => {
+    const e = extractEntities("not here yet and it's been two weeks");
+    const route = inferRoute(e);
+    expect(route?.next).toBe("LATE_YES_PREG");
+  });
+
+  it("implicit late + pregnancy chance + no test → PREGNANCY_ENTRY", () => {
+    const e = extractEntities("it still hasn't come and i had unprotected sex");
+    const route = inferRoute(e);
+    expect(route?.next).toBe("PREGNANCY_ENTRY");
+  });
+
+  it("implicit late + heavy bleeding → does NOT route as late (heavy wins)", () => {
+    // sym.heavy present → noOtherSymptoms=false → effectiveLate=false
+    // heavy+dizzy check doesn't fire (no dizzy); falls through to null
+    const e = extractEntities("still waiting but i'm having really heavy bleeding");
+    // heavy is true, no severity/duration → inferRoute returns null
+    expect(e.symptoms.heavy).toBe(true);
+    expect(e.symptoms.implicit_late).toBe(true);
+    // effectiveLate is false because heavy is present, so no late route fires
+    const route = inferRoute(e);
+    expect(route?.next).not.toBe("LATE_NO_GUIDANCE");
+    expect(route?.next).not.toBe("LATE_YES_PREG");
+    expect(route?.next).not.toBe("PREGNANCY_ENTRY");
+  });
+});
+
+describe("clarification helpers — ambiguity and missing context", () => {
+  it("asks targeted reproductive-health clarification for vague down-there wording", () => {
+    const text = "down there feel off";
+    const entities = extractEntities(text);
+    const q = detectAmbiguousInput(text, entities);
+    expect(q).toMatch(/discharge|irritation|down there/i);
+  });
+
+  it("treats broad stomach pain phrasing as ambiguous before pelvic explanation", () => {
+    const text = "my stomach hurt";
+    const entities = extractEntities(text);
+    const q = detectAmbiguousInput(text, entities);
+    expect(q).toMatch(/pelvis|stomach|belly/i);
+  });
+
+  it("missing-context probe also asks pelvis-vs-belly split for broad stomach phrasing", () => {
+    const text = "belly hurt";
+    const entities = extractEntities(text);
+    const q = detectMissingContext(entities, text);
+    expect(q).toMatch(/pelvic|belly|stomach/i);
   });
 });

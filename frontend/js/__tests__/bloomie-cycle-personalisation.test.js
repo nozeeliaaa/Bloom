@@ -42,8 +42,10 @@ import { generateIntegratedSignals } from "../algorithms/bloom-symptom-engine.js
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 vi.mock("../db.js", () => ({
-  loadBloomieMemory: vi.fn().mockResolvedValue(null),
-  saveBloomieMemory: vi.fn().mockResolvedValue(),
+  loadBloomieMemory:      vi.fn().mockResolvedValue(null),
+  saveBloomieMemory:      vi.fn().mockResolvedValue(),
+  loadLocalBloomieMemory: vi.fn().mockReturnValue(null),
+  saveLocalBloomieMemory: vi.fn(),
 }));
 
 vi.mock("../auth.js", () => ({
@@ -51,10 +53,14 @@ vi.mock("../auth.js", () => ({
   getUser:     vi.fn().mockReturnValue(null),
 }));
 
-vi.mock("../bloomie-logger.js", () => ({
-  logSafetyEvent:    vi.fn(),
-  logAnalyticsEvent: vi.fn(),
-}));
+vi.mock("../bloomie-logger.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    logSafetyEvent:    vi.fn(),
+    logAnalyticsEvent: vi.fn(),
+  };
+});
 
 // Bypass Patois normalisation (non-iterable PHRASE_MAP in test env).
 vi.mock("../bloomie-patois.js", async (importOriginal) => {

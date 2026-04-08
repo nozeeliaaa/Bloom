@@ -1,8 +1,8 @@
 /**
  * backend/src/routes/notifications.js
  *
- * POST   /notifications/token  — save FCM token for the current user
- * DELETE /notifications/token  — remove FCM token for the current user
+ * POST   /notifications/token  - save FCM token for the current user
+ * DELETE /notifications/token  - remove FCM token for the current user
  */
 
 import express from "express";

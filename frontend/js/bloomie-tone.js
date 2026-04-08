@@ -24,10 +24,20 @@
  *   - Never send conversation history to AI.
  *   - source field always present.
  *   - Tone behaviour never activates on first message (sessionDepth gate).
+ *
+ * AI calls go through the backend at /api/bloomie/ai/tone.
+ * ANTHROPIC_API_KEY lives on the server only — never in frontend code or
+ * Vite public env.
+ *
+ * Fields sent to the backend per call:
+ *   input          — current user message (trimmed, ≤500 chars)
+ *   ruleTone       — rule-layer tone result
+ *   ruleConfidence — rule-layer confidence tier
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { normalizePatois } from "./bloomie-patois.js";
+import { bloomieDiagnostic } from "./bloomie-logger.js";
 
 // ── Known vocabulary ──────────────────────────────────────────────────────────
 // After normalizePatois() all Patois is mapped to English.  Any remaining token
@@ -224,54 +234,61 @@ export function detectToneWithConfidence(text) {
  */
 export async function classifyEmotionAI(rawInput, ruleResult) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 800);
+  const timeoutId  = setTimeout(() => controller.abort(), 800);
 
   try {
-    const apiKey =
-      typeof import.meta !== "undefined" && import.meta.env
-        ? (import.meta.env.VITE_ANTHROPIC_API_KEY ?? "")
-        : "";
-
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
+    const resp = await fetch("/api/bloomie/ai/tone", {
+      method:  "POST",
+      signal:  controller.signal,
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 60,
-        system: [
-          "You are a single-message emotion classifier for a women's health chat app.",
-          `Rule-based result: tone="${ruleResult.tone}", confidence="${ruleResult.confidence}".`,
-          "Respond ONLY with a JSON object — no surrounding text, no markdown.",
-          'Format: {"confirms":true,"tone":"distressed|anxious|frustrated|casual|deflecting|neutral","intensity":"high|medium|low","subtext":"<one short phrase or none>"}',
-        ].join(" "),
-        messages: [{ role: "user", content: rawInput }],
+        input:          rawInput,
+        ruleTone:       ruleResult.tone,
+        ruleConfidence: ruleResult.confidence,
       }),
     });
 
     clearTimeout(timeoutId);
-    if (!resp.ok) return null;
 
-    const data = await resp.json();
-    const raw = data?.content?.[0]?.text?.trim() ?? "";
-    const parsed = JSON.parse(raw);
-
-    if (typeof parsed.confirms !== "boolean" || typeof parsed.tone !== "string") {
+    if (!resp.ok) {
+      const errBody = await resp.json().catch(() => ({}));
+      const code    = errBody.error ?? "ai_unavailable";
+      bloomieDiagnostic(code, {
+        module:         "bloomie-tone",
+        stage:          "classifyEmotionAI",
+        reason:         `backend returned ${resp.status}: ${code}`,
+        fallbackTarget: "rule_tone",
+      });
       return null;
     }
+
+    const parsed = await resp.json();
+
+    if (typeof parsed.confirms !== "boolean" || typeof parsed.tone !== "string") {
+      bloomieDiagnostic("ai_invalid_response", {
+        module:         "bloomie-tone",
+        stage:          "classifyEmotionAI",
+        reason:         "missing confirms or tone field in response",
+        fallbackTarget: "rule_tone",
+      });
+      return null;
+    }
+
     return {
       confirms:  Boolean(parsed.confirms),
       tone:      String(parsed.tone),
       intensity: String(parsed.intensity ?? "medium"),
-      subtext:   String(parsed.subtext ?? "none"),
+      subtext:   String(parsed.subtext   ?? "none"),
     };
-  } catch {
+  } catch (err) {
     clearTimeout(timeoutId);
+    const isTimeout = err.name === "AbortError";
+    bloomieDiagnostic(isTimeout ? "ai_timeout" : "ai_unavailable", {
+      module:         "bloomie-tone",
+      stage:          "classifyEmotionAI",
+      reason:         isTimeout ? "800ms hard timeout" : (err.message ?? "network error"),
+      fallbackTarget: "rule_tone",
+    });
     return null;
   }
 }
@@ -302,12 +319,29 @@ export async function resolveTone(rawInput, ctx) {
 
   // Both run immediately — AI is non-blocking (fired while pipeline normalises)
   const ruleResult = detectToneWithConfidence(rawInput);
-  const aiResult   = await classifyEmotionAI(rawInput, ruleResult);
+
+  // Log when rule layer is low-confidence so we know AI was needed
+  if (ruleResult.confidence === "low" || ruleResult.hasUnknownTokens) {
+    bloomieDiagnostic("routing_low_confidence", {
+      module:      "bloomie-tone",
+      stage:       "resolveTone",
+      confidence:  ruleResult.confidence,
+      reason:      ruleResult.hasUnknownTokens ? "unknown tokens present" : "no strong signal match",
+    });
+  }
+
+  const aiResult = await classifyEmotionAI(rawInput, ruleResult);
 
   let tone, intensity, subtext, source;
 
   if (aiResult === null) {
-    // API failure — silent fallback
+    // AI call failed — log the fallback consequence and use rule result
+    bloomieDiagnostic("fallback_to_rules", {
+      module:         "bloomie-tone",
+      stage:          "resolveTone",
+      confidence:     ruleResult.confidence,
+      fallbackTarget: "rule_tone",
+    });
     tone      = ruleResult.tone;
     intensity = "medium";
     subtext   = "none";
@@ -328,11 +362,12 @@ export async function resolveTone(rawInput, ctx) {
     source    = "rule+ai_confirmed";
 
   } else if (aiResult.tone !== ruleResult.tone) {
-    // AI disagrees — override and log
-    console.warn(
-      "[Bloomie Tone] AI override:",
-      ruleResult.tone, "(rule,", ruleResult.confidence, ") →", aiResult.tone, "(AI)"
-    );
+    // AI disagrees with rule — use structured diagnostic instead of console.warn
+    bloomieDiagnostic("ai_override", {
+      module:  "bloomie-tone",
+      stage:   "resolveTone",
+      reason:  `rule:${ruleResult.tone}(${ruleResult.confidence}) → ai:${aiResult.tone}`,
+    });
     tone      = aiResult.tone;
     intensity = aiResult.intensity;
     subtext   = aiResult.subtext;

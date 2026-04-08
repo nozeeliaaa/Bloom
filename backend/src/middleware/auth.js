@@ -18,13 +18,21 @@ export async function requireAuth(req, res, next) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
+      // Brand new user - create full doc with all expected fields
       await userRef.set({
         role: "user",
+        email: decoded.email || null,
         profile: {
+          role: "user",
           nickname: null,
-          yearOfBirth: null,
-          goal: null,
+          avatar: null,
+          goal: "period",
           mode: "account",
+          yearOfBirth: null,
+          avgCycleLength: null,
+          periodDuration: null,
+          weightKg: null,
+          heightCm: null,
           consentSensitive: false,
           remindersEnabled: false,
           reminderTime: "09:00",
@@ -34,67 +42,64 @@ export async function requireAuth(req, res, next) {
       });
 
       req.user = {
-        uid: decoded.uid,
-        email: decoded.email || null,
-        email_verified: !!decoded.email_verified,
-        role: "user",
-        ageBand: null,
-        yob: null,
+        uid:              decoded.uid,
+        email:            decoded.email || null,
+        email_verified:   !!decoded.email_verified,
+        role:             "user",
+        ageBand:          null,
+        yob:              null,
+        consentSensitive: false,
       };
 
       return next();
     }
 
-    const data = userDoc.data() || {};
-    const profile = data.profile || {};
+    // Doc exists - read it
+    const data    = userDoc.data();
+    const profile = data?.profile || {};
 
-    const needsBackfill =
-      !data.role ||
-      !data.profile ||
-      data.profile.nickname === undefined ||
-      data.profile.yearOfBirth === undefined ||
-      data.profile.goal === undefined ||
-      data.profile.mode === undefined ||
-      data.profile.consentSensitive === undefined ||
-      data.profile.remindersEnabled === undefined ||
-      data.profile.reminderTime === undefined ||
-      data.profile.role !== undefined ||
-      data.profile.goal === "track_cycle";
-
+    // Backfill any missing fields for legacy accounts
+    const needsBackfill = !data.role || !data.profile ||
+      profile.nickname === undefined || profile.avatar === undefined ||
+      profile.avgCycleLength === undefined || profile.goal === "track_cycle";
     if (needsBackfill) {
-      const normalizedGoal =
-        profile.goal === "track_cycle" ? null : (profile.goal ?? null);
-
       const backfill = {
-        role: data.role || "user",
+        role: data.role || profile.role || "user",
+        email: data.email || decoded.email || null,
         profile: {
-          nickname: profile.nickname ?? null,
-          yearOfBirth: profile.yearOfBirth ?? null,
-          goal: normalizedGoal,
-          mode: profile.mode ?? "account",
+          role:             profile.role             || "user",
+          nickname:         profile.nickname         ?? null,
+          avatar:           profile.avatar           ?? null,
+          goal:             profile.goal === "track_cycle" ? "period" : (profile.goal || "period"),
+          mode:             profile.mode             || "account",
+          yearOfBirth:      profile.yearOfBirth      ?? null,
+          avgCycleLength:   profile.avgCycleLength   ?? null,
+          periodDuration:   profile.periodDuration   ?? null,
+          weightKg:         profile.weightKg         ?? null,
+          heightCm:         profile.heightCm         ?? null,
           consentSensitive: profile.consentSensitive ?? false,
           remindersEnabled: profile.remindersEnabled ?? false,
-          reminderTime: profile.reminderTime ?? "09:00",
+          reminderTime:     profile.reminderTime     || "09:00",
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
-
       await userRef.set(backfill, { merge: true });
 
-      data.role = backfill.role;
-      data.profile = backfill.profile;
+      // Use the backfilled values going forward
+      Object.assign(data, backfill);
+      Object.assign(profile, backfill.profile);
     }
 
-    const safeProfile = data.profile || {};
-    const ageBand = deriveAgeBand(safeProfile.yearOfBirth);
+    const ageBand = deriveAgeBand(profile.yearOfBirth);
 
     req.user = {
-      uid: decoded.uid,
-      email: decoded.email || null,
-      email_verified: !!decoded.email_verified,
-      role: decoded.role || data.role || "user",
+      uid:              decoded.uid,
+      email:            decoded.email || null,
+      email_verified:   !!decoded.email_verified,
+      role:             decoded.role || data.role || profile.role || "user",
       ageBand,
-      yob: safeProfile.yearOfBirth || null,
+      yob:              profile.yearOfBirth || null,
+      consentSensitive: profile.consentSensitive === true,
     };
 
     return next();
@@ -152,7 +157,7 @@ export function deriveAgeBand(yob) {
   const currentYear = new Date().getFullYear();
   if (!Number.isInteger(year) || year < 1900 || year > currentYear) return null;
   const age = currentYear - year;
-  if (age >= 10 && age <= 17) return "10-17";
+  if (age >= 13 && age <= 17) return "13-17";
   if (age >= 18) return "18+";
   return null;
 }

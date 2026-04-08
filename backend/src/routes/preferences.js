@@ -1,8 +1,8 @@
 /**
  * src/routes/preferences.js
  *
- * GET  /preferences      — load user preferences from Firestore
- * PUT  /preferences      — save user preferences to Firestore
+ * GET  /preferences      - load user preferences from Firestore
+ * PUT  /preferences      - save user preferences to Firestore
  */
 
 import express from "express";
@@ -40,6 +40,7 @@ router.put("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const body = req.body;
+    console.log(`[preferences] PUT from uid=${uid} body=`, JSON.stringify(body));
 
     if (body.pregnancyMode !== undefined && req.user.ageBand === "10-17") {
       // Run the consent check manually for this field only
@@ -56,7 +57,7 @@ router.put("/", requireAuth, async (req, res) => {
         });
       }
     }
-    // Build a validated preferences object — never blindly store req.body
+    // Build a validated preferences object - never blindly store req.body
     const prefs = {};
 
     if (body.theme !== undefined) {

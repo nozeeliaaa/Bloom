@@ -8,101 +8,85 @@ import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
 const router = express.Router();
 
+// Sanitize a nickname string: strip HTML, control chars, truncate to 30 chars.
+// Returns a non-empty string or null.
+function sanitizeNickname(raw) {
+  if (typeof raw !== "string") return null;
+  let s = raw
+    .replace(/\0/g, "")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .replace(/<script\b[^>]*>.*?<\/script>/gis, "")
+    .replace(/<style\b[^>]*>.*?<\/style>/gis, "")
+    .replace(/<[^>]*>/g, "")
+    .trim()
+    .slice(0, 30)
+    .trim();
+  return s.length > 0 ? s : null;
+}
+
 function computeAgeBand(yob) {
   const age = new Date().getFullYear() - yob;
-  if (age >= 10 && age <= 17) return "10-17";
+  if (age >= 13 && age <= 17) return "13-17";
   if (age >= 18) return "18+";
   return null;
 }
-
 
 /* Create or update user profile */
 router.post("/profile", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
+    console.log(`[profile] POST from uid=${uid} body=`, JSON.stringify(req.body));
 
     const userRef = db.collection("users").doc(uid);
     const snap = await userRef.get();
     const existing = snap.exists ? snap.data() : null;
-    const existingProfile = existing?.profile || {};
+    const existingProfile = existing?.profile || null;
 
     // ---- Validate incoming body ----
     const validation = validateUserProfile(req.body, existingProfile);
     if (!validation.valid) {
+      console.log(`[profile] validation failed:`, validation.error);
       return res.status(400).json({ error: validation.error });
     }
 
     // ---- Build profile object ----
-    let yearOfBirth = existingProfile?.yearOfBirth ?? null;
-
-    if (req.body.yearOfBirth !== undefined && !existingProfile?.yearOfBirth) {
-      yearOfBirth = Number(req.body.yearOfBirth);
-    }
-
     const profile = {
+      role: existingProfile?.role || "user",
+      avatar: req.body.avatar !== undefined ? String(req.body.avatar).slice(0, 10) : (existingProfile?.avatar ?? null),
+      goal: req.body.goal ?? (existingProfile?.goal === "track_cycle" ? "period" : (existingProfile?.goal ?? "period")),
+      mode: req.body.mode ?? existingProfile?.mode ?? "account",
+      yearOfBirth:
+        req.body.yearOfBirth === undefined
+          ? existingProfile?.yearOfBirth ?? null
+          : existingProfile?.yearOfBirth
+            ? existingProfile.yearOfBirth
+            : Number(req.body.yearOfBirth),
+      consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
+      remindersEnabled: req.body.remindersEnabled ?? existingProfile?.remindersEnabled ?? false,
+      reminderTime: req.body.reminderTime ?? existingProfile?.reminderTime ?? "09:00",
+
       nickname:
         req.body.nickname !== undefined
-          ? (typeof req.body.nickname === "string"
-            ? req.body.nickname.trim().slice(0, 40)
-            : null)
-          : existingProfile?.nickname ?? null,
+          ? sanitizeNickname(req.body.nickname)
+          : (existingProfile?.nickname ?? null),
 
-      yearOfBirth,
-
-      goal:
-        req.body.goal !== undefined
-          ? req.body.goal
-          : existingProfile?.goal ?? null,
-
-      mode:
-        req.body.mode !== undefined
-          ? req.body.mode
-          : existingProfile?.mode ?? "account",
-
-      consentSensitive:
-        req.body.consentSensitive !== undefined
-          ? req.body.consentSensitive
-          : existingProfile?.consentSensitive ?? false,
-
-      remindersEnabled:
-        req.body.remindersEnabled !== undefined
-          ? req.body.remindersEnabled
-          : existingProfile?.remindersEnabled ?? false,
-
-      reminderTime:
-        req.body.reminderTime !== undefined
-          ? req.body.reminderTime
-          : existingProfile?.reminderTime ?? "09:00",
-    };
-
-    const existingHealthProfile = existing?.healthProfile || {};
-
-    const healthProfile = {
-      avgCycleLength:
-        req.body.avgCycleLength !== undefined
-          ? (req.body.avgCycleLength === null ? null : Number(req.body.avgCycleLength))
-          : existingHealthProfile.avgCycleLength ?? null,
-
-      periodDuration:
-        req.body.periodDuration !== undefined
-          ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
-          : existingHealthProfile.periodDuration ?? null,
-
-      weightKg:
-        req.body.weightKg !== undefined
-          ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
-          : existingHealthProfile.weightKg ?? null,
-
-      heightCm:
-        req.body.heightCm !== undefined
-          ? (req.body.heightCm === null ? null : Number(req.body.heightCm))
-          : existingHealthProfile.heightCm ?? null,
+      avgCycleLength: req.body.avgCycleLength !== undefined
+        ? (req.body.avgCycleLength === null ? null : Number(req.body.avgCycleLength))
+        : existingProfile?.avgCycleLength ?? null,
+      periodDuration: req.body.periodDuration !== undefined
+        ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
+        : existingProfile?.periodDuration ?? null,
+      weightKg: req.body.weightKg !== undefined
+        ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
+        : existingProfile?.weightKg ?? null,
+      heightCm: req.body.heightCm !== undefined
+        ? (req.body.heightCm === null ? null : Number(req.body.heightCm))
+        : existingProfile?.heightCm ?? null,
     };
 
     await userRef.set(
       {
         profile,
-        healthProfile,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
       },
@@ -110,64 +94,97 @@ router.post("/profile", requireAuth, async (req, res) => {
     );
 
     // ── Audit: track which fields changed ──
-    const allowedChangedFields = [
-      "nickname",
-      "yearOfBirth",
-      "goal",
-      "mode",
-      "consentSensitive",
-      "remindersEnabled",
-      "reminderTime",
-    ];
-
-    const changedFields = Object.keys(req.body).filter((k) =>
-      allowedChangedFields.includes(k)
+    const changedFields = Object.keys(req.body).filter(
+      (k) => k !== "role"
     );
 
-    // Special case: YOB being set for the first time is a locked action
     const yobJustSet =
       req.body.yearOfBirth !== undefined && !existingProfile?.yearOfBirth;
 
     if (yobJustSet) {
       const ageBand = computeAgeBand(Number(req.body.yearOfBirth));
 
-      // Store ageBand in Firestore
       await userRef.set({ profile: { ageBand } }, { merge: true });
 
-      // Set as Firebase custom claim so middleware can read req.user.ageBand
       const existingClaims = req.user || {};
       await auth.setCustomUserClaims(uid, {
-        role:    existingClaims.role    || "user",
+        role: existingClaims.role || "user",
         ageBand: ageBand,
       });
 
       await logAudit({
-        actorUid:   uid,
-        actorRole:  req.user.role,
-        action:     AUDIT_ACTIONS.YOB_SET,
+        actorUid: uid,
+        actorRole: req.user.role,
+        action: AUDIT_ACTIONS.YOB_SET,
         entityType: "user",
-        entityId:   uid,
-        meta:       { changedFields: ["yearOfBirth", "ageBand"] },
+        entityId: uid,
+        meta: { changedFields: ["yearOfBirth", "ageBand"] },
       });
     } else if (changedFields.length) {
       await logAudit({
-        actorUid:   uid,
-        actorRole:  req.user.role,
-        action:     AUDIT_ACTIONS.PROFILE_UPDATED,
+        actorUid: uid,
+        actorRole: req.user.role,
+        action: AUDIT_ACTIONS.PROFILE_UPDATED,
         entityType: "user",
-        entityId:   uid,
-        meta:       { changedFields },
-       });
-      }
+        entityId: uid,
+        meta: { changedFields },
+      });
+    }
 
-    const savedDoc = await userRef.get();
-    return res.json({
-      ok: true,
-      profile: savedDoc.data()?.profile ?? null,
-     });
+    console.log(`[profile] saved uid=${uid}`, JSON.stringify(profile));
+    return res.json({ ok: true, profile });
   } catch (err) {
     console.error("POST /profile error:", err);
     return res.status(500).json({ error: "Failed to save profile" });
+  }
+});
+
+// ─── Game progress ────────────────────────────────────────────────────────────
+
+function computeLevel(xp) {
+  if (xp >= 2250) return 10;
+  if (xp >= 1800) return 9;
+  if (xp >= 1400) return 8;
+  if (xp >= 1050) return 7;
+  if (xp >= 750) return 6;
+  if (xp >= 500) return 5;
+  if (xp >= 300) return 4;
+  if (xp >= 150) return 3;
+  if (xp >= 50) return 2;
+  return 1;
+}
+
+router.get("/game", requireAuth, async (req, res) => {
+  try {
+    const snap = await db.collection("users").doc(req.user.uid).get();
+    const game = snap.data()?.game || { xp: 0, level: 1, sessionsPlayed: 0 };
+    return res.json({ ok: true, game });
+  } catch (err) {
+    console.error("GET /game error:", err);
+    return res.status(500).json({ error: "Failed to fetch game progress" });
+  }
+});
+
+router.post("/game", requireAuth, async (req, res) => {
+  try {
+    const { xpEarned } = req.body;
+    if (typeof xpEarned !== "number" || xpEarned < 0 || xpEarned > 300) {
+      return res.status(400).json({ error: "Invalid xpEarned value" });
+    }
+    const userRef = db.collection("users").doc(req.user.uid);
+    const snap = await userRef.get();
+    const existing = snap.data()?.game || { xp: 0, level: 1, sessionsPlayed: 0 };
+    const newXP = (existing.xp || 0) + xpEarned;
+    const newLevel = computeLevel(newXP);
+    const newSessions = (existing.sessionsPlayed || 0) + 1;
+    await userRef.set(
+      { game: { xp: newXP, level: newLevel, sessionsPlayed: newSessions } },
+      { merge: true }
+    );
+    return res.json({ ok: true, game: { xp: newXP, level: newLevel, sessionsPlayed: newSessions } });
+  } catch (err) {
+    console.error("POST /game error:", err);
+    return res.status(500).json({ error: "Failed to save game progress" });
   }
 });
 
@@ -175,30 +192,13 @@ router.post("/profile", requireAuth, async (req, res) => {
 router.get("/profile", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const userRef = db.collection("users").doc(uid);
-    const doc = await userRef.get();
-
-    if (!doc.exists) {
-      const defaultUser = {
-        profile: {
-          nickname: null,
-          yearOfBirth: null,
-          goal: null,
-          mode: "account",
-          consentSensitive: false,
-          remindersEnabled: false,
-          reminderTime: "09:00",
-        },
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
-
-      await userRef.set(defaultUser, { merge: true });
-      const newDoc = await userRef.get();
-      return res.json(newDoc.data());
+    const doc = await db.collection("users").doc(uid).get();
+    if (!doc.exists) return res.json(null);
+    const data = doc.data();
+    if (data?.profile?.goal === "track_cycle") {
+      data.profile.goal = "period";
     }
-
-    return res.json(doc.data());
+    return res.json(data);
   } catch (err) {
     console.error("GET /profile error:", err);
     return res.status(500).json({ error: "Failed to fetch profile" });

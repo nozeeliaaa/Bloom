@@ -1,6 +1,5 @@
 // src/routes/symptomLogs.js
 import express from "express";
-import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -20,33 +19,8 @@ function sanitizeText(s, max = 300) {
   return s.trim().slice(0, max);
 }
 
-async function ensureParentDoc(collectionName, uid) {
-  const ref = db.collection(collectionName).doc(uid);
-  const snap = await ref.get();
-  const now = admin.firestore.FieldValue.serverTimestamp();
-
-  if (!snap.exists) {
-    await ref.set(
-      {
-        uid,
-        createdAt: now,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
-    return;
-  }
-
-  await ref.set(
-    {
-      updatedAt: now,
-    },
-    { merge: true }
-  );
-}
-
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
-// Each doc holds an items[] array — multiple symptoms per day
+// Each doc holds an items[] array - multiple symptoms per day
 
 // Create/Update symptoms for a day
 router.put("/:dateKey", requireAuth, async (req, res) => {
@@ -118,16 +92,13 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
     const payload = {
       dateKey,
       items: cleaned,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: new Date(),
     };
 
     const snap = await docRef.get();
-    if (!snap.exists) payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    if (!snap.exists) payload.createdAt = new Date();
 
     await docRef.set(payload, { merge: true });
-
-    // Ensure parent doc exists
-    await ensureParentDoc("symptomLogs", uid);
 
     return res.json({ ok: true, entry: payload });
   } catch (err) {
@@ -195,7 +166,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/symptoms — bulk delete all symptom logs for user
+// DELETE /api/symptoms - bulk delete all symptom logs for user
 router.delete("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -213,8 +184,6 @@ router.delete("/", requireAuth, async (req, res) => {
       const batch = db.batch();
       docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
       await batch.commit();
-      
-    await ensureParentDoc("symptomLogs", uid);
     }
 
     return res.json({ ok: true, deleted: docs.length });
@@ -240,8 +209,6 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey)
       .delete();
-    
-    await ensureParentDoc("symptomLogs", uid);
 
     return res.json({ ok: true });
   } catch (err) {
