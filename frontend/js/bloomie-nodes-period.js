@@ -873,7 +873,7 @@ export function createPeriodNodes(env, helpers) {
           "Thanks for walking through that with me 🩷",
           "This pattern can fit ovulation spotting, hormone shifts, or contraception adjustment when symptoms stay mild.",
           ...(insightLine ? [insightLine] : []),
-          "Track color, amount, and timing; if it repeats, gets heavier, or comes with pain/odor/dizziness, check with a provider.",
+          "Track colour, amount, and timing; if it repeats, gets heavier, or comes with pain/odor/dizziness, check with a provider.",
         ];
       },
       choices: [
