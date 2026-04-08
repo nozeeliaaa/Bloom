@@ -14,6 +14,7 @@ import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhase
 import { createOOS } from "./bloomie-oos.js";
 import { createNodes } from "./bloomie-nodes.js";
 import { sanitizeInput, classifyInputSafety, sanitizeBotLine, authorizeHtmlPayload, isHtmlPayloadAuthorized } from "./bloomie-safety.js";
+import { buildSignalBoard, scoreInterpretations, selectResponseStrategy } from "./bloomie-reasoning.js";
 import { isBloomieDebugEnabled } from "./bloom-storage.js";
 
 // ── Mood anomaly context ────────────────────────────────────────────────────
@@ -1272,33 +1273,6 @@ export function initBloomieChat({
         }
       }
 
-      // ── Pending route confirmation (MEDIUM confidence tier) ─────────────────
-      // If Bloomie asked a soft confirmation question last turn, check whether
-      // the user confirmed or corrected. Confirmed -> proceed to pending route.
-      // Corrected -> clear pending and re-run full pipeline with correction.
-      if (ctx.pendingRoute && ctx.state !== "MEDIUM_CONFIRM") {
-        const confirmText = text.toLowerCase().trim();
-        const YES_CONFIRM = ["yes", "yeah", "yep", "yah", "ya", "correct", "dat right", "that's right", "right", "sure", "ok", "okay", "exactly", "true", "yes that's it"];
-        const isConfirm = YES_CONFIRM.some(w => confirmText === w || confirmText.startsWith(w + " ") || confirmText.startsWith(w + ","));
-        const NO_CORRECT = ["no", "nah", "nope", "not really", "that's not", "thats not", "not that", "different"];
-        const isCorrection = NO_CORRECT.some(w => confirmText === w || confirmText.startsWith(w + " ") || confirmText.startsWith(w + ","));
-        if (isConfirm) {
-          const route = ctx.pendingRoute;
-          ctx.pendingRoute = null;
-          // User confirmed the pending route — treat as successful routing, reset streak.
-          ctx.confidenceFallbackCount = 0;
-          transition(route.next, route.payload || {});
-          return;
-        } else if (isCorrection) {
-          // User corrected -- clear pending, fall through to full routing pipeline
-          ctx.pendingRoute = null;
-          // (effectiveInput will be set below from 'text')
-        } else {
-          // Ambiguous response -- treat as correction / new message, clear pending
-          ctx.pendingRoute = null;
-        }
-      }
-
       // ── Resolve pending clarifying context ───────────────────────────────
       // If Bloomie asked a clarifying question last turn, combine the original
       // message with this answer and re-route on the combined context.
@@ -1345,8 +1319,14 @@ export function initBloomieChat({
       // Never fires in capture mode (capture path returns early above).
       {
         const _endChatRaw = text.trim().toLowerCase().replace(/[🩷💗.!]+$/, "").trim();
+        const _endChatNorm = normalizePatois(_endChatRaw).toLowerCase().trim();
         const END_CHAT_PATTERN = /^(bye|bye bye|goodbye|good\s*bye|ok\s+bye|okay\s+bye|alright\s+bye|that'?s\s+all|thanks?,?\s+i'?m\s+done|i'?m\s+done|all\s+done|done\s+for\s+now|thanks\s+bye|thank\s+you\s+bye|take\s+care|that'?s\s+it|i'?m\s+finished|i'?m\s+good\s+thanks)$/i;
-        if (END_CHAT_PATTERN.test(_endChatRaw)) {
+        const PATOIS_CLOSE_PATTERN = /^(mi\s+done|alright\s+mi\s+done|mi\s+good|seen|seen\s+den|later|lata|mi\s+a\s+guh|mi\s+guh)$/i;
+        if (
+          END_CHAT_PATTERN.test(_endChatRaw) ||
+          END_CHAT_PATTERN.test(_endChatNorm) ||
+          PATOIS_CLOSE_PATTERN.test(_endChatRaw)
+        ) {
           ctx.preEndChatState           = ctx.state;
           ctx.closeIntentDetected       = true;
           ctx.closeConfirmationPending  = true;
@@ -1358,6 +1338,11 @@ export function initBloomieChat({
       // Canonical turn base (step 3): normalize the full effective input once.
       // Downstream helpers should reuse this instead of re-normalizing text.
       const _patoisNorm = normalizePatois(effectiveInput);
+      // Canonical normalized turn text (full pipeline): this is the shared
+      // representation for routing/intent-sensitive phrase checks.
+      const _fuzzyText  = fuzzyCorrect(_patoisNorm) ?? _patoisNorm;
+      const _collapsed  = collapseRepeatedLetters(_fuzzyText);
+      const normalizedText = expandShorthand(_collapsed);
 
       // ── OOS follow-up context ────────────────────────────────────────────
       // Use canonical normalized turn text so follow-up parsing matches routing input.
@@ -1370,9 +1355,7 @@ export function initBloomieChat({
       }
 
       // ── "I tested today" reactive detection ──────────────────────────────
-      const testedToday = /(i tested|took a test|did a test|just tested|tested this morning|tested today|pregnancy test today)/.test(
-        _patoisNorm.toLowerCase()
-      );
+      const testedToday = /\b(?:i\s+(?:just\s+)?tested(?:\s+today|\s+this\s+morning)?|i\s+took\s+a\s+(?:pregnancy\s+)?test|took\s+a\s+(?:pregnancy\s+)?test|did\s+a\s+(?:pregnancy\s+)?test|tested\s+today|tested\s+this\s+morning|pregnancy\s+test\s+today)\b/.test(normalizedText.toLowerCase());
       if (testedToday) {
         const retestDate = addDays(new Date(), 3);
         say([
@@ -1413,12 +1396,7 @@ export function initBloomieChat({
       }
 
       // ── Full input processing pipeline (steps 3–7) ───────────────────────
-      // Step 4: Medical spell correction - phonetic variants then Levenshtein token correction
-      const _fuzzyText  = fuzzyCorrect(_patoisNorm) ?? _patoisNorm;
-      // Step 5: Collapse repeated characters ("helpppppp" → "help")
-      const _collapsed  = collapseRepeatedLetters(_fuzzyText);
-      // Step 6: Expand health/time shorthand ("ewcm", "bfp", "2wks", etc.)
-      const normalizedText = expandShorthand(_collapsed);
+      // normalizedText was already computed above as the canonical turn text.
 
       // Step 12: Resolve tone from the same canonical normalized text used by
       // extraction/routing so tone and intent evaluate one representation.
@@ -1464,6 +1442,28 @@ export function initBloomieChat({
         if (sym.cold_flashes)                       ctx.cumulativeRiskFlags.add("chills");
         // one_sided_pain: detect from normalized text
         if (/one.sided|one side/.test(normalizedText)) ctx.cumulativeRiskFlags.add("one_sided_pain");
+
+        // Hard-stop cumulative safety combo: heavy bleeding + dizziness.
+        // Keep this explicit so safety escalation cannot be bypassed by later
+        // ambiguity / missing-context prompts in the same turn.
+        if (
+          !entities.urgent &&
+          ctx.cumulativeRiskFlags.has("heavy_bleeding") &&
+          ctx.cumulativeRiskFlags.has("dizziness")
+        ) {
+          const reason = "cumulative: heavy_bleeding+dizziness";
+          ctx.urgency = true;
+          logSafetyEvent("urgent_trigger", {
+            input:     normalizedText,
+            route:     "HEAVY_URGENT",
+            reason,
+            topic:     ctx.topic,
+            riskLevel: ctx.riskLevel,
+          });
+          logAnalyticsEvent("urgency_escalation", { route: "HEAVY_URGENT", reason }, ctx);
+          transition("HEAVY_URGENT", { entities });
+          return;
+        }
 
         const cumulative = checkCumulativeRisk([...ctx.entityHistory.slice(-4), entities]);
         if (cumulative.escalate && !entities.urgent) {
@@ -1564,6 +1564,7 @@ export function initBloomieChat({
             `I noticed you mentioned: ${labelList}.`,
             "Which one is bothering you most right now? Let's start there.",
           ], {
+            question: "Primary concern right now",
             choices: detectedTopics.map(topic => ({
               id: `overload_${topic}`,
               label: TOPIC_LABELS[topic] || topic,
@@ -1834,6 +1835,47 @@ export function initBloomieChat({
               ? _inlineKey
               : ctx.reportedConditions[ctx.reportedConditions.length - 1] ?? null;
           transition("CONDITION_SYMPTOM_CONTEXT");
+          return;
+        }
+      }
+
+      // ── Lightweight reasoning layer (board → interpretation → strategy) ───
+      // Runs after extraction/merge and high-priority pre-checks, but before
+      // inferRoute / keyword routing. Keeps behavior explainable and rule-based.
+      {
+        const signalBoard = buildSignalBoard({
+          text: normalizedText,
+          entities: mergedEntities,
+          ctx,
+          userMode,
+          overdueDays: daysUntilNextPeriod(),
+          bloomieMemory,
+        });
+        const interpretations = scoreInterpretations(signalBoard);
+        const decision = selectResponseStrategy(signalBoard, interpretations);
+        ctx.lastReasoning = {
+          interpretation: decision.interpretation ?? null,
+          strategy: decision.strategy ?? "defer",
+          why: decision.why ?? null,
+          next: decision.next ?? null,
+        };
+        bloomieDebug("reasoning", ctx.lastReasoning);
+
+        if (decision.strategy === "repair" && Array.isArray(decision.reply)) {
+          const delay = estimateSayTime(decision.reply);
+          say(decision.reply, { keepLocked: true });
+          const tid = setTimeout(() => {
+            transition(decision.next || "START_MENU", decision.payload || {});
+          }, delay);
+          ctx.timers.add(tid);
+          return;
+        }
+
+        if (
+          ["safety_redirect", "continue_prior_topic", "triage", "clarify"].includes(decision.strategy) &&
+          decision.next
+        ) {
+          transition(decision.next, { entities: mergedEntities, ...(decision.payload || {}) });
           return;
         }
       }
@@ -2340,6 +2382,7 @@ export function initBloomieChat({
   // Handles: yes/no/not sure answers, patois variants, and partial label matches.
   // Resolve choices - can be a plain array OR a function returning an array
   function resolveChoices(node) {
+    if (Array.isArray(ctx.inlineChoices) && ctx.inlineChoices.length) return ctx.inlineChoices;
     if (!node) return [];
     const raw = typeof node.choices === "function" ? node.choices() : node.choices;
     return Array.isArray(raw) ? raw : [];
@@ -2851,8 +2894,15 @@ export function initBloomieChat({
   // delayMs    - optional flat override for inter-bubble delay; when null
   //              (default) each gap is calculated from the previous bubble's
   //              length via calcDelay() using BLOOMIE_TIMING buckets.
-  function say(lines, { delayMs = null, keepLocked = false } = {}) {
+  function say(lines, { delayMs = null, keepLocked = false, choices = null, question = null } = {}) {
     const _rawArr = Array.isArray(lines) ? lines : [lines];
+    if (Array.isArray(choices) && choices.length) {
+      ctx.inlineChoices = choices;
+      ctx.inlineQuestion = typeof question === "string" && question.trim() ? question.trim() : null;
+    } else {
+      ctx.inlineChoices = null;
+      ctx.inlineQuestion = null;
+    }
     // Apply tone-aware line transforms (only when source ≠ rule_only AND depth ≥ 2)
     const arr = applyToneToLines(
       _rawArr,
@@ -2948,6 +2998,35 @@ export function initBloomieChat({
       return;
     }
 
+    // ── Unresolved-concern close sentinels ───────────────────────────────
+    if (nextState === "_UNRESOLVED_YES") {
+      const UNRESOLVED_TOPIC_ENTRY_NODE = {
+        late: "LATE_INTRO",
+        heavy: "HEAVY_INTRO",
+        spot: "SPOT_INTRO",
+        pelvic: "PELVIC_INTRO",
+        pregnancy: "PREGNANCY_ENTRY",
+        discharge: "ELSE_DISCHARGE",
+        mood: "MOOD_INTRO",
+      };
+      const topic = ctx.pendingUnresolvedTopic;
+      ctx.pendingUnresolvedTopic = null;
+      if (topic) {
+        const list = ctx.conversationProfile?.concernsUnresolved || [];
+        const idx = list.indexOf(topic);
+        if (idx >= 0) list.splice(idx, 1);
+      }
+      transition(UNRESOLVED_TOPIC_ENTRY_NODE[topic] || "START_MENU");
+      return;
+    }
+    if (nextState === "_UNRESOLVED_NO") {
+      ctx.pendingUnresolvedTopic = null;
+      // One-shot bypass so the immediate CLOSE transition does not re-prompt.
+      ctx.closeSkipUnresolvedPrompt = true;
+      transition("CLOSE");
+      return;
+    }
+
     // ── Reset struggle streak on successful exit from disambiguation ──────
     // When the user navigates FROM a disambiguation node (NARROWING or
     // CONFIDENCE_FALLBACK) TO any real content node, that is a recovery
@@ -2995,6 +3074,8 @@ export function initBloomieChat({
       ctx.lastInferredReason        = null;
       ctx.lastCycleCtx              = null;
       ctx.pendingRoute              = null;
+      ctx.inlineChoices             = null;
+      ctx.inlineQuestion            = null;
       ctx.pendingAmbiguityContext   = null;
       ctx.pendingContradictionContext = null;
       ctx.pendingContextProbe       = null;
@@ -3002,6 +3083,8 @@ export function initBloomieChat({
       ctx.preEndChatState           = null;
       ctx.closeConfirmationPending  = false;
       ctx.closeIntentDetected       = false;
+      ctx.pendingUnresolvedTopic    = null;
+      ctx.closeSkipUnresolvedPrompt = false;
       ctx.resolutionStatus          = null;
       ctx.toneRequestId             = 0;
       ctx.narrowingAttemptCount     = 0;
@@ -3054,6 +3137,8 @@ export function initBloomieChat({
       if (ctx.nodeHistory.length > NODE_HISTORY_MAX) ctx.nodeHistory.shift();
     }
 
+    ctx.inlineChoices = null;
+    ctx.inlineQuestion = null;
     ctx.state = nextState;
 
     // ── Conversation profile: track topics and resolve concerns ──────────────
@@ -3073,40 +3158,85 @@ export function initBloomieChat({
       if (topicCode && !prof.topicsDiscussed.includes(topicCode)) {
         prof.topicsDiscussed.push(topicCode);
       }
-      // Mark topic as resolved when a wrap/close-adjacent node is entered
-      const RESOLVED_NODES = new Set([
-        "SUMMARY", "CLOSE", "MOOD_GUIDE", "HEAVY_GUIDE", "LATE_GUIDE",
-        "SPOT_GUIDE", "PELVIC_GUIDE", "PREG_GUIDE",
-      ]);
-      if (RESOLVED_NODES.has(nextState) && topicCode) {
-        if (!prof.concernsResolved.includes(topicCode)) {
-          prof.concernsResolved.push(topicCode);
-        }
+      // Mark topic as resolved using an explicit resolved-node mapping.
+      // This avoids coupling "resolved" detection to TOPIC_NODE_MAP entry nodes.
+      // Includes legacy *_GUIDE aliases plus current wrap/end nodes.
+      const RESOLVED_NODE_TOPIC_MAP = {
+        // Legacy guide aliases (kept for backward compatibility)
+        LATE_GUIDE: "late",
+        HEAVY_GUIDE: "heavy",
+        SPOT_GUIDE: "spot",
+        PELVIC_GUIDE: "pelvic",
+        PREG_GUIDE: "pregnancy",
+
+        // Current end/wrap nodes
+        MOOD_GUIDE: "mood",
+        LATE_WRAP: "late",
+        HEAVY_MONITOR: "heavy",
+        HEAVY_SOON: "heavy",
+        HEAVY_AFTER_CARE: "heavy",
+        SPOT_TRACK_WRAP: "spot",
+        SPOT_PROVIDER_SOON: "spot",
+        PELVIC_MANAGEABLE: "pelvic",
+        PELVIC_PERSISTENT: "pelvic",
+        PELVIC_REVIEW_SOON: "pelvic",
+        LATE_POSITIVE: "pregnancy",
+      };
+      const resolvedTopic = RESOLVED_NODE_TOPIC_MAP[nextState] || null;
+      if (resolvedTopic && !prof.concernsResolved.includes(resolvedTopic)) {
+        prof.concernsResolved.push(resolvedTopic);
       }
-      // Surface unresolved concerns before CLOSE
-      if (nextState === "CLOSE" && prof.concernsUnresolved.length > 0) {
+      // Surface unresolved concerns before CLOSE unless this close transition
+      // is an explicit one-shot bypass from "_UNRESOLVED_NO".
+      if (nextState === "CLOSE" && ctx.closeSkipUnresolvedPrompt) {
+        ctx.closeSkipUnresolvedPrompt = false;
+      } else if (nextState === "CLOSE" && prof.concernsUnresolved.length > 0) {
         const TOPIC_LABELS = {
           late: "late or missed period", heavy: "heavy bleeding", spot: "spotting",
           mood: "mood or energy changes", pelvic: "pelvic pain or cramps",
           pregnancy: "pregnancy concerns", discharge: "discharge",
         };
         const firstUnresolved = prof.concernsUnresolved[0];
-        const label = TOPIC_LABELS[firstUnresolved] || firstUnresolved;
-        say([
-          "Before you go - you also mentioned " + label + " earlier. Do you want to quickly look at that too? 💗",
-        ], {
-          choices: [
-            { id: "yes_unresolved", label: "Yes, let’s look at that", next: "START_MENU" },
-            { id: "no_done", label: "No, I’m done", next: "CLOSE" },
-          ],
+        ctx.pendingUnresolvedTopic = firstUnresolved;
+        transition("CLOSE_UNRESOLVED_CONFIRM", {
+          unresolvedLabel: TOPIC_LABELS[firstUnresolved] || firstUnresolved,
         });
-        prof.concernsUnresolved.shift();
         return;
       }
     }
 
     const node = NODES[nextState];
-    if (!node) return;
+    if (!node) {
+      const fallbackState = "START_MENU";
+      const isDev =
+        (typeof import.meta !== "undefined" && !!import.meta.env?.DEV) ||
+        (typeof process !== "undefined" && process?.env?.NODE_ENV !== "production");
+      if (isDev) {
+        console.warn("[Bloomie] Missing node transition target", {
+          missingNode: nextState,
+          currentState: ctx.state,
+          fallbackState,
+        });
+      }
+      logAnalyticsEvent("missing_node_fallback", { missingNode: nextState, fallbackState }, ctx);
+
+      const repairLine = "I lost my place for a second, but I'm still with you 🩷 Let's continue from here.";
+
+      // Prefer a real node fallback so the conversation can continue naturally.
+      if (nextState !== fallbackState && NODES[fallbackState]) {
+        clearTimers();
+        say([repairLine], { keepLocked: true });
+        const tid = setTimeout(() => transition(fallbackState), estimateSayTime([repairLine]));
+        ctx.timers.add(tid);
+      } else {
+        // Last-resort recovery if START_MENU is unavailable.
+        clearTimers();
+        pushMsg("bot", repairLine);
+        lockUI(false);
+        render();
+      }
+      return;
+    }
     // Fire onEnter hook - used by session mode setters and gate nodes
     if (typeof node.onEnter === "function") {
       node.onEnter();
@@ -3427,6 +3557,7 @@ export function initBloomieChat({
       // Track the epoch at which this node's choices were rendered so that
       // matchTypedToChoice can apply the same staleness guard as button clicks.
       ctx.nodeFlowId = renderedFlowId;
+      const activeQuestion = ctx.inlineQuestion || node?.question || null;
       // Record the active question shape so the very next typed message is
       // first interpreted as an answer to this question (turn binding).
       ctx.pendingQuestion = { type: classifyNodeQuestion(_choices), nodeState: ctx.state };
@@ -3457,7 +3588,7 @@ export function initBloomieChat({
           // for a button selection — the label itself carries the emotional signal).
           ctx.currentTone = detectUserTone(choice.label) ?? ctx.currentTone;
           ctx.toneResult  = { tone: ctx.currentTone, intensity: "medium", subtext: "none", source: "rule_only" };
-          if (node.question) recordAnswer(node.question, choice.label);
+          if (activeQuestion) recordAnswer(activeQuestion, choice.label);
           if (choice.action === "OPEN_MAP")      onOpenCareMap();
           if (choice.action === "REQUEST_PDF") {
             if (ctx.isAnon) { say(["To save a PDF summary, you'll need a free Bloom account 🩷 Sign up to keep a record of your conversations."]); }
@@ -3788,6 +3919,7 @@ export function initBloomieChat({
     buildSummaryCard, authorizeHtmlPayload, applySessionMode, canGiveAdvice, filterDedup,
     daysBetween, daysUntilNextPeriod, buildRecallLine, buildCyclePersonalisationLine, buildCycleSignalLine, buildSymptomPatternLine, buildSymptomInsightLine, greet, buildCycleCtx,
     withNickname, canUseNickname, getNickname,
+    isLateContextActive,
     pickPriorityConcern, getPhaseInsight, getToneOpener, buildGuidanceResponse,
     getStructuredSummary, computePhaseConfidence, logSafetyEvent,
     parseNaturalDate, validateCycleDate, validateCalendarDate,
@@ -3818,6 +3950,8 @@ export function initBloomieChat({
       ctx.history = [];
       ctx.answers = [];
       ctx.multiDraft = null;
+      ctx.inlineChoices = null;
+      ctx.inlineQuestion = null;
       ctx.locked = false;
       ctx.toneRequestId = 0;
       ctx.narrowingAttemptCount = 0;
@@ -3825,6 +3959,8 @@ export function initBloomieChat({
       ctx.lastClarifierFingerprint = null;
       ctx.lastClarifierTurn = -1;
       ctx.lastBotLineFingerprint = null;
+      ctx.pendingUnresolvedTopic = null;
+      ctx.closeSkipUnresolvedPrompt = false;
       transition("START");
     },
     getSummaryText: buildSummaryText,

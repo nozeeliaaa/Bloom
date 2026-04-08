@@ -9,6 +9,7 @@
  * LATE_PERIOD_CHECK, ABOUT_BLOOM, APP_HELP, APP_LOG_PERIOD, APP_LOG_SYMPTOM,
  * APP_LOG_CYCLE, APP_SWITCH_MODE, SEE_DOCTOR_GUIDE, RESOLUTION_CHECK,
  * RESOLUTION_ASK, RESOLUTION_YES, RESOLUTION_NO, END_CHAT_CONFIRM,
+ * CLOSE_UNRESOLVED_CONFIRM,
  * CLOSE (the node), SUMMARY.
  */
 export function createCoreNodes(env, helpers) {
@@ -1049,6 +1050,27 @@ export function createCoreNodes(env, helpers) {
       choices: [
         { id: "end_chat_confirm", label: "End Chat", next: "_END_CHAT_RESET",  primary: true },
         { id: "cancel",           label: "Cancel",   next: "_END_CHAT_CANCEL" },
+      ],
+    },
+
+    CLOSE_UNRESOLVED_CONFIRM: {
+      say(ctx, payload) {
+        const TOPIC_LABELS = {
+          late: "late or missed period",
+          heavy: "heavy bleeding",
+          spot: "spotting",
+          mood: "mood or energy changes",
+          pelvic: "pelvic pain or cramps",
+          pregnancy: "pregnancy concerns",
+          discharge: "discharge",
+        };
+        const topic = ctx.pendingUnresolvedTopic;
+        const label = payload?.unresolvedLabel || TOPIC_LABELS[topic] || topic || "something you mentioned";
+        return [`Before you go - you also mentioned ${label} earlier. Do you want to quickly look at that too? 💗`];
+      },
+      choices: [
+        { id: "yes_unresolved", label: "Yes, let’s look at that", next: "_UNRESOLVED_YES", primary: true },
+        { id: "no_done", label: "No, I’m done", next: "_UNRESOLVED_NO" },
       ],
     },
 

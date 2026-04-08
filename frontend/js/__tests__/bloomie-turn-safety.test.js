@@ -61,7 +61,12 @@ vi.mock("../bloomie-patois.js", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    normalizePatois: (text) => (typeof text === "string" ? text : ""),
+    normalizePatois: (text) => {
+      if (typeof text !== "string") return "";
+      return text
+        .replace(/\bmi\s+tek\s+a\s+test\b/gi, "i took a test")
+        .replace(/\bmi\s+did\s+a\s+test\b/gi, "i did a test");
+    },
     detectUserTone: () => "neutral",
     fuzzyCorrect: (text) => text,
     collapseRepeatedLetters: (text) => text,
@@ -135,11 +140,26 @@ describe("turn-safe async tone guard", () => {
 });
 
 describe("testedToday single history insertion", () => {
-  it("records one user history entry for testedToday input", () => {
+  it("records one user history entry for 'i tested today'", () => {
     sendMessage("i tested today");
     const state = chat.getState();
     const userMsgs = state.history.filter((m) => m.from === "user" && m.text === "i tested today");
     expect(userMsgs.length).toBe(1);
+  });
+
+  it("matches 'i took a test' and routes to LATE_TEST_Q follow-up", () => {
+    sendMessage("i took a test");
+    expect(chat.getState().state).toBe("LATE_TEST_Q");
+  });
+
+  it("matches 'did a test' and routes to LATE_TEST_Q follow-up", () => {
+    sendMessage("did a test");
+    expect(chat.getState().state).toBe("LATE_TEST_Q");
+  });
+
+  it("matches normalized patois variant 'mi tek a test'", () => {
+    sendMessage("mi tek a test");
+    expect(chat.getState().state).toBe("LATE_TEST_Q");
   });
 });
 

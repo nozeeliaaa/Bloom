@@ -2,6 +2,8 @@
  * bloomie-nodes-pelvic.js
  * Pelvic pain nodes and general pain (ELSE_PAIN_*) nodes.
  * Covers: PELVIC_INTRO, PELVIC_SAFETY_GATE, PELVIC_SAFETY_CHECK,
+ * PELVIC_ENTRY_GATE, CRAMPS_LATE_CONTEXT, CRAMPS_LATE_SPOT_CHECK,
+ * CRAMPS_LATE_PREG_CHECK, CRAMPS_LATE_NEXT_STEP,
  * PELVIC_NOT_SURE_SAFETY, PELVIC_URGENT, PELVIC_ENTRY,
  * PELVIC_PERIOD_ROUTE, PELVIC_OVULATION_ROUTE, PELVIC_RANDOM_ROUTE,
  * PELVIC_GENERAL_ROUTE, PELVIC_SEX_ENTRY, PELVIC_SEX_ENTRY_PAIN,
@@ -14,8 +16,33 @@ export function createPelvicNodes(env, helpers) {
   const {
     ctx, say, transition, pick, ack, qualifier,
     safeFooter, buildSymptomInsightLine, buildSymptomPatternLine,
+    daysUntilNextPeriod, isLateContextActive,
   } = env;
   const { pickCloseLabel, pickMainLabel } = helpers;
+
+  function getLateCrampsContext() {
+    const recent = Array.isArray(ctx.entityHistory) ? ctx.entityHistory.slice(-3) : [];
+    const overdueDays = typeof daysUntilNextPeriod === "function" ? daysUntilNextPeriod() : null;
+    const overdue = typeof overdueDays === "number" && overdueDays < -1;
+    const lateByIntent =
+      ctx.lastIntent === "late" || ctx.lastIntent === "LATE_INTRO" || ctx.lastIntent === "LATE_PERIOD_CHECK";
+    const lateByHistory = recent.some(e => e?.symptoms?.late || e?.symptoms?.implicit_late);
+    const lateByAssistant = typeof isLateContextActive === "function"
+      ? isLateContextActive({ includePromptContext: true })
+      : false;
+    const spottingRecent = recent.some(e => e?.symptoms?.spotting);
+    const pregnancySignalRecent = recent.some(e =>
+      e?.pregnancy?.chance || e?.pregnancy?.testedYet || e?.pregnancy?.result
+    );
+
+    return {
+      overdue,
+      overdueDays,
+      spottingRecent,
+      pregnancySignalRecent,
+      active: overdue || lateByIntent || lateByHistory || lateByAssistant,
+    };
+  }
 
   return {
     // Redirect kept so all existing menu buttons still reach the safety check
@@ -48,7 +75,7 @@ export function createPelvicNodes(env, helpers) {
       question: "Urgent symptoms present?",
       choices: [
         { id: "yes", label: "Yes",      next: "PELVIC_URGENT",       primary: true },
-        { id: "no",  label: "No",       next: "PELVIC_ENTRY" },
+        { id: "no",  label: "No",       next: "PELVIC_ENTRY_GATE" },
         { id: "ns",  label: "Not sure", next: "PELVIC_NOT_SURE_SAFETY" },
       ],
     },
@@ -56,7 +83,7 @@ export function createPelvicNodes(env, helpers) {
       say: ["Trust that instinct 🩷 If something feels seriously wrong, getting checked is always the safer call."],
       choices: [
         { id: "map",  label: "Find care near me",       next: "START", action: "OPEN_MAP", primary: true },
-        { id: "cont", label: "Continue with Bloomie",   next: "PELVIC_ENTRY" },
+        { id: "cont", label: "Continue with Bloomie",   next: "PELVIC_ENTRY_GATE" },
       ],
     },
     PELVIC_URGENT: {
@@ -69,6 +96,90 @@ export function createPelvicNodes(env, helpers) {
       choices: [
         { id: "map",  label: "Find emergency care", next: "START", action: "OPEN_MAP", primary: true },
         { id: "menu", label: pickMainLabel(),         next: "START_MENU" },
+      ],
+    },
+
+    // Context gate: if we already have active late-period context, ask a short
+    // combined-signal clarifier flow before generic pelvic routing.
+    PELVIC_ENTRY_GATE: {
+      say: [],
+      onEnter() {
+        const lateCtx = getLateCrampsContext();
+        if (lateCtx.active) {
+          transition("CRAMPS_LATE_CONTEXT");
+        } else {
+          transition("PELVIC_ENTRY");
+        }
+      },
+      choices: [],
+    },
+
+    CRAMPS_LATE_CONTEXT: {
+      say() {
+        const lateCtx = getLateCrampsContext();
+        const daysLine = (typeof lateCtx.overdueDays === "number" && lateCtx.overdueDays < -1)
+          ? `Since your period seems about ${Math.abs(lateCtx.overdueDays)} day${Math.abs(lateCtx.overdueDays) === 1 ? "" : "s"} late,`
+          : "Since your period still seems off,";
+        return [
+          "Got you 🩷",
+          `${daysLine} cramps can happen for a few reasons, so let's narrow it down gently.`,
+          "Does this feel like your usual period-type cramps, or different from usual?",
+        ];
+      },
+      question: "Late + cramps usual vs different",
+      choices: [
+        { id: "usual", label: "Feels like my usual cramps", next: "CRAMPS_LATE_SPOT_CHECK", primary: true },
+        { id: "diff",  label: "Feels different this time",   next: "CRAMPS_LATE_PREG_CHECK" },
+        { id: "ns",    label: "Not sure",                    next: "CRAMPS_LATE_PREG_CHECK" },
+      ],
+    },
+
+    CRAMPS_LATE_SPOT_CHECK: {
+      say() {
+        const lateCtx = getLateCrampsContext();
+        return [
+          lateCtx.spottingRecent
+            ? "I remember you also mentioned some spotting 🩷"
+            : "Quick check that helps with context 🩷",
+          "Any spotting or bleeding at all right now?",
+        ];
+      },
+      question: "Late + cramps spotting check",
+      choices: [
+        { id: "yes", label: "Yes, some spotting/bleeding", next: "SPOT_INTRO", primary: true },
+        { id: "no",  label: "No spotting yet",             next: "CRAMPS_LATE_PREG_CHECK" },
+      ],
+    },
+
+    CRAMPS_LATE_PREG_CHECK: {
+      say() {
+        const lateCtx = getLateCrampsContext();
+        return [
+          lateCtx.pregnancySignalRecent
+            ? "Thanks — and I still want to keep pregnancy possibility in mind 🩷"
+            : "One more useful check 🩷",
+          "Any chance of pregnancy this cycle?",
+        ];
+      },
+      question: "Late + cramps pregnancy chance",
+      choices: [
+        { id: "yes", label: "Yes / maybe", next: "LATE_TEST_Q", primary: true },
+        { id: "no",  label: "No",          next: "CRAMPS_LATE_NEXT_STEP" },
+        { id: "ns",  label: "Not sure",    next: "LATE_TEST_Q" },
+      ],
+    },
+
+    CRAMPS_LATE_NEXT_STEP: {
+      say: [
+        "Thanks for walking through that with me 🩷",
+        "With a late period plus cramps, possibilities include your period starting late, temporary hormonal delay, or other non-emergency cycle shifts.",
+        "I can't diagnose from chat alone, but we can keep this practical and track what happens next.",
+      ],
+      choices: [
+        { id: "late",  label: "Continue late-period support", next: "LATE_INTRO", primary: true },
+        { id: "pelvic",label: "Keep looking at the cramp pattern", next: "PELVIC_PERIOD_ROUTE" },
+        { id: "heavy", label: "Bleeding has started / feels heavy", next: "HEAVY_INTRO" },
+        { id: "menu",  label: pickMainLabel(), next: "START_MENU" },
       ],
     },
 

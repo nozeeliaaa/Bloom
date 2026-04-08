@@ -62,6 +62,8 @@ export function createCtx() {
     history:            [],
     answers:            [],
     multiDraft:         null,
+    inlineChoices:      null,       // one-off quick replies injected via say(..., { choices })
+    inlineQuestion:     null,       // optional question label paired with inlineChoices
     locked:             false,
     timers:             new Set(),
     capture:            null,
@@ -101,6 +103,8 @@ export function createCtx() {
     resolutionStatus:         null,   // "resolved" | "unresolved" | "skipped" — set by RESOLUTION_CHECK
     closeIntentDetected:      false,  // true when user typed a goodbye phrase (END_CHAT_PATTERN fired)
     closeConfirmationPending: false,  // true while END_CHAT_CONFIRM node is visible
+    pendingUnresolvedTopic:   null,   // unresolved topic currently being confirmed at close-time
+    closeSkipUnresolvedPrompt: false, // one-shot bypass so "_no, done" can reach CLOSE without re-prompt loop
     pendingContradictionContext: null,     // stored when contradiction was detected
     pendingContextProbe:      null,        // stored when missing-context probe was asked
     pendingQuestion:          null,        // { type: "yes_no"|"severity"|"timing"|"duration"|"test_result"|"choice", nodeState: string }

@@ -729,7 +729,7 @@ export function resolveSignals(sig, has) {
 
   // Pelvic + heavy → could be serious, go to heavy risk check
   if (has("pelvic", 2) && has("heavy", 2)) {
-    return { next: "HEAVY_RISK_SYMPTOMS", payload: { reason: "pelvic+heavy" } };
+    return { next: "HEAVY_ROUTE_C", payload: { reason: "pelvic+heavy" } };
   }
 
   // Late + pelvic (no heavy) → late intro with pelvic note
