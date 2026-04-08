@@ -93,6 +93,10 @@ export function createCtx() {
     toneRequestId:      0,          // monotonic token for in-flight async tone resolution; stale promises must not mutate ctx
     usedOpeners:        new Set(),  // opener strings already shown - prevents repetition within a session
     symptomSignals:     null,       // pre-computed SymptomSignal[] from bloom-symptom-engine, or null
+    aiSignals:          null,       // ExtractedSignals from bloomie-extract.js, or null when unavailable.
+                                    // Advisory only — never used to override rule-based urgent routing.
+                                    // Shape: { symptoms, timing, severity, tone, repair,
+                                    //          pregnancySignals, redFlags, confidence }
     cumulativeRiskFlags:      new Set(),  // accumulates risk signal flags across conversation
     pendingAmbiguityContext:  null,        // stored when ambiguity question was asked
     isMinor:                  false,

@@ -90,6 +90,8 @@ export function createPelvicNodes(env, helpers) {
       say: [
         "Please seek medical care as soon as possible 🩷",
         "Severe or sudden pelvic pain, especially with dizziness or fever, can sometimes need urgent attention. You deserve a proper assessment, not just reassurance.",
+        // Research anchor: heavy bleeding + dizziness/fainting + fever are red-flag combinations.
+        "If bleeding is getting heavy, pain is worsening, or you feel faint/very weak, treat that as urgent too.",
         "Please go to your nearest emergency room or urgent care centre, or call 119 in Jamaica.",
         "If you have one-sided sharp pain and there's any chance of pregnancy, that needs to be checked urgently.",
       ],
@@ -123,6 +125,8 @@ export function createPelvicNodes(env, helpers) {
         return [
           "Got you 🩷",
           `${daysLine} cramps can happen for a few reasons, so let's narrow it down gently.`,
+          // Research anchor: late + cramps can reflect delayed cycle start, hormonal shift, or early pregnancy context.
+          "Sometimes this is your period trying to start late, and sometimes it's another cycle shift worth checking.",
           "Does this feel like your usual period-type cramps, or different from usual?",
         ];
       },
@@ -173,6 +177,8 @@ export function createPelvicNodes(env, helpers) {
       say: [
         "Thanks for walking through that with me 🩷",
         "With a late period plus cramps, possibilities include your period starting late, temporary hormonal delay, or other non-emergency cycle shifts.",
+        // Research anchor: watch-for threshold guidance keeps this non-diagnostic but practical.
+        "If pain gets stronger, bleeding turns heavy, or you feel dizzy/faint, that's a sign to get checked sooner.",
         "I can't diagnose from chat alone, but we can keep this practical and track what happens next.",
       ],
       choices: [
@@ -187,6 +193,8 @@ export function createPelvicNodes(env, helpers) {
     PELVIC_ENTRY: {
       say: [
         "Pelvic pain can feel really different depending on what's behind it 🩷",
+        // Research anchor: phase-based reasoning (period vs ovulation vs non-cycle pattern).
+        "Sometimes it's linked to your cycle, like period cramps or ovulation pain, and sometimes it isn't, so pattern matters.",
         "Let's figure out what kind you're dealing with.",
       ],
       question: "Type of pelvic pain",
@@ -204,6 +212,8 @@ export function createPelvicNodes(env, helpers) {
       say: [
         "Period pain is one of the most common cycle experiences, but intensity and pattern matter a lot 🩷",
         "Mild cramping that eases with heat or painkillers is common. Pain that stops you from functioning or gets worse each cycle is worth taking more seriously.",
+        // Research anchor: common period duration reference.
+        "Most periods last about 3–7 days, so pain or bleeding outside your usual window is worth noting.",
         "Let's look at how it actually affects you.",
       ],
       autoNext(ctx) {
@@ -214,7 +224,8 @@ export function createPelvicNodes(env, helpers) {
     PELVIC_OVULATION_ROUTE: {
       say: [
         "Mid-cycle pain around ovulation is actually quite common, it's sometimes called mittelschmerz 🩷",
-        "It's usually one-sided, short-lived, and mild. But we'll check your pattern to make sure.",
+        "It's usually one-sided, short-lived, and mild. If it keeps worsening or comes with heavy bleeding, that's a reason to check in sooner.",
+        "We'll check your pattern to make sure.",
       ],
       autoNext(ctx) {
         ctx.pelvicRoute = "ovulation";
@@ -388,6 +399,8 @@ export function createPelvicNodes(env, helpers) {
           "Pelvic pain that is persistent, severe, or doesn't respond well to relief deserves attention. Not because something is 'wrong', but because pain shouldn't be dismissed.",
           routeNote,
           ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
+          // Research anchor: practical watch-for escalation language.
+          "If it starts disrupting sleep/work, comes with fever, or bleeding becomes heavy, that should be checked promptly.",
           "I can't diagnose anything, but noticing these patterns is an important step toward getting the right support.",
           ...safeFooter(),
         ];
@@ -423,6 +436,8 @@ export function createPelvicNodes(env, helpers) {
           `${ack()} 🩷`,
           note,
           ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
+          // Research anchor: symptom progression threshold.
+          "If it gets worse, lasts longer than your usual pattern, or comes with dizziness/fever, escalate sooner.",
           "It may be worth checking in with a healthcare provider in the next few weeks, not urgently, but soon.",
           ...safeFooter(),
         ];

@@ -45,6 +45,26 @@ export const VALID_INTENTS = new Set([
   "pregnancy", "discharge", "hormones", "else",
 ]);
 
+// Canonical reviewed allowlist for multi-label tagging.
+export const VALID_INTENT_TAGS = new Set([
+  "late_period",
+  "missed_period",
+  "cramps",
+  "pelvic_pain",
+  "nausea",
+  "breast_tenderness",
+  "spotting",
+  "heavy_bleeding",
+  "discharge",
+  "itching",
+  "pregnancy_concern",
+  "cycle_irregularity",
+  "mood_change",
+  "clarification",
+  "frustration",
+  "red_flag",
+]);
+
 export const INTENT_TO_ROUTE = {
   late:       "LATE_INTRO",
   heavy:      "HEAVY_INTRO",
@@ -56,6 +76,82 @@ export const INTENT_TO_ROUTE = {
   hormones:   "ELSE_INTRO",
   else:       "ELSE_INTRO",
 };
+
+/**
+ * Deterministic repair / clarification classifier.
+ * Input must be canonical normalized text from assistant.js.
+ * Returns label-only classification (no generated response text).
+ */
+export function classifyRepairClarification(normalizedText) {
+  const t = String(normalizedText || "").toLowerCase().trim();
+  if (!t) return null;
+
+  const clarificationPatterns = [
+    /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
+    /^\s*(what|huh)\s*\??\s*$/i,
+    /\b(what are you saying|what you mean|what do you mean|seh that again|say that again|explain that|explain that again|explain simpler)\b/i,
+    /\b(mi|me)\s+nuh\s+(understand|get it)\b/i,
+    /\byou lost me\b/i,
+    /\bnot what i mean\b/i,
+  ];
+  if (clarificationPatterns.some((rx) => rx.test(t))) {
+    return { label: "clarification", confidence: 0.92 };
+  }
+
+  const frustrationPatterns = [
+    /\bnot what i asked\b/i,
+    /\bthis (isn't|is not|not) what i asked\b/i,
+    /\byou (don't|do not) understand\b/i,
+  ];
+  if (frustrationPatterns.some((rx) => rx.test(t))) {
+    return { label: "frustration", confidence: 0.86 };
+  }
+
+  return null;
+}
+
+/**
+ * Deterministic multi-label tagger (labels only, no response text).
+ * Uses canonical normalized text plus extracted entities.
+ * Safe fallback: empty tag list if nothing matches.
+ */
+export function extractMultiIntentTags(normalizedText, entities = {}, { repair = null } = {}) {
+  const t = String(normalizedText || "").toLowerCase().trim();
+  const sym = entities?.symptoms || {};
+  const pregnancy = entities?.pregnancy || {};
+  const tags = new Set();
+
+  if (sym.late || sym.implicit_late) tags.add("late_period");
+  if (/\b(missed period|period missed|no period)\b/.test(t)) tags.add("missed_period");
+  if (sym.pelvic) {
+    tags.add("pelvic_pain");
+    if (/\bcramp|cramps\b/.test(t)) tags.add("cramps");
+  }
+  if (sym.nausea) tags.add("nausea");
+  if (sym.breast_tender) tags.add("breast_tenderness");
+  if (sym.spotting) tags.add("spotting");
+  if (sym.heavy) tags.add("heavy_bleeding");
+  if (sym.discharge || sym.unusual_discharge || sym.discharge_eggwhite || sym.discharge_creamy || sym.discharge_sticky) {
+    tags.add("discharge");
+  }
+  if (/\bitch|itching\b/.test(t)) tags.add("itching");
+  if (pregnancy.chance || /\b(pregnan|unprotected sex|pregnancy test|positive test|negative test)\b/.test(t)) {
+    tags.add("pregnancy_concern");
+  }
+  if (sym.irregular) tags.add("cycle_irregularity");
+  if (sym.mood || sym.anxiety || sym.depression || sym.irritability || sym.mood_rage) {
+    tags.add("mood_change");
+  }
+  if (repair?.label === "clarification") tags.add("clarification");
+  if (repair?.label === "frustration") tags.add("frustration");
+  if (entities?.urgent || (sym.heavy && (sym.large_clots || sym.dizziness)) || /\b(faint|can'?t breathe|severe pain)\b/.test(t)) {
+    tags.add("red_flag");
+  }
+
+  const canonicalTags = [...tags].filter((tag) => VALID_INTENT_TAGS.has(tag));
+  const confidence = canonicalTags.length ? Math.min(0.95, 0.55 + canonicalTags.length * 0.05) : 0;
+  return { tags: canonicalTags, confidence };
+}
 
 // Gate: only fire AI when the input looks health-adjacent.
 // This prevents wasting API calls on greetings or clearly OOS messages that

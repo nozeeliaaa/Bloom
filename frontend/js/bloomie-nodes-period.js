@@ -40,7 +40,8 @@ export function createPeriodNodes(env, helpers) {
         return null;
       },
       say: [
-        "That sounds really uncomfortable, let's figure out what's going on 🩷",
+        "I hear you 🩷",
+        "Heavy flow can happen, but soaking every hour is a key signal we should check quickly.",
         "During your heaviest moments, are you soaking through a pad or tampon every hour for two or more hours in a row?",
       ],
       choices: [
@@ -76,7 +77,8 @@ export function createPeriodNodes(env, helpers) {
         return null;
       },
       say: [
-        "I hear you, bleeding that just won't stop is exhausting 🩷",
+        "I hear you 🩷",
+        "Most periods are about 3–7 days, so when bleeding keeps going, duration helps us judge risk.",
         "How many days has the bleeding been going on?",
       ],
       choices: [
@@ -131,7 +133,8 @@ export function createPeriodNodes(env, helpers) {
         return null;
       },
       say: [
-        "Those symptoms alongside bleeding need attention 🩷",
+        "Thanks for telling me 🩷",
+        "Bleeding plus dizziness or weakness can mean your body needs quicker care.",
         "Are you feeling dizzy, faint, or very weak right now?",
       ],
       choices: [
@@ -281,11 +284,10 @@ export function createPeriodNodes(env, helpers) {
       say() {
         const insightLine = buildSymptomInsightLine();
         return [
-          "Based on what you've shared, this isn't an emergency right now, but it does need a proper look in the next few days 🩷",
-          "Bleeding that's heavier than usual or lasting longer than a week can sometimes point to things worth checking, like fibroids, hormonal shifts, or low iron.",
+          "Thanks for walking me through that 🩷",
+          "This is not an emergency right now, but heavier-than-usual flow or bleeding beyond a week is worth a proper check soon.",
           ...(insightLine ? [insightLine] : []),
-          "Book a visit with a healthcare provider or gynaecologist as soon as you can, ideally within the next 2–3 days.",
-          "If anything changes, you start feeling faint, bleeding gets suddenly heavier, or you develop severe pain, treat that as urgent and seek care the same day.",
+          "Try to get seen in the next 2–3 days, and if bleeding ramps up, pain becomes severe, or you feel faint, treat that as urgent.",
         ];
       },
       choices: [
@@ -296,15 +298,13 @@ export function createPeriodNodes(env, helpers) {
     },
     HEAVY_MONITOR: {
       say() {
-        const insightLine = buildSymptomInsightLine();
-        const patternLine = !insightLine
-          ? buildSymptomPatternLine(["HEAVY_FLOW", "LARGE_CLOTS", "VAGINAL_BLEEDING", "CRAMPS"])
-          : null;
+        const insightLine = buildSymptomInsightLine()
+          || buildSymptomPatternLine(["HEAVY_FLOW", "LARGE_CLOTS", "VAGINAL_BLEEDING", "CRAMPS"]);
         return [
-          "Based on what you shared, this sounds like it may be a heavier day rather than something immediately alarming 🩷",
-          "Some people naturally have heavier flow, especially in the first 1–2 days of their period. That said, your experience is always worth tracking.",
-          ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
-          "Keep monitoring over the next 24 hours. If the flow picks up, you start feeling weak or dizzy, or you notice large clots, come back and let me know.",
+          "Got you 🩷",
+          "The first 1–2 days can be heavier, but very fast soaking or feeling weak is not something to ignore.",
+          ...(insightLine ? [insightLine] : []),
+          "Monitor for 24 hours, and if flow increases, big clots appear, or dizziness starts, seek same-day care.",
         ];
       },
       choices: [
@@ -345,20 +345,16 @@ export function createPeriodNodes(env, helpers) {
         return null;
       },
       say() {
-        const cycleLine = buildCyclePersonalisationLine("late");
-        const signalLine = buildCycleSignalLine("late");
+        const cycleLine = buildCyclePersonalisationLine("late") || buildCycleSignalLine("late");
+        const interpretation = cycleLine
+          || "A one-off delay can happen if ovulation shifts, especially with stress, illness, or routine changes.";
         return [
           pick([
-            `${ack()} A late or missed period can be really stressful, especially when your body usually feels predictable 🩷`,
-            "Okay, a late period. Let's look at this properly 🩷",
-            "Waiting on your period is genuinely one of the more stressful things. Let's break it down 🩷",
-            "That uncertainty is real, not knowing what's going on with your own body is hard 🩷",
-            "Late periods happen for so many reasons. Let's figure out what might be going on for you 🩷",
+            `${ack()} waiting on your period can feel heavy 🩷`,
+            "Okay, let's check this calmly 🩷",
+            "That uncertainty is real, and you're not overreacting 🩷",
           ]),
-          ...(cycleLine ? [cycleLine] : []),
-          ...(signalLine ? [signalLine] : []),
-          "Cycles shift for all kinds of reasons: stress, travel, illness, weight changes, or just natural variation.",
-          "Let's take it step by step.",
+          interpretation,
           "Is your period more than 7 days later than you usually expect it to be?",
         ];
       },
@@ -386,9 +382,9 @@ export function createPeriodNodes(env, helpers) {
         return null;
       },
       say: [
-        "Okay 🩷 A few days of variation can be completely normal, even in people who are usually very regular.",
-        "Sometimes ovulation happens a little later than usual, and the period follows after.",
-        "For now, it can help to:\n• Keep tracking your cycle\n• Watch for signs like cramps, spotting, or breast tenderness\n• Check back in if it continues to be later than what's normal for you",
+        "Got you 🩷",
+        "A short delay can still be within normal variation, often from later ovulation that cycle.",
+        "Track what happens next, and if pain is severe, bleeding gets heavy, or you feel faint, seek care sooner.",
         "Next important question: is there any chance of pregnancy this cycle?",
       ],
       question: "Chance of pregnancy this cycle?",
@@ -402,10 +398,9 @@ export function createPeriodNodes(env, helpers) {
       say() {
         const signalLine = buildCycleSignalLine("late");
         return [
-          "Totally valid! irregular cycles make it genuinely hard to know what 'late' even means 🩷",
-          "Irregular cycles are common and can happen for lots of reasons: stress, hormonal imbalances, conditions like PCOS, weight changes, or just how your body works.",
-          ...(signalLine ? [signalLine] : []),
-          "A few things that can help: tracking even rough dates over a few months starts to reveal your personal pattern.",
+          "That makes sense 🩷",
+          signalLine || "With irregular cycles, 'late' is harder to define, and shifts can happen from stress, hormones, or body changes.",
+          "Use rough tracking for a few cycles to spot your pattern, and flag anything that keeps getting more irregular.",
           "Is there any chance of pregnancy this cycle?",
         ];
       },
@@ -450,6 +445,7 @@ export function createPeriodNodes(env, helpers) {
         }
         return [
           `${ack()} Pregnancy is one of the most common reasons for a late period, worth checking rather than worrying in silence 🩷`,
+          "If late timing comes with nausea, breast tenderness, or unusual fatigue, testing becomes more useful now.",
           "Is there any chance of pregnancy this cycle?",
         ];
       },
@@ -498,8 +494,9 @@ export function createPeriodNodes(env, helpers) {
     },
     PREG_CLARIFY_ROUTE: {
       say: [
-        "That's okay, pregnancy worries can feel overwhelming even when you're not sure what you're actually worried about 🩷",
-        "Are you feeling physically unwell right now, or is this more anxiety about the possibility?",
+        "I hear you 🩷",
+        "Pregnancy worry can feel intense even before you have clear answers.",
+        "Are you feeling physically unwell right now, or is this mostly anxiety about the possibility?",
       ],
       question: "Physically unwell or anxious?",
       choices: [
@@ -509,8 +506,9 @@ export function createPeriodNodes(env, helpers) {
     },
     PREG_CLARIFY_RESELECT: {
       say: [
-        "That makes sense, anxiety about pregnancy is completely valid, even when nothing has 'happened' yet 🩷",
-        "Take a breath. Let's figure out what would help you most right now.",
+        "You're doing okay 🩷",
+        "We'll keep this simple and focus on the next useful step.",
+        "What would help most right now?",
       ],
       question: "Pregnancy concern type",
       choices: [
@@ -558,8 +556,9 @@ export function createPeriodNodes(env, helpers) {
     LATE_TEST_SUGGEST: {
       say: [
         "That's okay 🩷",
-        "A late or missed period can sometimes be an early sign of pregnancy, even before other symptoms show up.",
-        "If there's any chance, taking a pregnancy test can help reduce uncertainty, especially if your period doesn't arrive in the next few days.",
+        "A late period can be an early pregnancy sign, so testing is the fastest way to reduce uncertainty.",
+        "If severe one-sided pain, heavy bleeding, or dizziness shows up, seek urgent care right away.",
+        "If your period still doesn't come in the next few days, testing is a good next step.",
       ],
       choices: [
         { id: "sym",  label: "Tell me about other symptoms", next: "LATE_SYMPTOMS_Q", primary: true },
@@ -594,8 +593,8 @@ export function createPeriodNodes(env, helpers) {
     LATE_NEG_UNCLEAR: {
       say: [
         `${ack()} 🩷`,
-        "Pregnancy tests can sometimes be negative or unclear early on.",
-        "If your period still hasn't started, repeating the test in a few days may give a clearer answer.",
+        "Early tests can be negative or unclear before hormone levels rise enough to detect.",
+        "Retesting in a few days is often clearer if your period still hasn't started.",
         "Have you had any major changes recently? (stress, illness, travel, intense exercise, or weight changes)",
       ],
       question: "Major changes recently?",
@@ -617,11 +616,12 @@ export function createPeriodNodes(env, helpers) {
         const pelvicKnown = ctx.entityHistory?.some(e => e.symptoms?.pelvic);
         return [
           "Thanks for sharing 🩷",
-          "Changes like stress, illness, or shifts in routine can affect hormone levels and delay ovulation, which can push your period later than usual.",
+          "Stress, illness, or routine shifts can delay ovulation, which can push your period later.",
+          "If pain worsens, bleeding gets heavy, or dizziness starts, treat that as a same-day check.",
           pelvicKnown
             ? pick([
-                "I've already noted you mentioned cramps or pelvic discomfort 🩷 Are you also experiencing any of the following?",
-                "I've got that you mentioned pelvic pain 🩷 Are any of these also happening?",
+                "I've already noted your cramps/pelvic discomfort, are any of these also happening?",
+                "I've got your pelvic pain noted, are any of these also happening?",
               ])
             : "Are you noticing any of the following right now?",
         ];
@@ -670,14 +670,9 @@ export function createPeriodNodes(env, helpers) {
         const insightLine = buildSymptomInsightLine();
         return [
           "Thanks for walking through this with me 🩷",
-          "Based on what you've shared, your late period could be related to recent changes, hormonal shifts, or possible pregnancy.",
-          "I can't diagnose conditions, but noticing patterns over time is really important.",
+          "From what you shared, this could be a cycle shift from recent changes, hormone timing, or possible pregnancy context.",
           ...(insightLine ? [insightLine] : []),
-          "If late or missed periods happen often, especially along with symptoms like acne, increased facial/body hair, weight changes, or ongoing mood shifts, some people choose to ask a healthcare provider about possible hormonal imbalances.",
-          "That doesn't mean anything is 'wrong', just that your hormones may need a closer look.",
-          "You might consider:\n• Continuing to track your cycle\n• Noting other symptoms over time\n• Reaching out to a healthcare provider if delays keep happening",
-          "You're doing the right thing by checking in and listening to your body 🩷",
-          "Would you like help with anything else today?",
+          "Keep tracking your pattern, and if delays keep repeating or symptoms escalate, check in with a provider.",
         ];
       },
       choices: [
@@ -691,13 +686,11 @@ export function createPeriodNodes(env, helpers) {
       say() {
         return [
           pick([
-            `${ack()} Spotting can feel confusing, especially when it shows up out of nowhere 🩷`,
-            "Unexpected spotting is unsettling, let's work out what's going on 🩷",
-            "Spotting outside your period can mean a few different things. Let's narrow it down 🩷",
-            "Okay, spotting. This is worth looking at properly, you were right to bring it up 🩷",
-            "Random bleeding between periods is something your body is trying to tell you something with. Let's listen 🩷",
+            `${ack()} spotting can feel unsettling 🩷`,
+            "Unexpected spotting is frustrating, let's check it properly 🩷",
+            "Okay, spotting. You did right by bringing it up 🩷",
           ]),
-          "A lot of the time it's harmless (hormonal shifts, ovulation, or early pregnancy), but sometimes it's your body asking for a closer look.",
+          "Light spotting can happen around ovulation or hormone shifts, but timing and symptoms matter.",
           "Is the spotting happening outside your normal period days?",
         ];
       },
@@ -710,11 +703,10 @@ export function createPeriodNodes(env, helpers) {
     },
     SPOT_NO_NORMAL: {
       say: [
-        "Okay 👍🏽",
-        "Light spotting at the very start or end of a period can be normal for many people, sometimes it's just your uterus finishing up.",
-        "If it stays light, doesn't come with strong pain, and doesn't drag on for days and days, it's usually not a big concern.",
-        "If you ever notice it getting heavier, lasting longer than usual, or coming with dizziness or severe cramps, that's a reason to check in with a provider.",
-        "Want to go back to the main options, or talk about something else you noticed?",
+        "Got you 🩷",
+        "Light spotting at the start or end of a period can be normal for some people.",
+        "If it gets heavier, lasts longer than usual, or comes with strong pain/dizziness, get checked.",
+        "Want to go back to main options or talk through another symptom?",
       ],
       choices: [
         { id: "menu", label: pickMainLabel(), next: "START_MENU", primary: true },
@@ -724,8 +716,8 @@ export function createPeriodNodes(env, helpers) {
     },
     SPOT_NOTSURE_TIMING: {
       say: [
-        "That's totally okay 🩷",
-        "Sometimes spotting is so light that it's hard to place in the cycle, especially if your period isn't super regular.",
+        "That's okay 🩷",
+        "When cycles vary, spotting timing can be hard to place, so rough timing still helps.",
         "About how many days after your last period did the spotting start?",
       ],
       question: "Timing of spotting after last period",
@@ -739,15 +731,15 @@ export function createPeriodNodes(env, helpers) {
     SPOT_MIDCYCLE_NOTE: {
       say: [
         "Got you 🩷",
-        "Spotting around the middle of the cycle can happen for some people around ovulation (a small hormone dip can cause light bleeding).",
-        "It's usually light and short, but we'll still check a few details to be safe.",
+        "Mid-cycle spotting can happen around ovulation and is often light and short.",
+        "We'll still check a few quick details to make sure there are no warning signs.",
       ],
       autoNext: () => "SPOT_YES_DURATION",
     },
     SPOT_YES_DURATION: {
       say: [
-        "Thanks for letting me know 🩷",
-        "A quick way to tell how concerned we should be is **duration + symptoms**.",
+        "Thanks for sharing 🩷",
+        "Duration plus symptoms is the quickest way to tell if this needs closer follow-up.",
         "Has the spotting lasted more than 2 days?",
       ],
       question: "Spotting lasted more than 2 days?",
@@ -756,6 +748,28 @@ export function createPeriodNodes(env, helpers) {
         { id: "no", label: "No", next: "SPOT_AMOUNT_Q" },
         { id: "ns", label: "Not sure", next: "SPOT_AMOUNT_Q" },
       ],
+    },
+    SPOT_SYMPTOMS_MULTI: {
+      say() {
+        const pelvicKnown   = ctx.entityHistory?.some(e => e.symptoms?.pelvic);
+        const dizzyKnown    = ctx.entityHistory?.some(e => e.symptoms?.dizziness);
+        const contextLine = dizzyKnown
+          ? "Since you've mentioned dizziness too, this needs a closer safety screen."
+          : pelvicKnown
+          ? "Since cramps are in the mix too, context matters more here."
+          : "Spotting that lasts longer or feels heavier matters more when other symptoms are present.";
+        return [
+          "Thanks for sharing 🩷",
+          contextLine,
+          "Let's quickly screen for warning signs.",
+        ];
+      },
+      multi: {
+        question: "Are you experiencing any of the following along with the spotting? (select any)",
+        options: ["Pelvic pain or cramps", "Unusual discharge or odor", "Dizziness or weakness", "Fever or chills", "Pain during sex", "None of these"],
+        nextOnSubmit: "SPOT_SYMPTOMS_GUIDE",
+        allowNone: false,
+      },
     },
     SPOT_AMOUNT_Q: {
       say: [pick(["Okay 🩷", "Got it 🩷", "Thanks 🩷"]), "Would you say it's mostly just when you wipe / a few drops… or more like a light flow?"],
@@ -766,28 +780,6 @@ export function createPeriodNodes(env, helpers) {
         { id: "ns", label: "Not sure", next: "SPOT_PREG_Q" },
       ],
     },
-    SPOT_SYMPTOMS_MULTI: {
-      say() {
-        const pelvicKnown   = ctx.entityHistory?.some(e => e.symptoms?.pelvic);
-        const dizzyKnown    = ctx.entityHistory?.some(e => e.symptoms?.dizziness);
-        const acks = [
-          ...(pelvicKnown ? [pick(["I've noted you mentioned pelvic pain or cramps 🩷", "I've got that you mentioned cramping 🩷"])] : []),
-          ...(dizzyKnown  ? [pick(["I've noted you mentioned dizziness 🩷", "I remember you mentioned feeling dizzy, keeping that in mind 🩷"])] : []),
-        ];
-        return [
-          "Thanks for sharing 🩷",
-          "Spotting that lasts more than a couple days, or feels heavier than expected, is worth paying attention to.",
-          ...acks,
-          "Let's check for anything that would make this more urgent.",
-        ];
-      },
-      multi: {
-        question: "Are you experiencing any of the following along with the spotting? (select any)",
-        options: ["Pelvic pain or cramps", "Unusual discharge or odor", "Dizziness or weakness", "Fever or chills", "Pain during sex", "None of these"],
-        nextOnSubmit: "SPOT_SYMPTOMS_GUIDE",
-        allowNone: false,
-      },
-    },
     SPOT_SYMPTOMS_GUIDE: {
       autoNext(_ctx, payload) {
         const sel = payload.multi || [];
@@ -796,9 +788,9 @@ export function createPeriodNodes(env, helpers) {
     },
     SPOT_PROVIDER_SOON: {
       say: [
-        `${ack()} Spotting plus other symptoms can sometimes mean irritation, infection, hormonal changes, or something worth checking 🩷`,
-        "I can't diagnose, but if symptoms continue, worsen, or you feel worried, speaking with a provider soon is the right move.",
-        ...urgentFooter(),
+        `${ack()} thanks for sharing that 🩷`,
+        "Spotting with these extra symptoms is worth a provider check soon.",
+        "If symptoms worsen, fever starts, bleeding gets heavier, or you feel weak/faint, treat that as urgent.",
       ],
       choices: [
         { id: "map", label: "Find care near me",    next: "START", action: "OPEN_MAP", primary: true },
@@ -810,7 +802,11 @@ export function createPeriodNodes(env, helpers) {
       ],
     },
     SPOT_PATTERN_CHECK: {
-      say: [pick(["Okay 👍🏽", "Got it 👍🏽", "Thanks 🩷"]), "Even without other symptoms, spotting can be useful information, especially if it becomes a pattern.", "Has this type of spotting happened more than once in recent cycles?"],
+      say: [
+        pick(["Okay 🩷", "Got it 🩷", "Thanks 🩷"]),
+        "Even without other symptoms, repeated spotting is useful pattern information.",
+        "Has this type of spotting happened more than once in recent cycles?",
+      ],
       question: "Spotting more than once recently?",
       choices: [
         { id: "yes", label: "Yes", next: "SPOT_TRACK_WRAP", primary: true },
@@ -819,7 +815,11 @@ export function createPeriodNodes(env, helpers) {
       ],
     },
     SPOT_PREG_Q: {
-      say: [pick(["Okay 🩷", "Got it 🩷", "Sure 🩷"]), "Next check: pregnancy can sometimes cause light spotting, especially early on.", "Is there any chance of pregnancy this cycle?"],
+      say: [
+        pick(["Okay 🩷", "Got it 🩷", "Sure 🩷"]),
+        "Pregnancy can sometimes cause light early spotting, so this helps narrow context.",
+        "Is there any chance of pregnancy this cycle?",
+      ],
       question: "Chance of pregnancy this cycle?",
       choices: [
         { id: "yes", label: "Yes", next: "SPOT_PREG_INFO", primary: true },
@@ -830,7 +830,7 @@ export function createPeriodNodes(env, helpers) {
     SPOT_PREG_INFO: {
       say: [
         "Thanks for sharing 🩷",
-        "If there's any chance of pregnancy, a test can help give clarity, especially if your period is late or your symptoms feel different than usual.",
+        "If pregnancy is possible, testing helps quickly separate normal spotting from pregnancy-related timing changes.",
         "Have you started, stopped, or changed birth control in the past few months?",
       ],
       question: "Birth control change recently?",
@@ -841,7 +841,11 @@ export function createPeriodNodes(env, helpers) {
       ],
     },
     SPOT_BC_Q: {
-      say: ["Birth control changes can sometimes cause spotting while your body adjusts.", "Have you started, stopped, or changed birth control in the past few months?"],
+      say: [
+        "Got you 🩷",
+        "Birth control changes can cause spotting while your body readjusts.",
+        "Have you started, stopped, or changed birth control in the past few months?",
+      ],
       question: "Birth control change recently?",
       choices: [
         { id: "yes", label: "Yes", next: "SPOT_BC_YES", primary: true },
@@ -852,9 +856,8 @@ export function createPeriodNodes(env, helpers) {
     SPOT_BC_YES: {
       say: [
         "That makes sense 🩷",
-        "Hormonal birth control changes can cause spotting while your body recalibrates, especially in the first 1–3 months.",
-        "It often improves over time, but tracking it helps you know if it's settling down or getting more frequent.",
-        "If spotting becomes heavy, persistent, or comes with pain or unusual discharge, it's worth checking in with a provider.",
+        "Spotting is common in the first 1–3 months after a birth-control change while hormones settle.",
+        "If it becomes heavy, persistent, painful, or comes with unusual discharge, get checked.",
         "Want to go back to the main options?",
       ],
       choices: [
@@ -864,21 +867,13 @@ export function createPeriodNodes(env, helpers) {
     },
     SPOT_TRACK_WRAP: {
       say() {
-        // Surface symptom/pattern intelligence on the spotting monitor path.
-        // insightLine takes priority; patternLine fills in when no insight fires.
-        const insightLine = buildSymptomInsightLine();
-        const patternLine = !insightLine
-          ? buildSymptomPatternLine(["VAGINAL_BLEEDING", "SPOTTING", "PELVIC_PAIN", "CRAMPS"])
-          : null;
+        const insightLine = buildSymptomInsightLine()
+          || buildSymptomPatternLine(["VAGINAL_BLEEDING", "SPOTTING", "PELVIC_PAIN", "CRAMPS"]);
         return [
           "Thanks for walking through that with me 🩷",
-          "Based on what you've shared, this spotting may be related to normal cycle changes (like ovulation), hormone fluctuations, birth control adjustments, or other non-emergency causes.",
-          ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
-          "Tracking helps you catch patterns early, and it also makes it easier to explain if you ever decide to see a provider.",
-          "If you want a simple tracking checklist:",
-          "• Color (pink/red/brown)\n• Amount (wipe-only vs light flow)\n• Days it lasted\n• Cycle day / timing\n• Any pain, odor, dizziness, or fever",
-          "If spotting becomes frequent, lasts longer, becomes heavier, or comes with pain/unusual discharge/dizziness, it may be a good idea to talk with a healthcare provider.",
-          "Would you like to go back to the main options, or check another symptom?",
+          "This pattern can fit ovulation spotting, hormone shifts, or contraception adjustment when symptoms stay mild.",
+          ...(insightLine ? [insightLine] : []),
+          "Track color, amount, and timing; if it repeats, gets heavier, or comes with pain/odor/dizziness, check with a provider.",
         ];
       },
       choices: [

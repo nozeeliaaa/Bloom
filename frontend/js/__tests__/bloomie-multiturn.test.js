@@ -654,6 +654,15 @@ describe("multi-turn: OOS follow-up resolution", () => {
     expect(state.lastOOS).toBeNull();
     expect(state.state).toBe("MOOD_SAFETY_CHECK");
   });
+
+  it("treats repair/clarification turns as non-OOS for streak counting", () => {
+    sendMessage("weather today?");
+    expect(chat.getState().oosStreakCount).toBe(1);
+
+    // Repair-classified message should not count as another OOS strike.
+    sendMessage("kmt what?");
+    expect(chat.getState().oosStreakCount).toBe(0);
+  });
 });
 
 // ── 12. Date capture interrupted by urgency ───────────────────────────────────

@@ -20,6 +20,13 @@
  *   Returns: { confirms, tone, intensity, subtext }  (200)
  *            { error: "ai_timeout"|"ai_parse_error"|"ai_unavailable"|... } (503/422/400)
  *
+ * POST /api/bloomie/ai/extract
+ *   Extracts structured health signals from a normalized user message.
+ *   AI produces structured JSON only — no advice text, no free-form responses.
+ *   Body:    { input: string }
+ *   Returns: { symptoms, timing, severity, tone, repair, pregnancySignals, redFlags, confidence } (200)
+ *            { error: "ai_timeout"|"ai_parse_error"|"ai_unavailable"|... } (503/422/400)
+ *
  * Security notes
  * ──────────────
  * - Auth is optional (same pattern as bloomieAnalytics.js) — Bloomie AI runs
@@ -54,6 +61,62 @@ const VALID_INTENTS = new Set([
 const VALID_TONES = new Set([
   "distressed", "anxious", "frustrated", "casual", "deflecting", "neutral",
 ]);
+
+// ── Signal extraction vocabularies ────────────────────────────────────────────
+// Allowlists used to validate the /extract endpoint response.
+// Codes align with bloomie-inference.js entity keys where possible so the
+// frontend can optionally map signals onto existing internal structures.
+const VALID_EXTRACT_SYMPTOMS = new Set([
+  "late", "heavy", "large_clots", "spotting", "cramps", "pelvic",
+  "one_sided_pain", "ovulation_pain", "pain_during_sex",
+  "nausea", "dizzy", "fatigue", "breast_pain",
+  "mood", "anxiety", "depression", "irritability",
+  "night_sweats", "discharge", "unusual_discharge", "odor",
+  "bloating", "headache", "migraine", "back_pain",
+]);
+
+const VALID_EXTRACT_TIMING = new Set([
+  "late_period", "missed_period", "early_period", "irregular",
+  "recent_onset", "ongoing", "worsening", "improving",
+]);
+
+const VALID_EXTRACT_SEVERITY = new Set(["mild", "moderate", "severe"]);
+
+const VALID_EXTRACT_TONES = new Set([
+  "anxious", "distressed", "frustrated", "casual", "deflecting", "neutral",
+]);
+
+// Red-flag codes are a strict subset used only for advisory signalling.
+// They NEVER override Bloomie's rule-based urgent routing — safety logic
+// remains entirely deterministic and is not gated on AI confidence.
+const VALID_EXTRACT_RED_FLAGS = new Set([
+  "heavy_and_dizzy",    // heavy bleeding + dizziness — ectopic / haemorrhage risk marker
+  "one_sided_severe",   // unilateral severe pain — ectopic risk marker
+  "signs_of_infection", // fever + abnormal discharge — infection risk marker
+  "very_heavy",         // soaking through protection — haemorrhage risk marker
+  "syncope_risk",       // actual or near-fainting
+]);
+
+// System prompt for the extraction endpoint.
+// Strict extraction only: no advice, no explanations, JSON output only.
+const EXTRACT_SYSTEM_PROMPT = [
+  "You are a structured health signal extractor for a women's menstrual health chat app.",
+  "Your ONLY job is to extract structured signals from the user message.",
+  "Do NOT generate advice. Do NOT write responses. Do NOT explain yourself.",
+  "Output ONLY compact JSON matching this exact schema (no markdown, no surrounding text):",
+  '{"symptoms":["<code>"],"timing":["<code>"],"severity":"mild|moderate|severe|null","tone":"anxious|distressed|frustrated|casual|deflecting|neutral","repair":false,"pregnancySignals":["<code>"],"redFlags":["<code>"],"confidence":0.0}',
+  "Valid symptom codes (use only these):",
+  "late, heavy, large_clots, spotting, cramps, pelvic, one_sided_pain, ovulation_pain, pain_during_sex,",
+  "nausea, dizzy, fatigue, breast_pain, mood, anxiety, depression, irritability,",
+  "night_sweats, discharge, unusual_discharge, odor, bloating, headache, migraine, back_pain.",
+  "Valid timing codes: late_period, missed_period, early_period, irregular, recent_onset, ongoing, worsening, improving.",
+  "Valid red flag codes: heavy_and_dizzy, one_sided_severe, signs_of_infection, very_heavy, syncope_risk.",
+  "repair: true if the user expresses frustration at not being understood or helped by the app.",
+  "pregnancySignals: subset of the symptoms array that are pregnancy-relevant (nausea, late, breast_pain, etc.).",
+  "confidence: 0.0 to 1.0 — how confident you are in the extraction given the message clarity.",
+  "Use [] for arrays when nothing applies. Use null for severity when unclear or not mentioned.",
+  "If the message contains no health content at all, return: {}",
+].join(" ");
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 // 30 requests / minute per IP.  AI only fires when rules are low-confidence,
@@ -234,6 +297,87 @@ router.post("/tone", aiLimiter, async (req, res) => {
   } catch (err) {
     const code = err.code ?? "ai_unavailable";
     console.error(`[bloomieAI/tone] ${code}:`, err.message);
+    return res.status(503).json({ error: code });
+  }
+});
+
+// ── POST /extract ─────────────────────────────────────────────────────────────
+/**
+ * Structured health signal extraction proxy.
+ *
+ * Receives the normalized user message and returns structured signals only.
+ * AI is strictly constrained to a fixed vocabulary — it cannot generate
+ * advice text or free-form health guidance.
+ *
+ * Fields forwarded to Anthropic: input only (≤500 chars, trimmed).
+ * No conversation history. No session data. No PII.
+ *
+ * Response validation: every field is checked against a fixed allowlist before
+ * being forwarded to the client. Unknown values are dropped, not passed through.
+ */
+router.post("/extract", aiLimiter, async (req, res) => {
+  const { input } = req.body ?? {};
+
+  if (typeof input !== "string" || !input.trim()) {
+    return res.status(400).json({ error: "input is required" });
+  }
+  if (input.length > 500) {
+    return res.status(400).json({ error: "input too long" });
+  }
+
+  try {
+    const parsed = await callAnthropic({
+      system:      EXTRACT_SYSTEM_PROMPT,
+      userContent: input.trim(),
+      maxTokens:   120,  // enough for the JSON shape; hard cap prevents runaway output
+      timeoutMs:   1200, // longer than intent (more fields) but still well inside UX window
+    });
+
+    // Empty object = no health content — return safe empty result
+    if (!parsed || typeof parsed !== "object" || Object.keys(parsed).length === 0) {
+      return res.json({
+        symptoms: [], timing: [], severity: null, tone: null,
+        repair: false, pregnancySignals: [], redFlags: [], confidence: 0,
+      });
+    }
+
+    // ── Server-side allowlist filtering ─────────────────────────────────────
+    // Each field is independently validated and unknown values are silently
+    // dropped. This is the primary defence against prompt-injection attempts
+    // that try to smuggle unexpected codes into the client.
+    const symptoms = Array.isArray(parsed.symptoms)
+      ? parsed.symptoms.filter(s => typeof s === "string" && VALID_EXTRACT_SYMPTOMS.has(s))
+      : [];
+
+    const timing = Array.isArray(parsed.timing)
+      ? parsed.timing.filter(t => typeof t === "string" && VALID_EXTRACT_TIMING.has(t))
+      : [];
+
+    const severity = VALID_EXTRACT_SEVERITY.has(parsed.severity) ? parsed.severity : null;
+
+    const tone = VALID_EXTRACT_TONES.has(parsed.tone) ? parsed.tone : null;
+
+    const repair = !!parsed.repair;
+
+    const pregnancySignals = Array.isArray(parsed.pregnancySignals)
+      ? parsed.pregnancySignals.filter(s => typeof s === "string" && VALID_EXTRACT_SYMPTOMS.has(s))
+      : [];
+
+    // redFlags are advisory only — the client must NOT use these to override
+    // Bloomie's rule-based urgent routing. Enforced in bloomie-extract.js.
+    const redFlags = Array.isArray(parsed.redFlags)
+      ? parsed.redFlags.filter(f => typeof f === "string" && VALID_EXTRACT_RED_FLAGS.has(f))
+      : [];
+
+    const confidence = typeof parsed.confidence === "number"
+      ? Math.min(1, Math.max(0, parsed.confidence))
+      : 0;
+
+    return res.json({ symptoms, timing, severity, tone, repair, pregnancySignals, redFlags, confidence });
+
+  } catch (err) {
+    const code = err.code ?? "ai_unavailable";
+    console.error(`[bloomieAI/extract] ${code}:`, err.message);
     return res.status(503).json({ error: code });
   }
 });

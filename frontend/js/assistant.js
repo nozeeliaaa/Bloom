@@ -4,7 +4,8 @@ import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory, loadLocalBloomieMemory, saveLocalBloomieMemory, loadUserProfile } from "./db.js";
 import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion, detectReportedCondition, detectConditionManagementQuestion, detectConditionSymptomQuestion, CONDITION_META, CONDITION_ALIASES, extractConditionKey, scoreVagueHealth } from "./bloomie-routing.js";
-import { resolveIntentAssist } from "./bloomie-intent.js";
+import { resolveIntentAssist, classifyRepairClarification, extractMultiIntentTags } from "./bloomie-intent.js";
+import { extractSignalsAI }   from "./bloomie-extract.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent, logAnalyticsEvent, bloomieDebug } from "./bloomie-logger.js";
 import { getIdToken, getUser } from "./auth.js";
@@ -14,7 +15,7 @@ import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhase
 import { createOOS } from "./bloomie-oos.js";
 import { createNodes } from "./bloomie-nodes.js";
 import { sanitizeInput, classifyInputSafety, sanitizeBotLine, authorizeHtmlPayload, isHtmlPayloadAuthorized } from "./bloomie-safety.js";
-import { buildSignalBoard, scoreInterpretations, selectResponseStrategy } from "./bloomie-reasoning.js";
+import { buildSignalBoard, scoreInterpretationBoard, scoreInterpretations, selectResponseStrategy } from "./bloomie-reasoning.js";
 import { isBloomieDebugEnabled } from "./bloom-storage.js";
 
 // ── Mood anomaly context ────────────────────────────────────────────────────
@@ -1344,11 +1345,43 @@ export function initBloomieChat({
       const _collapsed  = collapseRepeatedLetters(_fuzzyText);
       const normalizedText = expandShorthand(_collapsed);
 
+      // ── Repair / clarification gate (canonical text) ────────────────────
+      // Keep short frustration/confusion turns out of generic OOS handling.
+      // This is deterministic and label-only (no freeform generation).
+      {
+        const repair = classifyRepairClarification(normalizedText);
+        if (repair) {
+          const overdueDays = daysUntilNextPeriod();
+          const hasLateContext =
+            isLateContextActive({ includePromptContext: true }) ||
+            (typeof overdueDays === "number" && overdueDays < -1);
+
+          const repairLines = [
+            repair.label === "frustration"
+              ? "My bad 🩷 I hear you."
+              : "My bad 🩷 Let me say that more simply.",
+            hasLateContext
+              ? (typeof overdueDays === "number" && overdueDays < -1
+                  ? `Your logged dates suggest your period may be around ${Math.abs(overdueDays)} day${Math.abs(overdueDays) === 1 ? "" : "s"} late by estimate.`
+                  : "Your logged dates suggest your period may be later than expected.")
+              : "I can rephrase this in a simpler way and keep helping from here.",
+            "Do you want to focus on cramps, spotting, or pregnancy chance?",
+          ];
+
+          // Repair turns are conversational recovery, not OOS failures.
+          ctx.oosStreakCount = 0;
+          say(repairLines, { keepLocked: true });
+          transition("START_MENU");
+          return;
+        }
+      }
+
       // ── OOS follow-up context ────────────────────────────────────────────
       // Use canonical normalized turn text so follow-up parsing matches routing input.
       const oosFollowUp = resolveOOSFollowUp(_patoisNorm, ctx.lastOOS);
       if (oosFollowUp) {
         ctx.lastOOS = null;
+        ctx.oosStreakCount = 0;
         ctx.currentTone = detectUserTone(_patoisNorm);
         transition(oosFollowUp);
         return;
@@ -1843,14 +1876,30 @@ export function initBloomieChat({
       // Runs after extraction/merge and high-priority pre-checks, but before
       // inferRoute / keyword routing. Keeps behavior explainable and rule-based.
       {
+        // Repair/clarification classification + multi-label tags are computed
+        // from canonical normalized text only. Tags are advisory and feed the
+        // reasoning layer; routing still falls back to existing inferRoute/OOS.
+        const repairClassification = classifyRepairClarification(normalizedText);
+        const tagResult = extractMultiIntentTags(normalizedText, mergedEntities, {
+          repair: repairClassification,
+        });
+        ctx.turnIntentTags = tagResult.tags;
+        ctx.turnIntentTagConfidence = tagResult.confidence;
+        ctx.lastRepairClassification = repairClassification?.label || null;
+
         const signalBoard = buildSignalBoard({
           text: normalizedText,
           entities: mergedEntities,
+          tags: tagResult.tags,
+          repair: repairClassification,
+          phase: getCurrentPhase()?.phase ?? null,
           ctx,
           userMode,
           overdueDays: daysUntilNextPeriod(),
           bloomieMemory,
         });
+        const interpretationScorecard = scoreInterpretationBoard(signalBoard);
+        ctx.lastInterpretationScorecard = interpretationScorecard;
         const interpretations = scoreInterpretations(signalBoard);
         const decision = selectResponseStrategy(signalBoard, interpretations);
         ctx.lastReasoning = {
@@ -1858,6 +1907,8 @@ export function initBloomieChat({
           strategy: decision.strategy ?? "defer",
           why: decision.why ?? null,
           next: decision.next ?? null,
+          confidence: decision.confidence ?? interpretationScorecard.confidence ?? 0,
+          topInterpretation: interpretationScorecard.topInterpretation ?? null,
         };
         bloomieDebug("reasoning", ctx.lastReasoning);
 
@@ -2003,6 +2054,41 @@ export function initBloomieChat({
       // Returns null silently when: rule is confident, no health keywords, API fails.
       const _intentAssistPromise = resolveIntentAssist(normalizedText, ctx.routeConfidence);
 
+      // ── Signal extractor: fire in parallel, store fire-and-forget ─────────────
+      // Runs at the same pipeline position as intent assist, using the same
+      // canonical normalizedText. Never awaited in the hot path — result arrives
+      // on ctx.aiSignals whenever the network responds (within 1200 ms).
+      //
+      // Safety contract (enforced here and documented in bloomie-extract.js):
+      //   • Signals are advisory only — they enrich ctx but do NOT override
+      //     rule-based routing or safety triggers.
+      //   • If entities.urgent is true (rule layer flagged urgency) or
+      //     ctx.urgency is true (active urgent thread), signals are discarded.
+      //   • null result on any failure = Bloomie behaves exactly as before.
+      if (!entities.urgent && !ctx.urgency) {
+        extractSignalsAI(normalizedText)
+          .then(signals => {
+            if (!signals) return;
+            // Store on ctx for optional use by follow-up logic, memory
+            // persistence, analytics, and summary generation.
+            // Never referenced by inferRoute(), safety checks, or NODES directly.
+            ctx.aiSignals = signals;
+            bloomieDebug("ai", {
+              source:     "extract",
+              symptoms:   signals.symptoms.join(",") || "none",
+              timing:     signals.timing.join(",")   || "none",
+              severity:   signals.severity ?? "null",
+              repair:     signals.repair,
+              redFlags:   signals.redFlags.join(",") || "none",
+              confidence: signals.confidence,
+            });
+          })
+          .catch(() => {
+            // Extractor errors are already logged inside bloomie-extract.js.
+            // Nothing to do here — Bloomie continues unaffected.
+          });
+      }
+
       // ── Safety log: urgent_trigger (keyword router path) ──────────────────
       if (routed?.next === "HEAVY_URGENT") {
         logSafetyEvent("urgent_trigger", {
@@ -2017,6 +2103,10 @@ export function initBloomieChat({
 
       // ── Safety log: oos_fallback ────────────────────────────────────────────
       if (routed?.payload?.oos && routed.payload.oos !== "greeting") {
+        const REPAIR_OOS_CATEGORIES = new Set(["clarification_repair", "confused_with_bloomie"]);
+        if (REPAIR_OOS_CATEGORIES.has(routed.payload.oos)) {
+          // Repair/clarification turns are not true OOS failures.
+        } else {
         const containsHealthKeywords =
           /\b(bleed|faint|pass out|passing out|collapse|pain|cramp|late|pregnant|spotting|dizzy|discharge)\b/
           .test(normalizedText);
@@ -2027,6 +2117,7 @@ export function initBloomieChat({
           topic:                ctx.topic,
           riskLevel:            ctx.riskLevel,
         });
+        }
       }
 
       if (routed?.payload?.oos) {
@@ -2053,7 +2144,8 @@ export function initBloomieChat({
         const lines = Array.isArray(routed.reply) ? routed.reply : [routed.reply];
         const isOOS = !!routed.payload?.oos;
         const isGreetingOOS = routed.payload?.oos === "greeting";
-        if (isOOS && !isGreetingOOS) {
+        const isRepairOOS = new Set(["clarification_repair", "confused_with_bloomie"]).has(routed.payload?.oos);
+        if (isOOS && !isGreetingOOS && !isRepairOOS) {
           ctx.oosStreakCount = (ctx.oosStreakCount || 0) + 1;
           logAnalyticsEvent("oos_event", { streak: ctx.oosStreakCount }, ctx);
         } else {
