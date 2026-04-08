@@ -3,9 +3,9 @@
  * Biologically grounded phase education for the Today's Insight card.
  *
  * Each variant: { id, title, body, tags }
- *   title  – short bold label
- *   body   – 1-2 sentence educational fact (UK English, warm tone)
- *   tags   – uppercase symptom codes from SYMPTOM_CATEGORIES
+ *   title  - short bold label
+ *   body   - 1-2 sentence educational fact (UK English, warm tone)
+ *   tags   - uppercase symptom codes from SYMPTOM_CATEGORIES
  */
 
 export const PHASE_EDUCATION_MAP = {

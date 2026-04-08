@@ -59,6 +59,21 @@
       flex-direction: column;
       gap: 0.85rem;
       min-height: 400px;
+      scrollbar-width: thin;
+      scrollbar-color: #f0a0c0 transparent;
+    }
+    .chat-box::-webkit-scrollbar {
+      width: 5px;
+    }
+    .chat-box::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .chat-box::-webkit-scrollbar-thumb {
+      background: #f0a0c0;
+      border-radius: 99px;
+    }
+    .chat-box::-webkit-scrollbar-thumb:hover {
+      background: #e46a94;
     }
 
     .msg {
@@ -231,6 +246,18 @@
       .msg-avatar { display: none; }
     }
 
+    /* Hide footer entirely on this page */
+    .footer { display: none; }
+
+    /* Navbar scroll-fade */
+    .navbar {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .navbar.scrolled-away {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px);
+    }
   </style>
 </head>
 
@@ -238,24 +265,9 @@
   <div id="banner-area"></div>
 
   <main>
-    <div class="bloomie-shell" id="chat-container">
-      <div class="page-header">
-        <h1>Bloomie</h1>
-        <p class="text-muted">Your guided health education assistant</p>
-      </div>
-
+    <div class="bloomie-shell">
       <section class="card bloomie-card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Chat Assistant</div>
-            <div class="card-subtitle">
-              Educational support for cycle, symptom, and reproductive health questions
-            </div>
-          </div>
-        </div>
-
-        <div class="card-body">
-          <div class="chat-box" id="chat-box" aria-live="polite"></div>
+        <div class="chat-box" id="chat-box" aria-live="polite"></div>
 
         <div class="chat-input-area">
           <form class="chat-form" id="chat-form">
@@ -269,7 +281,6 @@
             />
             <button class="chat-send-btn chat-send-btn--text" type="submit" aria-label="Send message">Send</button>
           </form>
-          <p class="tiny-note">Bloomie provides educational information only. This is not medical advice. Always consult a healthcare provider for medical concerns.</p>
         </div>
       </section>
     </div>
@@ -281,7 +292,16 @@
     import { getUserGoal } from '/js/goals.js';
     import { onAuthChange, getIdToken } from '/js/auth.js';
     import { mountChat } from '/js/assistant.js';
+    import { fetchCycleState } from '/js/cycle-state.js';
     import { isAnonMode } from '/js/mode.js';
+
+    function parseDateKey(dateKey) {
+      return new Date(`${dateKey}T00:00:00`);
+    }
+
+    function formatDateKey(dateObj) {
+      return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    }
 
     function computeCycleBase(logs) {
       const periodDays = Object.keys(logs)
@@ -290,25 +310,36 @@
       const starts = [];
       let prev = null;
       for (const d of periodDays) {
-        if (!prev || (new Date(d) - new Date(prev)) / 86400000 > 3) starts.push(d);
+        if (!prev || (parseDateKey(d) - parseDateKey(prev)) / 86400000 > 3) starts.push(d);
         prev = d;
       }
       const lengths = [];
-      for (let i = 1; i < starts.length; i++)
-        lengths.push((new Date(starts[i]) - new Date(starts[i-1])) / 86400000);
+      for (let i = 1; i < starts.length; i++) {
+        lengths.push(Math.round((parseDateKey(starts[i]) - parseDateKey(starts[i - 1])) / 86400000));
+      }
       const avg = lengths.length
         ? Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length)
         : 28;
       const last = starts.length ? starts[starts.length - 1] : null;
       const next = last
-        ? new Date(new Date(last).getTime() + avg * 86400000).toISOString().slice(0, 10)
+        ? (() => {
+            const d = parseDateKey(last);
+            d.setDate(d.getDate() + avg);
+            return formatDateKey(d);
+          })()
         : null;
-      return { cycleStarts: starts, avgCycleLength: avg, nextPeriodDate: next };
+      return { cycleStarts: starts, cycleLengths: lengths, avgCycleLength: avg, nextPeriodDate: next };
     }
 
     renderNav('assistant');
     renderFooter();
     renderModeBanner(document.getElementById('banner-area'));
+
+    // Fade navbar out on scroll
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      if (navbar) navbar.classList.toggle('scrolled-away', window.scrollY > 40);
+    }, { passive: true });
 
     if (isAnonMode()) {
       document.getElementById('chat-container').innerHTML = `
@@ -324,21 +355,30 @@
     } else {
 
     async function init(user) {
-      const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
-      const isMinor = profile.ageRange === "under18";
-      const isAnon  = !user;
       const logsByDate = await getAllLogs();
       const cycle = computeCycleBase(logsByDate);
+      const cycleState = await fetchCycleState(logsByDate).catch(() => null);
       const goal = getUserGoal();
 
       const lastLmp = cycle.cycleStarts?.length
         ? cycle.cycleStarts[cycle.cycleStarts.length - 1]
         : null;
 
+      const stateCycleLength = Number(cycleState?.predictedCycleLength ?? cycleState?.avgCycleLength);
+      const cycleLength = Number.isFinite(stateCycleLength) && stateCycleLength > 0
+        ? Math.round(stateCycleLength)
+        : (cycle.avgCycleLength || null);
+      const nextPeriodDate = cycleState?.nextPeriodDate || cycle.nextPeriodDate || null;
+
       const cycleData = {
         lmp: lastLmp,
-        cycleLength: cycle.avgCycleLength || null,
-        nextPeriodDate: cycle.nextPeriodDate || null,
+        cycleLength,
+        nextPeriodDate,
+        previousCycleLengths: cycle.cycleLengths,
+        cycleCount: cycle.cycleStarts.length,
+        phase: cycleState?.phase || null,
+        phaseLabel: cycleState?.phaseLabel || null,
+        confidence: cycleState?.confidence?.level || null,
         isTrackingPregnancy: goal === 'pregnancy',
         mode: goal === 'pregnancy' ? 'pregnancy_tracking'
             : goal === 'ttc'      ? 'trying_to_conceive'
@@ -374,7 +414,7 @@
         } catch (_) { /* fall back to user.displayName */ }
       }
 
-      await mountChat(enrichedUser, cycleData, symptomHistory.length ? symptomHistory : null, { isMinor, isAnon });
+      await mountChat(enrichedUser, cycleData, symptomHistory.length ? symptomHistory : null);
     }
 
       onAuthChange(user => { init(user); });

@@ -340,7 +340,7 @@ function drawSummary(doc, data, y) {
     {
       label: "ML Predicted Cycle",
       value: `${data.predictedCycleLength} days`,
-      sub:   "ML-enhanced estimate",
+      sub:   "Predicted cycle length",
     },
     {
       label: "Est. Ovulation",
@@ -350,7 +350,7 @@ function drawSummary(doc, data, y) {
     {
       label: "Fertile Window",
       value: data.fertileStart && data.fertileEnd
-        ? `${formatDateMed(data.fertileStart)} – ${formatDateMed(data.fertileEnd)}`
+        ? `${formatDateMed(data.fertileStart)} - ${formatDateMed(data.fertileEnd)}`
         : "-",
       sub: data.fertileStart ? "estimated window" : "need more data",
     },
@@ -642,11 +642,11 @@ function drawTrends(doc, data, y) {
     if (tier === "tight") {
       varText = inTypicalRange
         ? `Your cycle lengths have been very consistent - a range of ${range ?? 0} day${range !== 1 ? "s" : ""} across your tracked cycles. This level of consistency makes your period easy to predict.`
-        : `Your cycle lengths have been very consistent (varying by only ${range ?? 0} day${range !== 1 ? "s" : ""}), though they fall outside the typical 21–35 day range. That consistency means your cycle is predictable on its own schedule.`;
+        : `Your cycle lengths have been very consistent (varying by only ${range ?? 0} day${range !== 1 ? "s" : ""}), though they fall outside the typical 21-35 day range. That consistency means your cycle is predictable on its own schedule.`;
     } else if (tier === "moderate") {
       varText = inTypicalRange
-        ? `Your cycle lengths have varied by about ${range} days (${min}–${max} days). This level of variation is common and generally within a normal range.`
-        : `Your cycle lengths have varied by about ${range} days (${min}–${max} days) and fall outside the typical 21–35 day range. Continued logging will help clarify whether this is a stable personal pattern.`;
+        ? `Your cycle lengths have varied by about ${range} days (${min}-${max} days). This level of variation is common and generally within a normal range.`
+        : `Your cycle lengths have varied by about ${range} days (${min}-${max} days) and fall outside the typical 21-35 day range. Continued logging will help clarify whether this is a stable personal pattern.`;
     } else {
       varText = `Your cycle lengths have varied notably, ranging from ${min} to ${max} days. Cycle irregularity can have many causes including stress, sleep, travel, and hormonal shifts. If this is a consistent pattern, it is worth discussing with a healthcare provider.`;
     }
@@ -709,7 +709,7 @@ function drawNextSteps(doc, data, y) {
   ];
   if (hasOutliers) {
     bullets.push(
-      "Consider a provider conversation - some of your cycles fall outside the typical 21–35 day range. A healthcare provider can help clarify whether this is your personal baseline or something worth investigating."
+      "Consider a provider conversation - some of your cycles fall outside the typical 21-35 day range. A healthcare provider can help clarify whether this is your personal baseline or something worth investigating."
     );
   }
 
