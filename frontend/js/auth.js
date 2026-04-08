@@ -167,6 +167,7 @@ export function onAuthChange(callback) {
       await syncUserRole(user);
     } else {
       clearCachedRole();
+      setMode("anon");
     }
     if (typeof callback === "function") callback(user);
   });

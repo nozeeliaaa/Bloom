@@ -59,6 +59,21 @@
       flex-direction: column;
       gap: 0.85rem;
       min-height: 400px;
+      scrollbar-width: thin;
+      scrollbar-color: #f0a0c0 transparent;
+    }
+    .chat-box::-webkit-scrollbar {
+      width: 5px;
+    }
+    .chat-box::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .chat-box::-webkit-scrollbar-thumb {
+      background: #f0a0c0;
+      border-radius: 99px;
+    }
+    .chat-box::-webkit-scrollbar-thumb:hover {
+      background: #e46a94;
     }
 
     .msg {
@@ -230,6 +245,19 @@
       .bloomie-card { min-height: calc(100vh - 230px); }
       .msg-avatar { display: none; }
     }
+
+    /* Hide footer entirely on this page */
+    .footer { display: none; }
+
+    /* Navbar scroll-fade */
+    .navbar {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .navbar.scrolled-away {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px);
+    }
   </style>
 </head>
 
@@ -238,11 +266,6 @@
 
   <main>
     <div class="bloomie-shell">
-      <div class="page-header">
-        <h1>Bloomie</h1>
-        <p class="text-muted">Your guided health education assistant</p>
-      </div>
-
       <section class="card bloomie-card">
         <div class="chat-box" id="chat-box" aria-live="polite"></div>
 
@@ -258,7 +281,6 @@
             />
             <button class="chat-send-btn chat-send-btn--text" type="submit" aria-label="Send message">Send</button>
           </form>
-          <p class="tiny-note">Bloomie provides educational information only. This is not medical advice. Always consult a healthcare provider for medical concerns.</p>
         </div>
       </section>
     </div>
@@ -298,6 +320,12 @@
     renderNav('assistant');
     renderFooter();
     renderModeBanner(document.getElementById('banner-area'));
+
+    // Fade navbar out on scroll
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      if (navbar) navbar.classList.toggle('scrolled-away', window.scrollY > 40);
+    }, { passive: true });
 
     if (isAnonMode()) {
       document.getElementById('chat-container').innerHTML = `

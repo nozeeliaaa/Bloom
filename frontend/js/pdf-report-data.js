@@ -192,7 +192,7 @@ function buildNarrative(d) {
         parts.push("Your cycle has been very consistent - your period tends to arrive on a predictable schedule.");
       } else {
         parts.push(
-          "Your cycle is highly consistent and follows a reliable pattern - it falls outside the typical 21–35 day range, " +
+          "Your cycle is highly consistent and follows a reliable pattern - it falls outside the typical 21-35 day range, " +
           "but its consistency means it is predictable for you specifically."
         );
       }
@@ -201,7 +201,7 @@ function buildNarrative(d) {
         parts.push(`Your cycle lengths have varied by up to ${range} days, which is within a normal range for most people.`);
       } else {
         parts.push(
-          `Your cycle falls outside the typical 21–35 day range and shows some variation (${min}–${max} days). ` +
+          `Your cycle falls outside the typical 21-35 day range and shows some variation (${min}-${max} days). ` +
           `Tracking over time will help clarify whether this is a stable pattern for you.`
         );
       }
@@ -256,7 +256,7 @@ function buildAlerts({ completedCycles, nextPeriodDate }) {
     alerts.push({
       title: "Cycle length outside typical range",
       body:
-        `${outliers.length} of your logged cycle${outliers.length !== 1 ? "s" : ""} fell outside the typical 21–35 day range. ` +
+        `${outliers.length} of your logged cycle${outliers.length !== 1 ? "s" : ""} fell outside the typical 21-35 day range. ` +
         `This is worth mentioning to your healthcare provider, especially if it is a recurring pattern.`,
     });
   }
@@ -278,7 +278,7 @@ function buildAlerts({ completedCycles, nextPeriodDate }) {
 }
 
 // ── "What This Means For You" interpretation ─────────────────────────────────
-// 3–4 sentences interpreting consistency, length context, and notable patterns.
+// 3-4 sentences interpreting consistency, length context, and notable patterns.
 
 function buildInterpretation(d) {
   if (!d.cyclesTracked) return null;
@@ -293,7 +293,7 @@ function buildInterpretation(d) {
       );
     } else if (avgCycleLength > 35) {
       parts.push(
-        `Your cycle runs longer than the typical 21–35 day range, but it is highly consistent - it follows a reliable rhythm that is your own normal, even if it differs from textbook timing.`
+        `Your cycle runs longer than the typical 21-35 day range, but it is highly consistent - it follows a reliable rhythm that is your own normal, even if it differs from textbook timing.`
       );
     } else {
       parts.push(
@@ -303,7 +303,7 @@ function buildInterpretation(d) {
   } else if (regularity?.tier === "moderate") {
     if (regularity.inTypicalRange) {
       parts.push(
-        "Your cycle falls within the typical 21–35 day range with some natural month-to-month variation - this is a common and healthy pattern."
+        "Your cycle falls within the typical 21-35 day range with some natural month-to-month variation - this is a common and healthy pattern."
       );
     } else {
       parts.push(
@@ -381,7 +381,7 @@ function buildPatternInsight(d) {
   // moderate
   if (!regularity.inTypicalRange) {
     return (
-      "Your cycle is outside the typical 21–35 day range but shows reasonable consistency - with more data, a clearer personal pattern will emerge."
+      "Your cycle is outside the typical 21-35 day range but shows reasonable consistency - with more data, a clearer personal pattern will emerge."
     );
   }
   return (

@@ -178,7 +178,7 @@ export function getCurrentPhase(today, lastPeriodStart, lastPeriodEnd, phases) {
  *
  * Hybrid strategy:
  *   0 periods    → ready: false
- *   1–3 cycles   → rule-based average, wide window
+ *   1-3 cycles   → rule-based average, wide window
  *   4+ cycles    → Weighted OLS (ML)
  *
  * Always check result.ready before accessing predictions.
@@ -313,7 +313,7 @@ export function runFullPrediction(
 }
 
 
-// Clamps predicted cycle length to biologically typical range (21–35 days)
+// Clamps predicted cycle length to biologically typical range (21-35 days)
 function clampCycleLength(value) {
   const v = Math.round(Number(value));
   if (!Number.isFinite(v)) return 28;

@@ -20,7 +20,7 @@ const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
 const MEMORY_KEY = "bloom_bloomie_memory";
 
-// Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → localhost:4000)
+// Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → 127.0.0.1:4000)
 const API_BASE = window.BLOOM_API_BASE || "";
 
 // --------------------
@@ -46,9 +46,12 @@ function setCloudSyncedBanner() {
 // In-memory cache for getAllLogs - avoids repeated API calls within the same page session
 let _logsCache = null;
 let _logsCacheMode = null;
+let _logsInFlight = null;
 
 export function invalidateLogsCache() {
   _logsCache = null;
+  _logsCacheMode = null;
+  _logsInFlight = null;
 }
 
 function showSyncWarning() {
@@ -256,61 +259,69 @@ export async function getAllLogs() {
 
   // Return cached result if available for this session
   if (_logsCache && _logsCacheMode === "account") return _logsCache;
+  // Dedupe concurrent account-mode fetches (dashboard + notifications startup path)
+  if (_logsInFlight) return _logsInFlight;
 
-  try {
-    const headers = await authHeaders();
-    if (!headers) return local;
+  _logsInFlight = (async () => {
+    try {
+      const headers = await authHeaders();
+      if (!headers) return local;
 
-    const [cycleRes, symptomRes] = await Promise.all([
-      fetch(apiUrl("/api/logs"), { headers }),
-      fetch(apiUrl("/api/symptoms"), { headers }),
-    ]);
+      const [cycleRes, symptomRes] = await Promise.all([
+        fetch(apiUrl("/api/logs"), { headers }),
+        fetch(apiUrl("/api/symptoms"), { headers }),
+      ]);
 
-    if (!cycleRes.ok) {
-      const txt = await cycleRes.text().catch(() => "");
-      console.warn("Cycle cloud fetch failed:", cycleRes.status, txt);
+      if (!cycleRes.ok) {
+        const txt = await cycleRes.text().catch(() => "");
+        console.warn("Cycle cloud fetch failed:", cycleRes.status, txt);
+        return local;
+      }
+
+      if (!symptomRes.ok) {
+        const txt = await symptomRes.text().catch(() => "");
+        console.warn("Symptom cloud fetch failed:", symptomRes.status, txt);
+        return local;
+      }
+
+      const cycleData = await cycleRes.json();
+      const symptomData = await symptomRes.json();
+
+      let cycleItems = [];
+      if (Array.isArray(cycleData?.items)) {
+        cycleItems = cycleData.items;
+      } else if (cycleData?.entries && typeof cycleData.entries === "object") {
+        cycleItems = Object.entries(cycleData.entries).map(([dateKey, entry]) => ({
+          dateKey,
+          ...entry,
+        }));
+      }
+
+      const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
+
+      const logs = mergeCloudLogs(cycleItems, symptomItems);
+
+      // Only overwrite local cache if cloud actually returned data.
+      // If cloud is empty but local has entries, keep local to avoid
+      // wiping logs that were saved before a sync had a chance to run.
+      if (Object.keys(logs).length > 0) {
+        writeJSON(LOGS_KEY, logs);
+        setCloudSyncedBanner();
+        _logsCache = logs;
+        _logsCacheMode = "account";
+        return logs;
+      }
+
       return local;
-    }
-
-    if (!symptomRes.ok) {
-      const txt = await symptomRes.text().catch(() => "");
-      console.warn("Symptom cloud fetch failed:", symptomRes.status, txt);
+    } catch (e) {
+      console.warn("Cloud fetch error:", e);
       return local;
+    } finally {
+      _logsInFlight = null;
     }
+  })();
 
-    const cycleData = await cycleRes.json();
-    const symptomData = await symptomRes.json();
-
-    let cycleItems = [];
-    if (Array.isArray(cycleData?.items)) {
-      cycleItems = cycleData.items;
-    } else if (cycleData?.entries && typeof cycleData.entries === "object") {
-      cycleItems = Object.entries(cycleData.entries).map(([dateKey, entry]) => ({
-        dateKey,
-        ...entry,
-      }));
-    }
-
-    const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
-
-    const logs = mergeCloudLogs(cycleItems, symptomItems);
-
-    // Only overwrite local cache if cloud actually returned data.
-    // If cloud is empty but local has entries, keep local to avoid
-    // wiping logs that were saved before a sync had a chance to run.
-    if (Object.keys(logs).length > 0) {
-      writeJSON(LOGS_KEY, logs);
-      setCloudSyncedBanner();
-      _logsCache = logs;
-      _logsCacheMode = "account";
-      return logs;
-    }
-
-    return local;
-  } catch (e) {
-    console.warn("Cloud fetch error:", e);
-    return local;
-  }
+  return _logsInFlight;
 }
 
 export async function deleteDailyLog(dateKey) {

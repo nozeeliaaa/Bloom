@@ -303,8 +303,10 @@ router.post('/state', requireAuth, requireConsent, async (req, res) => {
     // 1 ─ Derive period clusters
     const clusters = getPeriodClustersBackend(logs);
 
-    // Check in-memory cache before doing any computation
-    const lastPeriodDay = clusters.length ? clusters[clusters.length - 1].start : "none";
+    // Check in-memory cache before doing any computation.
+    // Keyed by cluster END (not start) so that logging each additional day of
+    // an ongoing period busts the cache and forces a fresh cyclePhaseEngine run.
+    const lastPeriodDay = clusters.length ? clusters[clusters.length - 1].end : "none";
     const cached = _getCachedState(uid, lastPeriodDay);
     if (cached) {
       console.log(`[cyclesML/state] cache hit uid=${uid}`);

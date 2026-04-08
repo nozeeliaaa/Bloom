@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cycle History - Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
+  <style>
+    .cycle-legend {
+      display: flex; gap: 1rem; flex-wrap: wrap;
+      margin-bottom: 0.85rem;
+    }
+    .cycle-legend-item {
+      display: flex; align-items: center; gap: 0.35rem;
+      font-size: 0.82rem; color: var(--color-text-muted);
+    }
+    .cycle-dot-item {
+      width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+    }
+    .dot-period     { background: #E8597A; }
+    .dot-fertile    { background: #7EC8C8; }
+    .dot-ovulation  { background: #1A8080; }
+    .dot-follicular { background: #A8C8E8; }
+    .dot-luteal     { background: #E8B86D; }
+
+    .cycle-card {
+      padding: 0.65rem 0.25rem;
+      border-bottom: 1px solid var(--color-border);
+      position: relative;
+    }
+    .cycle-card:last-child { border-bottom: none; }
+    .cycle-card--clickable {
+      cursor: pointer;
+      border-radius: 10px;
+      transition: background 0.15s;
+      padding: 0.65rem 0.5rem;
+    }
+    .cycle-card--clickable:hover { background: var(--color-primary-lightest, #fce4ec); }
+    .cycle-card-arrow {
+      position: absolute; right: 0.5rem; top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.3rem; color: var(--color-text-muted); line-height: 1;
+    }
+    .cycle-card-title {
+      display: block; font-size: 1rem; font-weight: 800;
+      color: var(--color-text); margin-bottom: 0.1rem;
+    }
+    .cycle-card-subtitle {
+      display: block; font-size: 0.82rem;
+      color: var(--color-text-muted); margin-bottom: 0.45rem;
+    }
+    .cycle-dot-row { display: flex; flex-wrap: wrap; gap: 3px; }
+
+    .chart-frame {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1rem 0.5rem;
+      background: var(--color-bg-card);
+      margin-top: 1.5rem;
+    }
+    .cycle-chart-container { width: 100%; height: 380px; }
+    .chart-title { margin: 0 0 0.75rem; font-size: 1rem; }
+
+    .history-back {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: none; border: none; font: inherit;
+      font-weight: 700; font-size: 0.95rem;
+      color: var(--color-text-muted); cursor: pointer; padding: 0;
+      margin-bottom: 1.25rem; transition: color 0.15s;
+    }
+    .history-back:hover { color: var(--color-primary); }
+
+    .no-data-msg { color: var(--color-text-muted); padding: 2rem 0; }
+  </style>
+</head>
+<body>
+  <div id="banner-area"></div>
+  <main>
+    <div class="page-header">
+      <button type="button" class="history-back" id="back-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Back to Dashboard
+      </button>
+      <h1>Cycle History</h1>
+      <p>Your full cycle log - tap a cycle for details</p>
+    </div>
+
+    <div class="card">
+      <div class="card-body" id="history-list">
+        <p class="text-muted">Loading…</p>
+      </div>
+    </div>
+
+    <div class="chart-frame hidden" id="chart-frame">
+      <h2 class="chart-title">Cycle Length Trends</h2>
+      <div id="cycleChart" class="cycle-chart-container"></div>
+    </div>
+  </main>
+
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner, formatDate, toDateKey } from '/js/utils.js';
+    import { getAllLogs } from '/js/db.js';
+    import { onAuthChange } from '/js/auth.js';
+
+    renderNav("dashboard");
+    renderFooter();
+    renderModeBanner(document.getElementById('banner-area'));
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      window.location.href = '/pages/dashboard.html';
+    });
+
+    function diffDays(a, b) {
+      return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+    }
+
+    function addDaysStr(dateStr, n) {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + n);
+      return toDateKey(d);
+    }
+
+    function buildCycleStarts(logsByDate) {
+      const periodDays = Object.keys(logsByDate)
+        .filter(k => logsByDate[k]?.flow && logsByDate[k].flow !== 'none')
+        .sort();
+      const starts = [];
+      let prev = null;
+      for (const day of periodDays) {
+        if (!prev || diffDays(prev, day) > 3) starts.push(day);
+        prev = day;
+      }
+      return starts;
+    }
+
+    function buildCard(cycleStarts, i, cycleLengths, logsByDate, todayKey) {
+      const start = cycleStarts[i];
+      const cycleLen = cycleLengths[i];
+      const isCurrent = cycleLen == null;
+      const nextStart = isCurrent ? null : cycleStarts[i + 1];
+      const cycleEndKey = nextStart ? addDaysStr(nextStart, -1) : todayKey;
+
+      const ovulationKey    = nextStart ? addDaysStr(nextStart, -14) : null;
+      const fertileStartKey = nextStart ? addDaysStr(nextStart, -19) : null;
+      const fertileEndKey   = nextStart ? addDaysStr(nextStart, -13) : null;
+
+      const displayLen = Math.min(cycleLen ?? (diffDays(start, todayKey) + 1), 40);
+      const dots = [];
+      for (let d = 0; d < displayLen; d++) {
+        const dk = addDaysStr(start, d);
+        const log = logsByDate[dk];
+        const isPeriod = !!(log && log.flow && log.flow !== 'none');
+        let cls = 'dot-follicular';
+        if (isPeriod) {
+          cls = 'dot-period';
+        } else if (ovulationKey && dk === ovulationKey) {
+          cls = 'dot-ovulation';
+        } else if (fertileStartKey && dk >= fertileStartKey && dk <= fertileEndKey) {
+          cls = 'dot-fertile';
+        } else if (ovulationKey && dk > ovulationKey) {
+          cls = 'dot-luteal';
+        }
+        dots.push(`<span class="cycle-dot-item ${cls}" title="${dk}"></span>`);
+      }
+
+      const daysSoFar = diffDays(start, todayKey) + 1;
+      const title    = isCurrent ? `Current cycle: ${daysSoFar} days` : `${cycleLen} days`;
+      const subtitle = `${formatDate(start)} - ${isCurrent ? 'present' : formatDate(cycleEndKey)}`;
+      const nextParam = nextStart ? `&next=${nextStart}` : '';
+
+      return `
+        <div class="cycle-card cycle-card--clickable" role="button" tabindex="0"
+             onclick="window.location.href='/pages/cycle-detail.html?start=${start}${nextParam}'"
+             onkeydown="if(event.key==='Enter')window.location.href='/pages/cycle-detail.html?start=${start}${nextParam}'">
+          <span class="cycle-card-title">${title}</span>
+          <span class="cycle-card-subtitle">${subtitle}</span>
+          <div class="cycle-dot-row">${dots.join('')}</div>
+          <span class="cycle-card-arrow">›</span>
+        </div>`;
+    }
+
+    function renderChart(cycleStarts, cycleLengths) {
+      const canvas = document.getElementById('cycleChart');
+      const frame  = document.getElementById('chart-frame');
+      if (!canvas || cycleLengths.length < 1) return;
+
+      frame.classList.remove('hidden');
+      const avg = Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length);
+      const labels = cycleStarts.slice(0, -1).map(s => formatDate(s));
+      const yPad = 6;
+      const yMin = Math.max(0, Math.min(...cycleLengths) - yPad);
+      const yMax = Math.max(...cycleLengths) + yPad;
+      const markerColors = cycleLengths.map(l => (l < 21 || l > 35 ? '#e05c7a' : '#D4749A'));
+
+      Plotly.newPlot(canvas, [
+        { x: labels, y: Array(labels.length).fill(35), type: 'scatter', mode: 'none', showlegend: false, hoverinfo: 'skip' },
+        { x: labels, y: Array(labels.length).fill(21), type: 'scatter', mode: 'none', fill: 'tonexty', fillcolor: 'rgba(180,160,210,0.09)', name: 'Typical range (21-35d)', hoverinfo: 'skip' },
+        { x: labels, y: Array(cycleLengths.length).fill(avg), type: 'scatter', mode: 'lines', name: `Avg: ${avg}d`, line: { color: '#B85C82', dash: 'dot', width: 1.8 }, hoverinfo: 'skip' },
+        {
+          x: labels, y: cycleLengths, type: 'scatter', mode: 'lines+markers',
+          name: 'Cycle length',
+          line: { color: '#D4749A', width: 3, shape: 'spline', smoothing: 1.1 },
+          marker: { color: markerColors, size: 10, line: { color: '#fff', width: 2.5 } },
+          hovertemplate: '<b>%{x}</b><br><b>%{y} days</b><extra></extra>',
+        },
+      ], {
+        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+        margin: { t: 14, r: 16, b: 72, l: 48 },
+        showlegend: true,
+        legend: { orientation: 'h', y: -0.28, x: 0, xanchor: 'left', font: { family: 'Nunito, sans-serif', size: 11 }, bgcolor: 'transparent' },
+        yaxis: { range: [yMin, yMax], gridcolor: 'rgba(0,0,0,0.06)', zeroline: false, tickfont: { family: 'Nunito, sans-serif', size: 11 }, ticksuffix: 'd', automargin: true, autorange: false },
+        xaxis: { showgrid: false, tickfont: { family: 'Nunito, sans-serif', size: 11 }, tickangle: -30, automargin: true },
+        hovermode: 'closest',
+        annotations: [{ x: labels[labels.length - 1], y: avg, xanchor: 'right', yanchor: 'bottom', text: `avg ${avg}d`, showarrow: false, font: { size: 10, color: '#B85C82', family: 'Nunito, sans-serif' }, yshift: 5 }],
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    onAuthChange(async () => {
+      const logsByDate = await getAllLogs();
+      const todayKey   = toDateKey(new Date());
+      const listEl     = document.getElementById('history-list');
+
+      const cycleStarts = buildCycleStarts(logsByDate);
+      if (!cycleStarts.length) {
+        listEl.innerHTML = `
+          <p class="no-data-msg">No periods logged yet. Open Calendar to begin tracking.</p>
+          <a class="btn btn-outline" href="/pages/calendar.html">Open calendar</a>`;
+        return;
+      }
+
+      const cycleLengths = [];
+      for (let i = 1; i < cycleStarts.length; i++) {
+        cycleLengths.push(diffDays(cycleStarts[i - 1], cycleStarts[i]));
+      }
+      cycleLengths.push(null); // current cycle has no length yet
+
+      const legend = `
+        <div class="cycle-legend">
+          <span class="cycle-legend-item"><span class="cycle-dot-item dot-period"></span>Period</span>
+          <span class="cycle-legend-item"><span class="cycle-dot-item dot-fertile"></span>Fertile</span>
+          <span class="cycle-legend-item"><span class="cycle-dot-item dot-ovulation"></span>Ovulation</span>
+          <span class="cycle-legend-item"><span class="cycle-dot-item dot-follicular"></span>Follicular</span>
+          <span class="cycle-legend-item"><span class="cycle-dot-item dot-luteal"></span>Luteal</span>
+        </div>`;
+
+      const cards = [...cycleStarts]
+        .map((_, i) => i)
+        .reverse()
+        .map(i => buildCard(cycleStarts, i, cycleLengths, logsByDate, todayKey));
+
+      listEl.innerHTML = legend + cards.join('');
+
+      // Chart uses completed cycles only (no current)
+      const completedLengths = cycleLengths.slice(0, -1);
+      renderChart(cycleStarts, completedLengths);
+    });
+  </script>
+</body>
+</html>

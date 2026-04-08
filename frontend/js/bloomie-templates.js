@@ -75,7 +75,7 @@ const SITUATION = {
   spotting_midcycle: (cx) => {
     if (cx?.dayOfCycle && cx?.cycleLength) {
       const ovDay = Math.round(cx.cycleLength / 2);
-      return `You're on day **${cx.dayOfCycle}** of a **${cx.cycleLength}-day cycle** - ovulation typically falls around day ${ovDay - 1}–${ovDay + 1}, which lines up with midcycle spotting.`;
+      return `You're on day **${cx.dayOfCycle}** of a **${cx.cycleLength}-day cycle** - ovulation typically falls around day ${ovDay - 1}-${ovDay + 1}, which lines up with midcycle spotting.`;
     }
     return "You're noticing light spotting around the middle of your cycle.";
   },
@@ -156,7 +156,7 @@ const MEANING = {
   spotting_midcycle: (cx) => {
     if (cx?.dayOfCycle && cx?.cycleLength) {
       const ovDay = Math.round(cx.cycleLength / 2);
-      return `Light spotting around day ${ovDay - 1}–${ovDay + 1} of a ${cx.cycleLength}-day cycle is often an ovulation sign - a small hormone dip can cause brief, light bleeding. You're on day **${cx.dayOfCycle}**, so this timing fits.`;
+      return `Light spotting around day ${ovDay - 1}-${ovDay + 1} of a ${cx.cycleLength}-day cycle is often an ovulation sign - a small hormone dip can cause brief, light bleeding. You're on day **${cx.dayOfCycle}**, so this timing fits.`;
     }
     return "Light spotting in the middle of the cycle is often related to ovulation - a small hormone dip can cause brief, light bleeding. This is common and usually harmless.";
   },
@@ -201,7 +201,7 @@ const NEXT_STEPS = {
   late_with_pain:
     "Note whether the pain is one-sided or worsening. If pregnancy is possible, a test is recommended. If pain becomes severe, seek care sooner.",
   late_with_pregnancy_chance:
-    "Take a pregnancy test - ideally the day after your expected period or later for best accuracy. If the result is negative but your period still doesn't come, retest in 48–72 hours.",
+    "Take a pregnancy test - ideally the day after your expected period or later for best accuracy. If the result is negative but your period still doesn't come, retest in 48-72 hours.",
   late_long_duration:
     "Consider speaking with a healthcare provider if your period is more than two weeks late and pregnancy has been ruled out. Tracking symptoms helps explain the situation clearly.",
   heavy_bleeding:
@@ -682,7 +682,7 @@ function softenInsight(text, phase) {
 /**
  * getPhaseInsight(phase, concern, lowConfidence) → string | null
  *
- * Returns a warm 1–2 sentence phase explanation for a given cycle phase and
+ * Returns a warm 1-2 sentence phase explanation for a given cycle phase and
  * concern category. Returns null if no insight exists for the combination so
  * callers can safely skip rendering without checking first.
  *
@@ -709,7 +709,7 @@ export function getPhaseInsight(phase, concern, lowConfidence = false) {
     },
     menstrual: {
       fatigue: "During your period your body is losing iron through bleeding - fatigue during this time can have a physical component. Iron-rich foods and rest genuinely help.",
-      mood:    "The drop in estrogen and progesterone at the start of your period can contribute to a low or flat mood in the first couple of days - it usually lifts as estrogen starts rising again around day 3–4.",
+      mood:    "The drop in estrogen and progesterone at the start of your period can contribute to a low or flat mood in the first couple of days - it usually lifts as estrogen starts rising again around day 3-4.",
       pain:    "Period cramps can happen when the uterus contracts to shed its lining - prostaglandins are the hormone-like compounds that contribute to that. Higher prostaglandin levels tend to mean more intense cramps.",
       bloating:"Bloating around the start of your period is very common - prostaglandins that contribute to cramps can also affect your digestive system. It usually eases within a day or two.",
       sleep:   "Sleep can be harder during your period - cramps, discomfort, and night sweats from hormonal shifts can all play a role. Rest as much as you can.",

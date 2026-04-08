@@ -62,7 +62,7 @@ app.use(
       if (!origin) return callback(null, true);
       // In dev (no ALLOWED_ORIGINS set), allow any localhost port
       if (!allowedOrigins) {
-        if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+        if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
       } else {
         if (allowedOrigins.includes(origin)) return callback(null, true);
       }

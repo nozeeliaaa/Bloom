@@ -85,7 +85,7 @@ export function createCtx() {
     flowId:             0,
     nodeFlowId:         -1,
     insightsGiven:      new Set(),  // keys like "luteal_mood" - prevents repeated full insights
-    cycleVariability:   null,       // range (max–min) across last 3 logged cycle lengths, null if unknown
+    cycleVariability:   null,       // range (max-min) across last 3 logged cycle lengths, null if unknown
     currentTone:        null,       // tone resolved for the current message ('distressed'|'angry'|…|'neutral')
     previousTone:       null,       // tone from the prior turn - used for session stability blending
     usedOpeners:        new Set(),  // opener strings already shown - prevents repetition within a session

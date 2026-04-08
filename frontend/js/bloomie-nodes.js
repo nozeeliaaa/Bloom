@@ -322,8 +322,8 @@ export function createNodes(env) {
     HEAVY_A_RATE: {
       say: ["How often are you having to change your pad or tampon?"],
       choices: [
-        { id: "2_3h", label: "Every 2–3 hours",  next: "HEAVY_A_2_3H",      primary: true },
-        { id: "3_4h", label: "Every 3–4 hours",  next: "HEAVY_SHARED_CORE" },
+        { id: "2_3h", label: "Every 2-3 hours",  next: "HEAVY_A_2_3H",      primary: true },
+        { id: "3_4h", label: "Every 3-4 hours",  next: "HEAVY_SHARED_CORE" },
         { id: "ns",   label: "Not sure",          next: "HEAVY_SHARED_CORE" },
       ],
     },
@@ -345,7 +345,7 @@ export function createNodes(env) {
         "How many days has the bleeding been going on?",
       ],
       choices: [
-        { id: "7_9",    label: "7–9 days",                               next: "HEAVY_B_7_9",    primary: true },
+        { id: "7_9",    label: "7-9 days",                               next: "HEAVY_B_7_9",    primary: true },
         { id: "10plus", label: "10 days or more",                        next: "HEAVY_B_10" },
         { id: "short",  label: "Less than 7 days but longer than usual", next: "HEAVY_B_LONGER" },
         { id: "ns",     label: "Not sure",                               next: "HEAVY_SHARED_CORE" },
@@ -509,7 +509,7 @@ export function createNodes(env) {
       say: [
         "Based on what you've shared, this isn't an emergency right now - but it does need a proper look in the next few days 🩷",
         "Bleeding that's heavier than usual or lasting longer than a week can sometimes point to things worth checking - like fibroids, hormonal shifts, or low iron.",
-        "Book a visit with a healthcare provider or gynaecologist as soon as you can, ideally within the next 2–3 days.",
+        "Book a visit with a healthcare provider or gynaecologist as soon as you can, ideally within the next 2-3 days.",
         "If anything changes - you start feeling faint, bleeding gets suddenly heavier, or you develop severe pain - treat that as urgent and seek care the same day.",
       ],
       choices: [
@@ -521,7 +521,7 @@ export function createNodes(env) {
     HEAVY_MONITOR: {
       say: [
         "Based on what you shared, this sounds like it may be a heavier day rather than something immediately alarming 🩷",
-        "Some people naturally have heavier flow - especially in the first 1–2 days of their period. That said, your experience is always worth tracking.",
+        "Some people naturally have heavier flow - especially in the first 1-2 days of their period. That said, your experience is always worth tracking.",
         "Keep monitoring over the next 24 hours. If the flow picks up, you start feeling weak or dizzy, or you notice large clots, come back and let me know.",
       ],
       choices: [
@@ -595,7 +595,7 @@ export function createNodes(env) {
           const lines = [
             `${ack()} That recommended test date has already passed - so you can test **today** 🩷`,
             "First morning urine gives the clearest result.",
-            `If it comes back negative but your period still hasn't arrived, retest again around **${fmtDate(retestDate)}** (48–72 hours from now).`,
+            `If it comes back negative but your period still hasn't arrived, retest again around **${fmtDate(retestDate)}** (48-72 hours from now).`,
           ];
           if (plan.bothDatesAvailable && plan._fromPeriod && plan._fromSex) {
             lines.splice(1, 0,
@@ -605,7 +605,7 @@ export function createNodes(env) {
           return lines;
         }
 
-        // Can test early (10–21 days after sex) but results are less reliable
+        // Can test early (10-21 days after sex) but results are less reliable
         if (plan.canTestEarly && plan.basis === "sex-date") {
           return [
             `${ack()} 🩷`,
@@ -613,7 +613,7 @@ export function createNodes(env) {
             "Early detection tests can pick up pregnancy from about 10 days after sex, but the result is less reliable at this stage.",
             "Testing too early can give a false negative because pregnancy hormone levels may not be high enough yet.",
             `For the most reliable result, wait until **${fmtDate(plan._fromSex)}** (21 days after sex).`,
-            `If negative, retest in 48–72 hours (around **${fmtDate(plan.retest)}**).`,
+            `If negative, retest in 48-72 hours (around **${fmtDate(plan.retest)}**).`,
             "If your cycles are irregular, you've recently stopped birth control, or you have PCOS, the 21-day rule after sex is generally the most reliable guide.",
           ];
         }
@@ -634,7 +634,7 @@ export function createNodes(env) {
 
         lines.push(
           "Testing too early can give a false negative because pregnancy hormone levels may not be high enough yet.",
-          `If the result is negative but your period still doesn't come, retest in **48–72 hours** (around **${fmtDate(plan.retest)}**).`
+          `If the result is negative but your period still doesn't come, retest in **48-72 hours** (around **${fmtDate(plan.retest)}**).`
         );
 
         if (plan.basis === "sex-date" || plan.bothDatesAvailable) {
@@ -658,7 +658,7 @@ export function createNodes(env) {
         const retestDate = addDays(new Date(), 3);
         return [
           "Logged 🩷",
-          `If today's test was negative, the best time to retest is around **${fmtDate(retestDate)}** - 48–72 hours from now, ideally first morning urine.`,
+          `If today's test was negative, the best time to retest is around **${fmtDate(retestDate)}** - 48-72 hours from now, ideally first morning urine.`,
           "A second negative at that point is more reliable.",
         ];
       },
@@ -713,7 +713,7 @@ export function createNodes(env) {
       ],
       choices: [
         { id: "today",  label: "Today or yesterday",     next: "TEST_RETEST_NOW", primary: true },
-        { id: "days2",  label: "1–2 days ago",           next: "TEST_RETEST_NOW" },
+        { id: "days2",  label: "1-2 days ago",           next: "TEST_RETEST_NOW" },
         { id: "week",   label: "3 or more days ago",     next: "TEST_NEGATIVE_TIMING" },
       ],
     },
@@ -1405,7 +1405,7 @@ export function createNodes(env) {
     SPOT_BC_YES: {
       say: [
         "That makes sense 🩷",
-        "Hormonal birth control changes can cause spotting while your body recalibrates - especially in the first 1–3 months.",
+        "Hormonal birth control changes can cause spotting while your body recalibrates - especially in the first 1-3 months.",
         "It often improves over time, but tracking it helps you know if it's settling down or getting more frequent.",
         "If spotting becomes heavy, persistent, or comes with pain or unusual discharge, it's worth checking in with a provider.",
         "Want to go back to the main options?",
@@ -1671,7 +1671,7 @@ export function createNodes(env) {
     MOOD_TIMING_HELP: {
       say: [
         "That's okay 🩷 Sometimes it's hard to connect the dots until you track it for a bit.",
-        "If it helps: many people notice mood shifts 3–7 days before bleeding starts, or right at the start of day 1–2.",
+        "If it helps: many people notice mood shifts 3-7 days before bleeding starts, or right at the start of day 1-2.",
         "Would you say it's closer to before, during, or random/anytime?",
       ],
       question: "Mood timing guess",
@@ -1820,8 +1820,8 @@ export function createNodes(env) {
 
     MOOD_TRACKING: {
       say: [
-        "What to log each day: your mood on a 1–10 scale, your cycle day if you know it, how you slept, and anything notable (big stressor, skipped meal, social event).",
-        "Patterns become visible after 2–3 cycles. That's when you start to see the shape of your own experience, and it becomes easier to prepare for the rough days rather than be surprised by them.",
+        "What to log each day: your mood on a 1-10 scale, your cycle day if you know it, how you slept, and anything notable (big stressor, skipped meal, social event).",
+        "Patterns become visible after 2-3 cycles. That's when you start to see the shape of your own experience, and it becomes easier to prepare for the rough days rather than be surprised by them.",
       ],
       choices: [
         { id: "log",  label: "Log mood now", next: "START_MENU",
@@ -2216,12 +2216,12 @@ export function createNodes(env) {
       ],
     },
     ELSE_PAIN_SCALE: {
-      say: ["On a scale from 0–10, how strong is the pain?"],
-      question: "Pain level (0–10 group)",
+      say: ["On a scale from 0-10, how strong is the pain?"],
+      question: "Pain level (0-10 group)",
       choices: [
-        { id: "m1", label: "0–3 (mild)", next: "ELSE_PAIN_MILD", primary: true },
-        { id: "m2", label: "4–6 (moderate)", next: "ELSE_PAIN_MILD" },
-        { id: "m3", label: "7–10 (severe)", next: "ELSE_PAIN_SEVERE" },
+        { id: "m1", label: "0-3 (mild)", next: "ELSE_PAIN_MILD", primary: true },
+        { id: "m2", label: "4-6 (moderate)", next: "ELSE_PAIN_MILD" },
+        { id: "m3", label: "7-10 (severe)", next: "ELSE_PAIN_SEVERE" },
       ],
     },
     ELSE_PAIN_MILD: {
@@ -2257,7 +2257,7 @@ export function createNodes(env) {
         "Got you 🩷",
         "If it only improves sometimes, it can help to notice what makes it worse or better.",
         "A few quick pattern checks:",
-        "• Is it worst on day 1–2?\n• Does it spike with stress or poor sleep?\n• Is it sharper on one side?",
+        "• Is it worst on day 1-2?\n• Does it spike with stress or poor sleep?\n• Is it sharper on one side?",
         "Would you say the pain is getting worse compared to your last few cycles?",
       ],
       question: "Pain getting worse over time?",
@@ -2834,7 +2834,7 @@ export function createNodes(env) {
           return quickSummary(
             `Your period was expected around ${fmtDate(timing.expectedPeriod)} - you can take a test now 🩷`,
             `${qualifier()}, ${effectiveCycleLength()}-day cycle.`,
-            "Use first morning urine for the clearest result. Negative but period still missing? Retest in 48–72 hours."
+            "Use first morning urine for the clearest result. Negative but period still missing? Retest in 48-72 hours."
           );
         }
         return quickSummary(
@@ -2972,7 +2972,7 @@ export function createNodes(env) {
         const fertileEnd   = addDays(ovulationDay, 1);
         const daysToOvulation = daysBetween(new Date(), ovulationDay);
         return [
-          `Based on your ${cd.cycleLength}-day cycle and last period of ${fmtDate(cd.lmp)}, your estimated ovulation window is ${fmtDate(fertileStart)} – ${fmtDate(fertileEnd)} 🩷`,
+          `Based on your ${cd.cycleLength}-day cycle and last period of ${fmtDate(cd.lmp)}, your estimated ovulation window is ${fmtDate(fertileStart)} - ${fmtDate(fertileEnd)} 🩷`,
           daysToOvulation > 0
             ? `That's about ${daysToOvulation} day${daysToOvulation === 1 ? "" : "s"} from now.`
             : daysToOvulation === 0
@@ -3046,7 +3046,7 @@ export function createNodes(env) {
         const fertileEnd   = addDays(ovDay,  1);
         const daysTo = daysBetween(new Date(), ovDay);
         return [
-          `Based on your ${cd.cycleLength}-day cycle, your estimated fertile window is ${fmtDate(fertileStart)} – ${fmtDate(fertileEnd)} 🩷`,
+          `Based on your ${cd.cycleLength}-day cycle, your estimated fertile window is ${fmtDate(fertileStart)} - ${fmtDate(fertileEnd)} 🩷`,
           daysTo > 0  ? `That's about ${daysTo} day${daysTo === 1 ? "" : "s"} away.`
           : daysTo === 0 ? "You're currently in your fertile window."
           : "Your fertile window has passed for this cycle.",
@@ -3381,7 +3381,7 @@ export function createNodes(env) {
     EDUC_CRAMPS: {
       say: [
         "Period cramps (dysmenorrhoea) happen because your uterus contracts to shed its lining 🩷",
-        "Mild cramps are common and normal for the first 1–2 days. But cramps that stop you from daily life, don't respond to pain relief, or happen outside your period - that's a different story.",
+        "Mild cramps are common and normal for the first 1-2 days. But cramps that stop you from daily life, don't respond to pain relief, or happen outside your period - that's a different story.",
         "Conditions like endometriosis and adenomyosis can cause severe cramping and are often under-diagnosed.",
         `${consent()} - how bad does it get for you?`,
       ],
@@ -3411,7 +3411,7 @@ export function createNodes(env) {
     EDUC_MOOD: {
       say: [
         "Mood changes tied to your cycle are driven by shifting hormone levels, mainly oestrogen and progesterone 🩷",
-        "In the luteal phase (roughly days 15–28), progesterone rises then drops sharply, which can cause irritability, sadness, anxiety, or brain fog.",
+        "In the luteal phase (roughly days 15-28), progesterone rises then drops sharply, which can cause irritability, sadness, anxiety, or brain fog.",
         "When it's mild, that's PMS. When it's significantly affecting your daily life, it might be PMDD, which is real and treatable.",
         "Things like poor sleep, high stress, and low iron can also make cycle-related mood shifts worse.",
         ...safeFooter(),

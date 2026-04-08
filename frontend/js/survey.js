@@ -526,7 +526,7 @@ function rangeBlock(id, value, min, max, ticks) {
     <div class="sliderRow">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <span class="pill">Value: <strong id="${id}_label">${escapeHtml(safeVal)}</strong></span>
-        <span class="tiny-note" style="opacity:0.85;">${escapeHtml(min)}–${escapeHtml(max)}</span>
+        <span class="tiny-note" style="opacity:0.85;">${escapeHtml(min)}-${escapeHtml(max)}</span>
       </div>
 
       <input id="${id}" type="range" min="${escapeAttr(min)}" max="${escapeAttr(max)}" step="1" value="${safeVal}" />

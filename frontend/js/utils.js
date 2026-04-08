@@ -480,10 +480,7 @@ export function renderBloomieFab() {
   modal.innerHTML = `
     <div class="bloomie-modal-backdrop" data-close="1"></div>
     <div class="bloomie-modal-panel" role="dialog" aria-modal="true">
-      <div class="bloomie-modal-header">
-        <strong>Bloomie</strong>
-        <button class="bloomie-close" data-close="1" aria-label="Close">✕</button>
-      </div>
+      <button class="bloomie-close" data-close="1" aria-label="Close">✕</button>
       <iframe class="bloomie-frame" src="/pages/assistant.html" title="Bloomie chat"></iframe>
     </div>
   `;

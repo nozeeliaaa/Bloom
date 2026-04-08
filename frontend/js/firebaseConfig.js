@@ -7,7 +7,7 @@
  * For production, use environment variables or a build step to inject these.
  * This file should be in .gitignore for security.
  */
-// Empty string = use Vite proxy (/api → http://localhost:4000). Avoids CORS entirely.
+// Empty string = use Vite proxy (/api → http://127.0.0.1:4000). Avoids CORS entirely.
 window.BLOOM_API_BASE = "";
 
 export const firebaseConfig = {

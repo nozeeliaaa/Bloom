@@ -268,6 +268,7 @@
         goPostAuth();
 
       } catch (err) {
+        console.error("[Bloom] login error:", err?.code || err?.message || err);
         if (err.code === 'auth/email-not-verified') {
           // Show the resend verification notice
           _unverifiedEmail = email;
@@ -284,8 +285,16 @@
               err.code === 'auth/wrong-password' ||
               err.code === 'auth/invalid-credential') {
             msg = 'Invalid email or password. Please try again.';
+          } else if (err.code === 'auth/user-disabled') {
+            msg = 'This account has been disabled. Please contact support.';
           } else if (err.code === 'auth/too-many-requests') {
             msg = 'Too many attempts. Please try again later.';
+          } else if (err.code === 'auth/network-request-failed') {
+            msg = 'Network error while signing in. Check your connection and try again.';
+          } else if (err.code === 'auth/invalid-api-key' || err.code === 'auth/app-not-authorized') {
+            msg = 'Authentication is temporarily unavailable due to app configuration. Please try again shortly.';
+          } else if (err.code) {
+            msg = `Login failed (${err.code}). Please try again.`;
           }
           showError(msg);
         }

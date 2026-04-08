@@ -679,9 +679,9 @@ const WORD_MAP = [
 //   2. Exact-match check against FUZZY_DICTIONARY - skip correction if already correct.
 //   3. Damerau-Levenshtein (OSA) - handles insertions, deletions, substitutions,
 //      and adjacent transpositions. Threshold based on max(token, dictWord) length:
-//        1–4 chars  → distance 0 (no fuzzy - "pad" must not match "pain")
-//        5–7 chars  → distance ≤ 1
-//        8–11 chars → distance ≤ 2
+//        1-4 chars  → distance 0 (no fuzzy - "pad" must not match "pain")
+//        5-7 chars  → distance ≤ 1
+//        8-11 chars → distance ≤ 2
 //        12+ chars  → distance ≤ 3
 //   4. PROTECTED_TOKENS - valid Patois words, never corrected.
 //   5. Correction cache - Map keyed on token, avoids re-running Levenshtein.
@@ -968,7 +968,7 @@ function _correctToken(token) {
  *   Always returns a string (never null) in sentence mode.
  *
  * Threshold rules (based on max(token, dictWord) length):
- *   1–4 chars  → no fuzzy  |  5–7 → dist ≤ 1  |  8–11 → dist ≤ 2  |  12+ → dist ≤ 3
+ *   1-4 chars  → no fuzzy  |  5-7 → dist ≤ 1  |  8-11 → dist ≤ 2  |  12+ → dist ≤ 3
  *
  * Exported so it can be called after normalizePatois() in the pipeline and
  * tested directly in __tests__/bloomie-patois.test.js.

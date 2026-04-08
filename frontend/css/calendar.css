@@ -2,12 +2,12 @@
 
 :root{
   /* Key + Calendar must use the same colors = must match legend exactly */
-  --period-logged:    #e46a94;   /* Period   – solid pink            */
-  --period-predicted: #f5b4c8;   /* Predicted period – pink stripe   */
-  --ovulation:        #0d9488;   /* Ovulation – dark teal            */
-  --fertility:        #2dd4bf;   /* Fertile window – teal            */
-  --follicular-color: #60a5fa;   /* Follicular – periwinkle blue     */
-  --luteal-color:     #f59e0b;   /* Luteal – amber/gold              */
+  --period-logged:    #e46a94;   /* Period   - solid pink            */
+  --period-predicted: #f5b4c8;   /* Predicted period - pink stripe   */
+  --ovulation:        #1A8080;   /* Ovulation - dark teal            */
+  --fertility:        #2dd4bf;   /* Fertile window - teal            */
+  --follicular-color: #60a5fa;   /* Follicular - periwinkle blue     */
+  --luteal-color:     #f59e0b;   /* Luteal - amber/gold              */
 }
 
 /* Wrapper */
@@ -105,11 +105,8 @@
   border: 2px solid var(--period-logged);
 }
 
-/* Optional “strike” to indicate predicted (you had this) */
 .calendar-cell.predicted-period .day-number {
-  text-decoration: line-through;
-  text-decoration-color: var(--period-logged);
-  text-decoration-thickness: 2px;
+  text-decoration: none;
 }
 
 /* ===== Fertile window (SOLID TEAL) ===== */
