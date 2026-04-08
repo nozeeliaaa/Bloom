@@ -117,9 +117,16 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
 
     // Map numeric flowLevel back to string used by the frontend
     const NUM_TO_FLOW = { 0: "none", 1: "light", 2: "medium", 3: "heavy" };
-    const flowStr = entry.flowLevel != null
-      ? (NUM_TO_FLOW[entry.flowLevel] ?? "none")
-      : "none";
+    let flowStr = "none";
+
+    if (entry.flowLevel != null) {
+      flowStr = NUM_TO_FLOW[entry.flowLevel] ?? "none";
+    }
+
+    // fallback if backend ever sends string flow
+    if (flowStr === "none" && entry.flow) {
+      flowStr = entry.flow;
+    }
 
     merged[dateKey] = {
       ...(merged[dateKey] || {}),
@@ -300,18 +307,26 @@ export async function getAllLogs() {
 
     const logs = mergeCloudLogs(cycleItems, symptomItems);
 
+    console.log("CLOUD cycleItems:", cycleItems);
+    console.log("MERGED logs:", logs);
+
     // Only overwrite local cache if cloud actually returned data.
     // If cloud is empty but local has entries, keep local to avoid
     // wiping logs that were saved before a sync had a chance to run.
+    // If cloud returned something → use it
     if (Object.keys(logs).length > 0) {
       writeJSON(LOGS_KEY, logs);
-      setCloudSyncedBanner();
       _logsCache = logs;
-      _logsCacheMode = "account";
       return logs;
     }
 
-    return local;
+    // If cloud empty BUT local exists → KEEP local
+    if (Object.keys(local).length > 0) {
+      return local;
+    }
+
+    // Only if BOTH empty → return empty
+    return {};
   } catch (e) {
     console.warn("Cloud fetch error:", e);
     return local;

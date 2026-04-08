@@ -1,8 +1,6 @@
-// backend/src/middleware/auth.js
 import { auth, db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 
-// ─── Main auth middleware ────────────────────────────────────────────────────
 export async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
 
@@ -18,88 +16,116 @@ export async function requireAuth(req, res, next) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      // Brand new user - create full doc with all expected fields
       await userRef.set({
         role: "user",
         email: decoded.email || null,
         profile: {
-          role: "user",
           nickname: null,
-          avatar: null,
-          goal: "period",
-          mode: "account",
+          avatar: "👤",
           yearOfBirth: null,
+          goal: null,
+          mode: "account",
+          consentSensitive: false,
+          remindersEnabled: false,
+          reminderTime: "09:00",
+        },
+        healthProfile: {
           avgCycleLength: null,
           periodDuration: null,
           weightKg: null,
           heightCm: null,
-          consentSensitive: false,
-          remindersEnabled: false,
-          reminderTime: "09:00",
         },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       req.user = {
-        uid:              decoded.uid,
-        email:            decoded.email || null,
-        email_verified:   !!decoded.email_verified,
-        role:             "user",
-        ageBand:          null,
-        yob:              null,
+        uid: decoded.uid,
+        email: decoded.email || null,
+        email_verified: !!decoded.email_verified,
+        role: "user",
+        ageBand: null,
+        yob: null,
         consentSensitive: false,
       };
 
       return next();
     }
 
-    // Doc exists - read it
-    const data    = userDoc.data();
-    const profile = data?.profile || {};
+    const data = userDoc.data() || {};
+    const profile = data.profile || {};
+    const healthProfile = data.healthProfile || {};
 
-    // Backfill any missing fields for legacy accounts
-    const needsBackfill = !data.role || !data.profile ||
-      profile.nickname === undefined || profile.avatar === undefined ||
-      profile.avgCycleLength === undefined || profile.goal === "track_cycle";
+    const needsBackfill =
+      !data.role ||
+      !data.profile ||
+      !data.healthProfile ||
+      profile.nickname === undefined ||
+      profile.avatar === undefined ||
+      profile.yearOfBirth === undefined ||
+      profile.goal === undefined ||
+      profile.mode === undefined ||
+      profile.consentSensitive === undefined ||
+      profile.remindersEnabled === undefined ||
+      profile.reminderTime === undefined ||
+      profile.role !== undefined ||
+      profile.avgCycleLength !== undefined ||
+      profile.periodDuration !== undefined ||
+      profile.weightKg !== undefined ||
+      profile.heightCm !== undefined ||
+      profile.goal === "track_cycle";
+
     if (needsBackfill) {
       const backfill = {
-        role: data.role || profile.role || "user",
+        role: data.role || "user",
         email: data.email || decoded.email || null,
         profile: {
-          role:             profile.role             || "user",
-          nickname:         profile.nickname         ?? null,
-          avatar:           profile.avatar           ?? null,
-          goal:             profile.goal === "track_cycle" ? "period" : (profile.goal || "period"),
-          mode:             profile.mode             || "account",
-          yearOfBirth:      profile.yearOfBirth      ?? null,
-          avgCycleLength:   profile.avgCycleLength   ?? null,
-          periodDuration:   profile.periodDuration   ?? null,
-          weightKg:         profile.weightKg         ?? null,
-          heightCm:         profile.heightCm         ?? null,
+          nickname: profile.nickname ?? null,
+          avatar: profile.avatar ?? "👤",
+          yearOfBirth: profile.yearOfBirth ?? null,
+          goal:
+            profile.goal === "track_cycle"
+              ? "period"
+              : profile.goal === "no_period"
+              ? "track_symptoms"
+              : (profile.goal ?? "period"),
+          mode: profile.mode ?? "account",
           consentSensitive: profile.consentSensitive ?? false,
           remindersEnabled: profile.remindersEnabled ?? false,
-          reminderTime:     profile.reminderTime     || "09:00",
+          reminderTime: profile.reminderTime ?? "09:00",
+        },
+        healthProfile: {
+          avgCycleLength:
+            healthProfile.avgCycleLength ?? profile.avgCycleLength ?? null,
+          periodDuration:
+            healthProfile.periodDuration ?? profile.periodDuration ?? null,
+          weightKg:
+            healthProfile.weightKg ?? profile.weightKg ?? null,
+          heightCm:
+            healthProfile.heightCm ?? profile.heightCm ?? null,
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
+
       await userRef.set(backfill, { merge: true });
 
-      // Use the backfilled values going forward
-      Object.assign(data, backfill);
-      Object.assign(profile, backfill.profile);
+      data.role = backfill.role;
+      data.email = backfill.email;
+      data.profile = backfill.profile;
+      data.healthProfile = backfill.healthProfile;
     }
 
-    const ageBand = deriveAgeBand(profile.yearOfBirth);
+    const safeProfile = data.profile || {};
+    const ageBand = deriveAgeBand(safeProfile.yearOfBirth);
 
     req.user = {
-      uid:              decoded.uid,
-      email:            decoded.email || null,
-      email_verified:   !!decoded.email_verified,
-      role:             decoded.role || data.role || profile.role || "user",
+      uid: decoded.uid,
+      email: decoded.email || null,
+      email_verified: !!decoded.email_verified,
+      role: decoded.role || data.role || profile.role || "user",
       ageBand,
-      yob:              profile.yearOfBirth || null,
-      consentSensitive: profile.consentSensitive === true,
+      yob: safeProfile.yearOfBirth || null,
+      consentSensitive: safeProfile.consentSensitive === true,
     };
 
     return next();
@@ -109,7 +135,6 @@ export async function requireAuth(req, res, next) {
   }
 }
 
-// ─── Role gate middleware ────────────────────────────────────────────────────
 export function requireRole(...allowed) {
   const allowedSet = new Set(allowed);
   return (req, res, next) => {
@@ -121,7 +146,6 @@ export function requireRole(...allowed) {
   };
 }
 
-// ─── Sensitive access gate ───────────────────────────────────────────────────
 export async function requireSensitiveAccess(req, res, next) {
   try {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
@@ -150,14 +174,13 @@ export async function requireSensitiveAccess(req, res, next) {
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 export function deriveAgeBand(yob) {
   if (!yob) return null;
   const year = Number(yob);
   const currentYear = new Date().getFullYear();
   if (!Number.isInteger(year) || year < 1900 || year > currentYear) return null;
   const age = currentYear - year;
-  if (age >= 13 && age <= 17) return "13-17";
+  if (age >= 10 && age <= 17) return "10-17";
   if (age >= 18) return "18+";
   return null;
 }

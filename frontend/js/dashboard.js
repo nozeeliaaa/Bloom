@@ -224,13 +224,13 @@ function renderGoalToolCard(goal, cycle) {
   if (!el) return;
   const todayKey = toDateKey(new Date());
 
-  if (goal === "no_period" || goal === "perimenopause") {
+  if (goal === "track_symptoms" || goal === "perimenopause") {
     el.innerHTML = `
       <div class="stat-number">Symptom Mode</div>
       <p class="text-muted">Log symptoms freely.</p>
       <a class="btn btn-outline" href="/pages/calendar.html" style="margin-top:0.5rem;display:inline-block;">Log today</a>
     `;
-    return;
+   return;
   }
 
   if (goal === "ttc") {
@@ -762,9 +762,8 @@ function renderPregnancyTools(goal, logsByDate) {
   try {
     const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
     const cycleLen = Number(profile.avgCycleLength) || 28;
-    // Parse LMP as local midnight to avoid UTC-offset shifting the date
+    // Parse LMP as local midnight to avoid UTC-offset shifting the date.
     const lmpDate = new Date(lmp + "T00:00:00");
-    console.log(`[pregnancy] LMP stored: ${lmp} → parsed: ${lmpDate.toDateString()} → daysAgo: ${Math.floor((Date.now() - lmpDate) / 86400000)}`);
     const r = algoPregnancy.estimatedDueDate(lmpDate, cycleLen);
     week = r.currentWeek;
     const size = week >= 4 && week <= 40 ? BABY_SIZES[week] : null;
@@ -806,8 +805,9 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   const subtitle = document.getElementById("symptom-tools-subtitle");
   if (!card || !body) return;
 
-  const on = goal === "no_period" || goal === "perimenopause";
-  document.body.classList.toggle("goal-no-period", goal === "no_period");
+  const isSymptomGoal = goal === "no_period" || goal === "track_symptoms";
+  const on = isSymptomGoal || goal === "perimenopause";
+  document.body.classList.toggle("goal-no-period", isSymptomGoal);
   document.body.classList.toggle("goal-perimenopause", goal === "perimenopause");
   show(card, on);
   if (!on) return;

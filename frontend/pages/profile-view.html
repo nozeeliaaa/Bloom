@@ -359,10 +359,12 @@
 
     function fillFields() {
       const p = loadProfile();
+
       nicknameEl.value  = p.nickname       || "";
       yobEl.value       = p.yob            || "";
       avgCycleEl.value  = p.avgCycleLength || "";
       periodDurEl.value = p.periodDuration || "";
+
       const lmp = localStorage.getItem(LS_LMP);
       if (lmp) lmpDateEl.value = lmp;
 
@@ -381,7 +383,6 @@
           heightInEl.value = ins;
         }
       }
-
       if (p.yob || localStorage.getItem(LS_YOB_LOCKED)) {
         localStorage.setItem(LS_YOB_LOCKED, "true");
         lockYobUI(p.yob || "");

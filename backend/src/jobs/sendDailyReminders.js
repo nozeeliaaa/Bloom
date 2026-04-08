@@ -129,8 +129,10 @@ export async function runDailyRemindersJob() {
 
           if (!logsSnap.empty) {
             const lastPeriodDate = new Date(logsSnap.docs[0].data().dateKey);
-            const userProfile = (await db.collection("users").doc(uid).get()).data()?.profile;
-            const avgCycle = userProfile?.avgCycleLength || 28;
+            const userDoc = await db.collection("users").doc(uid).get();
+            const userData = userDoc.data();
+            const avgCycle = userData?.healthProfile?.avgCycleLength || 28;
+
             const nextPeriod = new Date(lastPeriodDate);
             nextPeriod.setDate(nextPeriod.getDate() + avgCycle);
 
@@ -163,8 +165,9 @@ export async function runDailyRemindersJob() {
 
           if (!logsSnap.empty) {
             const lastPeriodDate = new Date(logsSnap.docs[0].data().dateKey);
-            const userProfile = (await db.collection("users").doc(uid).get()).data()?.profile;
-            const avgCycle = userProfile?.avgCycleLength || 28;
+            const userDoc = await db.collection("users").doc(uid).get();
+            const userData = userDoc.data();
+            const avgCycle = userData?.healthProfile?.avgCycleLength || 28;
 
             // Fertile window estimate: ovulation around day 14, fertile days 12-16
             const ovulationDay = new Date(lastPeriodDate);
