@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { extractEntities, inferRoute } from "../bloomie-inference.js";
+import { extractEntities, inferRoute, detectAmbiguousInput, detectMissingContext } from "../bloomie-inference.js";
 
 // ─── extractEntities ──────────────────────────────────────────────────────────
 
-describe("extractEntities - symptoms", () => {
+describe("extractEntities — symptoms", () => {
   it("detects late period", () => {
     const e = extractEntities("my period is late");
     expect(e.symptoms.late).toBe(true);
@@ -54,9 +54,14 @@ describe("extractEntities - symptoms", () => {
     const e = extractEntities("there is unusual discharge with odor");
     expect(e.symptoms.discharge).toBe(true);
   });
+
+  it("detects down-there 'off' phrasing as discharge-adjacent", () => {
+    const e = extractEntities("down there feel off");
+    expect(e.symptoms.discharge).toBe(true);
+  });
 });
 
-describe("extractEntities - severity", () => {
+describe("extractEntities — severity", () => {
   it("extracts severe", () => {
     const e = extractEntities("the pain is very bad and unbearable");
     expect(e.severity).toBe("severe");
@@ -73,7 +78,7 @@ describe("extractEntities - severity", () => {
   });
 });
 
-describe("extractEntities - timing", () => {
+describe("extractEntities — timing", () => {
   it("extracts before_period", () => {
     const e = extractEntities("i feel anxious a few days before my period");
     expect(e.timing).toBe("before_period");
@@ -90,7 +95,7 @@ describe("extractEntities - timing", () => {
   });
 });
 
-describe("extractEntities - pregnancy", () => {
+describe("extractEntities — pregnancy", () => {
   it("detects pregnancy chance from unprotected sex", () => {
     const e = extractEntities("i had unprotected sex and my period is late");
     expect(e.pregnancy.chance).toBe(true);
@@ -110,7 +115,7 @@ describe("extractEntities - pregnancy", () => {
   });
 });
 
-describe("extractEntities - urgency", () => {
+describe("extractEntities — urgency", () => {
   it("flags fainting", () => {
     // urgency regex matches \bfaint\b (not "fainted") and \bpassed out\b
     const e = extractEntities("i passed out from the bleeding");
@@ -118,7 +123,7 @@ describe("extractEntities - urgency", () => {
   });
 
   it("flags soaking through clothing", () => {
-    // urgency regex matches "bleed.*pants" - needs present-tense "bleed"
+    // urgency regex matches "bleed.*pants" — needs present-tense "bleed"
     const e = extractEntities("i bleed through my pants");
     expect(e.urgent).toBe(true);
   });
@@ -134,9 +139,9 @@ describe("extractEntities - urgency", () => {
   });
 });
 
-// ─── inferRoute - SAFETY CRITICAL ────────────────────────────────────────────
+// ─── inferRoute — SAFETY CRITICAL ────────────────────────────────────────────
 
-describe("inferRoute - urgent routes (highest priority)", () => {
+describe("inferRoute — urgent routes (highest priority)", () => {
   it("urgency flag → HEAVY_URGENT", () => {
     const e = extractEntities("i nearly fainted and i'm soaking through pads");
     const route = inferRoute(e);
@@ -160,11 +165,11 @@ describe("inferRoute - urgent routes (highest priority)", () => {
   });
 });
 
-describe("inferRoute - late period routes", () => {
-  it("late + pregnancy chance + no test → LATE_TEST_SUGGEST", () => {
+describe("inferRoute — late period routes", () => {
+  it("late + pregnancy chance + no test → PREGNANCY_ENTRY", () => {
     const e = extractEntities("my period is late and i had unprotected sex");
     const route = inferRoute(e);
-    expect(route.next).toBe("LATE_TEST_SUGGEST");
+    expect(route.next).toBe("PREGNANCY_ENTRY");
     expect(route.payload.reason).toBe("late+pregnancy_chance+no_test");
   });
 
@@ -194,9 +199,9 @@ describe("inferRoute - late period routes", () => {
   });
 });
 
-describe("inferRoute - heavy bleeding routes", () => {
+describe("inferRoute — heavy bleeding routes", () => {
   it("heavy + 7 days → HEAVY_LONGER_THAN_WEEK", () => {
-    // symptom regex uses \bheavy\b - "heavily" doesn't match; use "heavy bleeding"
+    // symptom regex uses \bheavy\b — "heavily" doesn't match; use "heavy bleeding"
     const e = extractEntities("i have heavy bleeding for a week");
     const route = inferRoute(e);
     expect(route.next).toBe("HEAVY_LONGER_THAN_WEEK");
@@ -217,7 +222,7 @@ describe("inferRoute - heavy bleeding routes", () => {
   });
 });
 
-describe("inferRoute - spotting routes", () => {
+describe("inferRoute — spotting routes", () => {
   it("spotting + mid cycle → SPOT_MIDCYCLE_NOTE", () => {
     const e = extractEntities("light spotting in the middle of my cycle");
     const route = inferRoute(e);
@@ -238,7 +243,7 @@ describe("inferRoute - spotting routes", () => {
   });
 });
 
-describe("inferRoute - pelvic pain routes", () => {
+describe("inferRoute — pelvic pain routes", () => {
   it("pelvic + after sex → PELVIC_SEX_INTRO", () => {
     // "pain after sex" alone doesn't set pelvic=true; need "cramps" or "pelvic"
     const e = extractEntities("i have cramps after sex");
@@ -254,7 +259,7 @@ describe("inferRoute - pelvic pain routes", () => {
   });
 });
 
-describe("inferRoute - mood routes", () => {
+describe("inferRoute — mood routes", () => {
   it("mood + before period → MOOD_SEVERITY", () => {
     const e = extractEntities("i feel very anxious and tired a few days before my period");
     const route = inferRoute(e);
@@ -263,7 +268,7 @@ describe("inferRoute - mood routes", () => {
   });
 });
 
-describe("inferRoute - discharge route", () => {
+describe("inferRoute — discharge route", () => {
   it("discharge alone (no spotting/pelvic) → ELSE_DISCHARGE", () => {
     const e = extractEntities("i have unusual discharge with a smell");
     const route = inferRoute(e);
@@ -272,7 +277,7 @@ describe("inferRoute - discharge route", () => {
   });
 });
 
-describe("inferRoute - nausea + late", () => {
+describe("inferRoute — nausea + late", () => {
   it("nausea + late → LATE_TEST_Q", () => {
     const e = extractEntities("i feel nauseous and my period is late");
     const route = inferRoute(e);
@@ -281,10 +286,98 @@ describe("inferRoute - nausea + late", () => {
   });
 });
 
-describe("inferRoute - no match", () => {
+describe("inferRoute — no match", () => {
   it("returns null for unrecognized input", () => {
     const e = extractEntities("i like flowers");
     const route = inferRoute(e);
     expect(route).toBeNull();
+  });
+});
+
+// ─── implicit_late extraction ─────────────────────────────────────────────────
+
+describe("extractEntities — implicit_late", () => {
+  it("detects 'it hasn't come'", () => {
+    expect(extractEntities("it hasn't come").symptoms.implicit_late).toBe(true);
+  });
+
+  it("detects 'it still hasn't come'", () => {
+    expect(extractEntities("it still hasn't come").symptoms.implicit_late).toBe(true);
+  });
+
+  it("detects 'hasn't arrived'", () => {
+    expect(extractEntities("hasn't arrived").symptoms.implicit_late).toBe(true);
+  });
+
+  it("detects 'still waiting'", () => {
+    expect(extractEntities("still waiting").symptoms.implicit_late).toBe(true);
+  });
+
+  it("detects 'not here yet'", () => {
+    expect(extractEntities("not here yet").symptoms.implicit_late).toBe(true);
+  });
+
+  it("does NOT fire on unrelated text", () => {
+    expect(extractEntities("i have heavy bleeding").symptoms.implicit_late).toBe(false);
+    expect(extractEntities("i like flowers").symptoms.implicit_late).toBe(false);
+  });
+});
+
+// ─── implicit_late routing (effectiveLate guard) ──────────────────────────────
+
+describe("inferRoute — implicit late (no other symptoms)", () => {
+  it("'it hasn't come' + 3 days → LATE_NO_GUIDANCE", () => {
+    const e = extractEntities("it hasn't come, it's been 3 days");
+    const route = inferRoute(e);
+    expect(route?.next).toBe("LATE_NO_GUIDANCE");
+  });
+
+  it("'not here yet' + 2 weeks → LATE_YES_PREG", () => {
+    const e = extractEntities("not here yet and it's been two weeks");
+    const route = inferRoute(e);
+    expect(route?.next).toBe("LATE_YES_PREG");
+  });
+
+  it("implicit late + pregnancy chance + no test → PREGNANCY_ENTRY", () => {
+    const e = extractEntities("it still hasn't come and i had unprotected sex");
+    const route = inferRoute(e);
+    expect(route?.next).toBe("PREGNANCY_ENTRY");
+  });
+
+  it("implicit late + heavy bleeding → does NOT route as late (heavy wins)", () => {
+    // sym.heavy present → noOtherSymptoms=false → effectiveLate=false
+    // heavy+dizzy check doesn't fire (no dizzy); falls through to null
+    const e = extractEntities("still waiting but i'm having really heavy bleeding");
+    // heavy is true, no severity/duration → inferRoute returns null
+    expect(e.symptoms.heavy).toBe(true);
+    expect(e.symptoms.implicit_late).toBe(true);
+    // effectiveLate is false because heavy is present, so no late route fires
+    const route = inferRoute(e);
+    expect(route?.next).not.toBe("LATE_NO_GUIDANCE");
+    expect(route?.next).not.toBe("LATE_YES_PREG");
+    expect(route?.next).not.toBe("PREGNANCY_ENTRY");
+  });
+});
+
+describe("clarification helpers — ambiguity and missing context", () => {
+  it("asks targeted reproductive-health clarification for vague down-there wording", () => {
+    const text = "down there feel off";
+    const entities = extractEntities(text);
+    const q = detectAmbiguousInput(text, entities);
+    expect(q).toMatch(/discharge|irritation|down there/i);
+  });
+
+  it("treats broad stomach pain phrasing as ambiguous before pelvic explanation", () => {
+    const text = "my stomach hurt";
+    const entities = extractEntities(text);
+    const q = detectAmbiguousInput(text, entities);
+    expect(q).toMatch(/pelvis|stomach|belly/i);
+  });
+
+  it("missing-context probe also asks pelvis-vs-belly split for broad stomach phrasing", () => {
+    const text = "belly hurt";
+    const entities = extractEntities(text);
+    const q = detectMissingContext(entities, text);
+    expect(q).toMatch(/pelvic|belly|stomach/i);
   });
 });

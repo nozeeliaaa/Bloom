@@ -4,18 +4,20 @@
  * Tests for the intent-driven conversation architecture.
  *
  * Covers:
- *   1. Template output format - no internal labels in visible response
- *   2. Intent switching - entity history cleared when topic changes
- *   3. Safety escalation - urgency always overrides topic bucket logic
- *   4. Stale button guard - flowId behaviour (unit-level logic)
- *   5. Response composer - conversational output shape
- *   6. Topic interrupt - primary bucket detection helper
+ *   1. Template output format — no internal labels in visible response
+ *   2. Intent switching — entity history cleared when topic changes
+ *   3. Safety escalation — urgency always overrides topic bucket logic
+ *   4. Stale button guard — flowId behaviour (unit-level logic)
+ *   5. Response composer — conversational output shape
+ *   6. Topic interrupt — primary bucket detection helper
+ *   7. Response variability — pick() and buildGuidanceResponse starters
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildGuidanceResponse } from "../bloomie-templates.js";
 import { extractEntities, inferRoute } from "../bloomie-inference.js";
+import { pick } from "../bloomie-routing.js";
 import { createCtx } from "../bloomie-session.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,7 +64,7 @@ function shouldClearHistory(prevEntities, newEntities) {
 
 // ─── 1. Template output format ────────────────────────────────────────────────
 
-describe("template output format - no internal labels", () => {
+describe("template output format — no internal labels", () => {
   const INTERNAL_HEADERS = [
     "Possible situation:",
     "What this may mean:",
@@ -113,9 +115,9 @@ describe("template output format - no internal labels", () => {
 });
 
 
-// ─── 2. Response composer - conversational shape ──────────────────────────────
+// ─── 2. Response composer — conversational shape ──────────────────────────────
 
-describe("response composer - conversational output", () => {
+describe("response composer — conversational output", () => {
   it("lines array has at least 3 entries for any matched scenario", () => {
     const scenarios = [
       makeEntities({ symptoms: { late: true } }),
@@ -158,9 +160,9 @@ describe("response composer - conversational output", () => {
 });
 
 
-// ─── 3. Topic interrupt - primary bucket detection ────────────────────────────
+// ─── 3. Topic interrupt — primary bucket detection ────────────────────────────
 
-describe("topic interrupt - primaryBucket detection", () => {
+describe("topic interrupt — primaryBucket detection", () => {
   it("late symptoms → 'period' bucket", () => {
     expect(primaryBucket(makeEntities({ symptoms: { late: true } }))).toBe("period");
   });
@@ -187,9 +189,9 @@ describe("topic interrupt - primaryBucket detection", () => {
 });
 
 
-// ─── 4. Intent switching - shouldClearHistory logic ───────────────────────────
+// ─── 4. Intent switching — shouldClearHistory logic ───────────────────────────
 
-describe("intent switching - entity history clearing", () => {
+describe("intent switching — entity history clearing", () => {
   it("same bucket (late → late): history should NOT be cleared", () => {
     const prev = makeEntities({ symptoms: { late: true } });
     const curr = makeEntities({ symptoms: { late: true }, severity: "mild" });
@@ -218,7 +220,7 @@ describe("intent switching - entity history clearing", () => {
   it("first message (no previous history): no clearing needed", () => {
     const prev = makeEntities();  // null bucket (no symptoms)
     const curr = makeEntities({ symptoms: { heavy: true } });
-    // shouldClearHistory requires BOTH buckets to be non-null - prev is null → falsy, not cleared
+    // shouldClearHistory requires BOTH buckets to be non-null — prev is null → falsy, not cleared
     expect(shouldClearHistory(prev, curr)).toBeFalsy();
   });
 });
@@ -226,7 +228,7 @@ describe("intent switching - entity history clearing", () => {
 
 // ─── 5. Safety escalation priority ───────────────────────────────────────────
 
-describe("safety escalation - urgent always wins route", () => {
+describe("safety escalation — urgent always wins route", () => {
   it("urgency flag → HEAVY_URGENT node regardless of other symptoms", () => {
     const ent = makeEntities({ urgent: true, symptoms: { mood: true, late: true } });
     const route = inferRoute(ent);
@@ -242,7 +244,7 @@ describe("safety escalation - urgent always wins route", () => {
   it("late + severe pelvic → PELVIC_PERSISTENT (pelvic+severe check fires before late+pelvic+severe)", () => {
     // inferRoute checks pelvic+severe before the late+pelvic+severe ectopic combo,
     // so this routes to PELVIC_PERSISTENT. The HEAVY_URGENT ectopic path requires
-    // the ectopic combo to be listed earlier in inferRoute if desired - this test
+    // the ectopic combo to be listed earlier in inferRoute if desired — this test
     // documents actual current priority order so any future reordering is visible.
     const ent = makeEntities({ symptoms: { late: true, pelvic: true }, severity: "severe" });
     const route = inferRoute(ent);
@@ -257,9 +259,9 @@ describe("safety escalation - urgent always wins route", () => {
 });
 
 
-// ─── 6. Stale button guard - flowId state ─────────────────────────────────────
+// ─── 6. Stale button guard — flowId state ─────────────────────────────────────
 
-describe("session state - flowId advances for stale button detection", () => {
+describe("session state — flowId advances for stale button detection", () => {
   it("initial ctx has flowId of 0", () => {
     const ctx = createCtx();
     expect(ctx.flowId).toBe(0);
@@ -285,12 +287,12 @@ describe("session state - flowId advances for stale button detection", () => {
     const ctx = createCtx();
     ctx.flowId = 3;
     const renderedAt = ctx.flowId;  // 3
-    expect(renderedAt).toBe(ctx.flowId);  // not stale - same epoch
+    expect(renderedAt).toBe(ctx.flowId);  // not stale — same epoch
   });
 });
 
 
-// ─── 7. Stale typed-choice guard - nodeFlowId check ──────────────────────────
+// ─── 7. Stale typed-choice guard — nodeFlowId check ──────────────────────────
 //
 // matchTypedToChoice runs AFTER advanceFlow(), so ctx.flowId is already N+1
 // when the guard executes.  ctx.nodeFlowId must equal N (the epoch at which
@@ -303,11 +305,11 @@ function isChoiceMatchAllowed(ctx) {
   return ctx.nodeFlowId === ctx.flowId - 1;
 }
 
-describe("typed-choice guard - nodeFlowId prevents stale matches", () => {
+describe("typed-choice guard — nodeFlowId prevents stale matches", () => {
   it("choices rendered at current epoch are valid on the very next message", () => {
     const ctx = createCtx();           // flowId=0, nodeFlowId=-1
     ctx.nodeFlowId = ctx.flowId;       // choices rendered at epoch 0
-    ctx.flowId++;                      // advanceFlow() - user sends a message
+    ctx.flowId++;                      // advanceFlow() — user sends a message
     expect(isChoiceMatchAllowed(ctx)).toBe(true);
   });
 
@@ -344,9 +346,9 @@ describe("typed-choice guard - nodeFlowId prevents stale matches", () => {
 
 // ─── 8. Entity extraction round-trip ─────────────────────────────────────────
 
-describe("entity extraction - real text inputs", () => {
+describe("entity extraction — real text inputs", () => {
   it("'I have bad cramps' extracts pelvic symptom", () => {
-    // "cramping" doesn't match \bcramp\b - use "cramps" to hit the word boundary
+    // "cramping" doesn't match \bcramp\b — use "cramps" to hit the word boundary
     const e = extractEntities("I have bad cramps");
     expect(e.symptoms.pelvic).toBe(true);
   });
@@ -366,5 +368,53 @@ describe("entity extraction - real text inputs", () => {
     const latent   = extractEntities("my period is late");
     const crampMsg = extractEntities("I have really bad cramps");
     expect(shouldClearHistory(latent, crampMsg)).toBe(true);
+  });
+});
+
+
+// ─── 9. Response variability — pick() and buildGuidanceResponse starters ──────
+
+describe("response variability — pick() and buildGuidanceResponse starters", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("pick() returns different items when Math.random produces different values", () => {
+    const arr = ["alpha", "beta", "gamma", "delta"];
+    const seen = new Set();
+    [0.0, 0.25, 0.5, 0.75].forEach(r => {
+      vi.spyOn(Math, "random").mockReturnValueOnce(r);
+      seen.add(pick(arr));
+    });
+    // Four evenly-spaced seeds across a 4-element array must produce all 4 items.
+    expect(seen.size).toBe(4);
+  });
+
+  it("10 calls with distinct Math.random seeds produce at least 2 different nextSteps starters", () => {
+    const ent = makeEntities({ symptoms: { late: true } });
+    const STARTER_RE = /^(Going forward|A helpful next step|What might help|Here's what to consider)/i;
+    const starterSeen = new Set();
+
+    for (let i = 0; i < 10; i++) {
+      // Cycle seed through 0.0 → 0.9 so the 4-item starters array is sampled at
+      // indices 0, 1, 2, 3, 0, 1, 2, 3, 0, 1 — producing multiple distinct entries.
+      vi.spyOn(Math, "random").mockReturnValue(i / 10);
+      const res = buildGuidanceResponse(ent, "late+short_duration");
+      const line = res?.lines.find(l => STARTER_RE.test(l));
+      if (line) starterSeen.add(line.match(STARTER_RE)[0]);
+      vi.restoreAllMocks();
+    }
+
+    expect(starterSeen.size).toBeGreaterThan(1);
+  });
+
+  it("disclaimer is always the final line regardless of random seed", () => {
+    const ent = makeEntities({ symptoms: { late: true } });
+    for (let i = 0; i < 4; i++) {
+      vi.spyOn(Math, "random").mockReturnValue(i * 0.25);
+      const res = buildGuidanceResponse(ent, "late+short_duration");
+      expect(res?.lines.at(-1)).toMatch(/educational info|not a diagnosis/i);
+      vi.restoreAllMocks();
+    }
   });
 });

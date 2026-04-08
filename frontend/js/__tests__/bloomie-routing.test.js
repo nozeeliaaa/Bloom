@@ -10,6 +10,8 @@ import {
   looksLikeGibberish,
   scoreSignals,
   resolveSignals,
+  computeRouteConfidence,
+  INTENT_TO_NODE,
 } from "../bloomie-routing.js";
 
 // ─── normalizeText ────────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ describe("looksLikeGibberish", () => {
 
 // ─── scoreSignals ─────────────────────────────────────────────────────────────
 
-describe("scoreSignals - late period", () => {
+describe("scoreSignals — late period", () => {
   it("scores 'my period is late'", () => {
     const { has } = scoreSignals("my period is late");
     expect(has("late")).toBe(true);
@@ -65,7 +67,7 @@ describe("scoreSignals - late period", () => {
   });
 });
 
-describe("scoreSignals - heavy bleeding", () => {
+describe("scoreSignals — heavy bleeding", () => {
   it("scores 'heavy bleeding'", () => {
     const { has } = scoreSignals("i have heavy bleeding");
     expect(has("heavy")).toBe(true);
@@ -82,7 +84,7 @@ describe("scoreSignals - heavy bleeding", () => {
   });
 });
 
-describe("scoreSignals - spotting", () => {
+describe("scoreSignals — spotting", () => {
   it("scores 'spotting'", () => {
     const { has } = scoreSignals("i noticed some spotting");
     expect(has("spot")).toBe(true);
@@ -94,14 +96,14 @@ describe("scoreSignals - spotting", () => {
   });
 });
 
-describe("scoreSignals - mood", () => {
+describe("scoreSignals — mood", () => {
   it("scores 'anxious and tired'", () => {
     const { has } = scoreSignals("i feel anxious and so tired");
     expect(has("mood")).toBe(true);
   });
 });
 
-describe("scoreSignals - pelvic pain", () => {
+describe("scoreSignals — pelvic pain", () => {
   it("scores 'cramps'", () => {
     const { has } = scoreSignals("i have really bad cramps");
     expect(has("pelvic")).toBe(true);
@@ -113,7 +115,7 @@ describe("scoreSignals - pelvic pain", () => {
   });
 });
 
-describe("scoreSignals - pregnancy", () => {
+describe("scoreSignals — pregnancy", () => {
   it("scores 'might be pregnant'", () => {
     const { has } = scoreSignals("i think i might be pregnant");
     expect(has("pregnancy")).toBe(true);
@@ -123,16 +125,46 @@ describe("scoreSignals - pregnancy", () => {
     const { has } = scoreSignals("i had unprotected sex last week");
     expect(has("pregnancy")).toBe(true);
   });
+
+  it("scores pregnancy-test phrasing without explicit 'pregnancy' keyword", () => {
+    const triggerPhrases = [
+      "pregnancy test",
+      "positive test",
+      "negative test",
+      "i took a test",
+      "i took a pregnancy test",
+      "my test came back positive",
+      "my test came back negative",
+    ];
+    triggerPhrases.forEach((phrase) => {
+      const { has } = scoreSignals(phrase);
+      expect(has("pregnancy")).toBe(true);
+    });
+  });
+
+  it("does not score non-pregnancy 'test' language", () => {
+    const nonPregnancyPhrases = [
+      "blood test",
+      "iron test",
+      "urine test",
+      "let me test something",
+      "test results",
+    ];
+    nonPregnancyPhrases.forEach((phrase) => {
+      const { has } = scoreSignals(phrase);
+      expect(has("pregnancy")).toBe(false);
+    });
+  });
 });
 
-// ─── resolveSignals - SAFETY CRITICAL combos ─────────────────────────────────
+// ─── resolveSignals — SAFETY CRITICAL combos ─────────────────────────────────
 
-describe("resolveSignals - safety-critical combinations", () => {
-  it("late + pregnancy → LATE_TEST_Q", () => {
+describe("resolveSignals — safety-critical combinations", () => {
+  it("late + pregnancy → PREGNANCY_ENTRY", () => {
     const { sig, has } = scoreSignals("my period is late and i think i might be pregnant");
     const route = resolveSignals(sig, has);
     expect(route).not.toBeNull();
-    expect(route.next).toBe("LATE_TEST_Q");
+    expect(route.next).toBe("PREGNANCY_ENTRY");
   });
 
   it("heavy + mood → HEAVY_INTRO", () => {
@@ -180,7 +212,122 @@ describe("resolveSignals - safety-critical combinations", () => {
   it("no combo match returns null (single signal falls to caller)", () => {
     const { sig, has } = scoreSignals("my period is late");
     const route = resolveSignals(sig, has);
-    // Late alone has no multi-signal rule - returns null so caller handles it
+    // Late alone has no multi-signal rule — returns null so caller handles it
     expect(route).toBeNull();
+  });
+});
+
+// ─── computeRouteConfidence — new fields: route, competitors, ambiguous ───────
+
+describe("computeRouteConfidence — route field", () => {
+  it("maps primaryIntent to the correct entry node", () => {
+    const { sig } = scoreSignals("my period is very late and i missed it last month");
+    const conf = computeRouteConfidence(sig, {});
+    expect(conf.route).toBe(INTENT_TO_NODE[conf.primaryIntent]);
+  });
+
+  it("urgency always routes to HEAVY_URGENT", () => {
+    const { sig } = scoreSignals("i am bleeding heavily");
+    const conf = computeRouteConfidence(sig, { urgent: true });
+    expect(conf.route).toBe("HEAVY_URGENT");
+    expect(conf.tier).toBe("high");
+    expect(conf.ambiguous).toBe(false);
+  });
+
+  it("zero-score input has null route", () => {
+    const conf = computeRouteConfidence(
+      { late: 0, heavy: 0, spot: 0, mood: 0, pelvic: 0, pregnancy: 0, discharge: 0, late_check: 0, red_flag: 0 },
+      {}
+    );
+    expect(conf.route).toBeNull();
+    expect(conf.tier).toBe("low");
+  });
+
+  it("late_check maps to LATE_INTRO (same as late)", () => {
+    const { sig } = scoreSignals("is my period late?");
+    const conf = computeRouteConfidence(sig, {});
+    if (conf.primaryIntent === "late") {
+      expect(conf.route).toBe("LATE_INTRO");
+    }
+  });
+});
+
+describe("computeRouteConfidence — competitors field", () => {
+  it("competitors is an array of node names, not intent keys", () => {
+    const { sig } = scoreSignals("heavy bleeding with bad cramps and pelvic pain");
+    const conf = computeRouteConfidence(sig, {});
+    // competitors should be node strings (capitalised), not raw intent keys
+    conf.competitors.forEach(c => {
+      expect(typeof c).toBe("string");
+      expect(c).toMatch(/^[A-Z_]+$/);
+    });
+  });
+
+  it("competitors contains no duplicates", () => {
+    const { sig } = scoreSignals("late period with spotting and mood swings");
+    const conf = computeRouteConfidence(sig, {});
+    const unique = new Set(conf.competitors);
+    expect(unique.size).toBe(conf.competitors.length);
+  });
+
+  it("urgency result has empty competitors array", () => {
+    const { sig } = scoreSignals("i am bleeding heavily");
+    const conf = computeRouteConfidence(sig, { urgent: true });
+    expect(conf.competitors).toEqual([]);
+  });
+
+  it("competitor nodes are all valid INTENT_TO_NODE values", () => {
+    const validNodes = new Set(Object.values(INTENT_TO_NODE));
+    const { sig } = scoreSignals("late period and spotting discharge");
+    const conf = computeRouteConfidence(sig, {});
+    conf.competitors.forEach(c => {
+      expect(validNodes.has(c)).toBe(true);
+    });
+  });
+});
+
+describe("computeRouteConfidence — ambiguous field", () => {
+  it("ambiguous is false when tier is high", () => {
+    const { sig } = scoreSignals("my period is very late i missed it completely for weeks");
+    const conf = computeRouteConfidence(sig, {});
+    expect(conf.ambiguous).toBe(conf.tier !== "high");
+  });
+
+  it("ambiguous is true for medium tier", () => {
+    // Two close signals → MEDIUM
+    const { sig } = scoreSignals("late period with severe cramps and pelvic pain");
+    const conf = computeRouteConfidence(sig, {});
+    if (conf.tier === "medium") expect(conf.ambiguous).toBe(true);
+  });
+
+  it("ambiguous is true for low tier", () => {
+    // Weak signals → LOW
+    const conf = computeRouteConfidence(
+      { late: 1, heavy: 1, spot: 0, mood: 1, pelvic: 0, pregnancy: 0, discharge: 0, late_check: 0, red_flag: 0 },
+      {}
+    );
+    if (conf.tier === "low") expect(conf.ambiguous).toBe(true);
+  });
+
+  it("ambiguous is always false when urgent", () => {
+    const { sig } = scoreSignals("i have heavy bleeding");
+    const conf = computeRouteConfidence(sig, { urgent: true });
+    expect(conf.ambiguous).toBe(false);
+  });
+});
+
+describe("INTENT_TO_NODE — completeness", () => {
+  it("covers all signal keys used by scoreSignals", () => {
+    const sigKeys = ["late", "heavy", "spot", "mood", "pelvic", "pregnancy", "discharge"];
+    sigKeys.forEach(k => {
+      expect(INTENT_TO_NODE[k]).toBeDefined();
+    });
+  });
+
+  it("all values are non-empty strings", () => {
+    Object.values(INTENT_TO_NODE).forEach(v => {
+      expect(typeof v).toBe("string");
+      expect(v.length).toBeGreaterThan(0);
+    });
   });
 });

@@ -3,7 +3,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Tests for the hybrid two-layer emotion detection system.
  *
- * API calls are fully mocked - no real network requests are made.
+ * API calls are fully mocked — no real network requests are made.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -60,7 +60,7 @@ afterEach(() => {
 // 1. detectToneWithConfidence
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("detectToneWithConfidence - rule layer", () => {
+describe("detectToneWithConfidence — rule layer", () => {
   it("distressed text with 2+ signals → high confidence", () => {
     const result = detectToneWithConfidence("I'm so scared and I don't know what to do");
     expect(result.tone).toBe("distressed");
@@ -122,7 +122,7 @@ describe("detectToneWithConfidence - rule layer", () => {
 // 2. classifyEmotionAI
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("classifyEmotionAI - AI layer", () => {
+describe("classifyEmotionAI — AI layer", () => {
   it("returns parsed result on successful API response", async () => {
     global.fetch = mockFetch(makeAIResponse(true, "distressed", "high", "feeling overwhelmed"));
     const ruleResult = { tone: "distressed", confidence: "high" };
@@ -173,10 +173,10 @@ describe("classifyEmotionAI - AI layer", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. resolveTone - resolution logic
+// 3. resolveTone — resolution logic
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("resolveTone - null API → rule_only", () => {
+describe("resolveTone — null API → rule_only", () => {
   it("returns rule tone with source 'rule_only' when API returns null", async () => {
     global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
     const ctx = makeCtx({ sessionDepth: 3 });
@@ -188,7 +188,7 @@ describe("resolveTone - null API → rule_only", () => {
   });
 });
 
-describe("resolveTone - AI confirms → rule+ai_confirmed", () => {
+describe("resolveTone — AI confirms → rule+ai_confirmed", () => {
   it("high confidence + AI confirms → source 'rule+ai_confirmed', rule tone kept", async () => {
     global.fetch = mockFetch(
       makeAIResponse(true, "distressed", "high", "very worried")
@@ -203,7 +203,7 @@ describe("resolveTone - AI confirms → rule+ai_confirmed", () => {
   });
 });
 
-describe("resolveTone - AI disagrees → ai_override", () => {
+describe("resolveTone — AI disagrees → ai_override", () => {
   it("AI tone ≠ rule tone → source 'ai_override', AI tone used", async () => {
     // Input that rule detects as deflecting but AI says is anxious
     global.fetch = mockFetch(
@@ -217,7 +217,7 @@ describe("resolveTone - AI disagrees → ai_override", () => {
   });
 });
 
-describe("resolveTone - low confidence / unknown tokens → ai_primary", () => {
+describe("resolveTone — low confidence / unknown tokens → ai_primary", () => {
   it("unknown tokens in input → source 'ai_primary', AI tone used", async () => {
     global.fetch = mockFetch(
       makeAIResponse(false, "distressed", "high", "unknown language")
@@ -233,7 +233,7 @@ describe("resolveTone - low confidence / unknown tokens → ai_primary", () => {
       makeAIResponse(false, "anxious", "medium", "subtle worry")
     );
     const ctx = makeCtx({ sessionDepth: 3 });
-    // Plain statement - rule gives neutral (low confidence)
+    // Plain statement — rule gives neutral (low confidence)
     const result = await resolveTone("my period is late", ctx);
     expect(result.source).toBe("ai_primary");
   });
@@ -243,12 +243,12 @@ describe("resolveTone - low confidence / unknown tokens → ai_primary", () => {
 // 4. Stability gate
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("resolveTone - stability gate", () => {
+describe("resolveTone — stability gate", () => {
   it("blocks tone shift at sessionDepth < 2 (holds previousTone)", async () => {
     global.fetch = mockFetch(
       makeAIResponse(true, "distressed", "high", "scared")
     );
-    // previousTone is "neutral", sessionDepth is 1 - gate should hold "neutral"
+    // previousTone is "neutral", sessionDepth is 1 — gate should hold "neutral"
     const ctx = makeCtx({ previousTone: "neutral", sessionDepth: 1 });
     const result = await resolveTone("I'm so scared and I don't know what to do", ctx);
     expect(result.tone).toBe("neutral"); // held by stability gate

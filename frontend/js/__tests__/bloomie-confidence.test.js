@@ -34,8 +34,10 @@ import { inferRoute } from "../bloomie-inference.js";
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 vi.mock("../db.js", () => ({
-  loadBloomieMemory: vi.fn().mockResolvedValue(null),
-  saveBloomieMemory: vi.fn().mockResolvedValue(),
+  loadBloomieMemory:      vi.fn().mockResolvedValue(null),
+  saveBloomieMemory:      vi.fn().mockResolvedValue(),
+  loadLocalBloomieMemory: vi.fn().mockReturnValue(null),
+  saveLocalBloomieMemory: vi.fn(),
 }));
 
 vi.mock("../auth.js", () => ({
@@ -43,10 +45,14 @@ vi.mock("../auth.js", () => ({
   getUser:    vi.fn().mockReturnValue(null),
 }));
 
-vi.mock("../bloomie-logger.js", () => ({
-  logSafetyEvent:    vi.fn(),
-  logAnalyticsEvent: vi.fn(),
-}));
+vi.mock("../bloomie-logger.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    logSafetyEvent:    vi.fn(),
+    logAnalyticsEvent: vi.fn(),
+  };
+});
 
 // Stub patois to identity + neutral tone (prevents PHRASE_MAP iteration bug).
 vi.mock("../bloomie-patois.js", async (importOriginal) => {
@@ -146,7 +152,7 @@ function withConfidence(tier, primaryIntent, competingIntents = []) {
     primaryIntent,
     competingIntents,
     confidenceNote: tier === "medium"
-      ? `Just to confirm - is this about ${(primaryIntent || "").replace(/_/g, " ")}?`
+      ? `Just to confirm — is this about ${(primaryIntent || "").replace(/_/g, " ")}?`
       : null,
     route,
     competitors,
@@ -177,7 +183,7 @@ afterEach(() => {
 
 // ── Pure function: computeRouteConfidence tier rules ──────────────────────────
 
-describe("computeRouteConfidence - tier rules (real implementation)", () => {
+describe("computeRouteConfidence — tier rules (real implementation)", () => {
   it("urgency always → high tier + HEAVY_URGENT route + ambiguous false", () => {
     const { sig } = scoreSignals("i am bleeding heavily");
     const conf = computeRouteConfidence(sig, { urgent: true });
@@ -256,7 +262,7 @@ describe("computeRouteConfidence - tier rules (real implementation)", () => {
   });
 });
 
-describe("computeRouteConfidence - route and competitors fields", () => {
+describe("computeRouteConfidence — route and competitors fields", () => {
   it("route matches INTENT_TO_NODE[primaryIntent]", () => {
     const { sig } = scoreSignals("my period is very late this month");
     const conf = computeRouteConfidence(sig, {});
@@ -296,7 +302,7 @@ describe("computeRouteConfidence - route and competitors fields", () => {
 
 // ── Integration: HIGH tier → routes directly ──────────────────────────────────
 
-describe("confidence router - HIGH tier", () => {
+describe("confidence router — HIGH tier", () => {
   it("routes directly without showing MEDIUM_CONFIRM or NARROWING", () => {
     withConfidence("high", "late");
     sendMessage(CANONICAL_INPUT);
@@ -328,7 +334,7 @@ describe("confidence router - HIGH tier", () => {
 
 // ── Integration: MEDIUM tier → MEDIUM_CONFIRM ────────────────────────────────
 
-describe("confidence router - MEDIUM tier", () => {
+describe("confidence router — MEDIUM tier", () => {
   it("transitions to MEDIUM_CONFIRM and sets pendingRoute", () => {
     withConfidence("medium", "late", ["pelvic"]);
     sendMessage(CANONICAL_INPUT);
@@ -378,7 +384,7 @@ describe("confidence router - MEDIUM tier", () => {
 
 // ── Integration: LOW tier → NARROWING ────────────────────────────────────────
 
-describe("confidence router - LOW tier", () => {
+describe("confidence router — LOW tier", () => {
   it("transitions to NARROWING on first LOW", () => {
     withConfidence("low", "late", []);
     sendMessage(CANONICAL_INPUT);
@@ -403,12 +409,21 @@ describe("confidence router - LOW tier", () => {
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().lastConfidence?.ambiguous).toBe(true);
   });
+
+  it("second unresolved narrowing attempt switches to guided split wording", () => {
+    withConfidence("low", "late", []);
+    sendMessage(CANONICAL_INPUT);
+    withConfidence("low", "late", []);
+    sendMessage("i missed my period");
+    expect(chat.getState().state).toBe("NARROWING");
+    expect(getChatBoxText()).toMatch(/quick split|cycle timing feels off|pain\/physical/i);
+  });
 });
 
 
 // ── Integration: repeated LOW → CONFIDENCE_FALLBACK ──────────────────────────
 
-describe("confidence router - CONFIDENCE_FALLBACK after repeated LOW", () => {
+describe("confidence router — CONFIDENCE_FALLBACK after repeated LOW", () => {
   it("routes to CONFIDENCE_FALLBACK when confidenceFallbackCount reaches 2", () => {
     // First LOW → NARROWING (count 0 → 1)
     withConfidence("low", "late", []);
@@ -420,7 +435,7 @@ describe("confidence router - CONFIDENCE_FALLBACK after repeated LOW", () => {
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().confidenceFallbackCount).toBe(2);
 
-    // Third LOW - use a distinct input to avoid the exact-repeat guard
+    // Third LOW — use a distinct input to avoid the exact-repeat guard
     // (3 identical messages in a row → ELSE_NOT_SURE_ROUTE instead of CONFIDENCE_FALLBACK)
     withConfidence("low", "late", []);
     sendMessage("i missed my period");
@@ -435,7 +450,7 @@ describe("confidence router - CONFIDENCE_FALLBACK after repeated LOW", () => {
     withConfidence("low", "late", []);
     sendMessage("i missed my period");
     expect(chat.getState().state).toBe("CONFIDENCE_FALLBACK");
-    expect(getChatBoxText()).toMatch(/hard time|pinpoint|main topics/i);
+    expect(getChatBoxText()).toMatch(/quick split|main thing|sticking with me|main topics/i);
   });
 
   it("confidenceFallbackCount keeps incrementing on each LOW/FALLBACK", () => {
@@ -457,7 +472,7 @@ describe("confidence router - CONFIDENCE_FALLBACK after repeated LOW", () => {
 
 // ── Integration: CLARIFICATION_PAIRS promotion ────────────────────────────────
 
-describe("confidence router - CLARIFICATION_PAIRS", () => {
+describe("confidence router — CLARIFICATION_PAIRS", () => {
   // The pair check uses conf.competingIntents[0], not the routing signals.
   // withConfidence injects the pair into the mocked confidence result,
   // while CANONICAL_INPUT reaches the confidence router reliably.
@@ -488,7 +503,7 @@ describe("confidence router - CLARIFICATION_PAIRS", () => {
   });
 
   it("single HIGH signal with no competitor does not promote", () => {
-    // mood with no competitors - no pair formed → routes directly
+    // mood with no competitors — no pair formed → routes directly
     withConfidence("high", "mood", []);
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().state).not.toBe("MEDIUM_CONFIRM");
@@ -496,7 +511,7 @@ describe("confidence router - CLARIFICATION_PAIRS", () => {
   });
 
   it("non-paired HIGH competitors do not promote to MEDIUM_CONFIRM", () => {
-    // late + discharge - not a defined clarification pair
+    // late + discharge — not a defined clarification pair
     withConfidence("high", "late", ["discharge"]);
     sendMessage(CANONICAL_INPUT);
     // Should route directly (not a known pair)
@@ -508,5 +523,154 @@ describe("confidence router - CLARIFICATION_PAIRS", () => {
     withConfidence("high", "late", ["pelvic"]);
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().pendingRoute?.next).toBe(INTENT_TO_NODE["late"]);
+  });
+});
+
+
+// ── confidenceFallbackCount streak reset ──────────────────────────────────────
+
+describe("confidenceFallbackCount — streak reset on successful routing", () => {
+  it("LOW → LOW → HIGH resets count to 0", () => {
+    // First LOW: count goes to 1
+    withConfidence("low", "late", []);
+    sendMessage(CANONICAL_INPUT);
+    expect(chat.getState().confidenceFallbackCount).toBe(1);
+
+    // Second LOW: count goes to 2
+    withConfidence("low", "late", []);
+    sendMessage("i missed my period");
+    expect(chat.getState().confidenceFallbackCount).toBe(2);
+
+    // HIGH success: count resets to 0
+    withConfidence("high", "late", []);
+    sendMessage("my period is a week late");
+    expect(chat.getState().confidenceFallbackCount).toBe(0);
+  });
+
+  it("a subsequent LOW after recovery starts fresh at 1, not 3", () => {
+    // Build up count to 2
+    withConfidence("low", "late", []);
+    sendMessage(CANONICAL_INPUT);
+    withConfidence("low", "late", []);
+    sendMessage("i missed my period");
+    expect(chat.getState().confidenceFallbackCount).toBe(2);
+
+    // Recover via HIGH
+    withConfidence("high", "late", []);
+    sendMessage("my period is a week late");
+    expect(chat.getState().confidenceFallbackCount).toBe(0);
+
+    // New LOW starts fresh — count is 1, not 3
+    withConfidence("low", "late", []);
+    sendMessage("something something cycle");
+    expect(chat.getState().confidenceFallbackCount).toBe(1);
+    // Should go to NARROWING, not CONFIDENCE_FALLBACK
+    expect(chat.getState().state).toBe("NARROWING");
+  });
+
+  it("CONFIDENCE_FALLBACK does not appear prematurely after earlier recovery", () => {
+    // Accumulate 2 LOWs
+    withConfidence("low", "late", []);
+    sendMessage(CANONICAL_INPUT);
+    withConfidence("low", "late", []);
+    sendMessage("i missed my period");
+
+    // Recover via HIGH — resets count
+    withConfidence("high", "late", []);
+    sendMessage("my period is a week late");
+
+    // One more LOW — should go to NARROWING (count=1), not CONFIDENCE_FALLBACK
+    withConfidence("low", "late", []);
+    sendMessage("something about my cycle");
+    expect(chat.getState().state).toBe("NARROWING");
+    expect(chat.getState().state).not.toBe("CONFIDENCE_FALLBACK");
+  });
+
+  it("NARROWING button click resets count to 0", () => {
+    // Get into NARROWING
+    withConfidence("low", "late", []);
+    sendMessage(CANONICAL_INPUT);
+    expect(chat.getState().state).toBe("NARROWING");
+    expect(chat.getState().confidenceFallbackCount).toBe(1);
+
+    // Click a topic button from NARROWING — this is a successful exit
+    clickButton("cycle");
+    expect(chat.getState().confidenceFallbackCount).toBe(0);
+  });
+
+  it("MEDIUM confirmation via yes_confirm resets count to 0", () => {
+    // Build up count
+    withConfidence("low", "late", []);
+    sendMessage(CANONICAL_INPUT);
+    expect(chat.getState().confidenceFallbackCount).toBe(1);
+
+    // Enter MEDIUM_CONFIRM
+    withConfidence("medium", "late", ["pelvic"]);
+    sendMessage("i missed my period");
+    expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
+
+    // Confirm — resets streak
+    clickButton("yes_confirm");
+    expect(chat.getState().confidenceFallbackCount).toBe(0);
+  });
+});
+
+
+// ── _MEDIUM_YES null/malformed pendingRoute recovery ─────────────────────────
+
+describe("_MEDIUM_YES — null and malformed pendingRoute recovery", () => {
+  it("_MEDIUM_YES with null route in pendingRoute recovers into NARROWING", () => {
+    // Get into MEDIUM_CONFIRM
+    withConfidence("medium", "late", ["pelvic"]);
+    sendMessage(CANONICAL_INPUT);
+    expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
+
+    // getState() shallow-copies ctx, but pendingRoute is shared by reference —
+    // nulling .next on the shared object is the reliable way to corrupt it.
+    chat.getState().pendingRoute.next = null;
+
+    // Clicking yes_confirm must not strand the user
+    clickButton("yes_confirm");
+    expect(chat.getState().state).toBe("NARROWING");
+    expect(chat.getState().state).not.toBe("MEDIUM_CONFIRM");
+  });
+
+  it("_MEDIUM_YES with undefined route in pendingRoute recovers into NARROWING", () => {
+    withConfidence("medium", "late", ["pelvic"]);
+    sendMessage(CANONICAL_INPUT);
+    expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
+
+    // Simulate a malformed pendingRoute where next is undefined
+    chat.getState().pendingRoute.next = undefined;
+
+    clickButton("yes_confirm");
+    expect(chat.getState().state).toBe("NARROWING");
+  });
+
+  it("_MEDIUM_YES recovery also resets confidenceFallbackCount", () => {
+    withConfidence("low", "late", []);
+    sendMessage(CANONICAL_INPUT);
+    expect(chat.getState().confidenceFallbackCount).toBe(1);
+
+    withConfidence("medium", "late", ["pelvic"]);
+    sendMessage("i missed my period");
+    // Corrupt route so recovery path is exercised
+    chat.getState().pendingRoute.next = null;
+
+    clickButton("yes_confirm");
+    // Reset fires even on the graceful recovery path
+    expect(chat.getState().confidenceFallbackCount).toBe(0);
+  });
+
+  it("_MEDIUM_YES with valid pendingRoute still routes correctly", () => {
+    withConfidence("medium", "late", ["pelvic"]);
+    sendMessage(CANONICAL_INPUT);
+    expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
+    expect(chat.getState().pendingRoute?.next).toBeTruthy();
+
+    clickButton("yes_confirm");
+    expect(chat.getState().pendingRoute).toBeNull();
+    expect(chat.getState().state).not.toBe("MEDIUM_CONFIRM");
+    expect(chat.getState().state).not.toBe("NARROWING");
   });
 });

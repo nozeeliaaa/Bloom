@@ -292,7 +292,16 @@
     import { getUserGoal } from '/js/goals.js';
     import { onAuthChange, getIdToken } from '/js/auth.js';
     import { mountChat } from '/js/assistant.js';
+    import { fetchCycleState } from '/js/cycle-state.js';
     import { isAnonMode } from '/js/mode.js';
+
+    function parseDateKey(dateKey) {
+      return new Date(`${dateKey}T00:00:00`);
+    }
+
+    function formatDateKey(dateObj) {
+      return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    }
 
     function computeCycleBase(logs) {
       const periodDays = Object.keys(logs)
@@ -301,20 +310,25 @@
       const starts = [];
       let prev = null;
       for (const d of periodDays) {
-        if (!prev || (new Date(d) - new Date(prev)) / 86400000 > 3) starts.push(d);
+        if (!prev || (parseDateKey(d) - parseDateKey(prev)) / 86400000 > 3) starts.push(d);
         prev = d;
       }
       const lengths = [];
-      for (let i = 1; i < starts.length; i++)
-        lengths.push((new Date(starts[i]) - new Date(starts[i-1])) / 86400000);
+      for (let i = 1; i < starts.length; i++) {
+        lengths.push(Math.round((parseDateKey(starts[i]) - parseDateKey(starts[i - 1])) / 86400000));
+      }
       const avg = lengths.length
         ? Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length)
         : 28;
       const last = starts.length ? starts[starts.length - 1] : null;
       const next = last
-        ? new Date(new Date(last).getTime() + avg * 86400000).toISOString().slice(0, 10)
+        ? (() => {
+            const d = parseDateKey(last);
+            d.setDate(d.getDate() + avg);
+            return formatDateKey(d);
+          })()
         : null;
-      return { cycleStarts: starts, avgCycleLength: avg, nextPeriodDate: next };
+      return { cycleStarts: starts, cycleLengths: lengths, avgCycleLength: avg, nextPeriodDate: next };
     }
 
     renderNav('assistant');
@@ -343,16 +357,28 @@
     async function init(user) {
       const logsByDate = await getAllLogs();
       const cycle = computeCycleBase(logsByDate);
+      const cycleState = await fetchCycleState(logsByDate).catch(() => null);
       const goal = getUserGoal();
 
       const lastLmp = cycle.cycleStarts?.length
         ? cycle.cycleStarts[cycle.cycleStarts.length - 1]
         : null;
 
+      const stateCycleLength = Number(cycleState?.predictedCycleLength ?? cycleState?.avgCycleLength);
+      const cycleLength = Number.isFinite(stateCycleLength) && stateCycleLength > 0
+        ? Math.round(stateCycleLength)
+        : (cycle.avgCycleLength || null);
+      const nextPeriodDate = cycleState?.nextPeriodDate || cycle.nextPeriodDate || null;
+
       const cycleData = {
         lmp: lastLmp,
-        cycleLength: cycle.avgCycleLength || null,
-        nextPeriodDate: cycle.nextPeriodDate || null,
+        cycleLength,
+        nextPeriodDate,
+        previousCycleLengths: cycle.cycleLengths,
+        cycleCount: cycle.cycleStarts.length,
+        phase: cycleState?.phase || null,
+        phaseLabel: cycleState?.phaseLabel || null,
+        confidence: cycleState?.confidence?.level || null,
         isTrackingPregnancy: goal === 'pregnancy',
         mode: goal === 'pregnancy' ? 'pregnancy_tracking'
             : goal === 'ttc'      ? 'trying_to_conceive'

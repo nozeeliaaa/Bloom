@@ -15,12 +15,17 @@
 import { getIdToken } from "./auth.js";
 import { isAccountMode } from "./mode.js";
 import { MODE_BANNER_ONCE_KEY } from "./utils.js";
+import { bloomieDiagnostic } from "./bloomie-logger.js";
+import {
+  loadBloomieMemoryLocal,
+  saveBloomieMemoryLocal,
+  clearBloomieMemoryLocal,
+} from "./bloom-storage.js";
 
 const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
-const MEMORY_KEY = "bloom_bloomie_memory";
 
-// Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → 127.0.0.1:4000)
+// Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → localhost:4000)
 const API_BASE = window.BLOOM_API_BASE || "";
 
 // --------------------
@@ -46,12 +51,9 @@ function setCloudSyncedBanner() {
 // In-memory cache for getAllLogs - avoids repeated API calls within the same page session
 let _logsCache = null;
 let _logsCacheMode = null;
-let _logsInFlight = null;
 
 export function invalidateLogsCache() {
   _logsCache = null;
-  _logsCacheMode = null;
-  _logsInFlight = null;
 }
 
 function showSyncWarning() {
@@ -259,69 +261,61 @@ export async function getAllLogs() {
 
   // Return cached result if available for this session
   if (_logsCache && _logsCacheMode === "account") return _logsCache;
-  // Dedupe concurrent account-mode fetches (dashboard + notifications startup path)
-  if (_logsInFlight) return _logsInFlight;
 
-  _logsInFlight = (async () => {
-    try {
-      const headers = await authHeaders();
-      if (!headers) return local;
+  try {
+    const headers = await authHeaders();
+    if (!headers) return local;
 
-      const [cycleRes, symptomRes] = await Promise.all([
-        fetch(apiUrl("/api/logs"), { headers }),
-        fetch(apiUrl("/api/symptoms"), { headers }),
-      ]);
+    const [cycleRes, symptomRes] = await Promise.all([
+      fetch(apiUrl("/api/logs"), { headers }),
+      fetch(apiUrl("/api/symptoms"), { headers }),
+    ]);
 
-      if (!cycleRes.ok) {
-        const txt = await cycleRes.text().catch(() => "");
-        console.warn("Cycle cloud fetch failed:", cycleRes.status, txt);
-        return local;
-      }
-
-      if (!symptomRes.ok) {
-        const txt = await symptomRes.text().catch(() => "");
-        console.warn("Symptom cloud fetch failed:", symptomRes.status, txt);
-        return local;
-      }
-
-      const cycleData = await cycleRes.json();
-      const symptomData = await symptomRes.json();
-
-      let cycleItems = [];
-      if (Array.isArray(cycleData?.items)) {
-        cycleItems = cycleData.items;
-      } else if (cycleData?.entries && typeof cycleData.entries === "object") {
-        cycleItems = Object.entries(cycleData.entries).map(([dateKey, entry]) => ({
-          dateKey,
-          ...entry,
-        }));
-      }
-
-      const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
-
-      const logs = mergeCloudLogs(cycleItems, symptomItems);
-
-      // Only overwrite local cache if cloud actually returned data.
-      // If cloud is empty but local has entries, keep local to avoid
-      // wiping logs that were saved before a sync had a chance to run.
-      if (Object.keys(logs).length > 0) {
-        writeJSON(LOGS_KEY, logs);
-        setCloudSyncedBanner();
-        _logsCache = logs;
-        _logsCacheMode = "account";
-        return logs;
-      }
-
+    if (!cycleRes.ok) {
+      const txt = await cycleRes.text().catch(() => "");
+      console.warn("Cycle cloud fetch failed:", cycleRes.status, txt);
       return local;
-    } catch (e) {
-      console.warn("Cloud fetch error:", e);
-      return local;
-    } finally {
-      _logsInFlight = null;
     }
-  })();
 
-  return _logsInFlight;
+    if (!symptomRes.ok) {
+      const txt = await symptomRes.text().catch(() => "");
+      console.warn("Symptom cloud fetch failed:", symptomRes.status, txt);
+      return local;
+    }
+
+    const cycleData = await cycleRes.json();
+    const symptomData = await symptomRes.json();
+
+    let cycleItems = [];
+    if (Array.isArray(cycleData?.items)) {
+      cycleItems = cycleData.items;
+    } else if (cycleData?.entries && typeof cycleData.entries === "object") {
+      cycleItems = Object.entries(cycleData.entries).map(([dateKey, entry]) => ({
+        dateKey,
+        ...entry,
+      }));
+    }
+
+    const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
+
+    const logs = mergeCloudLogs(cycleItems, symptomItems);
+
+    // Only overwrite local cache if cloud actually returned data.
+    // If cloud is empty but local has entries, keep local to avoid
+    // wiping logs that were saved before a sync had a chance to run.
+    if (Object.keys(logs).length > 0) {
+      writeJSON(LOGS_KEY, logs);
+      setCloudSyncedBanner();
+      _logsCache = logs;
+      _logsCacheMode = "account";
+      return logs;
+    }
+
+    return local;
+  } catch (e) {
+    console.warn("Cloud fetch error:", e);
+    return local;
+  }
 }
 
 export async function deleteDailyLog(dateKey) {
@@ -374,6 +368,30 @@ export async function getAssistantSession() {
   return readJSON(ASSIST_KEY, null);
 }
 
+/**
+ * getOrInitBloomieMemory()
+ * Reads Bloomie memory from versioned local storage and migrates legacy keys.
+ */
+export function getOrInitBloomieMemory() {
+  return loadBloomieMemoryLocal();
+}
+
+/**
+ * updateBloomieLocalMemory(patch)
+ * Merges patch into the versioned Bloomie memory cache and persists it.
+ */
+export function updateBloomieLocalMemory(patch) {
+  return saveBloomieMemoryLocal(patch || {}, { replace: false });
+}
+
+export function loadLocalBloomieMemory() {
+  return loadBloomieMemoryLocal();
+}
+
+export function saveLocalBloomieMemory(update) {
+  saveBloomieMemoryLocal(update || {}, { replace: false });
+}
+
 // --------------------
 // Bloomie persistent memory
 // --------------------
@@ -381,26 +399,44 @@ export async function getAssistantSession() {
 // Load the last session snapshot. Tries Firestore first (account mode),
 // falls back to localStorage for anon/offline.
 export async function loadBloomieMemory() {
-  const local = readJSON(MEMORY_KEY, null);
+  const local = loadBloomieMemoryLocal();
   if (!isAccountMode()) return local;
   try {
     const headers = await authHeaders();
     if (!headers) return local;
     const res = await fetch(apiUrl("/api/bloomie-memory"), { headers });
-    if (!res.ok) return local;
+    if (!res.ok) {
+      bloomieDiagnostic("memory_load_failed", {
+        module: "db",
+        stage:  "loadBloomieMemory",
+        reason: `backend returned ${res.status}`,
+        fallbackTarget: "local_memory",
+      });
+      return local;
+    }
     const data = await res.json();
-    if (data) writeJSON(MEMORY_KEY, data);
-    return data;
-  } catch {
+    if (data && typeof data === "object") {
+      return saveBloomieMemoryLocal(data, { replace: true });
+    }
+    return local;
+  } catch (err) {
+    bloomieDiagnostic("memory_load_failed", {
+      module: "db",
+      stage:  "loadBloomieMemory",
+      reason: err?.message ?? "network error",
+      fallbackTarget: "local_memory",
+    });
     return local;
   }
 }
 
 // Save a compact memory snapshot. Always writes to localStorage,
 // and syncs to Firestore in account mode.
+// Uses merge semantics for localStorage so a partial update from
+// persistMemory() does not overwrite fields it did not touch.
 export async function saveBloomieMemory(memoryData) {
   if (!memoryData) return;
-  writeJSON(MEMORY_KEY, memoryData);
+  saveBloomieMemoryLocal(memoryData, { replace: false });
   if (!isAccountMode()) return;
   try {
     const headers = await authHeaders();
@@ -410,15 +446,50 @@ export async function saveBloomieMemory(memoryData) {
       headers,
       body: JSON.stringify(memoryData),
     });
-  } catch (e) {
-    console.warn("[Bloomie] memory cloud save failed:", e);
+  } catch (err) {
+    bloomieDiagnostic("cache_write_failed", {
+      module: "db",
+      stage:  "saveBloomieMemory",
+      reason: err?.message ?? "network error",
+    });
+  }
+}
+
+// Load the authenticated user's profile (nickname) from the backend.
+// Returns { nickname: string | null }. Never throws.
+export async function loadUserProfile() {
+  try {
+    const headers = await authHeaders();
+    if (!headers) return { nickname: null };
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 3000)
+    );
+    const request = fetch(apiUrl("/api/user/profile"), { headers });
+    const res = await Promise.race([request, timeout]);
+    if (!res.ok) {
+      bloomieDiagnostic("profile_sync_failed", {
+        module: "db",
+        stage:  "loadUserProfile",
+        reason: `backend returned ${res.status}`,
+      });
+      return { nickname: null };
+    }
+    const data = await res.json();
+    return { nickname: data?.nickname ?? null };
+  } catch (err) {
+    bloomieDiagnostic("profile_sync_failed", {
+      module: "db",
+      stage:  "loadUserProfile",
+      reason: err?.message ?? "network error or timeout",
+    });
+    return { nickname: null };
   }
 }
 
 export async function deleteAllLocalData() {
   localStorage.removeItem(LOGS_KEY);
   localStorage.removeItem(ASSIST_KEY);
-  localStorage.removeItem(MEMORY_KEY);
+  clearBloomieMemoryLocal();
 }
 
 export async function clearAllLogs() {
