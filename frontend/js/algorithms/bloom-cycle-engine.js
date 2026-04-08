@@ -229,7 +229,7 @@ export function detectIrregularCycleSignal({
   recentlyStoppedBCCycleCount = 0,
   userAge = null,
 } = {}) {
-  // Teen users - relax thresholds (cycles 21–45 days are normal variation)
+  // Teen users - relax thresholds (cycles 21-45 days are normal variation)
   const effectiveStdDevThreshold = (userAge !== null && userAge < 18) ? 8  : stdDevThreshold;
   const effectiveRangeThreshold  = (userAge !== null && userAge < 18) ? 15 : rangeThreshold;
 
@@ -263,7 +263,7 @@ export function detectIrregularCycleSignal({
       show: true,
       title: "Post-birth-control adjustment",
       message:
-        "Cycles often take 2–3 months to settle after stopping hormonal birth control. Bloom will build your pattern as things regulate 🩷",
+        "Cycles often take 2-3 months to settle after stopping hormonal birth control. Bloom will build your pattern as things regulate 🩷",
       debug: { reason: "recentlyStoppedBC suppression", recentlyStoppedBCCycleCount },
     });
   }

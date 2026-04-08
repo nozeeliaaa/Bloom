@@ -275,8 +275,19 @@ export function createOOS(env) {
     {
       name: "diagnosis_request",
       patterns: [
-        /\b(do i have|is this|could this be|might i have|am i developing|could i have)\b.{0,30}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|anemia|cancer|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // Direct diagnostic questions: "do i have pcos", "could this be endo"
+        /\b(do i have|is this|could this be|might i have|am i developing|could i have)\b.{0,35}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|anemia|cancer|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I think I have / I think I might have"
+        /\b(i think i (have|might have|could have)|i feel like i (have|might have))\b.{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I'm scared I have / what if I have / do you think I have"
+        /\b(i('m| am) scared (i|i might) have|what if i have|do you think i have|you think i have|could i possibly have)\b.{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I heard/read about X and think I have it / relate to it"
+        /\b(i (heard|read|learned|saw).{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|cyst).{0,50}\b(think i have|think i might|relate|sounds like me|could be me|similar|same))\b/,
+        // "[condition] sounds like me / sounds like what I have"
+        /\b(pcos|endometriosis|fibroids?|adenomyosis|cyst)\b.{0,50}\b(think i have|might have|sounds like me|sounds like (my situation|what i have)|relate to|could be me)\b/,
+        // Generic: diagnose me / what's wrong with me
         /\b(diagnose me|what is wrong with me|what condition|tell me what i have|is this normal or serious|what disease)\b/,
+        // Condition name + diagnosis-intent word
         /\b(pcos|endometriosis|adenomyosis|fibroids?)\b.{0,30}\b(do i|have i|test for|signs of|symptom)\b/,
       ],
       replies: [
@@ -859,8 +870,31 @@ export function createOOS(env) {
     const urgentPhrases = [
       "faint", "passed out", "cant breathe", "can't breathe",
       "shortness of breath", "soaking through", "bleeding through",
+      // Additional red-flag phrases — broad enough to catch variants
+      "almost fainted", "nearly fainted", "about to faint", "feel like fainting",
+      "feel like i faint", "mi feel like mi a go faint",
+      "chest pain", "chest tight", "chest is tight", "chest hurts",
+      "trouble breathing", "hard to breathe", "can't get air", "cant get air",
+      "difficulty breathing", "breath is short",
     ];
-    if (urgentPhrases.some((p) => t.includes(p))) return { next: "HEAVY_URGENT" };
+    if (urgentPhrases.some((p) => t.includes(p))) return { next: "EMERGENCY_REDIRECT" };
+
+    // ── Severe pelvic pain — route directly to urgent care ─────────────────
+    const severePelvicPhrases = [
+      "severe pelvic pain", "unbearable pelvic pain", "extreme pelvic pain",
+      "severe cramps", "unbearable cramps", "cramps are unbearable",
+      "worst pain ever", "worst pain i ever", "pain is unbearable",
+      "pain is so bad i", "pain is too bad", "pain too bad",
+      "one-sided pain", "one sided pain", "sharp pain one side",
+      "pain one side", "pain spreading", "stabbing pain",
+    ];
+    if (severePelvicPhrases.some((p) => t.includes(p))) return { next: "PELVIC_URGENT" };
+
+    // ── Positive pregnancy test + pain or bleeding ─────────────────────────
+    // Possible ectopic / miscarriage concern — conservative redirect.
+    const posTestSignal = /positive test|tested positive|test (is|was|came back) positive|two lines|two line|pregnant and (have|got|feeling)|pregnancy test positive/.test(t);
+    const painOrBleedSignal = /\b(pain|cramp|bleed|bleeding|spotting|spot)\b/.test(t);
+    if (posTestSignal && painOrBleedSignal) return { next: "PELVIC_URGENT" };
 
     // ── Heavy bleeding multi-route detection (priority: C > A > B) ────────
     const heavyRouteC = [
@@ -886,7 +920,7 @@ export function createOOS(env) {
     const isHeavyC = heavyRouteC.some((p) => t.includes(p)) || /\bweak\b/.test(t);
     const isHeavyA = heavyRouteA.some((p) => t.includes(p));
     const isHeavyB = heavyRouteB.some((p) => t.includes(p));
-    if (isHeavyC && (isHeavyA || isHeavyB || /\bbleed|\bperiod|\bblood|\bheavy\b/.test(t))) return { next: "HEAVY_ROUTE_C" };
+    if (isHeavyC && (isHeavyA || isHeavyB || /\bbleed|\bperiod|\bblood|\bheavy\b/.test(t))) return { next: "HEAVY_ROUTE_C_GATE" };
     if (isHeavyA) return { next: "HEAVY_INTRO" };
     if (isHeavyB) return { next: "HEAVY_ROUTE_B" };
 
@@ -942,6 +976,13 @@ export function createOOS(env) {
     if (/^is this normal\??\s*$/i.test(t))                                         return { next: "ELSE_NOT_SURE_ROUTE" };
     if (/\b(something is coming out|sumn a come out)\b/.test(t))                   return { next: "ELSE_DISCHARGE_ENTRY" };
     if (/\b(i don.t feel like myself|mi nuh feel like miself)\b/.test(t))          return { next: "MOOD_SAFETY_CHECK" };
+
+    // Additional vague-but-clearly-reproductive-health messages
+    if (/\b(my body feels weird|body feels strange|body feels different|feel weird in my body|body acting weird|body acting strange)\b/.test(t)) return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(i don.?t feel normal|i dont feel normal|not feeling normal|don.?t feel right)\b/.test(t))                                           return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(my cycle has changed|cycle is different|my period has changed|period is different now|period been different|period acting different|period acting up|period is acting)\b/.test(t)) return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(something (is )?wrong with my period|something wrong with my cycle|something off with my period|sumn wrong with my period|period nuh normal)\b/.test(t))                        return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(i feel like something is wrong|feel like something wrong|something is off|something off with my body|body off)\b/.test(t))                                                     return { next: "ELSE_NOT_SURE_ROUTE" };
 
     // ── Condition education: PCOS ─────────────────────────────────────────
     // Explicit name, or "irregular period" paired with acne or hair symptoms.
@@ -1027,7 +1068,7 @@ export function createOOS(env) {
       /belly (a )?hurting/.test(t) ||
       /waist a hurt/.test(t) ||
       /pain between mi legs/.test(t)
-    ) return { next: "PELVIC_SAFETY_CHECK" };
+    ) return { next: "PELVIC_SAFETY_GATE" };
 
     const { sig, has } = scoreSignals(t);
     const combo = resolveSignals(sig, has);
@@ -1039,6 +1080,19 @@ export function createOOS(env) {
     const [bestIntent, bestScore] = best;
 
     if (bestScore < 2) {
+      // ── "Valid but unclear" reproductive-health fallback ─────────
+      // Catches messages that are clearly cycle/body adjacent but score
+      // below the single-signal threshold — avoids sending them to the
+      // generic OOS reply.
+      const VAGUE_REPRO_PATTERNS = [
+        /\b(cycle|period|bleeding|ovulat|menstrual|hormones?|discharge|womb|uterus|cervix|vagina|reproductive)\b/,
+        /\b(something feels off|feel off|not feeling right|body feels|feel weird|feel strange|feel different)\b/,
+        /\b(something (is )?wrong|something off|not normal|not right|has changed|been different|acting up)\b/,
+      ];
+      if (VAGUE_REPRO_PATTERNS.some((rx) => rx.test(t))) {
+        return { next: "ELSE_NOT_SURE_ROUTE", payload: { reason: "vague_repro_health" } };
+      }
+
       // ── Deterministic OOS handling ───────────────────────────────
       const cat = detectOutOfScope(t, OOS, HEALTH_OVERRIDE_PATTERNS);
       if (cat) {
@@ -1068,7 +1122,7 @@ export function createOOS(env) {
     if (bestIntent === "pregnancy") return { next: "PREGNANCY_ENTRY" };
     if (bestIntent === "discharge") return { next: "ELSE_DISCHARGE" };
     if (bestIntent === "pelvic") {
-      return { next: "PELVIC_SAFETY_CHECK" };
+      return { next: "PELVIC_SAFETY_GATE" };
     }
 
     // Late check with cycle data

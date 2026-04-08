@@ -20,7 +20,7 @@ export async function validateSymptomLog(body) {
     return { valid: false, error: `Unknown symptomKey: "${key}". Must match a catalog entry.` };
   }
 
-  // --- severity: required, must be 0–5 integer ---
+  // --- severity: required, must be 0-5 integer ---
   if (body.severity === undefined || body.severity === null) {
     return { valid: false, error: "severity is required" };
   }

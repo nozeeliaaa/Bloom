@@ -293,6 +293,7 @@ export function initBloomieChat({
     cycleLength:         Number(cycleData?.cycleLength) || 28,
     nextPeriodDate:      toDate(cycleData?.nextPeriodDate),
     edd:                 toDate(cycleData?.edd),
+    cycleCount:          Number(cycleData?.cycleCount) || 0,
     hasData:             !!(cycleData?.lmp),  // also re-checked via hasLmpData()
 
     // Explicit mode from dashboard - never guessed by Bloomie
@@ -640,9 +641,18 @@ export function initBloomieChat({
   // How many days until next period
   function daysUntilNextPeriod() {
     const lmp = effectiveLmp();
-    const next = cd.nextPeriodDate || (lmp ? addDays(lmp, effectiveCycleLength()) : null);
+    const fallbackNext = lmp ? addDays(lmp, effectiveCycleLength()) : null;
+    let next = cd.nextPeriodDate || fallbackNext;
     if (!next) return null;
-    return daysBetween(new Date(), next);
+
+    // Guard stale next-period dates that are on/before the latest logged start.
+    if (lmp && fallbackNext && next <= lmp) next = fallbackNext;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(next);
+    target.setHours(0, 0, 0, 0);
+    return daysBetween(today, target);
   }
 
   // Smart pregnancy test recommendation based on LMP

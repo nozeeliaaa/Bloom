@@ -133,7 +133,7 @@
    Period=pink  Follicular=blue  Ovulation=teal  Luteal=amber       */
 .phase-menstrual  { background: #fce7f3; color: #be185d; }   /* pink  */
 .phase-follicular { background: #eff6ff; color: #3b82f6; }   /* blue  */
-.phase-ovulation  { background: #f0fdfa; color: #0d9488; }   /* teal  */
+.phase-ovulation  { background: #E6F4F4; color: #1A8080; }   /* teal  */
 .phase-luteal     { background: #fffbeb; color: #d97706; }   /* amber */
 .phase-unknown    { background: #F4EEF0; color: var(--color-text-muted); }
 
@@ -161,7 +161,7 @@
 /* Active pill uses the same tokens as .phase-badge above */
 .phase-pill--active.phase-menstrual  { background: #fce7f3; color: #be185d; border-color: #be185d; }
 .phase-pill--active.phase-follicular { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
-.phase-pill--active.phase-ovulation  { background: #f0fdfa; color: #0d9488; border-color: #0d9488; }
+.phase-pill--active.phase-ovulation  { background: #E6F4F4; color: #1A8080; border-color: #1A8080; }
 .phase-pill--active.phase-luteal     { background: #fffbeb; color: #d97706; border-color: #d97706; }
 
 .phase-dot {

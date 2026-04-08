@@ -40,7 +40,7 @@ const CAT_FILTER   = args.includes("--category") ? args[args.indexOf("--category
 
 // ─── Pipeline runner ──────────────────────────────────────────────────────────
 
-// Full pipeline normalization (mirrors assistant.js steps 3–6):
+// Full pipeline normalization (mirrors assistant.js steps 3-6):
 //   normalizePatois → fuzzyCorrect → collapseRepeatedLetters → expandShorthand → normalizeText
 function pipelineNormalize(rawInput) {
   const p1 = normalizePatois(rawInput);

@@ -34,7 +34,7 @@ export function runBloomLoader({ targetUrl, minMs = 900 } = {}) {
     const startTime = Date.now();
 
     const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 6; // 6–15
+      progress += Math.floor(Math.random() * 10) + 6; // 6-15
       if (progress >= 100) progress = 100;
 
       if (bar) bar.style.width = progress + "%";

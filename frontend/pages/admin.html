@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin — Bloom</title>
+  <title>Admin - Bloom</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/admin.css" />
@@ -16,401 +16,340 @@
   <div id="banner-area"></div>
 
   <main>
-    <div style="max-width:1200px;margin:0 auto;padding:0 1rem 3rem;">
-
-      <div class="page-header admin-page-header">
-        <div>
-          <h1>Admin Dashboard</h1>
-          <p id="admin-subtitle" class="text-muted">Loading…</p>
-        </div>
-        <div class="admin-header-actions">
-          <a href="/pages/admin-safety.html" class="btn btn-outline btn-sm">Safety Log</a>
-          <button class="btn btn-sm" id="admin-refresh-btn" type="button">Refresh</button>
-        </div>
+    <div class="page-header admin-page-header">
+      <div>
+        <h1>Admin Panel</h1>
+        <p class="text-muted" id="admin-subtitle">Loading…</p>
       </div>
-
-      <!-- ── Tabs ─────────────────────────────────────────────────────────── -->
-      <div class="admin-tabs" role="tablist">
-        <button class="admin-tab active" role="tab" data-tab="overview"  aria-selected="true"  type="button">Overview</button>
-        <button class="admin-tab"         role="tab" data-tab="users"    aria-selected="false" type="button">Users</button>
-        <button class="admin-tab"         role="tab" data-tab="pamphlets" aria-selected="false" type="button">Pamphlets</button>
-        <button class="admin-tab"         role="tab" data-tab="clinics"  aria-selected="false" type="button">Clinics</button>
-        <button class="admin-tab"         role="tab" data-tab="support"  aria-selected="false" type="button">Support</button>
+      <div class="admin-header-actions">
+        <a class="btn btn-outline btn-sm" href="/pages/admin-safety.html">Safety Review</a>
+        <button class="btn btn-outline btn-sm" id="admin-refresh-btn" type="button">Refresh</button>
       </div>
+    </div>
 
-      <!-- ══════════════════════════════════════════════════════════════════
-           TAB: OVERVIEW
-      ══════════════════════════════════════════════════════════════════ -->
-      <div id="tab-overview" class="admin-tab-panel">
+    <nav class="admin-tabs" role="tablist">
+      <button class="admin-tab active" data-tab="overview" role="tab" aria-selected="true" type="button">Overview</button>
+      <button class="admin-tab" data-tab="users" role="tab" aria-selected="false" type="button">Users</button>
+      <button class="admin-tab" data-tab="pamphlets" role="tab" aria-selected="false" type="button">Pamphlets</button>
+      <button class="admin-tab" data-tab="clinics" role="tab" aria-selected="false" type="button">Clinics</button>
+      <button class="admin-tab" data-tab="support" role="tab" aria-selected="false" type="button">Support</button>
+    </nav>
 
-        <!-- KPI grid -->
-        <div class="admin-grid" style="margin-bottom:1.25rem;">
-          <section class="card">
-            <div class="card-body">
-              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Total Users</div>
-              <div class="admin-metric" id="stat-users">—</div>
-            </div>
-          </section>
-          <section class="card">
-            <div class="card-body">
-              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">New This Week</div>
-              <div class="admin-metric" id="stat-new-users">—</div>
-            </div>
-          </section>
-          <section class="card">
-            <div class="card-body">
-              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Cycle Logs</div>
-              <div class="admin-metric" id="stat-cycle-logs">—</div>
-            </div>
-          </section>
-          <section class="card">
-            <div class="card-body">
-              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Symptom Logs</div>
-              <div class="admin-metric" id="stat-symptom-logs">—</div>
-            </div>
-          </section>
-          <section class="card">
-            <div class="card-body">
-              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Pamphlets</div>
-              <div class="admin-metric" id="stat-pamphlets">—</div>
-            </div>
-          </section>
-          <section class="card">
-            <div class="card-body">
-              <div class="text-muted" style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;">Clinics</div>
-              <div class="admin-metric" id="stat-clinics">—</div>
-            </div>
-          </section>
-        </div>
+    <!-- Overview tab -->
+    <div class="admin-tab-panel" id="tab-overview" role="tabpanel">
+      <div class="admin-grid admin-stats-grid">
 
-        <!-- Goal distribution -->
-        <section class="card" style="margin-bottom:1.25rem;">
-          <div class="card-header">
-            <div>
-              <div class="card-title">User Goals</div>
-              <div class="card-subtitle">Distribution of selected health goals</div>
-            </div>
-          </div>
+        <div class="card admin-stat-card">
           <div class="card-body">
-            <div id="goal-distribution" class="admin-list">
-              <p class="text-muted">Loading…</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- ── Bloomie Analytics card ──────────────────────────────────── -->
-        <section class="card" id="ba-card">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Bloomie Analytics <span style="font-weight:400;font-size:.85rem;color:var(--color-text-muted);">(last 30 days)</span></div>
-              <div class="card-subtitle">Analytics are anonymised. No message content is stored.</div>
-            </div>
-            <div>
-              <button class="btn btn-outline btn-sm" id="ba-refresh-btn" type="button">Refresh</button>
-            </div>
-          </div>
-
-          <div class="card-body">
-            <p id="ba-status" class="text-muted" style="margin-bottom:1rem;">Loading…</p>
-
-            <!-- KPI row -->
-            <div class="admin-grid" style="margin-bottom:1.25rem;">
-              <div class="admin-item">
-                <div class="admin-item-meta">Confidence Fallbacks</div>
-                <div class="admin-metric" id="ba-fallbacks">—</div>
+            <div class="admin-stat-row">
+              <div class="admin-stat-icon admin-stat-icon--users">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
               </div>
-              <div class="admin-item">
-                <div class="admin-item-meta">No-Match Events</div>
-                <div class="admin-metric" id="ba-no-match">—</div>
-              </div>
-              <div class="admin-item">
-                <div class="admin-item-meta">Urgency Escalations</div>
-                <div class="admin-metric" id="ba-urgency">—</div>
-              </div>
-              <div class="admin-item">
-                <div class="admin-item-meta">OOS Events</div>
-                <div class="admin-metric" id="ba-oos">—</div>
-              </div>
-              <div class="admin-item">
-                <div class="admin-item-meta">Avg Session Depth</div>
-                <div class="admin-metric" id="ba-avg-depth">—</div>
-              </div>
-            </div>
-
-            <!-- Three columns: routes | confidence | tone/source -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;flex-wrap:wrap;">
-
-              <!-- Route distribution (top 10) -->
               <div>
-                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-bottom:.6rem;">Top Routes</div>
-                <div id="ba-route-list" class="admin-list" style="gap:.4rem;">
-                  <p class="text-muted" style="font-size:.85rem;">—</p>
-                </div>
+                <div class="card-subtitle">Total users</div>
+                <div class="admin-metric" id="stat-users">-</div>
               </div>
+            </div>
+          </div>
+        </div>
 
-              <!-- Confidence tiers -->
+        <div class="card admin-stat-card">
+          <div class="card-body">
+            <div class="admin-stat-row">
+              <div class="admin-stat-icon admin-stat-icon--new">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+                </svg>
+              </div>
               <div>
-                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-bottom:.6rem;">Confidence Tiers</div>
-                <div class="admin-list" style="gap:.4rem;">
-                  <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;">
-                    <span>HIGH</span>
-                    <span class="admin-badge admin-badge--primary" id="ba-confidence-high">—</span>
-                  </div>
-                  <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;">
-                    <span>MEDIUM</span>
-                    <span class="admin-badge admin-badge--warning" id="ba-confidence-medium">—</span>
-                  </div>
-                  <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;">
-                    <span>LOW</span>
-                    <span class="admin-badge admin-badge--danger" id="ba-confidence-low">—</span>
-                  </div>
-                </div>
-
-                <!-- Tone distribution -->
-                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-top:1rem;margin-bottom:.6rem;">Tone</div>
-                <div id="ba-tone-list" class="admin-list" style="gap:.4rem;">
-                  <p class="text-muted" style="font-size:.85rem;">—</p>
-                </div>
+                <div class="card-subtitle">New users (7 days)</div>
+                <div class="admin-metric" id="stat-new-users">-</div>
               </div>
+            </div>
+          </div>
+        </div>
 
-              <!-- Emotion source + top no-match phrases -->
+        <div class="card admin-stat-card">
+          <div class="card-body">
+            <div class="admin-stat-row">
+              <div class="admin-stat-icon admin-stat-icon--cycle">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
               <div>
-                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-bottom:.6rem;">Emotion Source</div>
-                <div id="ba-source-list" class="admin-list" style="gap:.4rem;">
-                  <p class="text-muted" style="font-size:.85rem;">—</p>
-                </div>
-
-                <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);margin-top:1rem;margin-bottom:.6rem;">Top No-Match Phrases</div>
-                <div id="ba-no-match-phrases" class="admin-list" style="gap:.4rem;">
-                  <p class="text-muted" style="font-size:.85rem;">—</p>
-                </div>
+                <div class="card-subtitle">Cycle logs</div>
+                <div class="admin-metric" id="stat-cycle-logs">-</div>
               </div>
-
-            </div><!-- /3-col grid -->
-          </div><!-- /card-body -->
-        </section><!-- /#ba-card -->
-
-      </div><!-- /#tab-overview -->
-
-      <!-- ══════════════════════════════════════════════════════════════════
-           TAB: USERS
-      ══════════════════════════════════════════════════════════════════ -->
-      <div id="tab-users" class="admin-tab-panel" hidden>
-        <div class="admin-row" style="margin-bottom:1rem;">
-          <h2 style="margin:0;">Users</h2>
-          <button class="btn btn-outline btn-sm" id="users-refresh" type="button">Refresh</button>
-        </div>
-        <section class="card">
-          <div class="card-body">
-            <div id="users-list" class="admin-list">
-              <p class="text-muted">Click "Users" tab to load.</p>
-            </div>
-            <div id="users-pagination" class="admin-pagination"></div>
-          </div>
-        </section>
-      </div>
-
-      <!-- ══════════════════════════════════════════════════════════════════
-           TAB: PAMPHLETS
-      ══════════════════════════════════════════════════════════════════ -->
-      <div id="tab-pamphlets" class="admin-tab-panel" hidden>
-        <div class="admin-row" style="margin-bottom:1rem;">
-          <h2 style="margin:0;">Pamphlets</h2>
-          <button class="btn btn-sm" id="pamphlet-add-btn" type="button">+ Add Pamphlet</button>
-        </div>
-        <section class="card">
-          <div class="card-body">
-            <div id="pamphlets-list" class="admin-list">
-              <p class="text-muted">Click "Pamphlets" tab to load.</p>
             </div>
           </div>
-        </section>
-      </div>
-
-      <!-- ══════════════════════════════════════════════════════════════════
-           TAB: CLINICS
-      ══════════════════════════════════════════════════════════════════ -->
-      <div id="tab-clinics" class="admin-tab-panel" hidden>
-        <div class="admin-row" style="margin-bottom:1rem;">
-          <h2 style="margin:0;">Clinics</h2>
-          <button class="btn btn-sm" id="clinic-add-btn" type="button">+ Add Clinic</button>
         </div>
-        <section class="card">
+
+        <div class="card admin-stat-card">
           <div class="card-body">
-            <div id="clinics-list" class="admin-list">
-              <p class="text-muted">Click "Clinics" tab to load.</p>
+            <div class="admin-stat-row">
+              <div class="admin-stat-icon admin-stat-icon--symptom">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+              </div>
+              <div>
+                <div class="card-subtitle">Symptom logs</div>
+                <div class="admin-metric" id="stat-symptom-logs">-</div>
+              </div>
             </div>
           </div>
-        </section>
-      </div>
+        </div>
 
-      <!-- ══════════════════════════════════════════════════════════════════
-           TAB: SUPPORT
-      ══════════════════════════════════════════════════════════════════ -->
-      <div id="tab-support" class="admin-tab-panel" hidden>
-        <div class="admin-row" style="margin-bottom:1rem;">
-          <h2 style="margin:0;">Support Requests</h2>
-          <div class="admin-tab-header-actions">
-            <select id="support-status-filter" class="admin-select">
-              <option value="">All statuses</option>
-              <option value="new">New</option>
-              <option value="open">Open</option>
-              <option value="resolved">Resolved</option>
-            </select>
-            <button class="btn btn-outline btn-sm" id="support-refresh-btn" type="button">Refresh</button>
+        <div class="card admin-stat-card">
+          <div class="card-body">
+            <div class="admin-stat-row">
+              <div class="admin-stat-icon admin-stat-icon--pamphlet">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+              </div>
+              <div>
+                <div class="card-subtitle">Pamphlets</div>
+                <div class="admin-metric" id="stat-pamphlets">-</div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="admin-list" id="support-list">
-          <p class="text-muted">Select the Support tab to load.</p>
+
+        <div class="card admin-stat-card">
+          <div class="card-body">
+            <div class="admin-stat-row">
+              <div class="admin-stat-icon admin-stat-icon--clinic">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+              </div>
+              <div>
+                <div class="card-subtitle">Clinics</div>
+                <div class="admin-metric" id="stat-clinics">-</div>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
 
-    </div><!-- /shell -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+          </div>
+          <div class="card-title">Goal Distribution</div>
+        </div>
+        <div class="card-body admin-list" id="goal-distribution">
+          <p class="text-muted">Loading…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users tab -->
+    <div class="admin-tab-panel" id="tab-users" role="tabpanel" hidden>
+      <div class="admin-row admin-tab-header">
+        <h2 class="no-margin">Users</h2>
+        <button class="btn btn-outline btn-sm" id="users-refresh" type="button">Refresh</button>
+      </div>
+      <div class="admin-list" id="users-list">
+        <p class="text-muted">Select the Users tab to load.</p>
+      </div>
+      <div class="admin-pagination" id="users-pagination"></div>
+    </div>
+
+    <!-- Pamphlets tab -->
+    <div class="admin-tab-panel" id="tab-pamphlets" role="tabpanel" hidden>
+      <div class="admin-row admin-tab-header">
+        <h2 class="no-margin">Pamphlets</h2>
+        <button class="btn btn-primary btn-sm" id="pamphlet-add-btn" type="button">+ Add Pamphlet</button>
+      </div>
+      <div class="admin-list" id="pamphlets-list">
+        <p class="text-muted">Select the Pamphlets tab to load.</p>
+      </div>
+    </div>
+
+    <!-- Clinics tab -->
+    <div class="admin-tab-panel" id="tab-clinics" role="tabpanel" hidden>
+      <div class="admin-row admin-tab-header">
+        <h2 class="no-margin">Clinics</h2>
+        <button class="btn btn-primary btn-sm" id="clinic-add-btn" type="button">+ Add Clinic</button>
+      </div>
+      <div class="admin-list" id="clinics-list">
+        <p class="text-muted">Select the Clinics tab to load.</p>
+      </div>
+    </div>
+
+    <!-- Support tab -->
+    <div class="admin-tab-panel" id="tab-support" role="tabpanel" hidden>
+      <div class="admin-row admin-tab-header">
+        <h2 class="no-margin">Support Requests</h2>
+        <div class="admin-tab-header-actions">
+          <select id="support-status-filter" class="admin-select">
+            <option value="">All statuses</option>
+            <option value="new">New</option>
+            <option value="open">Open</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <button class="btn btn-outline btn-sm" id="support-refresh-btn" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="admin-list" id="support-list">
+        <p class="text-muted">Select the Support tab to load.</p>
+      </div>
+    </div>
   </main>
 
-  <!-- ══════════════════════════════════════════════════════════════════════
-       PAMPHLET MODAL
-  ══════════════════════════════════════════════════════════════════════ -->
+  <!-- Pamphlet modal -->
   <div class="admin-modal-overlay" id="pamphlet-modal" hidden>
-    <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="pamphlet-modal-title">
+    <div class="admin-modal">
       <div class="admin-modal-header">
-        <h2 id="pamphlet-modal-title">New Pamphlet</h2>
+        <h2 id="pamphlet-modal-title">Pamphlet</h2>
         <button class="admin-modal-close" data-close="pamphlet-modal" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="admin-modal-body">
         <input type="hidden" id="pamphlet-id" />
         <div class="form-grid">
-          <div>
+          <div class="form-group">
             <label class="form-label" for="pamphlet-title">Title <span class="req">*</span></label>
-            <input class="form-control" id="pamphlet-title" type="text" maxlength="120" />
+            <input class="form-input" id="pamphlet-title" type="text" maxlength="120" />
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="pamphlet-category">Category <span class="req">*</span></label>
-            <input class="form-control" id="pamphlet-category" type="text" maxlength="60" />
+            <input class="form-input" id="pamphlet-category" type="text" maxlength="60" />
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="pamphlet-summary">Summary</label>
-            <input class="form-control" id="pamphlet-summary" type="text" maxlength="200" />
+            <input class="form-input" id="pamphlet-summary" type="text" maxlength="200" />
           </div>
-          <div>
-            <label class="form-label" for="pamphlet-readtime">Read time</label>
-            <input class="form-control" id="pamphlet-readtime" type="text" maxlength="20" placeholder="e.g. 3 min" />
+          <div class="form-group">
+            <label class="form-label" for="pamphlet-readtime">Read time (e.g. "3 min")</label>
+            <input class="form-input" id="pamphlet-readtime" type="text" maxlength="20" />
           </div>
-          <div style="display:flex;align-items:center;gap:.5rem;">
-            <input type="checkbox" id="pamphlet-sensitive" />
-            <label for="pamphlet-sensitive">Mark as sensitive</label>
+          <div class="form-group">
+            <label class="admin-checkbox-label">
+              <input type="checkbox" id="pamphlet-sensitive" />
+              Mark as sensitive content
+            </label>
           </div>
-          <div>
-            <label class="form-label" for="pamphlet-pdf-file">PDF file (optional — upload replaces current)</label>
-            <input class="form-control" id="pamphlet-pdf-file" type="file" accept="application/pdf" />
+          <div class="form-group">
+            <label class="form-label" for="pamphlet-pdf-file">PDF file (optional = upload replaces current)</label>
+            <input class="form-input" id="pamphlet-pdf-file" type="file" accept="application/pdf" />
             <p class="pamphlet-pdf-status" id="pamphlet-pdf-status"></p>
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="pamphlet-pdf-url">PDF URL (auto-filled after upload, or paste an external link)</label>
-            <input class="form-control" id="pamphlet-pdf-url" type="url" placeholder="https://…" />
+            <input class="form-input" id="pamphlet-pdf-url" type="url" placeholder="https://…" />
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="pamphlet-content">Content (HTML) <span class="req">*</span></label>
-            <textarea class="form-control admin-content-editor" id="pamphlet-content" rows="10"></textarea>
+            <textarea class="form-input admin-content-editor" id="pamphlet-content" rows="10"></textarea>
           </div>
         </div>
         <p class="admin-error" id="pamphlet-modal-error" hidden></p>
       </div>
       <div class="admin-modal-footer">
         <button class="btn btn-outline" data-close="pamphlet-modal" type="button">Cancel</button>
-        <button class="btn" id="pamphlet-save-btn" type="button">Save</button>
+        <button class="btn btn-primary" id="pamphlet-save-btn" type="button">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════════
-       CLINIC MODAL
-  ══════════════════════════════════════════════════════════════════════ -->
+  <!-- Clinic modal -->
   <div class="admin-modal-overlay" id="clinic-modal" hidden>
-    <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="clinic-modal-title">
+    <div class="admin-modal">
       <div class="admin-modal-header">
-        <h2 id="clinic-modal-title">New Clinic</h2>
+        <h2 id="clinic-modal-title">Clinic</h2>
         <button class="admin-modal-close" data-close="clinic-modal" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="admin-modal-body">
         <input type="hidden" id="clinic-id" />
         <div class="form-grid">
-          <div>
+          <div class="form-group">
             <label class="form-label" for="clinic-name">Name <span class="req">*</span></label>
-            <input class="form-control" id="clinic-name" type="text" maxlength="120" />
+            <input class="form-input" id="clinic-name" type="text" maxlength="120" />
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="clinic-country">Country <span class="req">*</span></label>
-            <input class="form-control" id="clinic-country" type="text" value="Jamaica" maxlength="80" />
+            <input class="form-input" id="clinic-country" type="text" value="Jamaica" maxlength="80" />
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="clinic-parish">Parish / Region</label>
-            <input class="form-control" id="clinic-parish" type="text" maxlength="80" />
+            <input class="form-input" id="clinic-parish" type="text" maxlength="80" />
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="clinic-address">Address</label>
-            <input class="form-control" id="clinic-address" type="text" maxlength="200" />
+            <input class="form-input" id="clinic-address" type="text" maxlength="200" />
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="clinic-type">Type</label>
-            <select class="form-control" id="clinic-type">
-              <option value="">— select —</option>
+            <select class="form-input" id="clinic-type">
+              <option value="">- Select -</option>
               <option value="public">Public</option>
               <option value="private">Private</option>
-              <option value="ngo">NGO / Non-profit</option>
+              <option value="ngo">NGO / Charity</option>
               <option value="pharmacy">Pharmacy</option>
             </select>
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="clinic-phone">Phone</label>
-            <input class="form-control" id="clinic-phone" type="text" maxlength="40" />
+            <input class="form-input" id="clinic-phone" type="text" maxlength="40" />
           </div>
-          <div>
+          <div class="form-group">
             <label class="form-label" for="clinic-hours">Hours</label>
-            <input class="form-control" id="clinic-hours" type="text" maxlength="100" placeholder="e.g. Mon–Fri 8am–5pm" />
+            <input class="form-input" id="clinic-hours" type="text" maxlength="100" placeholder="e.g. Mon-Fri 8am-5pm" />
           </div>
-          <div>
-            <label class="form-label" for="clinic-services">Services <span style="font-weight:400;">(comma-separated)</span></label>
-            <input class="form-control" id="clinic-services" type="text" maxlength="300" placeholder="e.g. STI testing, Family planning" />
+          <div class="form-group">
+            <label class="form-label" for="clinic-services">Services (comma-separated)</label>
+            <input class="form-input" id="clinic-services" type="text" maxlength="300" placeholder="e.g. STI testing, Family planning" />
           </div>
         </div>
         <p class="admin-error" id="clinic-modal-error" hidden></p>
       </div>
       <div class="admin-modal-footer">
         <button class="btn btn-outline" data-close="clinic-modal" type="button">Cancel</button>
-        <button class="btn" id="clinic-save-btn" type="button">Save</button>
+        <button class="btn btn-primary" id="clinic-save-btn" type="button">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════════
-       USER MODAL
-  ══════════════════════════════════════════════════════════════════════ -->
+  <!-- User modal -->
   <div class="admin-modal-overlay admin-modal--sm" id="user-modal" hidden>
-    <div class="admin-modal admin-modal--sm" role="dialog" aria-modal="true" aria-labelledby="user-modal-heading">
+    <div class="admin-modal admin-modal--sm">
       <div class="admin-modal-header">
-        <h2 id="user-modal-heading">Manage User</h2>
+        <h2>Manage User</h2>
         <button class="admin-modal-close" data-close="user-modal" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="admin-modal-body">
         <input type="hidden" id="user-modal-uid" />
-        <p style="margin-bottom:.85rem;font-weight:700;" id="user-modal-email"></p>
-        <div class="form-grid">
-          <div>
-            <label class="form-label" for="user-modal-role">Role</label>
-            <select class="form-control" id="user-modal-role">
-              <option value="user">user</option>
-              <option value="admin">admin</option>
-            </select>
-          </div>
+        <p class="admin-modal-user-email"><strong id="user-modal-email"></strong></p>
+        <div class="form-group">
+          <label class="form-label" for="user-modal-role">Role</label>
+          <select class="form-input" id="user-modal-role">
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
         </div>
         <p class="admin-error" id="user-modal-error" hidden></p>
       </div>
       <div class="admin-modal-footer">
-        <button class="btn btn-outline" id="user-disable-btn" type="button" style="margin-right:auto;">Disable Account</button>
-        <button class="btn btn-outline" id="user-enable-btn"  type="button" style="margin-right:auto;display:none;">Enable Account</button>
         <button class="btn btn-outline" data-close="user-modal" type="button">Cancel</button>
-        <button class="btn" id="user-save-btn" type="button">Save Role</button>
+        <button class="btn btn-sm btn-danger" id="user-disable-btn" type="button">Disable</button>
+        <button class="btn btn-sm btn-outline" id="user-enable-btn" type="button">Enable</button>
+        <button class="btn btn-primary" id="user-save-btn" type="button">Save Role</button>
       </div>
     </div>
   </div>

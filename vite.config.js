@@ -1,6 +1,8 @@
 import { defineConfig } from "vite";
 import { resolve } from "path";
 
+const LOCAL_API_TARGET = "http://127.0.0.1:4000";
+
 export default defineConfig({
   root: "frontend",
   publicDir: false,
@@ -11,15 +13,15 @@ export default defineConfig({
     // Proxy requests to the backend (avoids CORS + JSON parse errors)
     proxy: {
       "/api": {
-        target: "http://localhost:4000",
+        target: LOCAL_API_TARGET,
         changeOrigin: true,
       },
       "/catalog": {
-        target: "http://localhost:4000",
+        target: LOCAL_API_TARGET,
         changeOrigin: true,
       },
       "/health": {
-        target: "http://localhost:4000",
+        target: LOCAL_API_TARGET,
         changeOrigin: true,
       },
     },
@@ -29,6 +31,7 @@ export default defineConfig({
       allow: [
         resolve(__dirname, "frontend"),
         resolve(__dirname, "algorithms"),
+        resolve(__dirname, "backend/ml/inference"),
       ],
     },
   },

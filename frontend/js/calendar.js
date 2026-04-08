@@ -18,13 +18,17 @@ import {
 
 import { saveDailyLog, getAllLogs, deleteDailyLog, clearAllLogs } from "./db.js";
 import { getUserGoal } from "./goals.js";
-import { onAuthChange, getIdToken } from "./auth.js";
-import { isAnonMode } from "./mode.js";
+import { onAuthChange } from "./auth.js";
+import { fetchCycleState } from "./cycle-state.js";
 
-// ── Local cycle state computation (anon mode + auth fallback) ──────────────────
-// Pure JS = mirrors backend cyclePhaseEngine + buildFutureCyclesBackend logic.
-// Used when: (a) user is in anon mode, (b) auth token unavailable, (c) backend error.
+// ── PRESENTATION + INTEGRATION LAYER ONLY ────────────────────────────────────
+// This file gathers user data and passes it to the approved backend engines
+// via fetchCycleState (→ cyclesML.js → cyclePhaseEngine.js).
+// All reproductive-health calculations (phase, next period, fertile window,
+// ovulation, confidence) are computed ONLY by the approved engine files.
+// Do NOT add local calculation logic here.
 
+// Date utility helpers - used only for processing data returned by approved engines.
 function _addDays(dateStr, n) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + n);
@@ -37,214 +41,6 @@ function _daysBetween(a, b) {
   );
 }
 
-function computeCycleStateLocally(logs) {
-  const DISCLAIMER =
-    "This is an educational estimate, not a medical prediction. Consult a healthcare provider for medical advice.";
-  const EMPTY = {
-    ready: false, phase: "unknown", phaseLabel: "Unknown",
-    dayInCycle: null, avgCycleLength: null, predictedCycleLength: null,
-    confidence: { level: "Low", windowDays: 5, message: "Log your first period to see predictions." },
-    nextPeriodDate: null, ovulationDate: null, fertileStart: null, fertileEnd: null,
-    cyclesLogged: 0, predictedPeriodDays: [], futureOvulationDates: [],
-    allFertileDays: [], futureCycles: [], disclaimer: DISCLAIMER, source: "local",
-  };
-
-  const periodDays = Object.keys(logs || {})
-    .filter(k => { const l = logs[k]; return l && l.flow && l.flow !== "none"; })
-    .sort();
-
-  if (!periodDays.length) return EMPTY;
-
-  // Cluster starts & ends (gap > 3 days = new period)
-  const cStarts = [], cEnds = [];
-  let cs = periodDays[0], ce = periodDays[0];
-  for (let i = 1; i < periodDays.length; i++) {
-    if (_daysBetween(periodDays[i - 1], periodDays[i]) > 3) {
-      cStarts.push(cs); cEnds.push(ce); cs = periodDays[i];
-    }
-    ce = periodDays[i];
-  }
-  cStarts.push(cs); cEnds.push(ce);
-
-  const lastStart = cStarts[cStarts.length - 1];
-  const lastEnd   = cEnds[cEnds.length - 1];
-
-  // Cycle lengths
-  const cycleLengths = [];
-  for (let i = 1; i < cStarts.length; i++) {
-    cycleLengths.push(_daysBetween(cStarts[i - 1], cStarts[i]));
-  }
-  const avgCycleLength = cycleLengths.length
-    ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
-    : 28;
-
-  // Weighted-average predicted length (rule-based, mirrors backend fallback)
-  let predictedCycleLength = avgCycleLength;
-  if (cycleLengths.length > 0) {
-    const n = cycleLengths.length;
-    const weights = Array.from({ length: n }, (_, i) => i + 1);
-    const sumW = weights.reduce((a, w) => a + w, 0);
-    predictedCycleLength = Math.max(21, Math.min(45, Math.round(
-      weights.reduce((a, w, i) => a + w * cycleLengths[i], 0) / sumW
-    )));
-  }
-
-  // Day in cycle & phase
-  const todayKey = toDateKey(new Date());
-  const dayInCycle = _daysBetween(lastStart, todayKey) + 1;
-  const folEnd  = Math.round(predictedCycleLength * 13 / 28);
-  const ovDay   = Math.round(predictedCycleLength * 14 / 28);
-  const ovEnd   = Math.round(predictedCycleLength * 16 / 28);
-
-  let phase, phaseLabel;
-  if (periodDays.includes(todayKey))    { phase = "menstrual";  phaseLabel = "Menstrual";  }
-  else if (dayInCycle <= folEnd)        { phase = "follicular"; phaseLabel = "Follicular"; }
-  else if (dayInCycle <= ovEnd)         { phase = "ovulatory";  phaseLabel = "Ovulatory";  }
-  else if (dayInCycle <= predictedCycleLength) { phase = "luteal"; phaseLabel = "Luteal"; }
-  else                                  { phase = "luteal";     phaseLabel = "Late Luteal"; }
-
-  // Key dates
-  const nextPeriodDate = _addDays(lastStart, predictedCycleLength);
-  const ovulationDate  = _addDays(lastStart, ovDay - 1);
-  const fertileStart   = _addDays(lastStart, ovDay - 6);
-  const fertileEnd     = _addDays(lastStart, ovDay);
-
-  // Confidence
-  const confStr = cycleLengths.length >= 3 ? "high" : cycleLengths.length >= 1 ? "medium" : "low";
-  const CONF_MAP = {
-    high:   { level: "High",   windowDays: 0, message: "Your cycle is quite regular. This estimate is fairly reliable." },
-    medium: { level: "Medium", windowDays: 2, message: "Your cycle varies slightly. Showing an estimated window." },
-    low:    { level: "Low",    windowDays: 5, message: "Not enough history yet. Showing a wider estimate window." },
-  };
-  const confidence = CONF_MAP[confStr];
-
-  // Future cycles (date strings = converted to Date objects by recomputeCycleData)
-  const periodDuration = Math.max(1, _daysBetween(lastStart, lastEnd) + 1);
-  const futureCycles = [];
-  let chain = lastStart;
-  for (let i = 0; i < 3; i++) {
-    const pStart = _addDays(chain, predictedCycleLength);
-    const pEnd   = _addDays(pStart, periodDuration - 1);
-    const oDay   = _addDays(pStart, -14);
-    const fS     = _addDays(oDay, -5);
-    const fE     = _addDays(oDay, 1);
-    const grow   = confidence.windowDays * (i + 1);
-    futureCycles.push({
-      cycleLength: predictedCycleLength,
-      periodStart: pStart, periodEnd: pEnd, ovulationDay: oDay,
-      fertileWindow: { start: fS, end: fE },
-      earliestStart: _addDays(pStart, -grow), latestStart: _addDays(pStart, grow),
-      isEstimate: true,
-    });
-    chain = pStart;
-  }
-
-  // Calendar overlays
-  const predictedPeriodDays = [], futureOvulationDates = [], allFertileDays = [];
-  let computedNextPeriod = null;
-  for (const c of futureCycles) {
-    if (!c.periodStart || c.periodStart <= todayKey) continue;
-    const pMs = new Date(c.periodStart + "T00:00:00").getTime();
-    if (cStarts.some(s => Math.abs(new Date(s + "T00:00:00").getTime() - pMs) <= 14 * 86400000)) continue;
-    const dur = _daysBetween(c.periodStart, c.periodEnd) + 1;
-    for (let i = 0; i < dur; i++) predictedPeriodDays.push(_addDays(c.periodStart, i));
-    if (!computedNextPeriod) computedNextPeriod = c.periodStart;
-    if (c.ovulationDay) futureOvulationDates.push(c.ovulationDay);
-    if (c.fertileWindow?.start && c.fertileWindow?.end) {
-      let d = c.fertileWindow.start;
-      while (d <= c.fertileWindow.end) { allFertileDays.push(d); d = _addDays(d, 1); }
-    }
-  }
-
-  const periodLogsCount = Object.keys(logs).filter(k => logs[k]?.flow && logs[k].flow !== "none").length;
-  console.log(
-    `[calendar] local state: mode=${isAnonMode() ? "anon" : "account"} phase=${phase}` +
-    ` day=${dayInCycle} cycles=${cStarts.length} periodLogs=${periodLogsCount}` +
-    ` predPeriodDays=${predictedPeriodDays.length}`
-  );
-
-  return {
-    ready: true, phase, phaseLabel, dayInCycle,
-    avgCycleLength, predictedCycleLength, confidence,
-    nextPeriodDate: computedNextPeriod ?? nextPeriodDate,
-    ovulationDate, fertileStart, fertileEnd,
-    cyclesLogged: cStarts.length,
-    predictedPeriodDays, futureOvulationDates, allFertileDays,
-    futureCycles,
-    disclaimer: DISCLAIMER, source: "local",
-  };
-}
-
-// ── Backend API helper ─────────────────────────────────────────────────────────
-
-/**
- * POST /api/cycles/state → canonical cycle state from backend.
- * Falls back to local computation when:
- *   - user is in anon mode (no token by design)
- *   - auth token not yet available (cold load race)
- *   - backend is unreachable or returns an error
- */
-function _trimLogsForBackend(logs) {
-  const todayKey = toDateKey(new Date());
-  const d = new Date(todayKey + "T00:00:00");
-  d.setDate(d.getDate() - 90);
-  const cutoff = toDateKey(d);
-  const trimmed = {};
-  for (const [k, v] of Object.entries(logs || {})) {
-    if ((v?.flow && v.flow !== "none") || k >= cutoff) trimmed[k] = v;
-  }
-  return trimmed;
-}
-
-async function fetchCycleState(logs) {
-  const token = await getIdToken();
-
-  // sessionStorage cache: same key format as dashboard.js so both share hits
-  const periodDays = Object.keys(logs || {})
-    .filter(k => logs[k]?.flow && logs[k].flow !== "none").sort();
-  const lastPeriodDay = periodDays[periodDays.length - 1] || "none";
-  const todayKey = toDateKey(new Date());
-  const cacheKey = `bloom_cs_v1_${token ? "acct" : "anon"}_${lastPeriodDay}_${todayKey}`;
-
-  try {
-    const hit = sessionStorage.getItem(cacheKey);
-    if (hit) {
-      const { state, ts } = JSON.parse(hit);
-      if (Date.now() - ts < 6 * 60 * 60 * 1000) {
-        console.log("[calendar] cycle state (cache)");
-        return state;
-      }
-    }
-  } catch (_) {}
-
-  let result = null;
-
-  if (token) {
-    try {
-      const res = await fetch("/api/cycles/state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ logs: _trimLogsForBackend(logs) }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.state) {
-          console.log(`[calendar] cycle state (backend): phase=${json.state.phase} day=${json.state.dayInCycle}`);
-          result = { ...json.state, source: "backend" };
-        }
-      } else {
-        console.warn("[calendar] fetchCycleState backend error", res.status);
-      }
-    } catch (e) {
-      console.warn("[calendar] fetchCycleState backend unreachable:", e.message);
-    }
-  }
-
-  if (!result) result = computeCycleStateLocally(logs);
-
-  try { sessionStorage.setItem(cacheKey, JSON.stringify({ state: result, ts: Date.now() })); } catch (_) {}
-  return result;
-}
 
 // Render shared UI
 renderNav("calendar");
@@ -281,7 +77,7 @@ async function recomputeCycleData() {
 
   // Always rebuild predictedPeriodDays from futureCycles using the locally-computed
   // period duration. The backend caches by period START date, so logging additional
-  // days to an in-progress period doesn't bust its cache — it returns the duration
+  // days to an in-progress period doesn't bust its cache - it returns the duration
   // from when only 1 day was logged. allLogs is always up-to-date, so we recompute
   // the duration here and fill the correct number of days per future cycle.
   if (state.futureCycles?.length) {
@@ -306,7 +102,7 @@ async function recomputeCycleData() {
 
     const rebuilt = [];
     // Also fix periodEnd inside each futureCycle so the prediction panel shows
-    // the correct date range (e.g. "May 21 – May 26") not "May 21 – May 21".
+    // the correct date range (e.g. "May 21 - May 26") not "May 21 - May 21".
     state.futureCycles = state.futureCycles.map(c => {
       const pStart = typeof c.periodStart === "string" ? c.periodStart : null;
       if (!pStart) return c;
@@ -588,8 +384,8 @@ function renderCalendar() {
   const todayKey = toDateKey(today);
 
   const goal = getUserGoal();
-  const allowPredictedPeriod = ["period", "ttc", "perimenopause"].includes(goal);
-  const allowFertilityMarkers = ["period", "ttc", "perimenopause"].includes(goal);
+  const allowPredictedPeriod = ["period", "ttc", "perimenopause", "no_period"].includes(goal);
+  const allowFertilityMarkers = ["period", "ttc", "perimenopause", "no_period"].includes(goal);
 
   const predictedSet = new Set(
     allowPredictedPeriod && cycleData?.predictedPeriodDays ? cycleData.predictedPeriodDays : []
@@ -772,10 +568,12 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
   renderCalendar();
   showToast("Log saved successfully!");
 
-  // Persist + recompute predictions in background = render panel only after recompute finishes
+  // Persist + recompute in background, then re-render both grid and panel.
+  // renderCalendar() is called again so the predicted period overlay reflects
+  // the updated cycleData (e.g. clears old predicted window when new period logged).
   saveDailyLog(dateKey, data)
     .then(() => recomputeCycleData())
-    .then(() => renderPredictionPanel())
+    .then(() => { renderCalendar(); renderPredictionPanel(); })
     .catch(() => renderPredictionPanel());
 });
 
@@ -858,7 +656,7 @@ function renderPredictionPanel() {
   if (!panel) return;
 
   const goal = getUserGoal();
-  if (!["period", "ttc", "perimenopause"].includes(goal)) {
+  if (!["period", "ttc", "perimenopause", "no_period"].includes(goal)) {
     panel.innerHTML = "";
     return;
   }
@@ -871,7 +669,7 @@ function renderPredictionPanel() {
     return;
   }
 
-  const { confidence, currentPhase, futureCycles, cyclesLogged, disclaimer } = predResult;
+  const { confidence, currentPhase, futureCycles, cyclesLogged } = predResult;
   // Normalise confidence level to Title Case = backends may return "high"/"High"
   const confLevelNorm = confidence?.level
     ? confidence.level.charAt(0).toUpperCase() + confidence.level.slice(1).toLowerCase()
@@ -879,7 +677,6 @@ function renderPredictionPanel() {
   const confCls = confLevelNorm === "High" ? "conf-high" : confLevelNorm === "Medium" ? "conf-medium" : "conf-low";
   const phaseKey = currentPhase || "unknown";
   const phaseMeta = PHASE_META[phaseKey] || PHASE_META.unknown;
-  const isLocalFallback = predResult.source === "local";
 
   // Only show cycles that start today or in the future = skip stale past predictions
   const todayMs = new Date().setHours(0, 0, 0, 0);
@@ -893,9 +690,9 @@ function renderPredictionPanel() {
     return `
       <div class="pred-cycle-card">
         <div class="pred-cycle-title">${CYCLE_LABELS[i] || `Month ${i + 1}`}${windowNote}</div>
-        <div class="pred-cycle-row"><span>Period</span><span>${fmtShort(c.periodStart)} – ${fmtShort(c.periodEnd)}</span></div>
+        <div class="pred-cycle-row"><span>Period</span><span>${fmtShort(c.periodStart)} - ${fmtShort(c.periodEnd)}</span></div>
         <div class="pred-cycle-row"><span>Ovulation</span><span>${fmtShort(c.ovulationDay)}</span></div>
-        <div class="pred-cycle-row"><span>Fertile window</span><span>${fmtShort(c.fertileWindow?.start)} – ${fmtShort(c.fertileWindow?.end)}</span></div>
+        <div class="pred-cycle-row"><span>Fertile window</span><span>${fmtShort(c.fertileWindow?.start)} - ${fmtShort(c.fertileWindow?.end)}</span></div>
       </div>`;
   }).join("");
 
@@ -903,10 +700,8 @@ function renderPredictionPanel() {
     <section class="card pred-section">
       <div class="pred-row-space">
         <span class="pred-section-label">Confidence</span>
-        <span class="conf-badge ${confCls}">${confLevelNorm}${isLocalFallback ? " · rule-based" : ""}</span>
+        <span class="conf-badge ${confCls}">${confLevelNorm}</span>
       </div>
-      <p class="pred-msg">${confidence.message}</p>
-      ${isLocalFallback ? `<p class="pred-msg" style="color:var(--color-text-muted);font-size:0.82rem;">Predictions are rule-based estimates = sign in or log more cycles for ML-enhanced accuracy.</p>` : ""}
       <p class="pred-cycles-note">${cyclesLogged} cycle${cyclesLogged !== 1 ? "s" : ""} logged</p>
     </section>
 
@@ -927,14 +722,13 @@ function renderPredictionPanel() {
     <section class="card pred-section">
       <h3 class="pred-section-h3">Upcoming predicted cycles</h3>
       ${cycleCards || `<p style="color:var(--color-text-muted);font-size:0.9rem;">Log your current period to update predictions.</p>`}
-      <p class="pred-disclaimer" style="margin-top:0.75rem;">${disclaimer}</p>
     </section>`;
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
 // We wait for Firebase auth state to resolve (onAuthChange fires once on load)
 // before calling loadLogs + recomputeCycleData. This ensures getIdToken() has a
-// real token when the user is signed in (currentUser is null for ~200–500 ms after
+// real token when the user is signed in (currentUser is null for ~200-500 ms after
 // page load). In anon mode onAuthChange fires immediately with user=null, which is
 // also fine = fetchCycleState falls back to local computation.
 

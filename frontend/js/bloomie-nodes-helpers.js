@@ -225,11 +225,12 @@ export function buildNodeHelpers(env) {
       const daysLeft = daysUntilNextPeriod();
       const dueSoon  = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
       const overdue  = daysLeft !== null && daysLeft < -1;
+      const enoughCycleHistory = Number(cd?.cycleCount ?? 0) >= 2;
 
       if (overdue) {
         const lateDays = Math.abs(daysLeft);
         const contextLine = pick([
-          `Based on your logged dates, your period may be a little late${lateDays > 1 ? ` — around ${lateDays} days overdue by estimate` : ""} 🩷`,
+          `Based on your logged dates, your period may be a little late${enoughCycleHistory && lateDays > 1 ? ` — around ${lateDays} days overdue by estimate` : ""} 🩷`,
           `Looks like your period might be a bit later than expected 🩷`,
           `From your recent logs, your period may not have arrived yet 🩷`,
         ]);

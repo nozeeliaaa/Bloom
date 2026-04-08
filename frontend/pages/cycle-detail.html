@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cycle Details – Bloom</title>
+  <title>Cycle Details - Bloom</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css" />
@@ -294,7 +294,7 @@
       }
 
       // Range header
-      const rangeLabel = `${fmtShort(startKey)} – ${isCurrent ? 'present' : fmtShort(cycleEndKey)}`;
+      const rangeLabel = `${fmtShort(startKey)} - ${isCurrent ? 'present' : fmtShort(cycleEndKey)}`;
 
       // Cycle length card
       const cycleLenCard = cycleLen ? `
@@ -311,7 +311,7 @@
           <hr class="detail-divider">
           <p class="detail-stat-note">
             ${cycleLenNormal
-              ? 'This cycle was within the <strong>normal</strong> range (21–35 days).'
+              ? 'This cycle was within the <strong>normal</strong> range (21-35 days).'
               : cycleLen < 21
                 ? 'This cycle was <strong>short</strong> (under 21 days).'
                 : 'This cycle was <strong>long</strong> (36 days or more).'}
@@ -333,7 +333,7 @@
           <hr class="detail-divider">
           <p class="detail-stat-note">
             ${periodLenNormal
-              ? 'The length of this period was within the <strong>normal</strong> range (2–7 days).'
+              ? 'The length of this period was within the <strong>normal</strong> range (2-7 days).'
               : periodLen < 2
                 ? 'This period was <strong>shorter than usual</strong> (under 2 days).'
                 : 'This period was <strong>longer than usual</strong> (more than 7 days).'}
