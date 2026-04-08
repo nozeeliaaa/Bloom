@@ -192,26 +192,19 @@
           // ── Restore profile ──
           if (profileRes.ok) {
             const data = await profileRes.json();
-            const profile = data?.profile || {};
-            const healthProfile = data?.healthProfile || {};
+            const profile = data?.profile || data;
             if (profile) {
               localStorage.setItem('bloom_onboarded', '1');
-              let realGoal = profile.goal;
-              
-              if (!realGoal || realGoal === "track_cycle") {
-                realGoal = "period";
-              } else if (realGoal === "no_period") {
-                realGoal = "track_symptoms";
-              }
+              const realGoal = (profile.goal === "track_cycle" || !profile.goal) ? "period" : profile.goal;
               setUserGoal(realGoal);
               const restored = {};
-              if (profile.nickname !== undefined) restored.nickname = profile.nickname;
+              if (profile.nickname)       restored.nickname       = profile.nickname;
               if (profile.yearOfBirth)    restored.yob            = profile.yearOfBirth;
+              if (profile.avgCycleLength) restored.avgCycleLength = profile.avgCycleLength;
+              if (profile.periodDuration) restored.periodDuration = profile.periodDuration;
+              if (profile.weightKg)       restored.weightKg       = profile.weightKg;
+              if (profile.heightCm)       restored.heightCm       = profile.heightCm;
               if (profile.avatar)         localStorage.setItem('bloom_avatar', profile.avatar);
-              if (healthProfile.avgCycleLength) restored.avgCycleLength = healthProfile.avgCycleLength;
-              if (healthProfile.periodDuration) restored.periodDuration = healthProfile.periodDuration;
-              if (healthProfile.weightKg)       restored.weightKg       = healthProfile.weightKg;
-              if (healthProfile.heightCm)       restored.heightCm       = healthProfile.heightCm;
               localStorage.setItem('bloom_profile', JSON.stringify(restored));
             }
           } else {
@@ -275,6 +268,7 @@
         goPostAuth();
 
       } catch (err) {
+        console.error("[Bloom] login error:", err?.code || err?.message || err);
         if (err.code === 'auth/email-not-verified') {
           // Show the resend verification notice
           _unverifiedEmail = email;
@@ -291,8 +285,16 @@
               err.code === 'auth/wrong-password' ||
               err.code === 'auth/invalid-credential') {
             msg = 'Invalid email or password. Please try again.';
+          } else if (err.code === 'auth/user-disabled') {
+            msg = 'This account has been disabled. Please contact support.';
           } else if (err.code === 'auth/too-many-requests') {
             msg = 'Too many attempts. Please try again later.';
+          } else if (err.code === 'auth/network-request-failed') {
+            msg = 'Network error while signing in. Check your connection and try again.';
+          } else if (err.code === 'auth/invalid-api-key' || err.code === 'auth/app-not-authorized') {
+            msg = 'Authentication is temporarily unavailable due to app configuration. Please try again shortly.';
+          } else if (err.code) {
+            msg = `Login failed (${err.code}). Please try again.`;
           }
           showError(msg);
         }

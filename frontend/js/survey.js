@@ -288,7 +288,7 @@ function buildSteps(answers) {
           "focusGoal",
           [
             { value: "period",        icon: "🗓️", title: "Track my period",              desc: "Cycle predictions, phases, and period timing" },
-            { value: "track_symptoms",     icon: "🩷", title: "Track symptoms",               desc: "Log symptoms and patterns without period predictions" },
+            { value: "no_period",     icon: "🩷", title: "Track symptoms",               desc: "Log symptoms and patterns without period predictions" },
             { value: "ttc",           icon: "🌱", title: "Try to conceive",              desc: "Fertility window, ovulation insights, and timing tools" },
             { value: "perimenopause", icon: "🌙", title: "Track menopause / perimenopause", desc: "Cycle changes, hot flashes, and transitions" },
             { value: "pregnancy",     icon: "🤰", title: "Track my pregnancy",           desc: "Due date, trimester milestones, and pregnancy logs" },
@@ -526,7 +526,7 @@ function rangeBlock(id, value, min, max, ticks) {
     <div class="sliderRow">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <span class="pill">Value: <strong id="${id}_label">${escapeHtml(safeVal)}</strong></span>
-        <span class="tiny-note" style="opacity:0.85;">${escapeHtml(min)}–${escapeHtml(max)}</span>
+        <span class="tiny-note" style="opacity:0.85;">${escapeHtml(min)}-${escapeHtml(max)}</span>
       </div>
 
       <input id="${id}" type="range" min="${escapeAttr(min)}" max="${escapeAttr(max)}" step="1" value="${safeVal}" />
