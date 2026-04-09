@@ -35,6 +35,13 @@ router.post("/profile", requireAuth, async (req, res) => {
     }
 
     // ---- Build profile object ----
+    const finalYearOfBirth =
+      req.body.yearOfBirth === undefined
+        ? existingProfile?.yearOfBirth ?? null
+        : existingProfile?.yearOfBirth
+        ? existingProfile.yearOfBirth
+        : Number(req.body.yearOfBirth);
+
     const profile = {
       nickname: req.body.nickname !== undefined ? String(req.body.nickname).slice(0, 40) : (existingProfile?.nickname ?? null),
       avatar:
@@ -51,12 +58,8 @@ router.post("/profile", requireAuth, async (req, res) => {
             : (existingProfile?.goal ?? "period")
         ),
       mode: req.body.mode ?? existingProfile?.mode ?? "account",
-      yearOfBirth:
-        req.body.yearOfBirth === undefined
-        ? existingProfile?.yearOfBirth ?? null
-        : existingProfile?.yearOfBirth  
-        ? existingProfile.yearOfBirth
-        : Number(req.body.yearOfBirth),
+      yearOfBirth: finalYearOfBirth,
+      ageBand: finalYearOfBirth ? computeAgeBand(finalYearOfBirth) : null,
       consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
       remindersEnabled: req.body.remindersEnabled ?? existingProfile?.remindersEnabled ?? false,
       reminderTime: req.body.reminderTime ?? existingProfile?.reminderTime ?? "09:00",
@@ -99,23 +102,20 @@ router.post("/profile", requireAuth, async (req, res) => {
     if (yobJustSet) {
       const ageBand = computeAgeBand(Number(req.body.yearOfBirth));
 
-      // Store ageBand in Firestore
-      await userRef.set({ profile: { ageBand } }, { merge: true });
-
       // Set as Firebase custom claim so middleware can read req.user.ageBand
       const existingClaims = req.user || {};
       await auth.setCustomUserClaims(uid, {
-        role:    existingClaims.role    || "user",
-        ageBand: ageBand,
+        role: existingClaims.role || "user",
+        ageBand,
       });
 
       await logAudit({
-        actorUid:   uid,
-        actorRole:  req.user.role,
-        action:     AUDIT_ACTIONS.YOB_SET,
+        actorUid: uid,
+        actorRole: req.user.role,
+        action: AUDIT_ACTIONS.YOB_SET,
         entityType: "user",
-        entityId:   uid,
-        meta:       { changedFields: ["yearOfBirth", "ageBand"] },
+        entityId: uid,
+        meta: { changedFields: ["yearOfBirth", "ageBand"] },
       });
     } else if (changedFields.length) {
       await logAudit({

@@ -117,6 +117,20 @@ export async function requireAuth(req, res, next) {
     const safeProfile = data.profile || {};
     const ageBand = deriveAgeBand(safeProfile.yearOfBirth);
 
+    if (safeProfile.yearOfBirth && safeProfile.ageBand !== ageBand) {
+      await userRef.set(
+        {
+          profile: { ageBand },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      data.profile = {
+        ...safeProfile,
+        ageBand,
+      };
+    }
+
     req.user = {
       uid: decoded.uid,
       email: decoded.email || null,
