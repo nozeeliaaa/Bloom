@@ -64,9 +64,6 @@ onAuthChange(async (user) => {
     loadLogs();
     loadFeedback();
   });
-  document.getElementById("type-filter")?.addEventListener("change", () => {
-    renderTable(getFilteredDocs());
-  });
 });
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -95,14 +92,9 @@ async function loadLogs() {
   }
 
   loadingEl.style.display = "none";
-  renderTable(getFilteredDocs());
+  renderTable(allDocs);
 }
 
-// ─── Filtering ────────────────────────────────────────────────────────────────
-function getFilteredDocs() {
-  const type = document.getElementById("type-filter")?.value ?? "";
-  return type ? allDocs.filter((d) => d.type === type) : allDocs;
-}
 
 // ─── Rendering ────────────────────────────────────────────────────────────────
 function renderTable(docs) {
@@ -171,7 +163,7 @@ async function markReviewed(btn) {
     await api("PATCH", `/safety-logs/${id}/reviewed`);
     if (row) row.classList.add("row-reviewed");
     allDocs = allDocs.filter((d) => d.id !== id);
-    setTimeout(() => renderTable(getFilteredDocs()), 400);
+    setTimeout(() => renderTable(allDocs), 400);
   } catch (err) {
     btn.disabled    = false;
     btn.textContent = "Mark reviewed";

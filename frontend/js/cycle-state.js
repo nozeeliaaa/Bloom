@@ -162,11 +162,14 @@ export async function fetchCycleState(logs) {
     console.log("[cycle-state] no auth token - skipping backend and using local fallback when possible");
   } else {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3200);
       const res = await fetch("/api/cycles/state", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ logs: _trimLogsForBackend(logs) }),
-      });
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
       if (res.ok) {
         const json = await res.json();
         if (json.state) {

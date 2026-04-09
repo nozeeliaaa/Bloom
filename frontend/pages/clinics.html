@@ -727,6 +727,7 @@
         } catch (e2) {
           console.warn('Local fallback also failed:', e2);
           clinics = [];
+          setStatus('Clinic data is unavailable right now. Check /catalog/clinics or /data/clinics.json.', true);
         }
       }
 

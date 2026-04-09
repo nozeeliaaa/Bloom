@@ -52,6 +52,14 @@ export function validateUserProfile(body, existingProfile = null) {
     }
   }
 
+  // --- sleepScore ---
+  if (body.sleepScore !== undefined && body.sleepScore !== null) {
+    const val = Number(body.sleepScore);
+    if (!Number.isFinite(val) || val < 1 || val > 10) {
+      return { valid: false, error: "sleepScore must be a number between 1 and 10" };
+    }
+  }
+
   // --- weightKg ---
   if (body.weightKg !== undefined && body.weightKg !== null) {
     const val = Number(body.weightKg);

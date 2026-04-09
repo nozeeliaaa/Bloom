@@ -37,13 +37,16 @@
       gap: 1rem;
     }
     @media (min-width: 700px) {
-      .details-grid { grid-template-columns: 1fr 1fr; align-items: stretch; }
+      .details-grid { grid-template-columns: 1fr 1fr; align-items: start; }
     }
     .details-card {
       display: flex; flex-direction: column;
     }
-    .details-card .form-grid { flex: 1; }
-    .details-card .row-actions { margin-top: auto; padding-top: 1rem; }
+    .details-card .row-actions {
+      margin-top: 1rem;
+      padding-top: 0;
+      justify-content: flex-start;
+    }
     [hidden] { display: none !important; }
     .form-grid { display: grid; gap: 0.5rem; }
     .section-label {
@@ -163,6 +166,10 @@
             Typical period duration (days)
             <input class="form-input" id="period-duration" type="number" placeholder="e.g., 5" min="1" max="14" />
           </label>
+          <label class="form-label">
+            Sleep score (1-10)
+            <input class="form-input" id="sleep-score" type="number" placeholder="e.g., 7" min="1" max="10" step="1" />
+          </label>
           <div>
             <div class="weight-label-row">
               <label class="form-label" for="weight">Weight</label>
@@ -239,6 +246,7 @@
     const yobEl            = document.getElementById("yob");
     const avgCycleEl       = document.getElementById("avg-cycle");
     const periodDurEl      = document.getElementById("period-duration");
+    const sleepScoreEl     = document.getElementById("sleep-score");
     const lmpFieldEl       = document.getElementById("lmp-field");
     const lmpDateEl        = document.getElementById("lmp-date");
     const yobLockedNote    = document.getElementById("yob-locked-note");
@@ -363,6 +371,7 @@
       yobEl.value       = p.yob            || "";
       avgCycleEl.value  = p.avgCycleLength || "";
       periodDurEl.value = p.periodDuration || "";
+      sleepScoreEl.value = p.sleepScore ?? "";
       const lmp = localStorage.getItem(LS_LMP);
       if (lmp) lmpDateEl.value = lmp;
 
@@ -399,6 +408,7 @@
       const wasLocked = !!localStorage.getItem(LS_YOB_LOCKED);
       const avgCycle  = avgCycleEl.value.trim();
       const periodDur = periodDurEl.value.trim();
+      const sleepScore = sleepScoreEl.value.trim();
       const lmp       = lmpDateEl.value;
       const weightRaw = parseFloat(weightEl.value);
 
@@ -406,6 +416,14 @@
         const n = Number(yob);
         if (!Number.isFinite(n) || n < 1900 || n > 2100) {
           showStatus("Year of Birth must be between 1900 and 2100.");
+          return;
+        }
+      }
+
+      if (sleepScore) {
+        const n = Number(sleepScore);
+        if (!Number.isFinite(n) || n < 1 || n > 10) {
+          showStatus("Sleep score must be between 1 and 10.");
           return;
         }
       }
@@ -434,6 +452,7 @@
         yob: yob ? Number(yob) : "",
         avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
         periodDuration: periodDur ? Number(periodDur) : null,
+        sleepScore: sleepScore ? Number(sleepScore) : null,
         weightKg,
         heightCm,
       };
@@ -459,6 +478,7 @@
             nickname,
             avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
             periodDuration: periodDur ? Number(periodDur) : null,
+            sleepScore: sleepScore ? Number(sleepScore) : null,
             weightKg:  weightKg  ?? null,
             heightCm:  heightCm  ?? null,
             avatar:    selectedAvatar,
@@ -543,6 +563,7 @@
         if (p.yob)            payload.yearOfBirth    = Number(p.yob);
         if (p.avgCycleLength) payload.avgCycleLength = Number(p.avgCycleLength);
         if (p.periodDuration) payload.periodDuration = Number(p.periodDuration);
+        if (p.sleepScore)     payload.sleepScore     = Number(p.sleepScore);
         if (p.weightKg)       payload.weightKg       = Number(p.weightKg);
         if (p.heightCm)       payload.heightCm       = Number(p.heightCm);
         if (avatar && avatar !== "👤") payload.avatar = avatar;

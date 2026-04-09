@@ -35,6 +35,11 @@ let algoPregnancy    = null;
 let algoCycleEngine  = null;
 let algoSymptomEngine = null;
 let algoAnomalyEngine = null;
+// Reused by dashboard render + notification bootstrap to avoid duplicate fetches.
+let _logsPromise = null;
+let _logsPromiseMode = null;
+let _cycleStatePromise = null;
+let _dashboardLoadEpoch = 0;
 
 renderNav("dashboard");
 renderFooter();
@@ -87,6 +92,26 @@ function buildCycleBase(logsByDate) {
 function show(el, on) {
   if (!el) return;
   el.style.display = on ? "block" : "none";
+}
+
+function applyGoalClasses(goal) {
+  document.body.classList.toggle("goal-ttc", goal === "ttc");
+  document.body.classList.toggle("goal-pregnancy", goal === "pregnancy");
+  document.body.classList.toggle("goal-no-period", goal === "no_period");
+  document.body.classList.toggle("goal-perimenopause", goal === "perimenopause");
+}
+
+function ensureLogsPromise() {
+  const mode = isAnonMode() ? "anon" : "account";
+  if (!_logsPromise || _logsPromiseMode !== mode) {
+    _logsPromiseMode = mode;
+    _logsPromise = getAllLogs({ timeoutMs: 2500 });
+  }
+  return _logsPromise;
+}
+
+function afterFirstPaint(fn) {
+  requestAnimationFrame(() => setTimeout(fn, 0));
 }
 
 // ─── Phase-based insights ─────────────────────────────────────────────────────
@@ -468,6 +493,32 @@ function renderFactsSlideshow(goal) {
 
 // Twemoji SVG images via jsDelivr CDN — renders consistently on all platforms
 const _TW = (cp) => `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${cp}.svg`;
+const _SVG = (svg) => `data:image/svg+xml;utf8,${encodeURIComponent(svg.trim())}`;
+const PAPAYA_SVG = _SVG(`
+  <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96' role='img' aria-label='Papaya'>
+    <defs>
+      <linearGradient id='papayaOuter' x1='0' y1='0' x2='1' y2='1'>
+        <stop offset='0%' stop-color='#f9bd66'/>
+        <stop offset='100%' stop-color='#e78a2f'/>
+      </linearGradient>
+      <linearGradient id='papayaInner' x1='0' y1='0' x2='0' y2='1'>
+        <stop offset='0%' stop-color='#ffd8a5'/>
+        <stop offset='100%' stop-color='#ffc98b'/>
+      </linearGradient>
+    </defs>
+    <ellipse cx='48' cy='52' rx='26' ry='36' transform='rotate(-16 48 52)' fill='url(#papayaOuter)' stroke='#cd7326' stroke-width='2.5'/>
+    <ellipse cx='48' cy='52' rx='18' ry='27' transform='rotate(-16 48 52)' fill='url(#papayaInner)'/>
+    <ellipse cx='48' cy='52' rx='9' ry='17' transform='rotate(-16 48 52)' fill='#6a311b'/>
+    <g fill='#1f1714'>
+      <circle cx='46' cy='37' r='1.7'/><circle cx='42.5' cy='40.5' r='1.6'/><circle cx='49.5' cy='39.8' r='1.5'/>
+      <circle cx='43.2' cy='45' r='1.5'/><circle cx='50.4' cy='44.6' r='1.6'/><circle cx='46' cy='47.2' r='1.4'/>
+      <circle cx='41.8' cy='50.6' r='1.4'/><circle cx='50.8' cy='50.8' r='1.5'/><circle cx='45.2' cy='53.4' r='1.4'/>
+      <circle cx='42.4' cy='56.6' r='1.5'/><circle cx='49' cy='56.7' r='1.4'/><circle cx='45.8' cy='60.2' r='1.4'/>
+      <circle cx='42.8' cy='63.3' r='1.3'/><circle cx='48.4' cy='63.6' r='1.3'/><circle cx='45.2' cy='66.3' r='1.2'/>
+    </g>
+    <path d='M31 19c4-4 9-6 14-6' stroke='#648f35' stroke-width='4' fill='none' stroke-linecap='round'/>
+  </svg>
+`);
 
 const BABY_SIZES = [
   null, null, null, null,
@@ -489,7 +540,7 @@ const BABY_SIZES = [
   { label: "mango",            img: _TW("1f96d") }, // 19 🥭
   { label: "banana",           img: _TW("1f34c") }, // 20 🍌
   { label: "carrot",           img: _TW("1f955") }, // 21 🥕
-  { label: "papaya",           img: _TW("1f348") }, // 22 🍈
+  { label: "papaya",           img: PAPAYA_SVG },   // 22 custom papaya
   { label: "large mango",      img: _TW("1f96d") }, // 23 🥭
   { label: "corn",             img: _TW("1f33d") }, // 24 🌽
   { label: "cauliflower",      img: _TW("1f966") }, // 25 🥦
@@ -1393,6 +1444,8 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
 
 async function loadDashboard() {
   const goal = getUserGoal();
+  const loadEpoch = ++_dashboardLoadEpoch;
+  applyGoalClasses(goal);
   // ── Age-lock gate ─────────────────────────────────────────────────────────────
   // Try to Conceive, Track Pregnancy, and Track Perimenopause are 18+ goals.
   // If the user is under 18 and somehow reaches one, show a graceful locked state.
@@ -1425,14 +1478,18 @@ async function loadDashboard() {
   }
 
   // Load modules and logs in parallel so initial dashboard work starts sooner.
+  const needsPregnancyAlgo = goal === "pregnancy" || goal === "ttc";
   const moduleImportsPromise = Promise.all([
-    import("./algorithms/pregnancyAlgorithm.js").catch(() => null),
+    needsPregnancyAlgo
+      ? import("./algorithms/pregnancyAlgorithm.js").catch(() => null)
+      : Promise.resolve(null),
     import("./algorithms/bloom-cycle-engine.js").catch(() => null),
     import("./algorithms/bloom-symptom-engine.js").catch(() => null),
     import("./algorithms/bloom-anomaly-engine.js").catch(() => null),
   ]);
 
-  const logsByDate = await getAllLogs();
+  const logsByDate = await ensureLogsPromise();
+  if (loadEpoch !== _dashboardLoadEpoch) return;
   const cycle = buildCycleBase(logsByDate);
 
   // Derived cycle history
@@ -1454,12 +1511,9 @@ async function loadDashboard() {
     _cycleStatePromise = Promise.resolve(null);
   }
 
-  // Complete module loading while cycle state is being resolved.
-  [algoPregnancy, algoCycleEngine, algoSymptomEngine, algoAnomalyEngine] =
-    await moduleImportsPromise;
-
   if (lastPeriodStart) {
     const state = await _cycleStatePromise;
+    if (loadEpoch !== _dashboardLoadEpoch) return;
     if (state?.ready) {
       cycle.phase          = state.phase          ?? cycle.phase;
       cycle.phaseLabel     = state.phaseLabel      ?? null;
@@ -1485,11 +1539,6 @@ async function loadDashboard() {
     // FutureCycles resolution is now handled centrally in cycle-state.js
     // (_resolveFutureCycles runs on every fetchCycleState result before caching).
   }
-
-  const allLogDates = Object.keys(logsByDate)
-    .filter(k => { const l = logsByDate[k]; return l?.flow || l?.symptoms?.length || l?.notes; })
-    .sort();
-  const lastLogDate = allLogDates.length ? allLogDates[allLogDates.length - 1] : null;
 
   const goalBadge = document.getElementById("goal-badge");
   const goalDescEl = document.getElementById("goal-desc");
@@ -1518,20 +1567,14 @@ async function loadDashboard() {
     }
   }
 
-  // Stamp goal class on body so CSS can hide/show TTC-specific elements
-  document.body.classList.toggle("goal-ttc", goal === "ttc");
-
   renderPhaseCard(cycle);
   renderGoalToolCard(goal, cycle);
-  renderTtcTools(goal, cycle, logsByDate);
-  renderFactsSlideshow(goal);
-  renderPregnancyTools(goal, logsByDate);
-  renderSymptomTools(goal, logsByDate, cycle);
-  renderCycleHistoryAndChart(cycle, logsByDate);
 
-  // Append unified estimate note to the three top cards (always last)
+  const phaseKey = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
+  const todaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
+  setTodayInsights(phaseKey, goal, cycle.phaseLabel, todaySymptoms);
 
-  // Anon mode: hide advanced features
+  // Anon mode: hide advanced features quickly (without waiting for deferred work)
   if (isAnonMode()) {
     const advCard = document.getElementById("advanced-insights")?.closest(".card");
     if (advCard) {
@@ -1550,7 +1593,7 @@ async function loadDashboard() {
   // PDF export - generate and download directly without leaving the page
   const pdfBtn = document.getElementById("export-pdf");
   if (pdfBtn) {
-    pdfBtn.addEventListener("click", async () => {
+    pdfBtn.onclick = async () => {
       pdfBtn.disabled = true;
       const prev = pdfBtn.textContent;
       pdfBtn.textContent = "Generating…";
@@ -1573,31 +1616,48 @@ async function loadDashboard() {
         pdfBtn.disabled = false;
         pdfBtn.textContent = prev;
       }
-    });
+    };
   }
 
-  const phaseKey = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
-  const todaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
-  setTodayInsights(phaseKey, goal, cycle.phaseLabel, todaySymptoms);
+  // Defer heavier sections so the top cards paint first.
+  afterFirstPaint(async () => {
+    if (loadEpoch !== _dashboardLoadEpoch) return;
 
-  // Advanced insights (algorithm-powered, goal-gated)
-  renderAdvancedInsights(document.getElementById("advanced-insights"), {
-    cycle, cycleLengths, lastPeriodStart, lastLogDate,
-    logsByDate,
-    mlPredictedCycleLength: predictedCycleLength,
+    [algoPregnancy, algoCycleEngine, algoSymptomEngine, algoAnomalyEngine] =
+      await moduleImportsPromise;
+    if (loadEpoch !== _dashboardLoadEpoch) return;
+
+    renderTtcTools(goal, cycle, logsByDate);
+    renderFactsSlideshow(goal);
+    renderPregnancyTools(goal, logsByDate);
+    await renderSymptomTools(goal, logsByDate, cycle);
+
+    // Chart + advanced insights are the heaviest; run them after another paint.
+    afterFirstPaint(() => {
+      if (loadEpoch !== _dashboardLoadEpoch) return;
+
+      renderCycleHistoryAndChart(cycle, logsByDate);
+
+      const allLogDates = Object.keys(logsByDate)
+        .filter(k => { const l = logsByDate[k]; return l?.flow || l?.symptoms?.length || l?.notes; })
+        .sort();
+      const lastLogDate = allLogDates.length ? allLogDates[allLogDates.length - 1] : null;
+
+      renderAdvancedInsights(document.getElementById("advanced-insights"), {
+        cycle, cycleLengths, lastPeriodStart, lastLogDate,
+        logsByDate,
+        mlPredictedCycleLength: predictedCycleLength,
+      });
+    });
   });
 }
 
 
-// Shared cycle-state promise = set by loadDashboard, consumed by notifications.
-// Avoids a second POST /api/cycles/state call on the same page load.
-let _cycleStatePromise = null;
-
 onAuthChange(() => { loadDashboard(); });
 
 // Fire notifications using the same cycle state already fetched by loadDashboard.
-// getAllLogs() is cached in db.js so no extra network call there either.
-getAllLogs().then(async logs => {
+// Reuses the same logs promise to avoid duplicate cloud fetches on first paint.
+ensureLogsPromise().then(async logs => {
   const cycle = buildCycleBase(logs);
 
   if (!isAnonMode() && (cycle.cycleStarts || []).length >= 1) {

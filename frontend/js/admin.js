@@ -116,26 +116,14 @@ async function loadOverview() {
     api("GET", "/clinics")
       .then((d) => setText("stat-clinics", d.clinics?.length ?? "-"))
       .catch(() => setText("stat-clinics", "-"));
-
-    const distEl = document.getElementById("goal-distribution");
-    const dist = stats.goalDistribution || {};
-    const entries = Object.entries(dist);
-    if (entries.length) {
-      distEl.innerHTML = entries
-        .sort((a, b) => b[1] - a[1])
-        .map(([goal, count]) => `
-          <div class="admin-item">
-            <div class="admin-item-top">
-              <strong>${goalName(goal)}</strong>
-              <span class="admin-badge">${count}</span>
-            </div>
-          </div>
-        `).join("");
-    } else {
-      distEl.innerHTML = `<p class="text-muted">No goal data yet.</p>`;
-    }
   } catch (err) {
-    showError("goal-distribution", err.message);
+    setText("stat-users", "-");
+    setText("stat-new-users", "-");
+    setText("stat-cycle-logs", "-");
+    setText("stat-symptom-logs", "-");
+    setText("stat-pamphlets", "-");
+    setText("stat-clinics", "-");
+    console.error("[admin] overview load failed:", err);
   }
 }
 
@@ -584,19 +572,6 @@ function escHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-function goalName(id) {
-  const map = {
-    period: "Track my period",
-    ttc: "Get pregnant",
-    no_period: "No period / skip predictions",
-    pregnancy: "Track pregnancy",
-    perimenopause: "Perimenopause / menopause",
-    symptoms: "Track symptoms only",
-    unknown: "Unknown / not set",
-  };
-  return map[id] || id;
 }
 
 // ─────────────────────────────────────────

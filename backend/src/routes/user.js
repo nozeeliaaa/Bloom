@@ -57,6 +57,9 @@ router.post("/profile", requireAuth, async (req, res) => {
       periodDuration: req.body.periodDuration !== undefined
         ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
         : existingProfile?.periodDuration ?? null,
+      sleepScore: req.body.sleepScore !== undefined
+        ? (req.body.sleepScore === null ? null : Number(req.body.sleepScore))
+        : existingProfile?.sleepScore ?? null,
       weightKg: req.body.weightKg !== undefined
         ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
         : existingProfile?.weightKg ?? null,
