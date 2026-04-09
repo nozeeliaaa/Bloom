@@ -19,6 +19,16 @@ function sanitizeText(s, max = 300) {
   return s.trim().slice(0, max);
 }
 
+async function ensureSymptomLogsParent(uid) {
+  const parentRef = db.collection("symptomLogs").doc(uid);
+  const snap = await parentRef.get();
+  if (!snap.exists) {
+    await parentRef.set({ uid, createdAt: new Date(), updatedAt: new Date() });
+  } else {
+    await parentRef.set({ updatedAt: new Date() }, { merge: true });
+  }
+}
+
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
 // Each doc holds an items[] array - multiple symptoms per day
 
@@ -97,6 +107,8 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
 
     const snap = await docRef.get();
     if (!snap.exists) payload.createdAt = new Date();
+
+    await ensureSymptomLogsParent(uid);
 
     await docRef.set(payload, { merge: true });
 
@@ -185,7 +197,10 @@ router.delete("/", requireAuth, async (req, res) => {
       docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
       await batch.commit();
     }
-
+    await db.collection("symptomLogs").doc(uid).set(
+      { updatedAt: new Date() },
+      { merge: true }
+    );
     return res.json({ ok: true, deleted: docs.length });
   } catch (err) {
     console.error("DELETE /api/symptoms error:", err);
@@ -209,6 +224,11 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey)
       .delete();
+
+    await db.collection("symptomLogs").doc(uid).set(
+      { updatedAt: new Date() },
+      { merge: true }
+    );
 
     return res.json({ ok: true });
   } catch (err) {

@@ -1,72 +1,65 @@
-/**
- * scripts/migrateUserRoles.js
- *
- * One-time script to backfill missing role + profile fields
- * on all existing user documents in Firestore.
- *
- * Run from backend folder:
- *   node scripts/migrateUserRoles.js
- */
-
-import { db } from "../src/firebaseAdmin.js";
 import admin from "firebase-admin";
+import { db } from "../src/firebaseAdmin.js";
 
-async function migrateUserRoles() {
-  console.log("Starting user role migration...");
+const { FieldValue } = admin.firestore;
 
-  const snapshot = await db.collection("users").get();
-
-  if (snapshot.empty) {
-    console.log("No users found.");
-    return;
-  }
-
+async function migrateUsers() {
+  console.log("Starting full user migration...");
+  const snap = await db.collection("users").get();
   let updated = 0;
-  let skipped = 0;
 
-  for (const docSnap of snapshot.docs) {
-    const data    = docSnap.data();
-    const profile = data?.profile || {};
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    const profile = data.profile || {};
+    const healthProfile = data.healthProfile || {};
 
-    const needsRoleField   = !data.role;
-    const needsProfileField = !data.profile;
-
-    if (!needsRoleField && !needsProfileField) {
-      skipped++;
-      continue;
-    }
-
-    const backfill = {
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    const cleanProfile = {
+      nickname: profile.nickname ?? null,
+      avatar: profile.avatar ?? "👤",
+      yearOfBirth: profile.yearOfBirth ?? null,
+      goal:
+        profile.goal === "track_cycle" ? "period"
+        : profile.goal === "no_period" ? "track_symptoms"
+        : (profile.goal ?? "period"),
+      mode: profile.mode ?? "account",
+      consentSensitive: profile.consentSensitive ?? false,
+      remindersEnabled: profile.remindersEnabled ?? false,
+      reminderTime: profile.reminderTime ?? "09:00",
+      ageBand: profile.ageBand ?? null,
     };
 
-    if (needsRoleField) {
-      backfill.role = profile.role || "user";
-    }
+    const cleanHealthProfile = {
+      avgCycleLength: healthProfile.avgCycleLength ?? profile.avgCycleLength ?? null,
+      periodDuration: healthProfile.periodDuration ?? profile.periodDuration ?? null,
+      weightKg: healthProfile.weightKg ?? profile.weightKg ?? null,
+      heightCm: healthProfile.heightCm ?? profile.heightCm ?? null,
+    };
 
-    if (needsProfileField) {
-      backfill.profile = {
-        role:             "user",
-        yearOfBirth:      null,
-        consentSensitive: false,
-        remindersEnabled: false,
-        reminderTime:     "09:00",
-        mode:             "account",
-        goal:             "track_cycle",
-      };
-    }
+    await doc.ref.set({
+      role: data.role || "user",
+      email: data.email || null,
+      profile: {
+        ...cleanProfile,
+        role: FieldValue.delete(),
+        avgCycleLength: FieldValue.delete(),
+        periodDuration: FieldValue.delete(),
+        weightKg: FieldValue.delete(),
+        heightCm: FieldValue.delete(),
+      },
+      healthProfile: cleanHealthProfile,
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: data.createdAt ?? FieldValue.serverTimestamp(),
+    }, { merge: true });
 
-    await docSnap.ref.set(backfill, { merge: true });
-
-    console.log(`  ✓ Patched: ${docSnap.id} (${data.email || "no email"})`);
+    console.log(`✓ Migrated: ${doc.id}`);
     updated++;
   }
 
-  console.log(`\nDone. ${updated} updated, ${skipped} already correct.`);
+  console.log(`Done. ${updated} user(s) migrated.`);
   process.exit(0);
 }
 
-migrateUserRoles().catch((err) => {
+migrateUsers().catch((err) => {
   console.error("Migration failed:", err);
   process.exit(1);
 });
