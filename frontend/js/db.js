@@ -14,6 +14,7 @@
 
 import { getIdToken } from "./auth.js";
 import { isAccountMode } from "./mode.js";
+import symptomsCatalog from "../data/symptoms.json";
 import { MODE_BANNER_ONCE_KEY } from "./utils.js";
 
 const LOGS_KEY = "bloom_daily_logs";
@@ -22,6 +23,15 @@ const MEMORY_KEY = "bloom_bloomie_memory";
 
 // Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → localhost:4000)
 const API_BASE = window.BLOOM_API_BASE || "";
+
+// Label ↔ key lookup maps from symptoms catalog
+const LABEL_TO_KEY = {};
+const KEY_TO_LABEL = {};
+
+symptomsCatalog.forEach((s) => {
+  LABEL_TO_KEY[s.label] = s.key;
+  KEY_TO_LABEL[s.key] = s.label;
+});
 
 // --------------------
 // localStorage helpers
@@ -93,13 +103,16 @@ function toSymptomCode(label) {
 // Convert backend code back to readable label for UI.
 // Example: "BACK_PAIN" -> "Back Pain"
 function fromSymptomCode(code) {
-  return String(code || "")
-    .trim()
-    .toLowerCase()
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  const normalized = String(code || "").trim().toUpperCase();
+  return (
+    KEY_TO_LABEL[normalized] ||
+    normalized
+      .toLowerCase()
+      .split("_")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
+  );
 }
 
 // Merge cloud cycle logs + cloud symptom logs into one calendar-friendly object
@@ -206,7 +219,7 @@ export async function saveDailyLog(dateKey, log) {
 
     if (symptomsArray.length > 0) {
       const items = symptomsArray.map((symptom) => ({
-        code: toSymptomCode(symptom),
+        code: LABEL_TO_KEY[symptom] || toSymptomCode(symptom),
         severity: Number(localEntry.symptomSeverity?.[symptom] ?? 3),
         note: "",
       }));
