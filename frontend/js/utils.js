@@ -5,7 +5,7 @@ import { isAccountMode, isAnonMode } from "./mode.js";
 import { getUser } from "./auth.js";
 import { initTheme } from "./theme-manager.js";
 
-// ✅ Single source of truth for this key
+// Single source of truth for this key
 export const MODE_BANNER_ONCE_KEY = "bloom_show_mode_banner_once";
 
 // Initialize theme on every page load (prevents flash of wrong theme)

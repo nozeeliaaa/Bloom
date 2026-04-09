@@ -1,3 +1,5 @@
+import { softenEscalationLine } from "./bloomie-response-layers.js";
+
 /**
  * bloomie-templates.js
  * ─────────────────────────────────────────────────────────────────────────────
@@ -374,7 +376,7 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
   // Added before the situation line so the user feels held before receiving info.
   // Never applied to emergency/safety nodes.
   if (effectiveTone === "distressed" && !isSafetyNode) {
-    lines.push("I'm really glad you told me 🩷 Let's take this one step at a time.");
+    lines.push("I'm really glad you told me 🩷 We can take this one step at a time together.");
   }
 
   // ── Tone: exhausted/anxious — brief orienting frame before content ────────
@@ -452,6 +454,10 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
     for (let i = 0; i < lines.length; i++) {
       lines[i] = lines[i].replace(/!/g, ".");
     }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    lines[i] = softenEscalationLine(lines[i]);
   }
 
   if (extraFooter.length) lines.push(...extraFooter);

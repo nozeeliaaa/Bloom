@@ -532,10 +532,11 @@ function drawSymptomLog(doc, data, y) {
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M },
-    head:   [["Date", "Symptoms", "Notes"]],
+    head:   [["Date", "Symptoms", "Custom symptoms", "Notes"]],
     body:   data.symptomLog.slice(0, 90).map((entry) => [
       formatDateMed(entry.date),
       entry.symptoms.length ? entry.symptoms.join(", ") : "-",
+      entry.customSymptoms?.length ? entry.customSymptoms.join(", ") : "-",
       entry.notes || "-",
     ]),
     styles: {
@@ -556,8 +557,9 @@ function drawSymptomLog(doc, data, y) {
     alternateRowStyles: { fillColor: [...C.primaryLightest] },
     columnStyles: {
       0: { cellWidth: 30 },
-      1: { cellWidth: 84 },
-      2: { cellWidth: CW - 114 },
+      1: { cellWidth: 56 },
+      2: { cellWidth: 56 },
+      3: { cellWidth: CW - 142 },
     },
   });
 
@@ -566,8 +568,8 @@ function drawSymptomLog(doc, data, y) {
 
 // ── PATTERNS & INSIGHTS ───────────────────────────────────────────────────────
 function drawTrends(doc, data, y) {
-  const { topSymptoms, regularity, cyclesTracked } = data;
-  if (!topSymptoms.length && cyclesTracked < 2) return y;
+  const { topSymptoms, topCustomSymptoms = [], regularity, cyclesTracked } = data;
+  if (!topSymptoms.length && !topCustomSymptoms.length && cyclesTracked < 2) return y;
 
   y = maybeNewPage(doc, y, 30);
   y = sectionHeading(doc, "Patterns & Insights", y);
@@ -627,6 +629,24 @@ function drawTrends(doc, data, y) {
     y += Math.ceil(top8.length / 2) * 10 + 12;
     hRule(doc, y, C.border);
     y += 8;
+  }
+
+  if (topCustomSymptoms.length) {
+    y = maybeNewPage(doc, y, 18);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    tc(doc, C.textDark);
+    doc.text("Recurring Custom Symptoms", M, y);
+    y += 8;
+
+    topCustomSymptoms.slice(0, 5).forEach(([name, count], i) => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.8);
+      tc(doc, C.textMid);
+      doc.text(`${i + 1}. ${name} (${count})`, M + 2, y);
+      y += 7;
+    });
+    y += 4;
   }
 
   // Cycle variability

@@ -814,8 +814,11 @@ export function createCoreNodes(env, helpers) {
         }
         const lmp = effectiveLmp();
         const cycleLen = effectiveCycleLength();
-        const expectedNext = cd.nextPeriodDate || addDays(lmp, cycleLen);
-        const daysLate = daysBetween(expectedNext, new Date());
+        const daysUntil = daysUntilNextPeriod();
+        if (typeof daysUntil !== "number") {
+          return ["I couldn't line up your next expected period right now 🩷 Check that your logged dates are up to date and try again."];
+        }
+        const daysLate = -daysUntil;
 
         if (daysLate < 0) {
           const daysLeft = Math.abs(daysLate);
@@ -857,8 +860,8 @@ export function createCoreNodes(env, helpers) {
       },
       choices() {
         const late = hasLmpData() && (() => {
-          const expected = cd.nextPeriodDate || addDays(effectiveLmp(), effectiveCycleLength());
-          return daysBetween(expected, new Date()) > 0;
+          const daysUntil = daysUntilNextPeriod();
+          return typeof daysUntil === "number" ? daysUntil < 0 : false;
         })();
         const base = [
           { id: "walk",  label: "Walk me through possible reasons", next: "LATE_INTRO", primary: true },

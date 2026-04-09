@@ -21,6 +21,11 @@ import {
   saveBloomieMemoryLocal,
   clearBloomieMemoryLocal,
 } from "./bloom-storage.js";
+import {
+  normalizeCustomSymptomText,
+  sanitizeCustomSymptomNote,
+  sanitizeCustomSymptomText,
+} from "./custom-symptoms.js";
 
 const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
@@ -152,11 +157,25 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
       });
     }
 
+    const otherSymptoms = Array.isArray(entry.otherSymptoms)
+      ? entry.otherSymptoms
+          .map((it) => ({
+            text: sanitizeCustomSymptomText(it?.text),
+            normalizedText: normalizeCustomSymptomText(it?.normalizedText || it?.text),
+            severity: Number(it?.severity ?? 3),
+            note: sanitizeCustomSymptomNote(it?.note),
+            createdAt: typeof it?.createdAt === "string" ? it.createdAt : "",
+            dateKey: it?.dateKey || dateKey,
+          }))
+          .filter((it) => it.text)
+      : [];
+
     merged[dateKey] = {
       ...(merged[dateKey] || {}),
       date: dateKey,
       symptoms,
       symptomSeverity,
+      otherSymptoms,
     };
   }
 
@@ -208,8 +227,20 @@ export async function saveDailyLog(dateKey, log) {
     const symptomsArray = Array.isArray(localEntry.symptoms)
       ? localEntry.symptoms
       : [];
+    const otherSymptomsArray = Array.isArray(localEntry.otherSymptoms)
+      ? localEntry.otherSymptoms
+          .map((it) => ({
+            text: sanitizeCustomSymptomText(it?.text),
+            normalizedText: normalizeCustomSymptomText(it?.normalizedText || it?.text),
+            severity: Number(it?.severity ?? 3),
+            note: sanitizeCustomSymptomNote(it?.note),
+            createdAt: typeof it?.createdAt === "string" ? it.createdAt : new Date().toISOString(),
+            dateKey,
+          }))
+          .filter((it) => it.text)
+      : [];
 
-    if (symptomsArray.length > 0) {
+    if (symptomsArray.length > 0 || otherSymptomsArray.length > 0) {
       const items = symptomsArray.map((symptom) => ({
         code: toSymptomCode(symptom),
         severity: Number(localEntry.symptomSeverity?.[symptom] ?? 3),
@@ -219,7 +250,7 @@ export async function saveDailyLog(dateKey, log) {
       const symptomRes = await fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
         method: "PUT",
         headers,
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, otherSymptoms: otherSymptomsArray }),
       });
 
       if (!symptomRes.ok) {

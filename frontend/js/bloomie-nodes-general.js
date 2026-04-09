@@ -569,7 +569,7 @@ export function createGeneralNodes(env, helpers) {
         if (!p) return ["Couldn't work that out right now 🩷 Check that your last period date is up to date on the dashboard."];
         const lmp = effectiveLmp();
         const next = cd.nextPeriodDate || addDays(lmp, effectiveCycleLength());
-        const daysLeft = daysBetween(new Date(), next);
+        const daysLeft = daysUntilNextPeriod();
         const periodNote = daysLeft > 0
           ? `Your next period is expected in about ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`
           : "Your period may be due around now if it hasn't come, keep an eye on it.";
@@ -623,7 +623,10 @@ export function createGeneralNodes(env, helpers) {
           ];
         }
         const next = cd.nextPeriodDate || addDays(cd.lmp, cd.cycleLength);
-        const daysLeft = daysBetween(new Date(), next);
+        const daysLeft = daysUntilNextPeriod();
+        if (typeof daysLeft !== "number") {
+          return ["I couldn't line up your next expected period right now 🩷 Check that your logged dates are up to date and try again."];
+        }
         const nextStr = fmtDate(next);
         const ttcNote = userMode.isTTC
           ? `In TTC mode, ovulation likely falls around ${fmtDate(addDays(cd.lmp, Math.round(cd.cycleLength / 2)))} about ${Math.round(cd.cycleLength / 2)} days into your cycle.`

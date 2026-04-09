@@ -20,6 +20,12 @@ import { saveDailyLog, getAllLogs, deleteDailyLog, clearAllLogs } from "./db.js"
 import { getUserGoal } from "./goals.js";
 import { onAuthChange } from "./auth.js";
 import { fetchCycleState } from "./cycle-state.js";
+import {
+  customSymptomLooksUrgent,
+  normalizeCustomSymptomText,
+  sanitizeCustomSymptomNote,
+  sanitizeCustomSymptomText,
+} from "./custom-symptoms.js";
 
 // ── PRESENTATION + INTEGRATION LAYER ONLY ────────────────────────────────────
 // This file gathers user data and passes it to the approved backend engines
@@ -59,6 +65,7 @@ let selectedDate = "";
 let selectedFlow = "none";
 let selectedSymptoms = new Set();
 let selectedSymptomSeverity = new Map(); // symptom -> 1-5
+let selectedOtherSymptoms = []; // [{ text, normalizedText, severity, note, createdAt, dateKey }]
 
 const today = new Date();
 currentYear = today.getFullYear();
@@ -297,6 +304,97 @@ function updateSeverityPanel() {
 
 }
 
+function renderOtherSymptoms() {
+  const list = document.getElementById("other-symptom-list");
+  if (!list) return;
+
+  if (!selectedOtherSymptoms.length) {
+    list.innerHTML = `<p class="custom-symptom-empty">No custom symptoms added for this day.</p>`;
+    return;
+  }
+
+  list.innerHTML = "";
+
+  selectedOtherSymptoms.forEach((item, idx) => {
+    const row = document.createElement("div");
+    row.className = "custom-symptom-item";
+
+    const top = document.createElement("div");
+    top.className = "custom-symptom-top";
+
+    const name = document.createElement("div");
+    name.className = "custom-symptom-name";
+    name.textContent = item.text;
+    top.appendChild(name);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-outline btn-sm";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      selectedOtherSymptoms.splice(idx, 1);
+      renderOtherSymptoms();
+    });
+    top.appendChild(removeBtn);
+    row.appendChild(top);
+
+    const sevWrap = document.createElement("div");
+    sevWrap.className = "severity-btns";
+    for (let i = 1; i <= 5; i++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "severity-btn" + (Number(item.severity) === i ? " active" : "");
+      btn.textContent = String(i);
+      btn.addEventListener("click", () => {
+        selectedOtherSymptoms[idx].severity = i;
+        renderOtherSymptoms();
+      });
+      sevWrap.appendChild(btn);
+    }
+    row.appendChild(sevWrap);
+
+    const note = document.createElement("input");
+    note.type = "text";
+    note.className = "form-input custom-symptom-note";
+    note.placeholder = "Optional detail";
+    note.maxLength = 160;
+    note.value = item.note || "";
+    note.addEventListener("input", (e) => {
+      selectedOtherSymptoms[idx].note = sanitizeCustomSymptomNote(e.target.value);
+    });
+    row.appendChild(note);
+
+    list.appendChild(row);
+  });
+}
+
+function addOtherSymptomFromInput() {
+  const input = document.getElementById("other-symptom-input");
+  if (!input) return;
+
+  const text = sanitizeCustomSymptomText(input.value);
+  if (!text) return;
+
+  const normalizedText = normalizeCustomSymptomText(text);
+  const existing = selectedOtherSymptoms.find((item) => item.normalizedText === normalizedText);
+  if (existing) {
+    showToast("That custom symptom is already added for this day.", "info");
+    input.value = "";
+    return;
+  }
+
+  selectedOtherSymptoms.push({
+    text,
+    normalizedText,
+    severity: 3,
+    note: "",
+    createdAt: new Date().toISOString(),
+    dateKey: selectedDate,
+  });
+  input.value = "";
+  renderOtherSymptoms();
+}
+
 // ── Symptom search ─────────────────────────────────────────────────────────
 
 // Related terms for each symptom label. Lets users find symptoms using
@@ -379,6 +477,14 @@ document.getElementById("symptom-search").addEventListener("input", (e) => {
     });
     cat.style.display = visible === 0 ? "none" : "";
   });
+});
+
+document.getElementById("add-other-symptom-btn").addEventListener("click", addOtherSymptomFromInput);
+document.getElementById("other-symptom-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    addOtherSymptomFromInput();
+  }
 });
 
 // ── Calendar rendering ─────────────────────────────────────────────────────
@@ -504,12 +610,16 @@ function openLogModal(dateKey) {
     chip.disabled = isFuture;
     chip.classList.toggle("chip--disabled", isFuture);
   });
+  document.getElementById("other-symptom-input").disabled = isFuture;
+  document.getElementById("add-other-symptom-btn").disabled = isFuture;
 
   // Reset state
   selectedFlow = "none";
   selectedSymptoms.clear();
   selectedSymptomSeverity.clear();
+  selectedOtherSymptoms = [];
   document.getElementById("notes").value = "";
+  document.getElementById("other-symptom-input").value = "";
   document.getElementById("delete-log-btn").style.display = "none";
   document.getElementById("symptom-search").value = "";
 
@@ -536,6 +646,19 @@ function openLogModal(dateKey) {
       );
     }
 
+    if (Array.isArray(existing.otherSymptoms)) {
+      selectedOtherSymptoms = existing.otherSymptoms
+        .map((item) => ({
+          text: sanitizeCustomSymptomText(item?.text),
+          normalizedText: normalizeCustomSymptomText(item?.normalizedText || item?.text),
+          severity: Number(item?.severity ?? 3),
+          note: sanitizeCustomSymptomNote(item?.note),
+          createdAt: typeof item?.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+          dateKey: item?.dateKey || dateKey,
+        }))
+        .filter((item) => item.text);
+    }
+
     if (existing.notes) document.getElementById("notes").value = existing.notes;
     document.getElementById("delete-log-btn").style.display = "inline-flex";
   }
@@ -543,6 +666,7 @@ function openLogModal(dateKey) {
   updateFlowChips();
   updateSymptomChips();
   updateSeverityPanel();
+  renderOtherSymptoms();
   openModal("log-modal");
 }
 
@@ -562,7 +686,7 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
 
   // Block flow and symptoms on future dates regardless of how the modal was reached
   if (new Date(dateKey + "T00:00:00") > new Date()) {
-    if (selectedFlow !== "none" || selectedSymptoms.size > 0) {
+    if (selectedFlow !== "none" || selectedSymptoms.size > 0 || selectedOtherSymptoms.length > 0) {
       showToast("You cannot log flow or symptoms for a future date.", "error");
       return;
     }
@@ -572,6 +696,14 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
     flow: selectedFlow,
     symptoms: Array.from(selectedSymptoms),
     symptomSeverity: Object.fromEntries(selectedSymptomSeverity),
+    otherSymptoms: selectedOtherSymptoms.map((item) => ({
+      text: sanitizeCustomSymptomText(item.text),
+      normalizedText: normalizeCustomSymptomText(item.normalizedText || item.text),
+      severity: Number(item.severity ?? 3),
+      note: sanitizeCustomSymptomNote(item.note),
+      createdAt: item.createdAt || new Date().toISOString(),
+      dateKey,
+    })).filter((item) => item.text),
     notes: document.getElementById("notes").value.trim(),
   };
 
@@ -579,7 +711,14 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
   allLogs[dateKey] = { ...data, date: dateKey };
   closeModal("log-modal");
   renderCalendar();
-  showToast("Log saved successfully!");
+  let saveMessage = "Log saved successfully!";
+  if (data.otherSymptoms.length) {
+    saveMessage = "Saved to your symptom history. Custom symptoms are tracked in your history, but are not yet used in pattern predictions.";
+    if (data.otherSymptoms.some((item) => customSymptomLooksUrgent(item.text))) {
+      saveMessage += " If this symptom feels severe, sudden, or worrying, consider seeking medical advice.";
+    }
+  }
+  showToast(saveMessage);
 
   // Persist + recompute in background, then re-render both grid and panel.
   // renderCalendar() is called again so the predicted period overlay reflects

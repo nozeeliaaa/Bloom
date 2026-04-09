@@ -19,6 +19,20 @@ import { sanitizeInput, classifyInputSafety, sanitizeBotLine, authorizeHtmlPaylo
 import { buildSignalBoard, scoreInterpretationBoard, scoreInterpretations, selectResponseStrategy } from "./bloomie-reasoning.js";
 import { buildPolicyContext, evaluatePolicyDecision, sanitizeMinorEnglishLine } from "./bloomie-policy.js";
 import { isBloomieDebugEnabled } from "./bloom-storage.js";
+import {
+  buildEmotionalFollowUp,
+  buildFollowUpQuestion,
+  buildMiniReplay,
+  buildSoftContinuePrompt,
+  buildTinyWinLine,
+  detectHiddenConcern,
+  detectTinyWin,
+  maybeBuildRealityCheckPrefix,
+  shouldAddSoftContinue,
+  shouldAskFollowUp,
+  shouldUseMiniReplay,
+  softenEscalationLine,
+} from "./bloomie-response-layers.js";
 
 // ── Mood anomaly context ────────────────────────────────────────────────────
 // Combines cycle-timing anomaly (from bloom-anomaly-engine) with a
@@ -469,6 +483,10 @@ export function initBloomieChat({
   function toDate(val) {
     if (!val) return null;
     if (val?.toDate) return val.toDate();           // Firestore Timestamp
+    if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      const d = new Date(`${val}T00:00:00`);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
     const d = new Date(val);
     return Number.isNaN(d.getTime()) ? null : d;
   }
@@ -478,6 +496,10 @@ export function initBloomieChat({
     lmp:                 toDate(cycleData?.lmp),
     cycleLength:         Number(cycleData?.cycleLength) || 28,
     nextPeriodDate:      toDate(cycleData?.nextPeriodDate),
+    dayInCycle:          Number(cycleData?.dayInCycle) || null,
+    phase:               cycleData?.phase || null,
+    phaseLabel:          cycleData?.phaseLabel || null,
+    confidence:          cycleData?.confidence || null,
     edd:                 toDate(cycleData?.edd),
     hasData:             !!(cycleData?.lmp),  // also re-checked via hasLmpData()
 
@@ -512,6 +534,29 @@ export function initBloomieChat({
   function hasLmpData() {
     return !!(effectiveLmp());
   }
+  function hasSessionCycleOverride() {
+    return Boolean(ctx?.sessionData?.lmp || ctx?.sessionData?.cycleLength);
+  }
+  function startOfLocalDay(dateLike) {
+    const d = toDate(dateLike);
+    if (!d) return null;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  function daysBetweenCalendar(a, b) {
+    const start = startOfLocalDay(a);
+    const end = startOfLocalDay(b);
+    if (!start || !end) return null;
+    return Math.round((end - start) / 86400000);
+  }
+  function getCanonicalPhaseInfo() {
+    if (hasSessionCycleOverride()) return null;
+    if (!cd.phase) return null;
+    return {
+      phase: cd.phase,
+      days: Number.isFinite(cd.dayInCycle) ? Math.max(0, cd.dayInCycle - 1) : null,
+      label: cd.phaseLabel ? `${cd.phaseLabel} phase` : null,
+    };
+  }
 
   // Builds the cycle context object passed to buildGuidanceResponse so
   // templates can produce specific numbers ("you're 3 days late") rather
@@ -521,8 +566,11 @@ export function initBloomieChat({
     if (!lmp) return null;
     const cycleLength = effectiveCycleLength();
     const today       = new Date();
-    const dayOfCycle  = Math.max(1, Math.round((today - lmp) / (1000 * 60 * 60 * 24)) + 1);
-    const daysLate    = Math.max(0, dayOfCycle - cycleLength);
+    const dayOfCycle  = hasSessionCycleOverride()
+      ? Math.max(1, (daysBetweenCalendar(lmp, today) ?? 0) + 1)
+      : (cd.dayInCycle || Math.max(1, (daysBetweenCalendar(lmp, today) ?? 0) + 1));
+    const daysUntil   = daysUntilNextPeriod();
+    const daysLate    = typeof daysUntil === "number" ? Math.max(0, -daysUntil) : Math.max(0, dayOfCycle - cycleLength);
     return { lmp, cycleLength, dayOfCycle, daysLate };
   }
 
@@ -544,10 +592,12 @@ export function initBloomieChat({
 
   // Current cycle phase based on LMP and cycle length
   function getCurrentPhase() {
+    const canonical = getCanonicalPhaseInfo();
+    if (canonical) return canonical;
     const lmp = effectiveLmp();
     if (!lmp) return null;
     const today = new Date();
-    const dayOfCycle = daysBetween(lmp, today) % effectiveCycleLength();
+    const dayOfCycle = (daysBetweenCalendar(lmp, today) ?? 0) % effectiveCycleLength();
     if (dayOfCycle < 0) return null;
     if (dayOfCycle <= 5)  return { phase: "menstrual",   days: dayOfCycle, label: "your period phase (days 1–5)" };
     if (dayOfCycle <= 13) return { phase: "follicular",  days: dayOfCycle, label: "the follicular phase (days 6–13) - your body is preparing to ovulate" };
@@ -573,7 +623,7 @@ export function initBloomieChat({
   function computeLowConfidencePhase() {
     const lmp = effectiveLmp();
     if (!lmp) return false; // no LMP at all → getCurrentPhase() returns null anyway
-    const daysSinceLmp = Math.round((new Date() - lmp) / (1000 * 60 * 60 * 24));
+    const daysSinceLmp = daysBetweenCalendar(lmp, new Date());
     if (daysSinceLmp > 45) return true;
     if (ctx.cycleVariability !== null && ctx.cycleVariability > 5) return true;
     return false;
@@ -655,9 +705,9 @@ export function initBloomieChat({
       const cycleDays = matchingEntries
         .map(entry => {
           if (!lmp) return null;
-          const entryDate = new Date(entry.dateKey);
+          const entryDate = toDate(entry.dateKey);
           if (isNaN(entryDate.getTime())) return null;
-          const raw = Math.round((entryDate - lmp) / (1000 * 60 * 60 * 24));
+          const raw = daysBetweenCalendar(lmp, entryDate);
           // Fold back into current cycle using modulo; ignore negatives
           const cd = ((raw % cycleLen) + cycleLen) % cycleLen;
           return cd;
@@ -829,7 +879,7 @@ export function initBloomieChat({
     const lmp = effectiveLmp();
     const next = cd.nextPeriodDate || (lmp ? addDays(lmp, effectiveCycleLength()) : null);
     if (!next) return null;
-    return daysBetween(new Date(), next);
+    return daysBetweenCalendar(new Date(), next);
   }
 
   // Smart pregnancy test recommendation based on LMP
@@ -2399,6 +2449,31 @@ export function initBloomieChat({
       }
 
       const cycleCtx   = buildCycleCtx();
+      const layerContext = {
+        text,
+        normalizedText,
+        entities: mergedEntities,
+        currentEntities: entities,
+        cycleCtx,
+        tone: ctx.currentTone,
+        inferredReason: inferred?.payload?.reason || null,
+        inferredNext: inferred?.next || null,
+        lastIntent: ctx.lastIntent || null,
+        sessionDepth: ctx.conversationProfile?.sessionDepth ?? 0,
+        isShortFollowUp: isContextualShortReply(text, pendingQuestionAtTurnStart, choicesAtTurnStart),
+        hasPendingClarifier: !!(ctx.pendingAmbiguityContext || ctx.pendingContradictionContext || ctx.pendingContextProbe),
+      };
+
+      if (shouldAskFollowUp(layerContext)) {
+        const followUp = buildFollowUpQuestion(layerContext);
+        if (followUp) {
+          ctx.pendingContextProbe = { originalText: effectiveInput };
+          say([followUp]);
+          render();
+          return;
+        }
+      }
+
       const guidance   = buildGuidanceResponse(mergedEntities, inferred?.payload?.reason, cycleCtx, ctx.currentTone, minorSafeFooter());
 
       if (guidance) {
@@ -2424,9 +2499,54 @@ export function initBloomieChat({
           ctx.currentTone && ctx.currentTone !== "neutral" && !EMERGENCY_NODES.has(inferred?.next)
             ? getToneOpener(ctx.currentTone)
             : "";
-        const patternLine = !EMERGENCY_NODES.has(inferred?.next) ? getPatternCatcherLine(mergedEntities) : null;
-        const guidanceCore = patternLine ? [patternLine, ...guidance.lines] : guidance.lines;
-        const guidanceLines = guidanceOpener ? [guidanceOpener, ...guidanceCore] : guidanceCore;
+        const responseLayerContext = {
+          ...layerContext,
+          responseScenario: guidance.scenario,
+        };
+        const realityCheckPrefix = !EMERGENCY_NODES.has(inferred?.next)
+          ? maybeBuildRealityCheckPrefix(responseLayerContext)
+          : null;
+        const tinyWinType = !EMERGENCY_NODES.has(inferred?.next) ? detectTinyWin(responseLayerContext) : null;
+        const tinyWinLine = tinyWinType && !ctx.adviceGiven.has(`tiny_win_${tinyWinType}`)
+          ? buildTinyWinLine(tinyWinType, normalizedText)
+          : null;
+        if (tinyWinLine) ctx.adviceGiven.add(`tiny_win_${tinyWinType}`);
+
+        const miniReplay = !EMERGENCY_NODES.has(inferred?.next) && !realityCheckPrefix && shouldUseMiniReplay(responseLayerContext)
+          ? buildMiniReplay(responseLayerContext)
+          : null;
+        const patternLine = !EMERGENCY_NODES.has(inferred?.next) && !miniReplay
+          ? getPatternCatcherLine(mergedEntities)
+          : null;
+        const hiddenConcernFollowUp = !EMERGENCY_NODES.has(inferred?.next)
+          ? buildEmotionalFollowUp(responseLayerContext)
+          : null;
+        const shouldSoftContinue = !EMERGENCY_NODES.has(inferred?.next) && !hiddenConcernFollowUp
+          ? shouldAddSoftContinue(
+              {
+                ...responseLayerContext,
+                hiddenConcern: !!detectHiddenConcern(normalizedText, inferred?.payload?.reason || ctx.lastIntent, ctx.currentTone),
+                followUpAsked: false,
+              },
+              guidance
+            )
+          : false;
+        const softContinue = shouldSoftContinue && !ctx.adviceGiven.has("soft_continue_prompt")
+          ? buildSoftContinuePrompt(responseLayerContext)
+          : null;
+        if (softContinue) ctx.adviceGiven.add("soft_continue_prompt");
+
+        const guidanceLeadIn = (realityCheckPrefix || miniReplay) ? "" : guidanceOpener;
+        const prefixLines = [
+          tinyWinLine,
+          miniReplay,
+          guidanceLeadIn,
+          realityCheckPrefix,
+          patternLine,
+        ].filter(Boolean);
+        const suffixLines = [hiddenConcernFollowUp, softContinue].filter(Boolean);
+        const guidanceCore = [...guidance.lines, ...suffixLines];
+        const guidanceLines = [...prefixLines, ...guidanceCore];
         const delay = estimateSayTime(guidanceLines);
         if (inferred) {
           say(guidanceLines, { keepLocked: true });
@@ -3600,6 +3720,7 @@ export function initBloomieChat({
       ctx.toneResult ?? null,
       ctx.conversationProfile?.sessionDepth ?? 0
     );
+    arr = arr.map((line) => softenEscalationLine(line));
     if (ctx.policyContext?.ageGroup === "minor" || (ctx.isMinor && ctx.hasGuardianConsent)) {
       arr = arr.map((line) => sanitizeMinorEnglishLine(line));
     }

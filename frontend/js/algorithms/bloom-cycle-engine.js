@@ -925,7 +925,7 @@ export function detectSuspiciousEntrySignal(dates = []) {
 const SIGNAL_GROUPS = {
   ABSENCE:            ['EXTENDED_ABSENCE', 'AMENORRHEA_PATTERN'],
   FREQUENCY:          ['OLIGOMENORRHEA_PATTERN', 'POLYMENORRHEA_PATTERN'],
-  BLEEDING_INTENSITY: ['MENORRHAGIA_PATTERN', 'HYPOMENORRHEA_PATTERN'],
+  BLEEDING_INTENSITY: ['HEAVY_CLOTTING_PATTERN', 'MENORRHAGIA_PATTERN', 'HYPOMENORRHEA_PATTERN'],
   IRREGULAR_BLEEDING: ['METRORRHAGIA_PATTERN', 'MENOMETRORRHAGIA_PATTERN'],
 };
 
@@ -938,6 +938,7 @@ for (const [group, codes] of Object.entries(SIGNAL_GROUPS)) {
 /** Per-signal surface priority (higher = wins deduplication) */
 const SIGNAL_PRIORITIES = {
   MENOMETRORRHAGIA_PATTERN: 5,
+  HEAVY_CLOTTING_PATTERN:   5,
   MENORRHAGIA_PATTERN:      4,
   AMENORRHEA_PATTERN:       4,
   EXTENDED_ABSENCE:         3,
@@ -1050,10 +1051,10 @@ function _detectOligomenorrheaPattern({ cycleLengths }) {
   const cycleSummary = recent.map(c => `${c} days`).join(", ");
 
   const message =
-    `Looking at your last ${recent.length} logged cycles, Bloom noticed that the gaps between your periods have been consistently longer than the typical range. ` +
-    `Your recent cycles were ${cycleSummary}, with ${longCycles.length} out of ${recent.length} extending beyond 35 days. ` +
-    `An average spacing of around ${avg} days is on the longer side and suggests a more infrequent pattern than your earlier logs. ` +
-    `This kind of shift can sometimes happen gradually, so it may be worth keeping an eye on whether the spacing continues.`;
+    `Your recent cycles have been running longer than usual in your logs. ` +
+    `Across your last ${recent.length} cycles, Bloom recorded ${cycleSummary}, with ${longCycles.length} going beyond 35 days. ` +
+    `That puts your recent average around ${avg} days, which is more spread out than your earlier pattern. ` +
+    `It is worth keeping an eye on whether this longer spacing keeps repeating.`;
 
   return makeAdvancedSignal({
     code:    "OLIGOMENORRHEA_PATTERN",
@@ -1076,10 +1077,10 @@ function _detectPolymenorrheaPattern({ cycleLengths }) {
   const cycleSummary = recent.map(c => `${c} days`).join(", ");
 
   const message =
-    `Bloom noticed that your recent period gaps have been shorter than expected across your last ${recent.length} logged cycles. ` +
-    `Your recent cycles were ${cycleSummary}, and ${shortCycles.length} of them came in under 21 days. ` +
-    `Cycles averaging around ${avg} days are notably shorter than the typical range of 21–35 days. ` +
-    `Consistently short cycles can sometimes signal hormonal changes, so it's worth noting if the pattern continues.`;
+    `Your recent cycles have been coming closer together than usual in your logs. ` +
+    `Across your last ${recent.length} cycles, Bloom recorded ${cycleSummary}, and ${shortCycles.length} came in under 21 days. ` +
+    `That puts your recent average around ${avg} days, which is shorter than your earlier spacing. ` +
+    `It is worth watching whether this closer-together pattern continues.`;
 
   return makeAdvancedSignal({
     code:    "POLYMENORRHEA_PATTERN",
@@ -1088,6 +1089,32 @@ function _detectPolymenorrheaPattern({ cycleLengths }) {
     title:   "Cycles are coming closer together",
     message,
     debug:   { recentCycles: recent, shortCount: shortCycles.length, avg },
+  });
+}
+
+function _detectHeavyClottingPattern({ periodEntries }) {
+  if (!Array.isArray(periodEntries) || periodEntries.length < 2) return null;
+
+  const recent = lastN(periodEntries, 3);
+  const clottingCycles = recent.filter((e) =>
+    e?.hadLargeClots === true &&
+    (e.flowLevel === "heavy" || e.flowLevel === "very_heavy" || (e.flowScore ?? 0) >= 4)
+  );
+
+  if (clottingCycles.length < 2) return null;
+
+  const message =
+    `Your logs show heavier bleeding together with clotting across ${clottingCycles.length} recent period${clottingCycles.length === 1 ? "" : "s"}. ` +
+    `Because this has come up more than once, Bloom is treating it as a repeating pattern in your own history rather than a one-off entry. ` +
+    `Keeping logging flow level, timing, and any other symptoms can help show whether this pattern is staying the same or shifting over time.`;
+
+  return makeAdvancedSignal({
+    code:    "HEAVY_CLOTTING_PATTERN",
+    level:   "high",
+    show:    true,
+    title:   "Heavier bleeding with clotting has repeated",
+    message,
+    debug:   { clottingCycleCount: clottingCycles.length },
   });
 }
 
@@ -1108,16 +1135,16 @@ function _detectMenorrhagiaPattern({ periodEntries }) {
   let detail;
   if (longDur.length > 0) {
     const durationStr = longDur.map(e => `${e.durationDays} days`).join(" and ");
-    detail = `In ${longDur.length > 1 ? "multiple recent cycles" : "a recent cycle"}, your period lasted ${durationStr}, which is longer than the typical 3–7 day range. `;
+    detail = `Your logs show bleeding lasting ${durationStr} in ${longDur.length > 1 ? "multiple recent cycles" : "a recent cycle"}. `;
   } else {
-    detail = `Bloom noticed ${heavyFlow.length} of your recent logged periods included heavy or very heavy flow. `;
+    detail = `Your logs show heavier bleeding across ${heavyFlow.length} recent period${heavyFlow.length === 1 ? "" : "s"}. `;
   }
 
   const message =
     detail +
-    (avgDuration ? `Your average period length across recent logs is around ${avgDuration} days, which runs longer or heavier than what is usually expected. ` : "") +
-    `Heavier or longer periods can sometimes be a one-off, but when the pattern repeats it's worth keeping a detailed record. ` +
-    `If this is a noticeable change from your earlier cycle history, mentioning it to a healthcare provider can be helpful.`;
+    (avgDuration ? `Across those recent logs, your period length has averaged around ${avgDuration} days. ` : "") +
+    `Because this has shown up more than once, Bloom is treating it as part of your recent pattern from your own logs. ` +
+    `It is worth keeping track of whether the heavier days stay consistent or keep changing.`;
 
   return makeAdvancedSignal({
     code:    "MENORRHAGIA_PATTERN",
@@ -1145,12 +1172,11 @@ function _detectHypomenorrheaPattern({ periodEntries }) {
   const avgDuration = durations.length ? Math.round(mean(durations)) : null;
 
   const message =
-    `Bloom noticed that ${lightPeriods.length} of your recent logged periods have been lighter or shorter than what appeared in your earlier logs. ` +
+    `Bloom noticed that ${lightPeriods.length} of your recent logged periods have been lighter or shorter than your earlier pattern. ` +
     (avgDuration
       ? `Your recent periods are averaging around ${avgDuration} day${avgDuration === 1 ? "" : "s"}, which is on the lighter side of the typical range. `
       : "") +
-    `Lighter periods can reflect normal variation, but when the pattern repeats it sometimes signals a gradual change in hormonal activity. ` +
-    `This is a gentle observation — not a cause for alarm, but something worth continuing to track.`;
+    `This is a gentle note from your own logs rather than a diagnosis, and it is worth continuing to track if it keeps repeating.`;
 
   return makeAdvancedSignal({
     code:    "HYPOMENORRHEA_PATTERN",
@@ -1169,10 +1195,9 @@ function _detectMetrorrhagiaPattern({ unscheduledBleedingDates }) {
   const dateStr   = recent.map(d => _fmtShort(d)).join(", ");
 
   const message =
-    `Bloom noticed bleeding or spotting logged on ${recent.length} occasion${recent.length > 1 ? "s" : ""} that appeared to fall outside your expected period window (${dateStr}). ` +
-    `Mid-cycle spotting can sometimes be a normal variation, but when it recurs it is worth keeping close track of the timing. ` +
-    `This kind of irregular bleeding can have a range of causes, from hormonal shifts to other factors. ` +
-    `If it is happening regularly, it would be worth mentioning to a healthcare provider.`;
+    `Bloom noticed spotting or bleeding outside your expected period timing on ${recent.length} logged occasion${recent.length === 1 ? "" : "s"} (${dateStr}). ` +
+    `Because this has come up more than once, it is worth keeping close track of the timing in your future logs. ` +
+    `If it keeps repeating, that pattern would be useful to mention in a healthcare conversation.`;
 
   return makeAdvancedSignal({
     code:    "METRORRHAGIA_PATTERN",
@@ -1188,10 +1213,9 @@ function _detectMenometrorrhagiaPattern({ menorrhagiaSignal, metrorrhagiaSignal 
   if (!menorrhagiaSignal || !metrorrhagiaSignal) return null;
 
   const message =
-    `Bloom noticed a combination of two patterns in your recent logs: periods that appear longer or heavier than your earlier baseline, along with bleeding or spotting outside your expected period windows. ` +
-    `On their own, each of these can sometimes reflect normal variation — but together they suggest a more significant shift in your cycle's usual behaviour. ` +
-    `Tracking dates, flow level, and any other symptoms you notice will give the clearest picture of what's changing. ` +
-    `If this combination is new for you, it is worth raising with a healthcare provider.`;
+    `Your logs show both heavier bleeding and bleeding that is not staying neatly within expected period timing. ` +
+    `Because both patterns have repeated, Bloom is surfacing them together as one stronger observation from your own history. ` +
+    `Tracking dates, flow level, and any related symptoms will give the clearest picture of whether this combined pattern is continuing.`;
 
   return makeAdvancedSignal({
     code:    "MENOMETRORRHAGIA_PATTERN",
@@ -1247,6 +1271,9 @@ export function generateAdvancedInsights({
   const poly = _detectPolymenorrheaPattern({ cycleLengths });
   if (poly) rawSignals.push(poly);
 
+  const heavyClotting = _detectHeavyClottingPattern({ periodEntries });
+  if (heavyClotting) rawSignals.push(heavyClotting);
+
   const menorrhagia = _detectMenorrhagiaPattern({ periodEntries });
   if (menorrhagia) rawSignals.push(menorrhagia);
 
@@ -1258,12 +1285,16 @@ export function generateAdvancedInsights({
 
   // Menometrorrhagia fires only when both menorrhagia AND metrorrhagia are detected
   const menometrorrhagia = _detectMenometrorrhagiaPattern({
-    menorrhagiaSignal:  menorrhagia,
+    menorrhagiaSignal:  heavyClotting || menorrhagia,
     metrorrhagiaSignal: metrorrhagia,
   });
   if (menometrorrhagia) rawSignals.push(menometrorrhagia);
 
-  const { finalSignals, suppressedSignals } = dedupeSignals(rawSignals);
+  const bleedingCollapsed = menometrorrhagia
+    ? rawSignals.filter((s) => !["HEAVY_CLOTTING_PATTERN", "MENORRHAGIA_PATTERN", "METRORRHAGIA_PATTERN"].includes(s.code))
+    : rawSignals;
+
+  const { finalSignals, suppressedSignals } = dedupeSignals(bleedingCollapsed);
 
   return {
     signals: finalSignals,

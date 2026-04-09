@@ -858,6 +858,7 @@
         nextPeriodDate,
         previousCycleLengths: cycle.cycleLengths,
         cycleCount: cycle.cycleStarts.length,
+        dayInCycle: cycleState?.dayInCycle ?? null,
         phase: cycleState?.phase || null,
         phaseLabel: cycleState?.phaseLabel || null,
         confidence: cycleState?.confidence?.level || null,
