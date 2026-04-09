@@ -16,6 +16,54 @@ export function createPerimenopauseNodes(env, helpers) {
   } = env;
   const { pickMainLabel } = helpers;
 
+  function recentPeriSignals() {
+    const recent = Array.isArray(ctx.entityHistory) ? ctx.entityHistory.slice(-4) : [];
+    const hasHeavy = recent.some(e => e?.symptoms?.heavy || e?.symptoms?.large_clots);
+    const hasPelvic = recent.some(e => e?.symptoms?.pelvic || e?.symptoms?.ovulation_pain);
+    const hasLate = recent.some(e => e?.symptoms?.late || e?.symptoms?.implicit_late);
+    const hasSpotting = recent.some(e => e?.symptoms?.spotting);
+    const hasMood = recent.some(e =>
+      e?.symptoms?.mood || e?.symptoms?.anxiety || e?.symptoms?.depression || e?.symptoms?.irritability
+    );
+    const hasSleep = recent.some(e => e?.symptoms?.sleep || e?.symptoms?.insomnia || e?.symptoms?.fatigue);
+    return { hasHeavy, hasPelvic, hasLate, hasSpotting, hasMood, hasSleep };
+  }
+
+  function periContextLineFor(entry) {
+    const sig = recentPeriSignals();
+    if (entry === "cycle") {
+      if (sig.hasHeavy && sig.hasPelvic) {
+        return "That helps narrow things down — when cycle changes come with heavy flow and pelvic pain together, the pattern is more meaningful than any one symptom alone 🩷";
+      }
+      if (sig.hasHeavy) {
+        return "That gives me more context — you've also mentioned heavier bleeding, which can be useful when cycle changes are part of the picture 🩷";
+      }
+      if (sig.hasLate || sig.hasSpotting) {
+        return "That gives me more context — timing shifts plus late/spotting patterns often tell a clearer story over time 🩷";
+      }
+      return null;
+    }
+    if (entry === "mood") {
+      if (sig.hasSleep && sig.hasMood) {
+        return "That helps narrow things down — mood and sleep changes clustering together is common in hormone transitions 🩷";
+      }
+      if (sig.hasHeavy || sig.hasLate) {
+        return "That gives me more context — mood changes alongside cycle shifts can happen when hormones are fluctuating 🩷";
+      }
+      return null;
+    }
+    if (entry === "vaso") {
+      if (sig.hasSleep) {
+        return "That gives me more context — hot flashes/night sweats plus sleep disruption often reinforce each other 🩷";
+      }
+      if (sig.hasLate || sig.hasHeavy) {
+        return "That helps narrow things down — vasomotor symptoms alongside cycle changes can point toward a broader hormonal transition pattern 🩷";
+      }
+      return null;
+    }
+    return null;
+  }
+
   return {
     /* ---------------- PERIMENOPAUSE PATHWAY ---------------- */
     PERIMENOPAUSE_INTRO: {
@@ -40,25 +88,35 @@ export function createPerimenopauseNodes(env, helpers) {
     },
 
     PERI_VASOMOTOR_ROUTE: {
-      say: [
-        "Hot flashes and night sweats are some of the most well-known perimenopause symptoms 🩷",
-        "They happen because estrogen fluctuations affect your body's temperature regulation, your brain gets a false signal that you're overheating.",
-        "How often are they happening, and are they affecting your sleep or daily life?",
-      ],
+      say() {
+        const contextLine = periContextLineFor("vaso");
+        return [
+          "Hot flashes and night sweats are some of the most well-known perimenopause symptoms 🩷",
+          ...(contextLine ? [contextLine] : []),
+          "They happen because estrogen fluctuations affect your body's temperature regulation, your brain gets a false signal that you're overheating.",
+          "Quick check before we route this: are these episodes also disrupting your sleep most nights?",
+          "How often are they happening, and are they affecting your sleep or daily life?",
+        ];
+      },
       choices: [
         { id: "manage",  label: "A few times a week, manageable",      next: "PERI_MONITOR_WRAP" },
-        { id: "daily",   label: "Daily or disrupting sleep",           next: "PERI_PROVIDER_SOON", primary: true },
+        { id: "daily",   label: "Daily or disrupting sleep",            next: "PERI_PROVIDER_SOON", primary: true },
         { id: "sweat",   label: "Happening with heavy sweating at night", next: "PERI_PROVIDER_SOON" },
         { id: "unsure",  label: "Not sure yet",                        next: "PERI_MONITOR_WRAP" },
       ],
     },
 
     PERI_CYCLE_ROUTE: {
-      say: [
-        "Irregular periods are often one of the first signs of perimenopause 🩷",
-        "Cycles can get shorter, longer, heavier, lighter, or just unpredictable, because estrogen and progesterone are no longer following their usual rhythm.",
-        "Has the change been gradual, or did it seem to shift suddenly?",
-      ],
+      say() {
+        const contextLine = periContextLineFor("cycle");
+        return [
+          "Irregular periods are often one of the first signs of perimenopause 🩷",
+          ...(contextLine ? [contextLine] : []),
+          "Cycles can get shorter, longer, heavier, lighter, or just unpredictable, because estrogen and progesterone are no longer following their usual rhythm.",
+          "One quick clarifier: is this mostly a timing shift, or timing plus other symptoms like heavier flow or pelvic pain?",
+          "Has the change been gradual, or did it seem to shift suddenly?",
+        ];
+      },
       choices: [
         { id: "gradual",  label: "Gradual change over time",        next: "PERI_MONITOR_WRAP" },
         { id: "sudden",   label: "Sudden change",                   next: "PERI_PROVIDER_SOON" },
@@ -81,11 +139,16 @@ export function createPerimenopauseNodes(env, helpers) {
     },
 
     PERI_MOOD_ROUTE: {
-      say: [
-        "Mood changes, brain fog, and emotional intensity during perimenopause are real, not imagined, not dramatic 🩷",
-        "Estrogen affects serotonin and other brain chemicals, so as levels fluctuate, mood stability can too.",
-        "Is it more like anxiety and irritability, or more like low mood and exhaustion?",
-      ],
+      say() {
+        const contextLine = periContextLineFor("mood");
+        return [
+          "Mood changes, brain fog, and emotional intensity during perimenopause are real, not imagined, not dramatic 🩷",
+          ...(contextLine ? [contextLine] : []),
+          "Estrogen affects serotonin and other brain chemicals, so as levels fluctuate, mood stability can too.",
+          "That gives me more context — when symptoms cluster over time (for example mood + sleep + cycle shifts), the pattern is often more informative than one symptom on its own.",
+          "Is it more like anxiety and irritability, or more like low mood and exhaustion?",
+        ];
+      },
       choices: [
         { id: "anxiety", label: "Anxiety or irritability",    next: "MOOD_ANXIETY_ROUTE" },
         { id: "low",     label: "Low mood or exhaustion",     next: "MOOD_LOW_ROUTE" },

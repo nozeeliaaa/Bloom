@@ -24,17 +24,31 @@
 
 /** Convert Date|number|string to Date safely */
 function toDate(value) {
-  if (value instanceof Date) return new Date(value.getTime());
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) {
-    throw new Error(`Invalid date input: ${value}`);
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date) {
+    const d = new Date(value.getTime());
+    return Number.isNaN(d.getTime()) ? null : d;
   }
-  return d;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function safeNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function sanitizePositiveNumbers(values = []) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v > 0);
 }
 
 /** Normalize date to local midnight */
 function startOfDay(d) {
   const x = toDate(d);
+  if (!x) return null;
   x.setHours(0, 0, 0, 0);
   return x;
 }
@@ -42,7 +56,10 @@ function startOfDay(d) {
 /** Whole-day difference: (b - a) in days */
 function diffDays(a, b) {
   const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.floor((startOfDay(b).getTime() - startOfDay(a).getTime()) / msPerDay);
+  const startA = startOfDay(a);
+  const startB = startOfDay(b);
+  if (!startA || !startB) return 0;
+  return Math.floor((startB.getTime() - startA.getTime()) / msPerDay);
 }
 
 /** Absolute whole-day difference */
@@ -57,14 +74,16 @@ function clamp(value, min, max) {
 
 /** Mean of array */
 function mean(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) return 0;
-  return arr.reduce((sum, x) => sum + x, 0) / arr.length;
+  const clean = sanitizePositiveNumbers(arr);
+  if (!clean.length) return 0;
+  return clean.reduce((sum, x) => sum + x, 0) / clean.length;
 }
 
 /** Median of array */
 function median(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) return 0;
-  const sorted = [...arr].sort((a, b) => a - b);
+  const clean = sanitizePositiveNumbers(arr);
+  if (!clean.length) return 0;
+  const sorted = [...clean].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0
     ? (sorted[mid - 1] + sorted[mid]) / 2
@@ -73,9 +92,10 @@ function median(arr) {
 
 /** Standard deviation of array */
 function stdDev(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) return 0;
-  const m = mean(arr);
-  const variance = arr.reduce((sum, x) => sum + Math.pow(x - m, 2), 0) / arr.length;
+  const clean = sanitizePositiveNumbers(arr);
+  if (!clean.length) return 0;
+  const m = mean(clean);
+  const variance = clean.reduce((sum, x) => sum + Math.pow(x - m, 2), 0) / clean.length;
   return Math.sqrt(variance);
 }
 
@@ -87,18 +107,19 @@ function lastN(arr, n) {
 
 /** Simple linear slope over equally spaced points */
 function slopeOfSeries(values) {
-  if (!Array.isArray(values) || values.length < 2) return 0;
+  const clean = sanitizePositiveNumbers(values);
+  if (clean.length < 2) return 0;
 
-  const n = values.length;
+  const n = clean.length;
   const xs = Array.from({ length: n }, (_, i) => i);
   const xMean = mean(xs);
-  const yMean = mean(values);
+  const yMean = mean(clean);
 
   let numerator = 0;
   let denominator = 0;
 
   for (let i = 0; i < n; i += 1) {
-    numerator += (xs[i] - xMean) * (values[i] - yMean);
+    numerator += (xs[i] - xMean) * (clean[i] - yMean);
     denominator += Math.pow(xs[i] - xMean, 2);
   }
 
@@ -180,7 +201,7 @@ export function detectPeriodStatusSignal({
     irregularRangeThreshold = 9,
   } = settings;
 
-  if (!lastPeriodStart) {
+  if (!lastPeriodStart || !toDate(lastPeriodStart)) {
     return makeSignal({
       code: "PERIOD_STATUS",
       level: "medium",
@@ -191,9 +212,17 @@ export function detectPeriodStatusSignal({
 
   const todayD = startOfDay(today);
   const lastPeriodD = startOfDay(lastPeriodStart);
+  if (!todayD || !lastPeriodD) {
+    return makeSignal({
+      code: "PERIOD_STATUS",
+      level: "medium",
+      show: false,
+      debug: { reason: "Invalid date inputs for period status" },
+    });
+  }
   const daysSinceLastPeriod = diffDays(lastPeriodD, todayD);
 
-  const recentCycles = lastN(cycleLengths, 6);
+  const recentCycles = lastN(sanitizePositiveNumbers(cycleLengths), 6);
   const range =
     recentCycles.length > 0 ? Math.max(...recentCycles) - Math.min(...recentCycles) : 0;
   const sd = recentCycles.length > 0 ? stdDev(recentCycles) : 0;
@@ -324,7 +353,9 @@ export function detectIrregularCycleSignal({
   stdDevThreshold = 5,
   rangeThreshold = 8,
 } = {}) {
-  if (!Array.isArray(cycleLengths) || cycleLengths.length < minCycles) {
+  const safeMinCycles = Math.max(1, Math.floor(safeNumber(minCycles, 4)));
+  const cleanCycleLengths = sanitizePositiveNumbers(cycleLengths);
+  if (cleanCycleLengths.length < safeMinCycles) {
     return makeSignal({
       code: "IRREGULAR_CYCLE",
       level: "medium",
@@ -333,14 +364,16 @@ export function detectIrregularCycleSignal({
     });
   }
 
-  const recent = lastN(cycleLengths, 6);
+  const recent = lastN(cleanCycleLengths, 6);
   const min = Math.min(...recent);
   const max = Math.max(...recent);
   const range = max - min;
   const sd = stdDev(recent);
   const avg = mean(recent);
 
-  const show = range >= rangeThreshold || sd >= stdDevThreshold;
+  const safeRangeThreshold = Math.max(0, safeNumber(rangeThreshold, 8));
+  const safeStdDevThreshold = Math.max(0, safeNumber(stdDevThreshold, 5));
+  const show = range >= safeRangeThreshold || sd >= safeStdDevThreshold;
 
   return makeSignal({
     code: "IRREGULAR_CYCLE",
@@ -356,8 +389,8 @@ export function detectIrregularCycleSignal({
       median: Number(median(recent).toFixed(2)),
       stdDev: Number(sd.toFixed(2)),
       range,
-      stdDevThreshold,
-      rangeThreshold,
+      stdDevThreshold: safeStdDevThreshold,
+      rangeThreshold: safeRangeThreshold,
     },
   });
 }
@@ -374,7 +407,9 @@ export function detectCycleTrendSignal({
   slopeThreshold = 1.0,
   suddenShiftDays = 5,
 } = {}) {
-  if (!Array.isArray(cycleLengths) || cycleLengths.length < minCycles) {
+  const cleanCycleLengths = sanitizePositiveNumbers(cycleLengths);
+  const safeMinCycles = Math.max(1, Math.floor(safeNumber(minCycles, 4)));
+  if (cleanCycleLengths.length < safeMinCycles) {
     return makeSignal({
       code: "CYCLE_TREND",
       level: "low",
@@ -383,7 +418,7 @@ export function detectCycleTrendSignal({
     });
   }
 
-  const recent = lastN(cycleLengths, 6);
+  const recent = lastN(cleanCycleLengths, 6);
   const slope = slopeOfSeries(recent);
   const recentAvg = averageRecent(recent, Math.min(3, recent.length));
   const baselineWindow = recent.slice(0, Math.max(1, recent.length - 3));
@@ -396,21 +431,24 @@ export function detectCycleTrendSignal({
   let level = "low";
   let show = false;
 
-  if (slope >= slopeThreshold) {
+  const safeSlopeThreshold = Math.max(0, safeNumber(slopeThreshold, 1.0));
+  const safeSuddenShiftDays = Math.max(0, safeNumber(suddenShiftDays, 5));
+
+  if (slope >= safeSlopeThreshold) {
     code = "LENGTHENING_CYCLE_TREND";
     title = "Cycles appear to be lengthening";
     message =
       "Bloom noticed your recent cycle lengths appear to be trending longer than your earlier recent pattern.";
-    level = Math.abs(shiftFromBaseline) >= suddenShiftDays ? "medium" : "low";
+    level = Math.abs(shiftFromBaseline) >= safeSuddenShiftDays ? "medium" : "low";
     show = true;
-  } else if (slope <= -slopeThreshold) {
+  } else if (slope <= -safeSlopeThreshold) {
     code = "SHORTENING_CYCLE_TREND";
     title = "Cycles appear to be shortening";
     message =
       "Bloom noticed your recent cycle lengths appear to be trending shorter than your earlier recent pattern.";
-    level = Math.abs(shiftFromBaseline) >= suddenShiftDays ? "medium" : "low";
+    level = Math.abs(shiftFromBaseline) >= safeSuddenShiftDays ? "medium" : "low";
     show = true;
-  } else if (Math.abs(shiftFromBaseline) >= suddenShiftDays) {
+  } else if (Math.abs(shiftFromBaseline) >= safeSuddenShiftDays) {
     code = "SUDDEN_CYCLE_SHIFT";
     title = "Recent cycle pattern changed";
     message =
@@ -428,11 +466,11 @@ export function detectCycleTrendSignal({
     debug: {
       recentCycles: recent,
       slope: Number(slope.toFixed(2)),
-      slopeThreshold,
+      slopeThreshold: safeSlopeThreshold,
       recentAvg: Number(recentAvg.toFixed(2)),
       baselineAvg: Number(baselineAvg.toFixed(2)),
       shiftFromBaseline: Number(shiftFromBaseline.toFixed(2)),
-      suddenShiftDays,
+      suddenShiftDays: safeSuddenShiftDays,
     },
   });
 }
@@ -446,7 +484,10 @@ export function detectLowPredictionConfidenceSignal({
   predictionShiftDays = 0,
   expectedNextPeriodWindow = null,
 } = {}) {
-  if (!Array.isArray(cycleLengths) || cycleLengths.length === 0) {
+  const cleanCycleLengths = sanitizePositiveNumbers(cycleLengths);
+  const safeMissingLogDays = Math.max(0, safeNumber(missingLogDays, 0));
+  const safePredictionShiftDays = Math.max(0, safeNumber(predictionShiftDays, 0));
+  if (cleanCycleLengths.length === 0) {
     return makeSignal({
       code: "LOW_PREDICTION_CONFIDENCE",
       level: "low",
@@ -460,14 +501,14 @@ export function detectLowPredictionConfidenceSignal({
     });
   }
 
-  const recent = lastN(cycleLengths, 6);
+  const recent = lastN(cleanCycleLengths, 6);
   const sd = stdDev(recent);
   const range = recent.length ? Math.max(...recent) - Math.min(...recent) : 0;
 
   let score = 100;
 
-  if (cycleLengths.length < 3) score -= 35;
-  else if (cycleLengths.length < 6) score -= 15;
+  if (cleanCycleLengths.length < 3) score -= 35;
+  else if (cleanCycleLengths.length < 6) score -= 15;
 
   if (sd >= 6) score -= 25;
   else if (sd >= 4) score -= 12;
@@ -475,11 +516,11 @@ export function detectLowPredictionConfidenceSignal({
   if (range >= 10) score -= 15;
   else if (range >= 7) score -= 8;
 
-  if (missingLogDays > 30) score -= 20;
-  else if (missingLogDays > 14) score -= 10;
+  if (safeMissingLogDays > 30) score -= 20;
+  else if (safeMissingLogDays > 14) score -= 10;
 
-  if (predictionShiftDays > 7) score -= 20;
-  else if (predictionShiftDays > 4) score -= 10;
+  if (safePredictionShiftDays > 7) score -= 20;
+  else if (safePredictionShiftDays > 4) score -= 10;
 
   if (expectedNextPeriodWindow?.start && expectedNextPeriodWindow?.end) {
     const width = diffDays(expectedNextPeriodWindow.start, expectedNextPeriodWindow.end);
@@ -500,12 +541,12 @@ export function detectLowPredictionConfidenceSignal({
       : "",
     debug: {
       confidenceScore: score,
-      cycleCount: cycleLengths.length,
+      cycleCount: cleanCycleLengths.length,
       recentCycleCount: recent.length,
       stdDev: Number(sd.toFixed(2)),
       range,
-      missingLogDays,
-      predictionShiftDays,
+      missingLogDays: safeMissingLogDays,
+      predictionShiftDays: safePredictionShiftDays,
       expectedWindowWidthDays:
         expectedNextPeriodWindow?.start && expectedNextPeriodWindow?.end
           ? diffDays(expectedNextPeriodWindow.start, expectedNextPeriodWindow.end)
@@ -531,12 +572,24 @@ export function detectPredictionDriftSignal({
     });
   }
 
+  const previousD = toDate(previousPredictedDate);
+  const currentD = toDate(currentPredictedDate);
+  if (!previousD || !currentD) {
+    return makeSignal({
+      code: "PREDICTION_DRIFT",
+      level: "low",
+      show: false,
+      debug: { reason: "Invalid predicted date input(s)" },
+    });
+  }
+
   const shiftDays = diffDaysAbs(
-    toDate(previousPredictedDate),
-    toDate(currentPredictedDate)
+    previousD,
+    currentD
   );
 
-  const show = shiftDays >= driftThresholdDays;
+  const safeDriftThresholdDays = Math.max(0, safeNumber(driftThresholdDays, 4));
+  const show = shiftDays >= safeDriftThresholdDays;
 
   return makeSignal({
     code: "PREDICTION_DRIFT",
@@ -548,9 +601,9 @@ export function detectPredictionDriftSignal({
       : "",
     debug: {
       shiftDays,
-      threshold: driftThresholdDays,
-      previousPredictedDateISO: toDate(previousPredictedDate).toISOString(),
-      currentPredictedDateISO: toDate(currentPredictedDate).toISOString(),
+      threshold: safeDriftThresholdDays,
+      previousPredictedDateISO: previousD.toISOString(),
+      currentPredictedDateISO: currentD.toISOString(),
     },
   });
 }
@@ -563,7 +616,8 @@ export function detectLoggingGapSignal({
   today = new Date(),
   gapDays = 30,
 } = {}) {
-  if (!lastLogDate) {
+  const safeGapDays = Math.max(0, safeNumber(gapDays, 30));
+  if (!lastLogDate || !toDate(lastLogDate)) {
     return makeSignal({
       code: "LOGGING_GAP",
       level: "low",
@@ -577,7 +631,7 @@ export function detectLoggingGapSignal({
   const todayD = startOfDay(today);
   const lastLogD = startOfDay(lastLogDate);
   const daysSinceLastLog = diffDays(lastLogD, todayD);
-  const show = daysSinceLastLog >= gapDays;
+  const show = daysSinceLastLog >= safeGapDays;
 
   return makeSignal({
     code: "LOGGING_GAP",
@@ -589,7 +643,7 @@ export function detectLoggingGapSignal({
       : "",
     debug: {
       daysSinceLastLog,
-      threshold: gapDays,
+      threshold: safeGapDays,
     },
   });
 }
@@ -628,6 +682,8 @@ export function generateCycleSignals({
   settings = {},
 } = {}) {
   const signals = [];
+  const cleanCycleLengths = sanitizePositiveNumbers(cycleLengths);
+  const safeMissingLogDays = Math.max(0, safeNumber(missingLogDays, 0));
 
   const predictionShiftDays =
     previousPredictedDate && currentPredictedDate
@@ -639,14 +695,14 @@ export function generateCycleSignals({
       expectedNextPeriodWindow,
       today,
       lastPeriodStart,
-      cycleLengths,
+      cycleLengths: cleanCycleLengths,
       settings,
     })
   );
 
   signals.push(
     detectIrregularCycleSignal({
-      cycleLengths,
+      cycleLengths: cleanCycleLengths,
       minCycles: settings.irregularMinCycles ?? 4,
       stdDevThreshold: settings.irregularStdDevThreshold ?? 5,
       rangeThreshold: settings.irregularRangeThreshold ?? 8,
@@ -655,7 +711,7 @@ export function generateCycleSignals({
 
   signals.push(
     detectCycleTrendSignal({
-      cycleLengths,
+      cycleLengths: cleanCycleLengths,
       minCycles: settings.trendMinCycles ?? 4,
       slopeThreshold: settings.trendSlopeThreshold ?? 1.0,
       suddenShiftDays: settings.suddenShiftDays ?? 5,
@@ -664,8 +720,8 @@ export function generateCycleSignals({
 
   signals.push(
     detectLowPredictionConfidenceSignal({
-      cycleLengths,
-      missingLogDays,
+      cycleLengths: cleanCycleLengths,
+      missingLogDays: safeMissingLogDays,
       predictionShiftDays,
       expectedNextPeriodWindow,
     })

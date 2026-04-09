@@ -126,6 +126,51 @@
       border-color: var(--color-primary);
       color: #fff;
     }
+    .custom-symptom-add {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+      margin-bottom: 0.65rem;
+    }
+    .custom-symptom-add input { flex: 1; }
+    .custom-symptom-helper {
+      margin: 0.25rem 0 0.6rem;
+      font-size: 0.84rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+    .custom-symptom-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .custom-symptom-item {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 0.8rem;
+      background: var(--color-bg);
+    }
+    .custom-symptom-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.55rem;
+    }
+    .custom-symptom-name {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--color-text);
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .custom-symptom-note { margin-top: 0.55rem; }
+    .custom-symptom-empty {
+      margin: 0;
+      font-size: 0.88rem;
+      color: var(--color-text-muted);
+    }
 
     /* ── Prediction panel ── */
     .pred-section { margin-top: 1rem; }
@@ -255,6 +300,18 @@
         <div class="form-group severity-panel" id="severity-panel">
           <label class="form-label">Severity per symptom <span class="severity-hint">(1 = mild, 5 = severe)</span></label>
           <div class="severity-panel-list" id="symptom-severity-list"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="other-symptom-input">Other symptom</label>
+          <div class="custom-symptom-add">
+            <input type="text" class="form-input" id="other-symptom-input" maxlength="80" placeholder="Type a symptom that is not in the list" />
+            <button type="button" class="btn btn-outline" id="add-other-symptom-btn">Add</button>
+          </div>
+          <p class="custom-symptom-helper">Saved to your symptom history. Custom symptoms are tracked in your history, but are not yet used in pattern predictions.</p>
+          <div class="custom-symptom-list" id="other-symptom-list">
+            <p class="custom-symptom-empty">No custom symptoms added for this day.</p>
+          </div>
         </div>
 
         <div class="form-group">

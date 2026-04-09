@@ -62,6 +62,8 @@ export function createCtx() {
     history:            [],
     answers:            [],
     multiDraft:         null,
+    inlineChoices:      null,       // one-off quick replies injected via say(..., { choices })
+    inlineQuestion:     null,       // optional question label paired with inlineChoices
     locked:             false,
     timers:             new Set(),
     capture:            null,
@@ -91,16 +93,28 @@ export function createCtx() {
     toneRequestId:      0,          // monotonic token for in-flight async tone resolution; stale promises must not mutate ctx
     usedOpeners:        new Set(),  // opener strings already shown - prevents repetition within a session
     symptomSignals:     null,       // pre-computed SymptomSignal[] from bloom-symptom-engine, or null
+    aiSignals:          null,       // ExtractedSignals from bloomie-extract.js, or null when unavailable.
+                                    // Advisory only — never used to override rule-based urgent routing.
+                                    // Shape: { symptoms, timing, severity, tone, repair,
+                                    //          pregnancySignals, redFlags, confidence }
     cumulativeRiskFlags:      new Set(),  // accumulates risk signal flags across conversation
     pendingAmbiguityContext:  null,        // stored when ambiguity question was asked
     isMinor:                  false,
     isAnon:                   false,
+    ageGroup:                 "unknown",   // "adult" | "minor" | "unknown" (policy-derived)
+    hasGuardianConsent:       false,       // consent gate for minors
+    policySeed:               null,        // seed provided by assistant page/profile context
+    policyContext:            null,        // per-turn policy context object
+    policyAnonDisclosureShown: false,      // one-time anonymous disclosure guard
+    policyTrustedAdultNudgePending: false, // set by policy when minor medium/high risk
     userNickname:             null,
     lastNicknameUsedAtDepth:  null,
     preEndChatState:          null,   // state to restore if user cancels END_CHAT_CONFIRM
     resolutionStatus:         null,   // "resolved" | "unresolved" | "skipped" — set by RESOLUTION_CHECK
     closeIntentDetected:      false,  // true when user typed a goodbye phrase (END_CHAT_PATTERN fired)
     closeConfirmationPending: false,  // true while END_CHAT_CONFIRM node is visible
+    pendingUnresolvedTopic:   null,   // unresolved topic currently being confirmed at close-time
+    closeSkipUnresolvedPrompt: false, // one-shot bypass so "_no, done" can reach CLOSE without re-prompt loop
     pendingContradictionContext: null,     // stored when contradiction was detected
     pendingContextProbe:      null,        // stored when missing-context probe was asked
     pendingQuestion:          null,        // { type: "yes_no"|"severity"|"timing"|"duration"|"test_result"|"choice", nodeState: string }

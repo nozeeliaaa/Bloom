@@ -2,6 +2,8 @@
  * bloomie-nodes-pelvic.js
  * Pelvic pain nodes and general pain (ELSE_PAIN_*) nodes.
  * Covers: PELVIC_INTRO, PELVIC_SAFETY_GATE, PELVIC_SAFETY_CHECK,
+ * PELVIC_ENTRY_GATE, CRAMPS_LATE_CONTEXT, CRAMPS_LATE_SPOT_CHECK,
+ * CRAMPS_LATE_PREG_CHECK, CRAMPS_LATE_NEXT_STEP,
  * PELVIC_NOT_SURE_SAFETY, PELVIC_URGENT, PELVIC_ENTRY,
  * PELVIC_PERIOD_ROUTE, PELVIC_OVULATION_ROUTE, PELVIC_RANDOM_ROUTE,
  * PELVIC_GENERAL_ROUTE, PELVIC_SEX_ENTRY, PELVIC_SEX_ENTRY_PAIN,
@@ -14,8 +16,33 @@ export function createPelvicNodes(env, helpers) {
   const {
     ctx, say, transition, pick, ack, qualifier,
     safeFooter, buildSymptomInsightLine, buildSymptomPatternLine,
+    daysUntilNextPeriod, isLateContextActive,
   } = env;
   const { pickCloseLabel, pickMainLabel } = helpers;
+
+  function getLateCrampsContext() {
+    const recent = Array.isArray(ctx.entityHistory) ? ctx.entityHistory.slice(-3) : [];
+    const overdueDays = typeof daysUntilNextPeriod === "function" ? daysUntilNextPeriod() : null;
+    const overdue = typeof overdueDays === "number" && overdueDays < -1;
+    const lateByIntent =
+      ctx.lastIntent === "late" || ctx.lastIntent === "LATE_INTRO" || ctx.lastIntent === "LATE_PERIOD_CHECK";
+    const lateByHistory = recent.some(e => e?.symptoms?.late || e?.symptoms?.implicit_late);
+    const lateByAssistant = typeof isLateContextActive === "function"
+      ? isLateContextActive({ includePromptContext: true })
+      : false;
+    const spottingRecent = recent.some(e => e?.symptoms?.spotting);
+    const pregnancySignalRecent = recent.some(e =>
+      e?.pregnancy?.chance || e?.pregnancy?.testedYet || e?.pregnancy?.result
+    );
+
+    return {
+      overdue,
+      overdueDays,
+      spottingRecent,
+      pregnancySignalRecent,
+      active: overdue || lateByIntent || lateByHistory || lateByAssistant,
+    };
+  }
 
   return {
     // Redirect kept so all existing menu buttons still reach the safety check
@@ -48,7 +75,7 @@ export function createPelvicNodes(env, helpers) {
       question: "Urgent symptoms present?",
       choices: [
         { id: "yes", label: "Yes",      next: "PELVIC_URGENT",       primary: true },
-        { id: "no",  label: "No",       next: "PELVIC_ENTRY" },
+        { id: "no",  label: "No",       next: "PELVIC_ENTRY_GATE" },
         { id: "ns",  label: "Not sure", next: "PELVIC_NOT_SURE_SAFETY" },
       ],
     },
@@ -56,13 +83,15 @@ export function createPelvicNodes(env, helpers) {
       say: ["Trust that instinct 🩷 If something feels seriously wrong, getting checked is always the safer call."],
       choices: [
         { id: "map",  label: "Find care near me",       next: "START", action: "OPEN_MAP", primary: true },
-        { id: "cont", label: "Continue with Bloomie",   next: "PELVIC_ENTRY" },
+        { id: "cont", label: "Continue with Bloomie",   next: "PELVIC_ENTRY_GATE" },
       ],
     },
     PELVIC_URGENT: {
       say: [
         "Please seek medical care as soon as possible 🩷",
         "Severe or sudden pelvic pain, especially with dizziness or fever, can sometimes need urgent attention. You deserve a proper assessment, not just reassurance.",
+        // Research anchor: heavy bleeding + dizziness/fainting + fever are red-flag combinations.
+        "If bleeding is getting heavy, pain is worsening, or you feel faint/very weak, treat that as urgent too.",
         "Please go to your nearest emergency room or urgent care centre, or call 119 in Jamaica.",
         "If you have one-sided sharp pain and there's any chance of pregnancy, that needs to be checked urgently.",
       ],
@@ -72,10 +101,100 @@ export function createPelvicNodes(env, helpers) {
       ],
     },
 
+    // Context gate: if we already have active late-period context, ask a short
+    // combined-signal clarifier flow before generic pelvic routing.
+    PELVIC_ENTRY_GATE: {
+      say: [],
+      onEnter() {
+        const lateCtx = getLateCrampsContext();
+        if (lateCtx.active) {
+          transition("CRAMPS_LATE_CONTEXT");
+        } else {
+          transition("PELVIC_ENTRY");
+        }
+      },
+      choices: [],
+    },
+
+    CRAMPS_LATE_CONTEXT: {
+      say() {
+        const lateCtx = getLateCrampsContext();
+        const daysLine = (typeof lateCtx.overdueDays === "number" && lateCtx.overdueDays < -1)
+          ? `Since your period seems about ${Math.abs(lateCtx.overdueDays)} day${Math.abs(lateCtx.overdueDays) === 1 ? "" : "s"} late,`
+          : "Since your period still seems off,";
+        return [
+          "Got you 🩷",
+          `${daysLine} cramps can happen for a few reasons, so let's narrow it down gently.`,
+          // Research anchor: late + cramps can reflect delayed cycle start, hormonal shift, or early pregnancy context.
+          "Sometimes this is your period trying to start late, and sometimes it's another cycle shift worth checking.",
+          "Does this feel like your usual period-type cramps, or different from usual?",
+        ];
+      },
+      question: "Late + cramps usual vs different",
+      choices: [
+        { id: "usual", label: "Feels like my usual cramps", next: "CRAMPS_LATE_SPOT_CHECK", primary: true },
+        { id: "diff",  label: "Feels different this time",   next: "CRAMPS_LATE_PREG_CHECK" },
+        { id: "ns",    label: "Not sure",                    next: "CRAMPS_LATE_PREG_CHECK" },
+      ],
+    },
+
+    CRAMPS_LATE_SPOT_CHECK: {
+      say() {
+        const lateCtx = getLateCrampsContext();
+        return [
+          lateCtx.spottingRecent
+            ? "I remember you also mentioned some spotting 🩷"
+            : "Quick check that helps with context 🩷",
+          "Any spotting or bleeding at all right now?",
+        ];
+      },
+      question: "Late + cramps spotting check",
+      choices: [
+        { id: "yes", label: "Yes, some spotting/bleeding", next: "SPOT_INTRO", primary: true },
+        { id: "no",  label: "No spotting yet",             next: "CRAMPS_LATE_PREG_CHECK" },
+      ],
+    },
+
+    CRAMPS_LATE_PREG_CHECK: {
+      say() {
+        const lateCtx = getLateCrampsContext();
+        return [
+          lateCtx.pregnancySignalRecent
+            ? "Thanks — and I still want to keep pregnancy possibility in mind 🩷"
+            : "One more useful check 🩷",
+          "Any chance of pregnancy this cycle?",
+        ];
+      },
+      question: "Late + cramps pregnancy chance",
+      choices: [
+        { id: "yes", label: "Yes / maybe", next: "LATE_TEST_Q", primary: true },
+        { id: "no",  label: "No",          next: "CRAMPS_LATE_NEXT_STEP" },
+        { id: "ns",  label: "Not sure",    next: "LATE_TEST_Q" },
+      ],
+    },
+
+    CRAMPS_LATE_NEXT_STEP: {
+      say: [
+        "Thanks for walking through that with me 🩷",
+        "With a late period plus cramps, possibilities include your period starting late, temporary hormonal delay, or other non-emergency cycle shifts.",
+        // Research anchor: watch-for threshold guidance keeps this non-diagnostic but practical.
+        "If pain gets stronger, bleeding turns heavy, or you feel dizzy/faint, that's a sign to get checked sooner.",
+        "I can't diagnose from chat alone, but we can keep this practical and track what happens next.",
+      ],
+      choices: [
+        { id: "late",  label: "Continue late-period support", next: "LATE_INTRO", primary: true },
+        { id: "pelvic",label: "Keep looking at the cramp pattern", next: "PELVIC_PERIOD_ROUTE" },
+        { id: "heavy", label: "Bleeding has started / feels heavy", next: "HEAVY_INTRO" },
+        { id: "menu",  label: pickMainLabel(), next: "START_MENU" },
+      ],
+    },
+
     // ── Step 2: Route-first entry ─────────────────────────────────────────────
     PELVIC_ENTRY: {
       say: [
         "Pelvic pain can feel really different depending on what's behind it 🩷",
+        // Research anchor: phase-based reasoning (period vs ovulation vs non-cycle pattern).
+        "Sometimes it's linked to your cycle, like period cramps or ovulation pain, and sometimes it isn't, so pattern matters.",
         "Let's figure out what kind you're dealing with.",
       ],
       question: "Type of pelvic pain",
@@ -93,6 +212,8 @@ export function createPelvicNodes(env, helpers) {
       say: [
         "Period pain is one of the most common cycle experiences, but intensity and pattern matter a lot 🩷",
         "Mild cramping that eases with heat or painkillers is common. Pain that stops you from functioning or gets worse each cycle is worth taking more seriously.",
+        // Research anchor: common period duration reference.
+        "Most periods last about 3–7 days, so pain or bleeding outside your usual window is worth noting.",
         "Let's look at how it actually affects you.",
       ],
       autoNext(ctx) {
@@ -103,7 +224,8 @@ export function createPelvicNodes(env, helpers) {
     PELVIC_OVULATION_ROUTE: {
       say: [
         "Mid-cycle pain around ovulation is actually quite common, it's sometimes called mittelschmerz 🩷",
-        "It's usually one-sided, short-lived, and mild. But we'll check your pattern to make sure.",
+        "It's usually one-sided, short-lived, and mild. If it keeps worsening or comes with heavy bleeding, that's a reason to check in sooner.",
+        "We'll check your pattern to make sure.",
       ],
       autoNext(ctx) {
         ctx.pelvicRoute = "ovulation";
@@ -277,6 +399,8 @@ export function createPelvicNodes(env, helpers) {
           "Pelvic pain that is persistent, severe, or doesn't respond well to relief deserves attention. Not because something is 'wrong', but because pain shouldn't be dismissed.",
           routeNote,
           ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
+          // Research anchor: practical watch-for escalation language.
+          "If it starts disrupting sleep/work, comes with fever, or bleeding becomes heavy, that should be checked promptly.",
           "I can't diagnose anything, but noticing these patterns is an important step toward getting the right support.",
           ...safeFooter(),
         ];
@@ -312,6 +436,8 @@ export function createPelvicNodes(env, helpers) {
           `${ack()} 🩷`,
           note,
           ...(insightLine ? [insightLine] : patternLine ? [patternLine] : []),
+          // Research anchor: symptom progression threshold.
+          "If it gets worse, lasts longer than your usual pattern, or comes with dizziness/fever, escalate sooner.",
           "It may be worth checking in with a healthcare provider in the next few weeks, not urgently, but soon.",
           ...safeFooter(),
         ];

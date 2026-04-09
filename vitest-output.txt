@@ -1,0 +1,365 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.0 [39m[90m/Users/nozeeliablair/Downloads/Bloom/frontend[39m
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — threshold=1 for tokens < 8 chars[2m > [22m[2mcorrects a dropped letter in a short term
+[22m[39m[Bloomie Fuzzy] dizy → dizzy (phonetic)
+[Bloomie Fuzzy] perod → period (dist 1)
+[Bloomie Fuzzy] nausia → nausea (dist 1)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — threshold=1 for tokens < 8 chars[2m > [22m[2mcorrects transpositions in short terms via phonetic table (Damerau-Levenshtein)
+[22m[39m[Bloomie Fuzzy] peroid → period (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — threshold=2 for tokens ≥ 8 chars[2m > [22m[2mcorrects a single dropped letter in a long term
+[22m[39m[Bloomie Fuzzy] pregnacy → pregnancy (phonetic)
+[Bloomie Fuzzy] spoting → spotting (phonetic)
+[Bloomie Fuzzy] bleding → bleeding (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — threshold=2 for tokens ≥ 8 chars[2m > [22m[2mcorrects a transposition in a long term (dist=2)
+[22m[39m[Bloomie Fuzzy] ovultaion → ovulation (dist 1)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — threshold=2 for tokens ≥ 8 chars[2m > [22m[2mcorrects a dropped letter + substitution in a long term
+[22m[39m[Bloomie Fuzzy] menstraton → menstruation (dist 2)
+
+ [32m✓[39m js/__tests__/bloom-symptom-engine.test.js [2m([22m[2m60 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+[90mstderr[2m | js/__tests__/bloomie-tone.test.js[2m > [22m[2mresolveTone — AI disagrees → ai_override[2m > [22m[2mAI tone ≠ rule tone → source 'ai_override', AI tone used
+[22m[39m[Bloomie Tone] AI override: deflecting (rule, high ) → anxious (AI)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mdetectUserTone — distressed[2m > [22m[2mdetects Patois distress signals
+[22m[39m[Bloomie Fuzzy] overwhelmed, → overwhelmed (dist 1)
+
+ [32m✓[39m js/__tests__/bloomie-tone.test.js [2m([22m[2m24 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mdetectUserTone — casual[2m > [22m[2mdetects casual tone by short message length
+[22m[39m[Bloomie Fuzzy] period? → period (dist 1)
+
+ [32m✓[39m js/__tests__/bloom-cycle-engine.test.js [2m([22m[2m40 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (panadol)[2m > [22m[2mpanandol → panadol
+[22m[39m[Bloomie Fuzzy] panandol → panadol (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (panadol)[2m > [22m[2mpanadoll → panadol
+[22m[39m[Bloomie Fuzzy] panadoll → panadol (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (panadol)[2m > [22m[2mpanaodl  → panadol
+[22m[39m[Bloomie Fuzzy] panaodl → panadol (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (panadol)[2m > [22m[2mpnadol   → panadol
+[22m[39m[Bloomie Fuzzy] pnadol → panadol (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)[2m > [22m[2mpregnat  → pregnant
+[22m[39m[Bloomie Fuzzy] pregnat → pregnant (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)[2m > [22m[2mspotian  → spotting
+[22m[39m[Bloomie Fuzzy] spotian → spotting (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)[2m > [22m[2mdisscharge → discharge
+[22m[39m[Bloomie Fuzzy] disscharge → discharge (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)[2m > [22m[2mibupropen → ibuprofen
+[22m[39m[Bloomie Fuzzy] ibupropen → ibuprofen (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)[2m > [22m[2mmenstral → menstrual
+[22m[39m[Bloomie Fuzzy] menstral → menstrual (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)[2m > [22m[2mendometrosis → endometriosis
+[22m[39m[Bloomie Fuzzy] endometrosis → endometriosis (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — phonetic variants (pregnancy / spotting / bleeding)[2m > [22m[2mmenapose → menopause
+[22m[39m[Bloomie Fuzzy] menapose → menopause (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — Levenshtein catches (not in phonetic table)[2m > [22m[2mspottng  → spotting  (deletion)
+[22m[39m[Bloomie Fuzzy] spottng → spotting (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — Levenshtein catches (not in phonetic table)[2m > [22m[2mbleedin  → bleeding  (deletion)
+[22m[39m[Bloomie Fuzzy] bleedin → bleeding (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — Levenshtein catches (not in phonetic table)[2m > [22m[2mcraming  → cramping  (phonetic/dl)
+[22m[39m[Bloomie Fuzzy] craming → cramping (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — Levenshtein catches (not in phonetic table)[2m > [22m[2mnausous  → nauseous  (substitution)
+[22m[39m[Bloomie Fuzzy] nausous → nauseous (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — Levenshtein catches (not in phonetic table)[2m > [22m[2mibprofen → ibuprofen (deletion)
+[22m[39m[Bloomie Fuzzy] ibprofen → ibuprofen (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfull sentence correction through normalizePatois pipeline[2m > [22m[2mcorrects 'pregnent' and 'spotian' in a plain English sentence
+[22m[39m[Bloomie Fuzzy] pregnent → pregnant (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — correction cache[2m > [22m[2mreturns same result on second call (cached)
+[22m[39m[Bloomie Fuzzy] bleding → bleeding (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — correction cache[2m > [22m[2mincrements cache hit counter on second call
+[22m[39m[Bloomie Fuzzy] panandol → panadol (phonetic)
+
+[90mstdout[2m | js/__tests__/bloomie-patois.test.js[2m > [22m[2mfuzzyCorrect — correction cache[2m > [22m[2mthird call also hits cache
+[22m[39m[Bloomie Fuzzy] menstral → menstrual (phonetic)
+
+ [32m✓[39m js/__tests__/bloomie-patois.test.js [2m([22m[2m100 tests[22m[2m)[22m[32m 113[2mms[22m[39m
+ [32m✓[39m js/__tests__/bloomie-inference.test.js [2m([22m[2m52 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m js/__tests__/bloomie-routing.test.js [2m([22m[2m41 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m js/__tests__/bloomie-templates.test.js [2m([22m[2m100 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m js/__tests__/bloomie-intent-flow.test.js [2m([22m[2m39 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m js/__tests__/bloomie-logger.test.js [2m([22m[2m12 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: cumulative risk flags — heavy + dizziness[2m > [22m[2mescalates to HEAVY_URGENT when heavy bleeding is followed by dizziness
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie] advanceFlow → flowId [33m2[39m
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: cumulative risk flags — late + one-sided pain[2m > [22m[2mescalates to HEAVY_URGENT when late period is followed by one-sided pain
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie guidance] scenario → late_period
+[Bloomie] advanceFlow → flowId [33m2[39m
+
+[90mstdout[2m | js/__tests__/bloomie-cycle-personalisation.test.js[2m > [22m[2mbuildCyclePersonalisationLine — variability line in LATE_INTRO[2m > [22m[2mappends variability string when IRREGULAR_CYCLE signal + cycleVariability set
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-cycle-personalisation.test.js[2m > [22m[2mbuildCyclePersonalisationLine — variability line in LATE_INTRO[2m > [22m[2mdoes not append variability line when no cycleSignals are present
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-cycle-personalisation.test.js[2m > [22m[2mbuildCyclePersonalisationLine — variability line in LATE_INTRO[2m > [22m[2mdoes not append variability line when urgency routes away from LATE_INTRO
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — HIGH tier[2m > [22m[2mroutes directly without showing MEDIUM_CONFIRM or NARROWING
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-cycle-personalisation.test.js[2m > [22m[2mbuildSymptomPatternLine — pattern line in mood flow[2m > [22m[2mreturns a pattern string the first time when signal and history match
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: topic interrupt clears entity history[2m > [22m[2mresets entityHistory when topic switches from late period to cramps
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie guidance] scenario → late_period
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie] Topic switch: period → pain — clearing entity history
+[Bloomie inference] Symptoms detected: cramps, pelvic pain | Severity: severe
+[Bloomie guidance] scenario → pelvic_severe
+
+[90mstdout[2m | js/__tests__/bloomie-cycle-personalisation.test.js[2m > [22m[2mbuildSymptomPatternLine — pattern line in mood flow[2m > [22m[2madviceGiven key is set after first pattern line render
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — HIGH tier[2m > [22m[2msets lastConfidence with tier=high after routing
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-cycle-personalisation.test.js[2m > [22m[2mbuildSymptomPatternLine — pattern line in mood flow[2m > [22m[2mpattern line appears at most once across MOOD_INTRO and MOOD_SAFETY_CHECK
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: loop detection — exact repeat[2m > [22m[2msecond repeat (3rd send) sets isRetryAttempt and does NOT route to ELSE_NOT_SURE_ROUTE
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie inference] No structured entities extracted
+
+[90mstdout[2m | js/__tests__/bloomie-cycle-personalisation.test.js[2m > [22m[2mbuildSymptomPatternLine — pattern line in mood flow[2m > [22m[2mreturns null (no pattern line) when symptomHistory is empty
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — HIGH tier[2m > [22m[2mdoes not increment confidenceFallbackCount on HIGH
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-cycle-personalisation.test.js[2m > [22m[2mbuildSymptomPatternLine — pattern line in mood flow[2m > [22m[2mreturns null (no pattern line) when no matching pattern signal is present
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+
+ [32m✓[39m js/__tests__/bloomie-cycle-personalisation.test.js [2m([22m[2m13 tests[22m[2m)[22m[32m 258[2mms[22m[39m
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — HIGH tier[2m > [22m[2mlastConfidence.ambiguous is false on HIGH
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — MEDIUM tier[2m > [22m[2mtransitions to MEDIUM_CONFIRM and sets pendingRoute
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: loop detection — exact repeat[2m > [22m[2mthird repeat (4th send) routes to ELSE_NOT_SURE_ROUTE
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m4[39m
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — MEDIUM tier[2m > [22m[2myes_confirm resolves pendingRoute and leaves MEDIUM_CONFIRM
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m2[39m
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — MEDIUM tier[2m > [22m[2mno_confirm clears pendingRoute and goes to NARROWING
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m2[39m
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: loop detection — exact repeat[2m > [22m[2misRetryAttempt resets to false when a non-repeat message is sent
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m4[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie guidance] scenario → late_period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — MEDIUM tier[2m > [22m[2mMEDIUM_CONFIRM node renders the confidenceNote
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — MEDIUM tier[2m > [22m[2mlastConfidence.ambiguous is true on MEDIUM
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — MEDIUM tier[2m > [22m[2mlastConfidence.competitors is non-empty array on MEDIUM
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: IDK loop[2m > [22m[2mroutes to ELSE_NOT_SURE_ROUTE after 3 idk-variant messages
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m3[39m
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — LOW tier[2m > [22m[2mtransitions to NARROWING on first LOW
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — LOW tier[2m > [22m[2mincrements confidenceFallbackCount to 1 on first LOW
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — LOW tier[2m > [22m[2mNARROWING node shows disambiguating topic buttons
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — LOW tier[2m > [22m[2mlastConfidence.ambiguous is true on LOW
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: conversational repair → NARROWING[2m > [22m[2mtransitions to NARROWING after 2 consecutive OOS at session depth ≥ 3
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie inference] No structured entities extracted
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CONFIDENCE_FALLBACK after repeated LOW[2m > [22m[2mroutes to CONFIDENCE_FALLBACK when confidenceFallbackCount reaches 2
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: MEDIUM confidence pending route[2m > [22m[2mshows MEDIUM_CONFIRM choices and routes to pending destination on yes
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period, cramps, pelvic pain
+[Bloomie] advanceFlow → flowId [33m2[39m
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CONFIDENCE_FALLBACK after repeated LOW[2m > [22m[2mCONFIDENCE_FALLBACK node shows the full topic menu
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: MEDIUM confidence pending route[2m > [22m[2mclears pending route and goes to NARROWING on no
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period, cramps, pelvic pain
+[Bloomie] advanceFlow → flowId [33m2[39m
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CONFIDENCE_FALLBACK after repeated LOW[2m > [22m[2mconfidenceFallbackCount keeps incrementing on each LOW/FALLBACK
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie] advanceFlow → flowId [33m4[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CLARIFICATION_PAIRS[2m > [22m[2mlate+pelvic pair promotes HIGH → MEDIUM_CONFIRM
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CLARIFICATION_PAIRS[2m > [22m[2mpelvic+late pair (reversed key order) promotes HIGH → MEDIUM_CONFIRM
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CLARIFICATION_PAIRS[2m > [22m[2mlate+pregnancy pair promotes HIGH → MEDIUM_CONFIRM
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CLARIFICATION_PAIRS[2m > [22m[2mmood+heavy pair promotes HIGH → MEDIUM_CONFIRM
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CLARIFICATION_PAIRS[2m > [22m[2msingle HIGH signal with no competitor does not promote
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CLARIFICATION_PAIRS[2m > [22m[2mnon-paired HIGH competitors do not promote to MEDIUM_CONFIRM
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+[90mstdout[2m | js/__tests__/bloomie-confidence.test.js[2m > [22m[2mconfidence router — CLARIFICATION_PAIRS[2m > [22m[2mpair promotion sets pendingRoute to conf.route
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+
+ [32m✓[39m js/__tests__/bloomie-confidence.test.js [2m([22m[2m36 tests[22m[2m)[22m[33m 422[2mms[22m[39m
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: return to resolved topic[2m > [22m[2mpopulates concernsResolved when MOOD_GUIDE is entered
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie] advanceFlow → flowId [33m4[39m
+[Bloomie] advanceFlow → flowId [33m5[39m
+[Bloomie] advanceFlow → flowId [33m6[39m
+[Bloomie] advanceFlow → flowId [33m7[39m
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: return to resolved topic[2m > [22m[2moffers return-to-resolved dialog when user mentions mood again after resolution
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie] advanceFlow → flowId [33m4[39m
+[Bloomie] advanceFlow → flowId [33m5[39m
+[Bloomie] advanceFlow → flowId [33m6[39m
+[Bloomie] advanceFlow → flowId [33m7[39m
+[Bloomie] advanceFlow → flowId [33m8[39m
+[Bloomie inference] Symptoms detected: mood swings, fatigue, low mood
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: unresolved concerns before CLOSE[2m > [22m[2msurfaces 'Before you go' prompt when user navigates to CLOSE with an unresolved topic
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie guidance] scenario → late_period
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m3[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m4[39m
+[Bloomie inference] No structured entities extracted
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: OOS follow-up resolution[2m > [22m[2mresolves a food OOS follow-up to MOOD_SAFETY_CHECK when user confirms pre-period
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] No structured entities extracted
+[Bloomie] advanceFlow → flowId [33m2[39m
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: date capture interrupted by urgency[2m > [22m[2mabandons date capture and escalates to HEAVY_URGENT on urgent input
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie] advanceFlow → flowId [33m2[39m
+[Bloomie] advanceFlow → flowId [33m3[39m
+
+[90mstdout[2m | js/__tests__/bloomie-multiturn.test.js[2m > [22m[2mmulti-turn: stale button guard[2m > [22m[2mignores button clicks from a previous render epoch after user sends a message
+[22m[39m[Bloomie] advanceFlow → flowId [33m1[39m
+[Bloomie inference] Symptoms detected: missed period
+[Bloomie guidance] scenario → late_period
+
+ [32m✓[39m js/__tests__/bloomie-multiturn.test.js [2m([22m[2m17 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 557[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m12 passed[39m[22m[90m (12)[39m
+[2m      Tests [22m [1m[32m533 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (534)[39m
+[2m   Start at [22m 16:50:02
+[2m   Duration [22m 1.99s[2m (transform 1.24s, setup 0ms, import 1.72s, tests 1.58s, environment 3.61s)[22m
+

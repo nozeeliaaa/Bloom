@@ -677,7 +677,7 @@
         (err) => {
           const msgs = {
             1: "Location permission denied. Use 'Pin location on map' instead.",
-            2: "Location unavailable - check your browser settings.",
+            2: "Location unavailable — check your browser settings.",
             3: "Location request timed out. Try again or pin manually.",
           };
           setStatus(msgs[err.code] || "Could not get location.", true);
@@ -733,6 +733,11 @@
 
       populateFilters();
       renderClinics();
+
+      // Auto-request location when navigated from the chat "Find care near me" button
+      if (new URLSearchParams(window.location.search).get("autolocate") === "true") {
+        requestUserLocation();
+      }
     }
 
     init();

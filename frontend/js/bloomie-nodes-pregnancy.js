@@ -79,6 +79,8 @@ export function createPregnancyNodes(env, helpers) {
           const retestDate = addDays(new Date(), 3);
           const lines = [
             `${ack()} That recommended test date has already passed, so you can test **today** 🩷`,
+            // Research anchor: cluster-sensitive safety net for test context.
+            "If you also have severe one-sided pain, heavy bleeding, or feel faint, seek urgent care instead of waiting.",
             "First morning urine gives the clearest result.",
             `If it comes back negative but your period still hasn't arrived, retest again around **${fmtDate(retestDate)}** (48–72 hours from now).`,
           ];
@@ -119,7 +121,8 @@ export function createPregnancyNodes(env, helpers) {
 
         lines.push(
           "Testing too early can give a false negative because pregnancy hormone levels may not be high enough yet.",
-          `If the result is negative but your period still doesn't come, retest in **48–72 hours** (around **${fmtDate(plan.retest)}**).`
+          `If the result is negative but your period still doesn't come, retest in **48–72 hours** (around **${fmtDate(plan.retest)}**).`,
+          "If severe one-sided pain, heavy bleeding, dizziness, or faintness starts, get urgent care."
         );
 
         if (plan.basis === "sex-date" || plan.bothDatesAvailable) {
@@ -157,6 +160,7 @@ export function createPregnancyNodes(env, helpers) {
     TEST_URGENT_CHECK: {
       say: [
         "One quick check before we look at your test plan 🩷",
+        // Research anchor: pregnancy concern + red-flag symptom cluster.
         "Are you having any of these right now: severe one-sided pain, feeling faint or dizzy, heavy bleeding, or shoulder tip pain?",
       ],
       choices: [
@@ -183,6 +187,7 @@ export function createPregnancyNodes(env, helpers) {
     TEST_NEGATIVE_INTRO: {
       say: [
         "Okay 🩷 A negative result isn't always final, it depends on when you tested and how.",
+        // Research anchor: keep urgent screen explicit before reassurance.
         "Quick check first, are you having any of these right now: severe one-sided pain, feeling faint, heavy bleeding, or shoulder tip pain?",
       ],
       choices: [
@@ -220,6 +225,7 @@ export function createPregnancyNodes(env, helpers) {
         "First morning urine is the most concentrated, which means the pregnancy hormone is easiest to detect.",
         "**Retest now** if you haven't already today, use first morning urine tomorrow if you've already used the bathroom.",
         "If that also comes back negative but your period still hasn't come, let me know and we can look at next steps.",
+        // Research anchor: red-flag warning signs while waiting.
         "_If you develop severe one-sided pain, feel faint, or have heavy bleeding, please seek medical care straight away._",
       ],
       choices: [
@@ -234,6 +240,7 @@ export function createPregnancyNodes(env, helpers) {
       say(ctx) {
         const lines = [
           "Okay 🩷 The timing of a reliable test depends on how many days have passed since sex.",
+          "If pregnancy prevention is the immediate concern, emergency contraception works best as soon as possible and can still help up to 5 days after sex.",
           "Type the date of the unprotected sex like: 2026-02-08 (YYYY-MM-DD).",
         ];
         if (ctx.isMinor) lines.unshift("This is a safe space — I won't share anything you tell me 🩷");
@@ -262,12 +269,16 @@ export function createPregnancyNodes(env, helpers) {
         const sexDate = ctx.captureData?.sexDate ? new Date(ctx.captureData.sexDate) : null;
         const earlyDate = sexDate ? fmtDate(addDays(sexDate, 10)) : "10 days after sex";
         const reliableDate = sexDate ? fmtDate(addDays(sexDate, 21)) : "21 days after sex";
+        const daysSince = sexDate ? Math.floor((new Date() - sexDate) / 86400000) : null;
+        const ecWindowOpen = Number.isFinite(daysSince) && daysSince >= 0 && daysSince <= 5;
         return [
           "It's a little too early for a reliable result right now 🩷",
+          ...(ecWindowOpen ? ["You may still be within the emergency-contraception window (up to 5 days after sex), so same-day pharmacy or clinic support can help."] : []),
           "Pregnancy tests work by detecting a hormone (hCG) that builds up in your body after implantation. In the first 10 days it often isn't detectable yet.",
           `The **earliest** you could try an early detection test is around **${earlyDate}** but even then, a negative result could be a false negative.`,
           `For the most reliable result, wait until **${reliableDate}** (21 days after sex).`,
           "If your cycles are irregular, you've recently stopped birth control, or you have PCOS, the 21-day rule after sex is generally the most reliable guide.",
+          "If pain becomes severe, bleeding gets heavy, or you feel dizzy/faint while waiting, seek urgent care.",
           "Would you like me to remind you when it's the right time to test?",
         ];
       },
@@ -286,120 +297,56 @@ export function createPregnancyNodes(env, helpers) {
 
     ABORTION_OPTIONS: {
       say: [
-        "I hear you 🩷 This is a space where you can talk, without judgment, none.",
-        "Whatever has happened or is happening, you don't need to explain yourself to me. Your safety is what matters most.",
-        "If you've already taken something or had any kind of procedure, watch for these warning signs and go to emergency care if any appear:",
-        "🚨 Fever (38°C / 100.4°F or higher) or chills, especially lasting more than a few hours",
-        "🚨 Heavy bleeding, soaking more than 2 pads per hour for 2 hours in a row",
-        "🚨 Severe or worsening pain in your abdomen that isn't easing",
-        "🚨 Foul-smelling discharge, or discharge that looks unusual",
-        "You can get care at a hospital without having to explain why. Confidential support also exists, you don't have to go through this alone.",
-        "What kind of support are you looking for right now?",
+        "I hear you 🩷 I can stay with you on safety, legal context, and confidential support.",
+        "I can't provide abortion instructions or planning steps.",
+        "If you already took something or had a procedure, choose aftercare so we can check warning signs now.",
       ],
       choices: [
-        { id: "decision",  label: "I'm still deciding what to do",         next: "ABORTION_DECISION_SUPPORT", primary: true },
-        { id: "after",     label: "I already took something / I need help", next: "ABORTION_AFTERCARE_CHECK" },
-        { id: "pregnant",  label: "I'm pregnant but not sure I want to be", next: "ABORTION_HONEST_CONTEXT" },
-        { id: "privacy",   label: "Privacy first, before anything else",    next: "ABORTION_PRIVACY" },
-        { id: "counsel",   label: "Find confidential support",              next: "CLOSE", action: "OPEN_MAP" },
-        { id: "menu",      label: "Actually it's something else",           next: "START_MENU" },
+        { id: "context",  label: "Legal context",                           next: "ABORTION_HONEST_CONTEXT", primary: true },
+        { id: "after",    label: "I already took something / had a procedure", next: "ABORTION_AFTERCARE_CHECK" },
+        { id: "privacy",  label: "Privacy first",                           next: "ABORTION_PRIVACY" },
+        { id: "support",  label: "Confidential support options",            next: "ABORTION_RESOURCES" },
+        { id: "menu",     label: "Back to main options",                    next: "START_MENU" },
       ],
     },
 
-    // Honest legal context doesn't shame, doesn't lie, doesn't advise
     ABORTION_HONEST_CONTEXT: {
       say(ctx) {
         const lines = [
-          "I want to be honest with you because you deserve honesty 🩷",
-          "In Jamaica, abortion is currently illegal under the Offences Against the Person Act. There are no formal legal exceptions, not even for rape or incest.",
-          "This means there is no safe, legal clinical option available in-country right now.",
-          "I can't tell you what to do, and I won't pretend the situation isn't hard.",
-          "What I can do is help you think through your options, your safety, and how to access non-judgmental support, confidentially.",
+          "I want to be clear and honest with you 🩷",
+          "In Jamaica, abortion is currently illegal under the Offences Against the Person Act.",
+          "I can't help with methods, medication names, dosing, or planning.",
+          "I can help with safety checks, urgent warning signs, and confidential support options.",
         ];
-        if (ctx.isMinor) lines.unshift("You came to the right place — I'm here to help, not to judge 🩷");
+        if (ctx.isMinor) lines.unshift("You deserve support and safety, not judgment 🩷");
         return lines;
       },
       choices: [
-        { id: "options",   label: "Talk through my options",              next: "ABORTION_DECISION_SUPPORT", primary: true },
-        { id: "safe",      label: "What do I need to know to stay safe?", next: "ABORTION_SAFETY_INFO" },
-        { id: "counsel",   label: "I want someone to talk to",            next: "ABORTION_RESOURCES" },
-        { id: "privacy",   label: "Privacy, how to protect myself",      next: "ABORTION_PRIVACY" },
+        { id: "after",   label: "I need an aftercare safety check", next: "ABORTION_AFTERCARE_CHECK", primary: true },
+        { id: "privacy", label: "Privacy tips",                      next: "ABORTION_PRIVACY" },
+        { id: "support", label: "Confidential support options",      next: "ABORTION_RESOURCES" },
+        { id: "menu",    label: pickMainLabel(),                      next: "START_MENU" },
       ],
     },
 
-    // Non-directive decision support presents all options without steering
-    ABORTION_DECISION_SUPPORT: {
-      say: [
-        "You're not alone in this, and there's no right answer, only what's right for you 🩷",
-        "People in this situation generally face three paths: continuing the pregnancy (with support or adoption), or ending it.",
-        "Because of Jamaica's laws, ending a pregnancy carries serious legal and medical risk. There are no safe, legal clinical services in-country.",
-        "Some people travel to access services in countries where it is legal. Others seek confidential counselling to help make a decision.",
-        "Non-directive pregnancy counselling, where someone listens without pushing an agenda, exists and is confidential. Would you like help finding it?",
-      ],
-      choices: [
-        { id: "counsel",  label: "Yes, find me confidential support",   next: "ABORTION_RESOURCES", primary: true },
-        { id: "safe",     label: "I need to know about staying safe",     next: "ABORTION_SAFETY_INFO" },
-        { id: "privacy",  label: "Help me protect my privacy first",      next: "ABORTION_PRIVACY" },
-        { id: "after",    label: "I've already taken something",          next: "ABORTION_AFTERCARE_CHECK" },
-        { id: "menu",     label: "Back to main options",                  next: "START_MENU" },
-      ],
-    },
-
-    // Safety information harm reduction without method instruction
-    ABORTION_SAFETY_INFO: {
-      say: [
-        "Your safety matters most 🩷 I can share what signs to watch for, not instructions.",
-        "If you or someone you know has taken something or had a procedure, these are the warning signs that mean you need emergency care immediately:",
-        "🚨 Heavy bleeding soaking 2+ pads per hour for 2+ hours in a row",
-        "🚨 Severe abdominal pain that doesn't ease",
-        "🚨 Fever lasting more than 24 hours, or any fever with chills",
-        "🚨 Foul-smelling discharge",
-        "🚨 Dizziness, fainting, or feeling unable to stand",
-        "If any of these happen, go to the emergency room. You can say you are having a miscarriage. Emergency departments are required to treat you regardless of how the pregnancy ended.",
-        ...urgentFooter(),
-      ],
-      choices: [
-        { id: "checkme",  label: "I have some of those symptoms",    next: "ABORTION_AFTERCARE_CHECK", primary: true },
-        { id: "counsel",  label: "I need someone to talk to",        next: "ABORTION_RESOURCES" },
-        { id: "privacy",  label: "How do I protect my privacy?",     next: "ABORTION_PRIVACY" },
-        { id: "map",      label: "Find emergency care near me",      next: "CLOSE", action: "OPEN_MAP" },
-      ],
-    },
-
-    // Aftercare safety check for those who've already acted
     ABORTION_AFTERCARE_CHECK: {
       say: [
-        `${ack()} Your safety is the priority right now 🩷`,
-        "Are you having any of these right now? Select any that apply.",
+        `${ack()} Your safety comes first 🩷`,
+        "Are you having any warning signs now: very heavy bleeding (soaking 2+ pads/hour for 2 hours), severe or worsening belly/pelvic pain, dizziness/fainting/weakness, fever or chills, or foul-smelling/unusual discharge?",
       ],
-      multi: {
-        question: "Warning signs- select any:",
-        options: [
-          "Heavy bleeding (soaking 2+ pads/hour for 2+ hours)",
-          "Severe belly or pelvic pain",
-          "Fever or chills",
-          "Foul-smelling discharge",
-          "Dizziness, fainting, or very weak",
-          "None of these",
-        ],
-        nextOnSubmit: "ABORTION_AFTERCARE_GUIDE",
-        allowNone: false,
-      },
-    },
-
-    ABORTION_AFTERCARE_GUIDE: {
-      autoNext(_ctx, payload) {
-        const sel = payload.multi || [];
-        return sel.length && !sel.includes("None of these") ? "ABORTION_URGENT" : "ABORTION_MONITORING";
-      },
+      question: "Any abortion aftercare warning signs now?",
+      choices: [
+        { id: "yes", label: "Yes / maybe", next: "ABORTION_URGENT", primary: true },
+        { id: "no",  label: "No, none right now", next: "ABORTION_MONITORING" },
+      ],
     },
 
     ABORTION_URGENT: {
       say: [
-        "Please get to an emergency room as soon as possible 🩷",
-        "These symptoms can mean your body needs immediate medical support.",
-        "When you arrive, you can say you are having a miscarriage, this is medically accurate and emergency rooms are required to treat you without asking for the cause.",
-        "You do not have to explain anything beyond your symptoms.",
+        "Please get emergency care now 🩷",
+        "Those symptoms can mean you need immediate medical support.",
+        "Share your symptoms clearly: bleeding level, pain, dizziness/fainting, fever/chills, and discharge changes.",
+        "You can keep details brief and ask for confidential care.",
       ],
       choices: [
         { id: "map",  label: "Find emergency care now", next: "START", action: "OPEN_MAP", primary: true },
@@ -409,65 +356,42 @@ export function createPregnancyNodes(env, helpers) {
 
     ABORTION_MONITORING: {
       say: [
-        "Okay, none of the urgent warning signs right now 🩷",
-        "Keep monitoring yourself over the next few days. Watch for: increasing pain, fever, heavy bleeding that starts or worsens, or anything that feels wrong.",
-        "If any of those things start, treat it as urgent and go to emergency care.",
-        "Would you like to connect with confidential support?",
-        ...urgentFooter(),
+        "Okay, no urgent warning signs right now 🩷",
+        "Keep monitoring closely over the next 24–48 hours.",
+        "Go to emergency care immediately if bleeding becomes heavy, pain becomes severe or worsening, you feel dizzy/faint/very weak, you develop fever/chills, or discharge becomes foul-smelling or unusual.",
       ],
       choices: [
-        { id: "counsel",  label: "Yes, I want confidential support",   next: "ABORTION_RESOURCES", primary: true },
-        { id: "privacy",  label: "Help me protect my privacy",         next: "ABORTION_PRIVACY" },
-        { id: "menu",     label: pickMainLabel(),                       next: "START_MENU" },
+        { id: "urgent",  label: "I now have warning signs",        next: "ABORTION_URGENT", primary: true },
+        { id: "support", label: "Confidential support options",    next: "ABORTION_RESOURCES" },
+        { id: "privacy", label: "Privacy tips",                    next: "ABORTION_PRIVACY" },
+        { id: "menu",    label: pickMainLabel(),                    next: "START_MENU" },
       ],
     },
 
-    // Privacy  practical screen/data protection guidance
     ABORTION_PRIVACY: {
       say: [
-        "Privacy is real and valid, here's what you can do 🩷",
-        "• Clear your chat: use the reset option in Bloomie settings if available, or close the browser tab",
-        "• If someone shares your device: use an incognito/private browser window",
-        "• When contacting organisations: use a number they don't know, or a messaging app with disappearing messages",
-        "• What to say: 'I need confidential pregnancy options support. How do you handle privacy?'",
-        "• Ask any service before sharing: 'Is this fully confidential?', you have the right to ask.",
+        "Privacy matters 🩷",
+        "• Use private/incognito browsing and clear chat history if needed",
+        "• Use a private device/session when possible",
+        "• Ask any service first: “Is this confidential before I share details?”",
       ],
       choices: [
-        { id: "counsel",  label: "Show confidential support options",  next: "ABORTION_RESOURCES", primary: true },
-        { id: "safe",     label: "What should I watch for healthwise?",next: "ABORTION_SAFETY_INFO" },
-        { id: "menu",     label: pickMainLabel(),                       next: "START_MENU" },
+        { id: "support", label: "Show confidential support options", next: "ABORTION_RESOURCES", primary: true },
+        { id: "after",   label: "Do an aftercare safety check",      next: "ABORTION_AFTERCARE_CHECK" },
+        { id: "menu",    label: pickMainLabel(),                      next: "START_MENU" },
       ],
     },
 
-    // Resources confidential orgs operating in Jamaica
     ABORTION_RESOURCES: {
       say: [
-        "Here are organisations that provide confidential, non-judgmental support 🩷",
-        "• **FAMPLAN (Jamaica Family Planning Association)** - sexual & reproductive health counselling, islandwide. famplanjamaica.org",
-        "• **Jamaica Pregnancy Resource Centre (Montego Bay)** - counselling and options support.",
-        "• **Caribbean Family Planning Affiliation (CFPA)** - regional, provides referrals and telehealth options.",
-        "• **International Planned Parenthood Federation (IPPF)** - can help with information about accessing services in other countries confidentially. ippf.org",
-        "When you contact them, you don't have to share any details upfront - just say you need confidential pregnancy support.",
+        "If you want confidential support, look for a trusted reproductive-health counsellor, clinic social worker, or licensed healthcare provider 🩷",
+        "When reaching out, keep it simple: “I need confidential pregnancy support and want to understand your privacy policy first.”",
+        "If you feel unwell at any point, switch to aftercare safety check immediately.",
       ],
       choices: [
-        { id: "script", label: "Help me write what to say",    next: "ABORTION_CALL_SCRIPT", primary: true },
-        { id: "privacy", label: "How to protect my privacy",  next: "ABORTION_PRIVACY" },
-        { id: "safe",    label: "Safety signs to watch for",  next: "ABORTION_SAFETY_INFO" },
-        { id: "menu",    label: pickMainLabel(),               next: "START_MENU" },
-      ],
-    },
-
-    ABORTION_CALL_SCRIPT: {
-      say: [
-        "Here's what you can say, keep it simple until you know they're trustworthy 🩷",
-        "📞 *'Hi, I need confidential pregnancy options support. Can you tell me how your privacy policy works before I share anything?'*",
-        "If they ask for details before answering that, hang up and try somewhere else.",
-        "You're allowed to ask questions first. You're allowed to say no. You're in charge of this.",
-      ],
-      choices: [
-        { id: "resources", label: "Back to support organisations", next: "ABORTION_RESOURCES", primary: true },
-        { id: "menu",      label: pickMainLabel(),                  next: "START_MENU" },
-        { id: "done",      label: pickCloseLabel(),              next: "CLOSE" },
+        { id: "after",   label: "Do an aftercare safety check", next: "ABORTION_AFTERCARE_CHECK", primary: true },
+        { id: "privacy", label: "Privacy tips",                 next: "ABORTION_PRIVACY" },
+        { id: "menu",    label: pickMainLabel(),                 next: "START_MENU" },
       ],
     },
   };

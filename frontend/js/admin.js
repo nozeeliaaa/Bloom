@@ -34,6 +34,7 @@ onAuthChange(async (user) => {
 
   initTabs();
   loadOverview();
+  loadBloomieAnalytics();
 });
 
 // ─────────────────────────────────────────
@@ -80,18 +81,21 @@ function initTabs() {
       if (target === "users") loadUsers();
       if (target === "pamphlets") loadPamphlets();
       if (target === "clinics") loadClinics();
+      if (target === "overview") loadBloomieAnalytics();
       if (target === "support") loadSupportMessages();
     });
   });
 
   document.getElementById("admin-refresh-btn").addEventListener("click", () => {
     const active = document.querySelector(".admin-tab.active")?.dataset.tab;
-    if (active === "overview") loadOverview();
+    if (active === "overview") { loadOverview(); loadBloomieAnalytics(); }
     if (active === "users") loadUsers();
     if (active === "pamphlets") loadPamphlets();
     if (active === "clinics") loadClinics();
     if (active === "support") loadSupportMessages();
   });
+
+  document.getElementById("ba-refresh-btn")?.addEventListener("click", loadBloomieAnalytics);
 
   document.getElementById("users-refresh")?.addEventListener("click", loadUsers);
 }
@@ -575,6 +579,92 @@ function escHtml(str) {
 }
 
 // ─────────────────────────────────────────
+// BLOOMIE ANALYTICS
+// ─────────────────────────────────────────
+async function loadBloomieAnalytics() {
+  const statusEl = document.getElementById("ba-status");
+  if (statusEl) { statusEl.textContent = "Loading…"; statusEl.hidden = false; }
+
+  try {
+    const { summary } = await api("GET", "/bloomie-analytics/summary");
+
+    if (statusEl) statusEl.hidden = true;
+
+    // KPIs
+    setText("ba-fallbacks", summary.fallbackCount ?? 0);
+    setText("ba-no-match",  summary.noMatchCount  ?? 0);
+    setText("ba-urgency",   summary.urgencyEscalationCount ?? 0);
+    setText("ba-oos",       summary.oosEventCount ?? 0);
+    setText("ba-avg-depth", summary.avgSessionDepth ?? 0);
+
+    // Confidence tiers
+    const tiers = summary.confidenceTierDistribution || {};
+    setText("ba-confidence-high",   tiers.HIGH   ?? 0);
+    setText("ba-confidence-medium", tiers.MEDIUM ?? 0);
+    setText("ba-confidence-low",    tiers.LOW    ?? 0);
+
+    // Route distribution (top 10)
+    const routeEl = document.getElementById("ba-route-list");
+    if (routeEl) {
+      const routes = Object.entries(summary.routeDistribution || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      routeEl.innerHTML = routes.length
+        ? routes.map(([route, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <code style="font-size:.82rem;">${escHtml(route)}</code>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Tone distribution
+    const toneEl = document.getElementById("ba-tone-list");
+    if (toneEl) {
+      const tones = Object.entries(summary.toneDistribution || {})
+        .sort((a, b) => b[1] - a[1]);
+      toneEl.innerHTML = tones.length
+        ? tones.map(([tone, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.88rem;">${escHtml(tone)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Emotion source distribution
+    const sourceEl = document.getElementById("ba-source-list");
+    if (sourceEl) {
+      const sources = Object.entries(summary.emotionSourceDistribution || {})
+        .sort((a, b) => b[1] - a[1]);
+      sourceEl.innerHTML = sources.length
+        ? sources.map(([src, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.88rem;">${escHtml(src)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Top no-match phrases
+    const phraseEl = document.getElementById("ba-no-match-phrases");
+    if (phraseEl) {
+      const phrases = summary.topNoMatchPhrases || [];
+      phraseEl.innerHTML = phrases.length
+        ? phrases.map(({ phrase, count }) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.82rem;word-break:break-word;max-width:160px;">${escHtml(phrase)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = `Failed to load: ${err.message}`; statusEl.hidden = false; }
+  }
+}
+
+// ─────────────────────────────────────────
 // Support Messages
 // ─────────────────────────────────────────
 
@@ -600,7 +690,7 @@ async function loadSupportMessages() {
     }
 
     list.innerHTML = messages.map(m => {
-      const date    = m.createdAt ? new Date(m.createdAt).toLocaleString() : "=";
+      const date    = m.createdAt ? new Date(m.createdAt).toLocaleString() : "-";
       const badge   = `<span style="padding:2px 8px;border-radius:999px;font-size:0.78rem;font-weight:700;${STATUS_COLOURS[m.status] || ""}">${STATUS_LABELS[m.status] || m.status}</span>`;
       const options = ["new", "open", "resolved"]
         .map(s => `<option value="${s}"${m.status === s ? " selected" : ""}>${STATUS_LABELS[s]}</option>`)
@@ -610,7 +700,7 @@ async function loadSupportMessages() {
         <div class="admin-list-item" style="flex-direction:column;align-items:flex-start;gap:0.4rem;">
           <div class="admin-row" style="width:100%;">
             <div>
-              <strong>${m.requestId || "="}</strong>
+              <strong>${m.requestId || "-"}</strong>
               <span class="text-muted" style="margin-left:0.5rem;font-size:0.85rem;">${date}</span>
               ${badge}
             </div>
@@ -618,7 +708,7 @@ async function loadSupportMessages() {
               ${options}
             </select>
           </div>
-          <div style="font-size:0.88rem;"><strong>Subject:</strong> ${m.subject || "="}</div>
+          <div style="font-size:0.88rem;"><strong>Subject:</strong> ${m.subject || "-"}</div>
           ${m.name    ? `<div style="font-size:0.88rem;"><strong>Name:</strong> ${m.name}</div>` : ""}
           ${m.replyEmail ? `<div style="font-size:0.88rem;"><strong>Reply-to:</strong> ${m.replyEmail}</div>` : ""}
           <div style="font-size:0.88rem;white-space:pre-wrap;background:var(--color-bg-soft,#f5f0f3);padding:0.5rem 0.75rem;border-radius:8px;width:100%;box-sizing:border-box;">${m.message || ""}</div>

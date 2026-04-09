@@ -193,18 +193,53 @@ describe("multi-turn: topic interrupt clears entity history", () => {
   });
 });
 
+// ── 3b. Accumulated extraction for low-context follow-ups ───────────────────
+
+describe("multi-turn: accumulated extraction window", () => {
+  it("keeps prior late-period signal when follow-up is low-context ('also')", () => {
+    sendMessage("my period is late");
+    sendMessage("also");
+
+    const state = chat.getState();
+    const latest = state.entityHistory[state.entityHistory.length - 1];
+    expect(!!latest?.symptoms?.late || !!latest?.symptoms?.implicit_late).toBe(true);
+  });
+
+  it("interprets 'still no' as late-context follow-up when already in late flow", () => {
+    sendMessage("my period is late");
+    sendMessage("still no");
+    const state = chat.getState();
+    const latest = state.entityHistory[state.entityHistory.length - 1];
+    expect(!!latest?.symptoms?.late || !!latest?.symptoms?.implicit_late).toBe(true);
+  });
+
+  it("interprets 'same thing' as continuity in an active late thread", () => {
+    sendMessage("my period is late");
+    sendMessage("same thing");
+    const state = chat.getState();
+    const latest = state.entityHistory[state.entityHistory.length - 1];
+    expect(!!latest?.symptoms?.late || !!latest?.symptoms?.implicit_late).toBe(true);
+  });
+});
+
 // ── 4. Overload triage — 3+ topics in one message ────────────────────────────
 
 describe("multi-turn: overload detection", () => {
-  it.skip(
-    "shows overload triage when 3+ distinct topics appear in one message" +
-    " — SKIP: the overload handler calls say([...], { choices: [...] }) but" +
-    " say() only destructures { delayMs, keepLocked } — the choices option is" +
-    " silently ignored and overload buttons are never rendered. The overload" +
-    " text does appear (via the bubbles) but no overload_* data-choice buttons" +
-    " are written to the DOM. The state-stays-START part is correct behaviour.",
-    () => {}
-  );
+  it("shows overload triage text and renders overload_* quick-reply buttons", () => {
+    sendMessage("my period is late and i feel nauseous and anxious");
+    const state = chat.getState();
+    // Overload prompt does not force a node transition; it should remain in current node context.
+    expect(state.state).toBe("START");
+    expect(getChatBoxText()).toMatch(/You've shared a lot/i);
+    expect(getChatBoxText()).toMatch(/Which one is bothering you most/i);
+
+    const overloadButtons = [...document.querySelectorAll('button[data-choice^="overload_"]')];
+    expect(overloadButtons.length).toBeGreaterThanOrEqual(3);
+    const ids = overloadButtons.map((b) => b.getAttribute("data-choice"));
+    expect(ids).toContain("overload_late_period");
+    expect(ids).toContain("overload_nausea");
+    expect(ids).toContain("overload_mood");
+  });
 });
 
 // ── 5. Loop detection — adaptive repeat handling ─────────────────────────────
@@ -423,47 +458,212 @@ describe("multi-turn: return to resolved topic", () => {
   });
 });
 
+describe("multi-turn: topic resolution at guide/wrap nodes", () => {
+  function navigateToLateWrap() {
+    clickButton("period"); // PERIOD_TRIAGE
+    clickButton("late");   // LATE_INTRO
+    clickButton("no");     // LATE_NO_GUIDANCE
+    clickButton("no");     // LATE_CHANGES_Q
+    clickButton("no");     // LATE_SYMPTOMS_Q
+    clickButton("none");   // LATE_PATTERN_Q
+    clickButton("yes");    // LATE_WRAP
+  }
+
+  function navigateToHeavyMonitor() {
+    clickButton("period"); // PERIOD_TRIAGE
+    clickButton("heavy");  // HEAVY_INTRO
+    clickButton("no");     // HEAVY_A_RATE
+    clickButton("3_4h");   // HEAVY_SHARED_CORE
+    clickButton("no");     // HEAVY_CORE_CLOTS
+    clickButton("no");     // HEAVY_CORE_SYMP_GATE
+    clickButton("no");     // HEAVY_DECIDE -> HEAVY_MONITOR
+  }
+
+  function navigateToSpotWrap() {
+    clickButton("period"); // PERIOD_TRIAGE
+    clickButton("spot");   // SPOT_INTRO
+    clickButton("yes");    // SPOT_YES_DURATION
+    clickButton("no");     // SPOT_AMOUNT_Q
+    clickButton("wipe");   // SPOT_PREG_Q
+    clickButton("no");     // SPOT_BC_Q
+    clickButton("no");     // SPOT_TRACK_WRAP
+  }
+
+  function navigateToPelvicReviewSoon() {
+    clickButton("pain");   // PELVIC_INTRO -> PELVIC_SAFETY_CHECK
+    clickButton("no");     // PELVIC_ENTRY
+    clickButton("ns");     // PELVIC_GENERAL_ROUTE -> PELVIC_SEVERITY
+    clickButton("mild");   // PELVIC_IMPACT
+    clickButton("no");     // PELVIC_PATTERN
+    clickButton("new");    // PELVIC_REVIEW_SOON
+  }
+
+  function navigateToPregnancyResolutionNode() {
+    clickButton("preg");   // PREGNANCY_ENTRY
+    clickButton("tested"); // PREG_TESTED_ROUTE
+    clickButton("pos");    // LATE_POSITIVE
+  }
+
+  it("marks late concern as resolved at LATE_WRAP", () => {
+    navigateToLateWrap();
+    expect(chat.getState().state).toBe("LATE_WRAP");
+    expect(chat.getState().conversationProfile.concernsResolved).toContain("late");
+  });
+
+  it("marks heavy concern as resolved at HEAVY_MONITOR", () => {
+    navigateToHeavyMonitor();
+    expect(chat.getState().state).toBe("HEAVY_MONITOR");
+    expect(chat.getState().conversationProfile.concernsResolved).toContain("heavy");
+  });
+
+  it("marks spotting concern as resolved at SPOT_TRACK_WRAP", () => {
+    navigateToSpotWrap();
+    expect(chat.getState().state).toBe("SPOT_TRACK_WRAP");
+    expect(chat.getState().conversationProfile.concernsResolved).toContain("spot");
+  });
+
+  it("marks pelvic concern as resolved at PELVIC_REVIEW_SOON", () => {
+    navigateToPelvicReviewSoon();
+    expect(chat.getState().state).toBe("PELVIC_REVIEW_SOON");
+    expect(chat.getState().conversationProfile.concernsResolved).toContain("pelvic");
+  });
+
+  it("marks pregnancy concern as resolved at LATE_POSITIVE", () => {
+    navigateToPregnancyResolutionNode();
+    expect(chat.getState().state).toBe("LATE_POSITIVE");
+    expect(chat.getState().conversationProfile.concernsResolved).toContain("pregnancy");
+  });
+});
+
+// ── 10. Pelvic pain context-aware flow (late + cramps) ──────────────────────
+
+describe("multi-turn: pelvic pain context-aware late-period handling", () => {
+  function remountChat(options = {}) {
+    document.body.innerHTML = `
+      <div id="chat-box"></div>
+      <form id="chat-form"><input id="chat-input" /></form>
+    `;
+    chat = initBloomieChat(options);
+    vi.advanceTimersByTime(10_000);
+  }
+
+  it("late context + cramps routes through CRAMPS_LATE_CONTEXT before advice", () => {
+    const lmp = new Date(Date.now() - 44 * 24 * 60 * 60 * 1000);
+    remountChat({
+      cycleData: {
+        lmp,
+        cycleLength: 28,
+        mode: "cycle_tracking",
+      },
+    });
+
+    clickButton("pain"); // -> PELVIC_INTRO -> PELVIC_SAFETY_CHECK
+    clickButton("no");   // -> PELVIC_ENTRY_GATE -> CRAMPS_LATE_CONTEXT
+
+    expect(chat.getState().state).toBe("CRAMPS_LATE_CONTEXT");
+    expect(getChatBoxText()).toMatch(/cramps can happen for a few reasons/i);
+    expect(getChatBoxText()).toMatch(/usual period-type cramps/i);
+  });
+
+  it("normal timing + cramps stays on standard pelvic entry flow", () => {
+    const lmp = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    remountChat({
+      cycleData: {
+        lmp,
+        cycleLength: 28,
+        mode: "cycle_tracking",
+      },
+    });
+
+    clickButton("pain");
+    clickButton("no");
+
+    expect(chat.getState().state).toBe("PELVIC_ENTRY");
+    expect(getChatBoxText()).toMatch(/Pelvic pain can feel really different/i);
+  });
+
+  it("late context cramps + spotting follows spotting pathway", () => {
+    const lmp = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+    remountChat({
+      cycleData: {
+        lmp,
+        cycleLength: 28,
+        mode: "cycle_tracking",
+      },
+    });
+
+    clickButton("pain");
+    clickButton("no");      // CRAMPS_LATE_CONTEXT
+    clickButton("usual");   // CRAMPS_LATE_SPOT_CHECK
+    clickButton("yes");     // SPOT_INTRO
+
+    expect(chat.getState().state).toBe("SPOT_INTRO");
+  });
+});
+
 // ── 10. Unresolved concerns surfaced before CLOSE ────────────────────────────
 
 describe("multi-turn: unresolved concerns before CLOSE", () => {
-  it("surfaces 'Before you go' prompt when user navigates to CLOSE with an unresolved topic", () => {
-    // Turn 1: health message that sets lastIntent (establishes a topic in-progress).
-    // "my period is late" routes via guidance (late_period scenario) but does not
-    // transition to a GUIDE node, so the topic is NOT in concernsResolved.
-    sendMessage("my period is late");
-    // lastIntent is set after the guidance fires.
-    // (Guidance fires and stays at START; depth increments.)
+  function goToCloseTriggerNode() {
+    clickButton("preg");   // PREGNANCY_ENTRY
+    clickButton("tested"); // PREG_TESTED_ROUTE
+    clickButton("pos");    // LATE_POSITIVE (has "done" -> CLOSE)
+  }
 
-    // Turn 2: OOS message while a health topic is in lastIntent.
-    // The OOS handler now pushes the topic into concernsUnresolved.
-    sendMessage("what is the weather today");
-    expect(chat.getState().conversationProfile.concernsUnresolved.length).toBeGreaterThan(0);
+  function countUnresolvedClosePrompts() {
+    return chat.getState().history.filter(
+      m => m.from === "bot" && /Before you go - you also mentioned/.test(m.text)
+    ).length;
+  }
 
-    // Turn 3: navigate to CLOSE — the guard intercepts and surfaces the prompt.
-    // Use transition via the done button available from a suitable node.
-    // Directly send a message that routes to CLOSE is not reliable, so we
-    // set up a node with a CLOSE button. The simplest path is: send an OOS
-    // message a second time (streak 2 at depth ≥ 3) to reach NARROWING, then
-    // click its "done" equivalent, or just verify concernsUnresolved is set and
-    // manually trigger transition through the public getState / internal path.
-    //
-    // Simpler approach: verify that after clicking a CLOSE-next button the
-    // CLOSE guard text appears. Navigate via NARROWING → click its start-menu
-    // option, then navigate to a node with a "done" button.
-    // The most direct path: send another OOS to trip the repair (streak=2,depth=2),
-    // then one more to reach NARROWING (streak=2,depth=3).
-    sendMessage("tell me a joke");
-    sendMessage("who is the president");
+  it("one unresolved + yes routes directly to that topic and consumes it", () => {
+    goToCloseTriggerNode();
+    chat.getState().conversationProfile.concernsUnresolved = ["late"];
 
-    // At this point state should be NARROWING (repair fired at streak≥2,depth≥3).
-    // NARROWING doesn't have a CLOSE button, so navigate to CLOSE via the
-    // "Something else" → ELSE_INTRO path which has a "done" button.
-    //
-    // Simplest: verify concernsUnresolved is populated (the core fix) and that
-    // the CLOSE guard text fires when transition("CLOSE") would be called.
-    // We verify the full path by checking the guard renders the text on CLOSE.
-    expect(chat.getState().conversationProfile.concernsUnresolved.length).toBeGreaterThan(0);
-    expect(getChatBoxText()).toMatch(/I want to make sure I help you/);
+    clickButton("done"); // attempt CLOSE -> CLOSE_UNRESOLVED_CONFIRM
+    expect(chat.getState().state).toBe("CLOSE_UNRESOLVED_CONFIRM");
+    expect(chat.getState().pendingUnresolvedTopic).toBe("late");
+
+    clickButton("yes_unresolved");
+    expect(chat.getState().state).toBe("LATE_INTRO");
+    expect(chat.getState().conversationProfile.concernsUnresolved).toEqual([]);
+  });
+
+  it("one unresolved + no closes cleanly without immediate re-prompt loop", () => {
+    goToCloseTriggerNode();
+    chat.getState().conversationProfile.concernsUnresolved = ["late"];
+
+    clickButton("done");
+    expect(chat.getState().state).toBe("CLOSE_UNRESOLVED_CONFIRM");
+    clickButton("no_done");
+
+    expect(chat.getState().state).toBe("CLOSE");
+    expect(chat.getState().pendingUnresolvedTopic).toBeNull();
+    expect(chat.getState().conversationProfile.concernsUnresolved).toEqual(["late"]);
+    expect(countUnresolvedClosePrompts()).toBe(1);
+  });
+
+  it("multiple unresolved + no does not nag through the rest of the queue", () => {
+    goToCloseTriggerNode();
+    chat.getState().conversationProfile.concernsUnresolved = ["late", "pelvic"];
+
+    clickButton("done");
+    clickButton("no_done");
+
+    expect(chat.getState().state).toBe("CLOSE");
+    expect(chat.getState().conversationProfile.concernsUnresolved).toEqual(["late", "pelvic"]);
+    expect(countUnresolvedClosePrompts()).toBe(1);
+  });
+
+  it("multiple unresolved + yes consumes only the selected first unresolved topic", () => {
+    goToCloseTriggerNode();
+    chat.getState().conversationProfile.concernsUnresolved = ["late", "pelvic"];
+
+    clickButton("done");
+    clickButton("yes_unresolved");
+
+    expect(chat.getState().state).toBe("LATE_INTRO");
+    expect(chat.getState().conversationProfile.concernsUnresolved).toEqual(["pelvic"]);
   });
 });
 
@@ -482,6 +682,15 @@ describe("multi-turn: OOS follow-up resolution", () => {
     const state = chat.getState();
     expect(state.lastOOS).toBeNull();
     expect(state.state).toBe("MOOD_SAFETY_CHECK");
+  });
+
+  it("treats repair/clarification turns as non-OOS for streak counting", () => {
+    sendMessage("weather today?");
+    expect(chat.getState().oosStreakCount).toBe(1);
+
+    // Repair-classified message should not count as another OOS strike.
+    sendMessage("kmt what?");
+    expect(chat.getState().oosStreakCount).toBe(0);
   });
 });
 
@@ -535,5 +744,39 @@ describe("multi-turn: stale button guard", () => {
 
     // State must remain at START — stale click had no effect.
     expect(chat.getState().state).toBe("START");
+  });
+});
+
+// ── 14. END_CHAT detection (English + Jamaican/Patois variants) ─────────────
+
+describe("multi-turn: end-chat intent detection", () => {
+  it("still detects existing English close intent", () => {
+    sendMessage("bye");
+    expect(chat.getState().state).toBe("END_CHAT_CONFIRM");
+  });
+
+  it("detects Patois close variant: 'mi done'", () => {
+    sendMessage("mi done");
+    expect(chat.getState().state).toBe("END_CHAT_CONFIRM");
+  });
+
+  it("detects Patois close variant: 'mi good'", () => {
+    sendMessage("mi good");
+    expect(chat.getState().state).toBe("END_CHAT_CONFIRM");
+  });
+
+  it("detects Jamaican farewell variant: 'seen'", () => {
+    sendMessage("seen");
+    expect(chat.getState().state).toBe("END_CHAT_CONFIRM");
+  });
+
+  it("detects Jamaican farewell variant: 'later'", () => {
+    sendMessage("later");
+    expect(chat.getState().state).toBe("END_CHAT_CONFIRM");
+  });
+
+  it("does not trigger close-intent for ambiguous non-farewell phrase", () => {
+    sendMessage("i seen spotting today");
+    expect(chat.getState().state).not.toBe("END_CHAT_CONFIRM");
   });
 });

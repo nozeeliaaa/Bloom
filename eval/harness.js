@@ -7,10 +7,10 @@
  * Runs all cases from eval/cases.js through the full Bloomie pipeline and
  * computes four metrics:
  *
- *   1. Routing accuracy     - correct route / total routing cases
- *   2. Red-flag recall      - urgent cases correctly flagged / total urgent cases
- *   3. False reassurance    - urgent cases missed / total urgent cases (target: 0%)
- *   4. Fallback quality     - OOS/gibberish correctly handled / total fallback cases
+ *   1. Routing accuracy     — correct route / total routing cases
+ *   2. Red-flag recall      — urgent cases correctly flagged / total urgent cases
+ *   3. False reassurance    — urgent cases missed / total urgent cases (target: 0%)
+ *   4. Fallback quality     — OOS/gibberish correctly handled / total fallback cases
  *
  * Usage:
  *   node eval/harness.js
@@ -43,7 +43,8 @@ const CAT_FILTER   = args.includes("--category") ? args[args.indexOf("--category
 // Full pipeline normalization (mirrors assistant.js steps 3-6):
 //   normalizePatois → fuzzyCorrect → collapseRepeatedLetters → expandShorthand → normalizeText
 function pipelineNormalize(rawInput) {
-  const p1 = normalizePatois(rawInput);
+  const safeInput = rawInput == null ? "" : String(rawInput);
+  const p1 = normalizePatois(safeInput);
   const p2 = fuzzyCorrect(p1) ?? p1;
   const p3 = collapseRepeatedLetters(p2);
   const p4 = expandShorthand(p3);
@@ -51,7 +52,8 @@ function pipelineNormalize(rawInput) {
 }
 
 function runPipeline(rawInput) {
-  const normalized = pipelineNormalize(rawInput);
+  const safeInput = rawInput == null ? "" : String(rawInput);
+  const normalized = pipelineNormalize(safeInput);
   const entities   = extractEntities(normalized);
   const route      = inferRoute(entities);
   const guidance   = route
@@ -82,7 +84,8 @@ function runPipeline(rawInput) {
 
 // Runs a multi-turn case: history = array of prior messages, current = the final message
 function runMultiTurnCumulative(history, current) {
-  const allMessages = [...(history || []), current];
+  const safeHistory = Array.isArray(history) ? history : [];
+  const allMessages = [...safeHistory, current];
   const entityHistory = allMessages.map(msg => extractEntities(pipelineNormalize(msg)));
   return checkCumulativeRisk(entityHistory);
 }
@@ -92,7 +95,7 @@ function runMultiTurnCumulative(history, current) {
 
 function evaluateCase(c) {
   const result = runPipeline(c.input);
-  const exp    = c.expected;
+  const exp    = c?.expected || {};
   const checks = [];
 
   // Check: expected route
@@ -155,7 +158,7 @@ function evaluateCase(c) {
     checks.push({ name: "confidence", pass, expected: exp.confidence, got: result.confidence?.tier });
   }
 
-  // Check: cumulative escalation (multi-turn case - uses c.history field)
+  // Check: cumulative escalation (multi-turn case — uses c.history field)
   if (exp.cumulativeEscalation !== undefined) {
     const cumResult = runMultiTurnCumulative(c.history || [], c.input);
     const pass = cumResult.escalate === exp.cumulativeEscalation;
@@ -170,7 +173,7 @@ function evaluateCase(c) {
 // ─── Metric computation ───────────────────────────────────────────────────────
 
 function computeMetrics(evaluated) {
-  // 1. Routing accuracy - routing + edge cases with expected.route
+  // 1. Routing accuracy — routing + edge cases with expected.route
   const routingCases = evaluated.filter(c =>
     (c.category === "routing" || c.category === "edge") &&
     c.expected.route !== undefined
@@ -179,13 +182,16 @@ function computeMetrics(evaluated) {
     c.checks.find(ch => ch.name === "route")?.pass
   ).length;
 
-  // 2. Red-flag recall - all red_flag cases + any case with expected.urgent = true
+  // 2. Red-flag recall — all red_flag cases + any case with expected.urgent = true.
+  //    Exclude cumulative-escalation-only cases (single-turn pipeline cannot flag them
+  //    as urgent by design — same exclusion applied to false-reassurance below).
   const redFlagCases = evaluated.filter(c =>
-    c.category === "red_flag" || c.expected.urgent === true
+    (c.category === "red_flag" || c.expected.urgent === true) &&
+    !(c.expected.cumulativeEscalation !== undefined && c.expected.urgent === undefined)
   );
   const redFlagCaught = redFlagCases.filter(c => c.result.urgent === true).length;
 
-  // 3. False reassurance - urgent cases where urgent was NOT caught.
+  // 3. False reassurance — urgent cases where urgent was NOT caught.
   //    Exclude cumulative-escalation-only cases (single-turn pipeline cannot flag them
   //    as urgent by design; urgency is only detectable across turns via checkCumulativeRisk).
   const falseReassurance = redFlagCases.filter(c =>
@@ -193,7 +199,7 @@ function computeMetrics(evaluated) {
     !(c.expected.cumulativeEscalation !== undefined && c.expected.urgent === undefined)
   ).length;
 
-  // 4. Fallback quality - fallback cases with gibberish or noRoute checks
+  // 4. Fallback quality — fallback cases with gibberish or noRoute checks
   const fallbackCases = evaluated.filter(c => c.category === "fallback");
   const fallbackCorrect = fallbackCases.filter(c => c.passed).length;
 
@@ -293,8 +299,9 @@ function printReport(evaluated, metrics) {
     console.log(C.bold + C.red + `  FAILURES (${failures.length})` + C.reset);
     console.log("  " + "─".repeat(60));
     for (const c of failures) {
+      const inputText = c?.input == null ? "" : String(c.input);
       console.log();
-      console.log(`  ${C.bold}${c.id}${C.reset}  ${C.grey}[${c.category}]${C.reset}  "${C.yellow}${c.input.slice(0, 70)}${c.input.length > 70 ? "…" : ""}${C.reset}"`);
+      console.log(`  ${C.bold}${c.id}${C.reset}  ${C.grey}[${c.category}]${C.reset}  "${C.yellow}${inputText.slice(0, 70)}${inputText.length > 70 ? "…" : ""}${C.reset}"`);
       for (const ch of c.checks.filter(ch => !ch.pass)) {
         console.log(`    ${C.red}✗${C.reset} ${ch.name.padEnd(12)} expected: ${C.green}${JSON.stringify(ch.expected)}${C.reset}   got: ${C.red}${JSON.stringify(ch.got)}${C.reset}`);
       }
@@ -317,8 +324,9 @@ function printReport(evaluated, metrics) {
       const icon   = statusIcon(c.passed);
       const route  = c.result.actualRoute ?? "null";
       const urgent = c.result.urgent ? C.red + "URGENT" + C.reset : "ok";
+      const inputText = c?.input == null ? "" : String(c.input);
       console.log(`  ${icon}  ${C.bold}${c.id}${C.reset}  route=${C.cyan}${route}${C.reset}  urgent=${urgent}`);
-      console.log(`     ${C.grey}"${c.input.slice(0, 80)}${c.input.length > 80 ? "…" : ""}"${C.reset}`);
+      console.log(`     ${C.grey}"${inputText.slice(0, 80)}${inputText.length > 80 ? "…" : ""}"${C.reset}`);
     }
     console.log();
   }
@@ -329,9 +337,13 @@ function printReport(evaluated, metrics) {
 
 function main() {
   // Apply filters
-  let filteredCases = cases;
-  if (TAG_FILTER)  filteredCases = filteredCases.filter(c => c.tags.includes(TAG_FILTER));
-  if (CAT_FILTER)  filteredCases = filteredCases.filter(c => c.category === CAT_FILTER);
+  let filteredCases = Array.isArray(cases) ? cases : [];
+  if (TAG_FILTER) {
+    filteredCases = filteredCases.filter((c) => Array.isArray(c?.tags) && c.tags.includes(TAG_FILTER));
+  }
+  if (CAT_FILTER) {
+    filteredCases = filteredCases.filter((c) => c?.category === CAT_FILTER);
+  }
 
   if (filteredCases.length === 0) {
     console.error(`No cases match the given filter.`);

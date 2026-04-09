@@ -913,3 +913,395 @@ export function detectSuspiciousEntrySignal(dates = []) {
     debug: { pairs: pairs.map((p) => ({ gapDays: p.gapDays })) },
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Advanced Insights — period-pattern detection                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Signal groups used for deduplication.
+ * When two signals share a group, only the higher-priority one is surfaced.
+ */
+const SIGNAL_GROUPS = {
+  ABSENCE:            ['EXTENDED_ABSENCE', 'AMENORRHEA_PATTERN'],
+  FREQUENCY:          ['OLIGOMENORRHEA_PATTERN', 'POLYMENORRHEA_PATTERN'],
+  BLEEDING_INTENSITY: ['HEAVY_CLOTTING_PATTERN', 'MENORRHAGIA_PATTERN', 'HYPOMENORRHEA_PATTERN'],
+  IRREGULAR_BLEEDING: ['METRORRHAGIA_PATTERN', 'MENOMETRORRHAGIA_PATTERN'],
+};
+
+// Reverse lookup: signal code → group name (built once at load)
+const _SIGNAL_TO_GROUP = {};
+for (const [group, codes] of Object.entries(SIGNAL_GROUPS)) {
+  for (const code of codes) _SIGNAL_TO_GROUP[code] = group;
+}
+
+/** Per-signal surface priority (higher = wins deduplication) */
+const SIGNAL_PRIORITIES = {
+  MENOMETRORRHAGIA_PATTERN: 5,
+  HEAVY_CLOTTING_PATTERN:   5,
+  MENORRHAGIA_PATTERN:      4,
+  AMENORRHEA_PATTERN:       4,
+  EXTENDED_ABSENCE:         3,
+  OLIGOMENORRHEA_PATTERN:   3,
+  POLYMENORRHEA_PATTERN:    3,
+  HYPOMENORRHEA_PATTERN:    2,
+  METRORRHAGIA_PATTERN:     2,
+};
+
+/** Wrap _makeSignal with advanced-insight extra fields */
+function makeAdvancedSignal(p) {
+  const base = _makeSignal({ category: "cycle", ...p });
+  return {
+    ...base,
+    id:          base.code,
+    priority:    SIGNAL_PRIORITIES[base.code] ?? 1,
+    dedupeGroup: _SIGNAL_TO_GROUP[base.code] ?? null,
+  };
+}
+
+/** Format a Date as "Month Day" (e.g. "March 2") */
+function _fmtShort(date) {
+  if (!date) return "unknown date";
+  try {
+    return toDate(date).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  } catch {
+    return "unknown date";
+  }
+}
+
+/**
+ * Deduplicate a list of advanced signals.
+ * Within each dedupeGroup, only the highest-priority signal is kept.
+ * Signals without a group are always kept.
+ *
+ * @param {Object[]} signals
+ * @returns {{ finalSignals: Object[], suppressedSignals: Object[] }}
+ */
+function dedupeSignals(signals) {
+  const LEVEL_NUM = { high: 3, medium: 2, low: 1 };
+  const groupMap  = {};
+
+  for (const s of signals) {
+    if (!s.dedupeGroup) continue;
+    if (!groupMap[s.dedupeGroup]) groupMap[s.dedupeGroup] = [];
+    groupMap[s.dedupeGroup].push(s);
+  }
+
+  const finalSignals     = signals.filter(s => !s.dedupeGroup); // ungrouped always pass through
+  const suppressedSignals = [];
+
+  for (const group of Object.values(groupMap)) {
+    group.sort((a, b) =>
+      (b.priority - a.priority) ||
+      ((LEVEL_NUM[b.level] || 0) - (LEVEL_NUM[a.level] || 0))
+    );
+    const [keep, ...rest] = group;
+    finalSignals.push(keep);
+    for (const s of rest) {
+      suppressedSignals.push({ id: s.code, reason: "lower_priority_same_group" });
+    }
+  }
+
+  return { finalSignals, suppressedSignals };
+}
+
+/* ── Individual pattern detectors ─────────────────────────────────── */
+
+function _detectAmenorrheaPattern({ lastPeriodStart, today, cycleLengths, settings = {} }) {
+  const threshold = settings.amenorrheaDays ?? 90;
+  if (!lastPeriodStart) return null;
+
+  const todayD     = startOfDay(toDate(today));
+  const lastD      = startOfDay(toDate(lastPeriodStart));
+  const daysSince  = diffDays(lastD, todayD);
+
+  if (daysSince < threshold) return null;
+
+  const recent   = lastN(cycleLengths, 6);
+  const avgCycle = recent.length >= 2 ? Math.round(mean(recent)) : 28;
+  const lastStr  = _fmtShort(lastPeriodStart);
+  const months   = Math.floor(daysSince / 30);
+  const weeks    = Math.floor(daysSince / 7);
+  const timePhrase = months >= 3 ? `about ${months} months` : `roughly ${weeks} weeks`;
+
+  const message =
+    `Bloom noticed that your last logged period was on ${lastStr} — ${timePhrase} ago. ` +
+    `Based on your cycle history, a gap of ${daysSince} days is significantly longer than your usual spacing of around ${avgCycle} days. ` +
+    `Cycles can sometimes pause or shift due to stress, hormonal changes, or other factors. ` +
+    `If this kind of extended gap is new for you, it may be worth keeping track and checking in with a healthcare provider if it continues.`;
+
+  return makeAdvancedSignal({
+    code:    "AMENORRHEA_PATTERN",
+    level:   "high",
+    show:    true,
+    title:   "Extended gap since last period",
+    message,
+    debug:   { daysSince, lastPeriodStart: lastStr, avgCycle, threshold },
+  });
+}
+
+function _detectOligomenorrheaPattern({ cycleLengths }) {
+  if (cycleLengths.length < 3) return null;
+
+  const recent     = lastN(cycleLengths, 3);
+  const longCycles = recent.filter(c => c > 35);
+  if (longCycles.length < 2) return null;
+
+  const avg         = Math.round(mean(recent));
+  const cycleSummary = recent.map(c => `${c} days`).join(", ");
+
+  const message =
+    `Your recent cycles have been running longer than usual in your logs. ` +
+    `Across your last ${recent.length} cycles, Bloom recorded ${cycleSummary}, with ${longCycles.length} going beyond 35 days. ` +
+    `That puts your recent average around ${avg} days, which is more spread out than your earlier pattern. ` +
+    `It is worth keeping an eye on whether this longer spacing keeps repeating.`;
+
+  return makeAdvancedSignal({
+    code:    "OLIGOMENORRHEA_PATTERN",
+    level:   "medium",
+    show:    true,
+    title:   "Cycle timing looks more spread out",
+    message,
+    debug:   { recentCycles: recent, longCount: longCycles.length, avg },
+  });
+}
+
+function _detectPolymenorrheaPattern({ cycleLengths }) {
+  if (cycleLengths.length < 3) return null;
+
+  const recent      = lastN(cycleLengths, 3);
+  const shortCycles = recent.filter(c => c < 21);
+  if (shortCycles.length < 2) return null;
+
+  const avg         = Math.round(mean(recent));
+  const cycleSummary = recent.map(c => `${c} days`).join(", ");
+
+  const message =
+    `Your recent cycles have been coming closer together than usual in your logs. ` +
+    `Across your last ${recent.length} cycles, Bloom recorded ${cycleSummary}, and ${shortCycles.length} came in under 21 days. ` +
+    `That puts your recent average around ${avg} days, which is shorter than your earlier spacing. ` +
+    `It is worth watching whether this closer-together pattern continues.`;
+
+  return makeAdvancedSignal({
+    code:    "POLYMENORRHEA_PATTERN",
+    level:   "medium",
+    show:    true,
+    title:   "Cycles are coming closer together",
+    message,
+    debug:   { recentCycles: recent, shortCount: shortCycles.length, avg },
+  });
+}
+
+function _detectHeavyClottingPattern({ periodEntries }) {
+  if (!Array.isArray(periodEntries) || periodEntries.length < 2) return null;
+
+  const recent = lastN(periodEntries, 3);
+  const clottingCycles = recent.filter((e) =>
+    e?.hadLargeClots === true &&
+    (e.flowLevel === "heavy" || e.flowLevel === "very_heavy" || (e.flowScore ?? 0) >= 4)
+  );
+
+  if (clottingCycles.length < 2) return null;
+
+  const message =
+    `Your logs show heavier bleeding together with clotting across ${clottingCycles.length} recent period${clottingCycles.length === 1 ? "" : "s"}. ` +
+    `Because this has come up more than once, Bloom is treating it as a repeating pattern in your own history rather than a one-off entry. ` +
+    `Keeping logging flow level, timing, and any other symptoms can help show whether this pattern is staying the same or shifting over time.`;
+
+  return makeAdvancedSignal({
+    code:    "HEAVY_CLOTTING_PATTERN",
+    level:   "high",
+    show:    true,
+    title:   "Heavier bleeding with clotting has repeated",
+    message,
+    debug:   { clottingCycleCount: clottingCycles.length },
+  });
+}
+
+function _detectMenorrhagiaPattern({ periodEntries }) {
+  if (!Array.isArray(periodEntries) || periodEntries.length === 0) return null;
+
+  const recent      = lastN(periodEntries, 3);
+  const longDur     = recent.filter(e => (e.durationDays ?? 0) > 7);
+  const heavyFlow   = recent.filter(e =>
+    e.flowLevel === "heavy" || e.flowLevel === "very_heavy" || (e.flowScore ?? 0) >= 4
+  );
+
+  if (longDur.length === 0 && heavyFlow.length < 2) return null;
+
+  const durations   = recent.filter(e => e.durationDays != null).map(e => e.durationDays);
+  const avgDuration = durations.length ? Math.round(mean(durations)) : null;
+
+  let detail;
+  if (longDur.length > 0) {
+    const durationStr = longDur.map(e => `${e.durationDays} days`).join(" and ");
+    detail = `Your logs show bleeding lasting ${durationStr} in ${longDur.length > 1 ? "multiple recent cycles" : "a recent cycle"}. `;
+  } else {
+    detail = `Your logs show heavier bleeding across ${heavyFlow.length} recent period${heavyFlow.length === 1 ? "" : "s"}. `;
+  }
+
+  const message =
+    detail +
+    (avgDuration ? `Across those recent logs, your period length has averaged around ${avgDuration} days. ` : "") +
+    `Because this has shown up more than once, Bloom is treating it as part of your recent pattern from your own logs. ` +
+    `It is worth keeping track of whether the heavier days stay consistent or keep changing.`;
+
+  return makeAdvancedSignal({
+    code:    "MENORRHAGIA_PATTERN",
+    level:   longDur.length > 0 ? "high" : "medium",
+    show:    true,
+    title:   "Periods appear longer or heavier than usual",
+    message,
+    debug:   { longDurationCount: longDur.length, heavyFlowCount: heavyFlow.length, avgDuration },
+  });
+}
+
+function _detectHypomenorrheaPattern({ periodEntries }) {
+  if (!Array.isArray(periodEntries) || periodEntries.length < 2) return null;
+
+  const recent      = lastN(periodEntries, 3);
+  const lightPeriods = recent.filter(e =>
+    (e.durationDays != null && e.durationDays < 2) ||
+    e.flowLevel === "light" || e.flowLevel === "very_light" || e.flowLevel === "spotting" ||
+    (e.flowScore != null && e.flowScore <= 2)
+  );
+
+  if (lightPeriods.length < 2) return null;
+
+  const durations   = recent.filter(e => e.durationDays != null).map(e => e.durationDays);
+  const avgDuration = durations.length ? Math.round(mean(durations)) : null;
+
+  const message =
+    `Bloom noticed that ${lightPeriods.length} of your recent logged periods have been lighter or shorter than your earlier pattern. ` +
+    (avgDuration
+      ? `Your recent periods are averaging around ${avgDuration} day${avgDuration === 1 ? "" : "s"}, which is on the lighter side of the typical range. `
+      : "") +
+    `This is a gentle note from your own logs rather than a diagnosis, and it is worth continuing to track if it keeps repeating.`;
+
+  return makeAdvancedSignal({
+    code:    "HYPOMENORRHEA_PATTERN",
+    level:   "medium",
+    show:    true,
+    title:   "Periods may be lighter than your usual pattern",
+    message,
+    debug:   { lightCount: lightPeriods.length, avgDuration },
+  });
+}
+
+function _detectMetrorrhagiaPattern({ unscheduledBleedingDates }) {
+  if (!Array.isArray(unscheduledBleedingDates) || unscheduledBleedingDates.length < 2) return null;
+
+  const recent    = lastN(unscheduledBleedingDates, 3);
+  const dateStr   = recent.map(d => _fmtShort(d)).join(", ");
+
+  const message =
+    `Bloom noticed spotting or bleeding outside your expected period timing on ${recent.length} logged occasion${recent.length === 1 ? "" : "s"} (${dateStr}). ` +
+    `Because this has come up more than once, it is worth keeping close track of the timing in your future logs. ` +
+    `If it keeps repeating, that pattern would be useful to mention in a healthcare conversation.`;
+
+  return makeAdvancedSignal({
+    code:    "METRORRHAGIA_PATTERN",
+    level:   "medium",
+    show:    true,
+    title:   "Bleeding logged outside expected window",
+    message,
+    debug:   { unscheduledCount: recent.length, dates: recent.map(d => _fmtShort(d)) },
+  });
+}
+
+function _detectMenometrorrhagiaPattern({ menorrhagiaSignal, metrorrhagiaSignal }) {
+  if (!menorrhagiaSignal || !metrorrhagiaSignal) return null;
+
+  const message =
+    `Your logs show both heavier bleeding and bleeding that is not staying neatly within expected period timing. ` +
+    `Because both patterns have repeated, Bloom is surfacing them together as one stronger observation from your own history. ` +
+    `Tracking dates, flow level, and any related symptoms will give the clearest picture of whether this combined pattern is continuing.`;
+
+  return makeAdvancedSignal({
+    code:    "MENOMETRORRHAGIA_PATTERN",
+    level:   "high",
+    show:    true,
+    title:   "Irregular timing and heavier flow together",
+    message,
+    debug:   { menorrhagiaTrigger: true, metrorrhagiaTrigger: true },
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Advanced Insights engine                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Generate Advanced Insight signals from period-pattern analysis.
+ *
+ * Runs all pattern detectors, then deduplicates within signal groups so
+ * the UI never surfaces two overlapping cards.
+ *
+ * @param {Object}  params
+ * @param {number[]} params.cycleLengths             - ordered list of cycle lengths in days
+ * @param {Date|string|null} params.lastPeriodStart  - most recent period start date
+ * @param {Date}    params.today                     - reference date (default: now)
+ * @param {Array<{durationDays?: number, flowLevel?: string, flowScore?: number}>} params.periodEntries
+ *   - per-period metadata used for menorrhagia / hypomenorrhea detection
+ * @param {(Date|string)[]} params.unscheduledBleedingDates
+ *   - dates where bleeding was logged outside the expected period window
+ * @param {Object}  params.settings                  - optional threshold overrides
+ *
+ * @returns {{
+ *   signals: Object[],
+ *   debug: { rawSignals: Object[], suppressedSignals: Object[], selectedSignals: Object[] }
+ * }}
+ */
+export function generateAdvancedInsights({
+  cycleLengths            = [],
+  lastPeriodStart         = null,
+  today                   = new Date(),
+  periodEntries           = [],
+  unscheduledBleedingDates = [],
+  settings                = {},
+} = {}) {
+  const rawSignals = [];
+
+  const amenorrhea = _detectAmenorrheaPattern({ lastPeriodStart, today, cycleLengths, settings });
+  if (amenorrhea) rawSignals.push(amenorrhea);
+
+  const oligo = _detectOligomenorrheaPattern({ cycleLengths });
+  if (oligo) rawSignals.push(oligo);
+
+  const poly = _detectPolymenorrheaPattern({ cycleLengths });
+  if (poly) rawSignals.push(poly);
+
+  const heavyClotting = _detectHeavyClottingPattern({ periodEntries });
+  if (heavyClotting) rawSignals.push(heavyClotting);
+
+  const menorrhagia = _detectMenorrhagiaPattern({ periodEntries });
+  if (menorrhagia) rawSignals.push(menorrhagia);
+
+  const hypomenorrhea = _detectHypomenorrheaPattern({ periodEntries });
+  if (hypomenorrhea) rawSignals.push(hypomenorrhea);
+
+  const metrorrhagia = _detectMetrorrhagiaPattern({ unscheduledBleedingDates });
+  if (metrorrhagia) rawSignals.push(metrorrhagia);
+
+  // Menometrorrhagia fires only when both menorrhagia AND metrorrhagia are detected
+  const menometrorrhagia = _detectMenometrorrhagiaPattern({
+    menorrhagiaSignal:  heavyClotting || menorrhagia,
+    metrorrhagiaSignal: metrorrhagia,
+  });
+  if (menometrorrhagia) rawSignals.push(menometrorrhagia);
+
+  const bleedingCollapsed = menometrorrhagia
+    ? rawSignals.filter((s) => !["HEAVY_CLOTTING_PATTERN", "MENORRHAGIA_PATTERN", "METRORRHAGIA_PATTERN"].includes(s.code))
+    : rawSignals;
+
+  const { finalSignals, suppressedSignals } = dedupeSignals(bleedingCollapsed);
+
+  return {
+    signals: finalSignals,
+    debug: {
+      rawSignals:        rawSignals.map(s => ({ id: s.code, group: s.dedupeGroup, priority: s.priority, level: s.level })),
+      suppressedSignals,
+      selectedSignals:   finalSignals.map(s => ({ id: s.code, group: s.dedupeGroup })),
+    },
+  };
+}

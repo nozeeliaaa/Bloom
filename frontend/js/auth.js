@@ -97,7 +97,8 @@ async function syncUserRole(user) {
     const ref = doc(db, "users", user.uid);
     const snap = await getDoc(ref);
 
-    const role = snap.exists() ? snap.data()?.role : null;
+    // Schema: role lives at users/{uid}.profile.role (nested object, not a top-level field)
+    const role = snap.exists() ? snap.data()?.profile?.role : null;
 
     localStorage.setItem(ROLE_KEY, role || "user");
     localStorage.setItem(IS_ADMIN_KEY, role === "admin" ? "1" : "0");
@@ -262,6 +263,8 @@ export async function resendVerificationEmail(email, password) {
 const USER_LOCAL_KEYS = [
   "bloom_daily_logs",
   "bloom_assistant_session",
+  "bloomie_state_v2",
+  "bloomieMemory",
   "bloom_bloomie_memory",
   "bloom_avatar",
   "bloom_goal",

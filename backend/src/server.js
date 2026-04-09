@@ -21,6 +21,7 @@ import cron from "node-cron";
 import express from "express";
 import cors from "cors";
 import path from "path";
+import rateLimit from "express-rate-limit";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,24 +29,27 @@ const __dirname = path.dirname(__filename);
 
 import { db } from "./firebaseAdmin.js";
 import { runDailyRemindersJob } from "./jobs/sendDailyReminders.js";
-import cycleLogRoutes from "./routes/cycleLogs.js";
-import notificationRoutes from "./routes/notifications.js";
-import symptomLogRoutes from "./routes/symptomLogs.js";
-import consentRoutes from "./routes/consent.js";
-import catalogRoutes from "./routes/catalog.js";
-import userRoutes from "./routes/user.js";
-import authRoutes from "./routes/auth.js";
-import adminRoutes from "./routes/admin.js";
-import bloomieMemoryRoutes from "./routes/bloomieMemory.js";
-import bloomieSafetyLogRoutes from "./routes/bloomieSafetyLog.js";
-import feedbackRoutes from "./routes/feedback.js";
-import preferencesRoutes from "./routes/preferences.js";
-import cyclesMLRoutes from "./routes/cyclesML.js";
-import contactRoutes  from "./routes/contact.js";
+import { runAgeUpgradeJob }     from "./jobs/ageUpgrade.js";
+import { runTokenExpiryJob }    from "./jobs/tokenExpiry.js";
 
-import { runAgeUpgradeJob } from "./jobs/ageUpgrade.js";
-import { runTokenExpiryJob } from "./jobs/tokenExpiry.js";
-import rateLimit from "express-rate-limit";
+import cycleLogRoutes            from "./routes/cycleLogs.js";
+import notificationRoutes        from "./routes/notifications.js";
+import symptomLogRoutes          from "./routes/symptomLogs.js";
+import consentRoutes             from "./routes/consent.js";
+import catalogRoutes             from "./routes/catalog.js";
+import userRoutes                from "./routes/user.js";
+import authRoutes                from "./routes/auth.js";
+import adminRoutes               from "./routes/admin.js";
+import bloomieMemoryRoutes       from "./routes/bloomieMemory.js";
+import bloomieSafetyLogRoutes    from "./routes/bloomieSafetyLog.js";
+import bloomieAnalyticsRoutes    from "./routes/bloomieAnalytics.js";
+import bloomieAIRoutes           from "./routes/bloomieAI.js";
+import feedbackRoutes            from "./routes/feedback.js";
+import bloomieContextRoutes      from "./routes/bloomieContext.js";
+import bloomieContentMatchRoutes from "./routes/bloomieContentMatch.js";
+import preferencesRoutes         from "./routes/preferences.js";
+import cyclesMLRoutes            from "./routes/cyclesML.js";
+import contactRoutes             from "./routes/contact.js";
 
 const app = express();
 console.log(">>> SERVER.JS LOADED - version check OK <<<");
@@ -112,21 +116,25 @@ app.use("/api/logs", cycleLogRoutes);
 // /api/cycle - legacy alias kept for backwards compat
 app.use("/api/cycle", cycleLogRoutes);
 
-app.use("/api/symptoms", symptomLogRoutes);
-app.use("/api/consent", consentRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/catalog", catalogRoutes);
-app.use("/api/user", userRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/bloomie-memory",    bloomieMemoryRoutes);
-app.use("/api/bloomie-safety-log", bloomieSafetyLogRoutes);
-app.use("/api/feedback",           feedbackRoutes);
-app.use("/api/preferences",        preferencesRoutes);
-app.use("/api/cycles",             cyclesMLRoutes);
-app.use("/api/contact",            contactRoutes);
+app.use("/api/symptoms",              symptomLogRoutes);
+app.use("/api/consent",               consentRoutes);
+app.use("/api/auth",                  authRoutes);
+app.use("/catalog",                   catalogRoutes);
+app.use("/api/user",                  userRoutes);
+app.use("/api/admin",                 adminRoutes);
+app.use("/api/notifications",         notificationRoutes);
+app.use("/api/bloomie-memory",        bloomieMemoryRoutes);
+app.use("/api/bloomie-safety-log",    bloomieSafetyLogRoutes);
+app.use("/api/bloomie/analytics",     bloomieAnalyticsRoutes);
+app.use("/api/bloomie/ai",            bloomieAIRoutes);
+app.use("/api/feedback",              feedbackRoutes);
+app.use("/api/bloomie-context",       bloomieContextRoutes);
+app.use("/api/bloomie-content-match", bloomieContentMatchRoutes);
+app.use("/api/preferences",           preferencesRoutes);
+app.use("/api/cycles",                cyclesMLRoutes);
+app.use("/api/contact",               contactRoutes);
 
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   res.json({ ok: true, message: "Backend is running 🚀" });
 });
 

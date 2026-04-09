@@ -9,6 +9,7 @@
  * LATE_PERIOD_CHECK, ABOUT_BLOOM, APP_HELP, APP_LOG_PERIOD, APP_LOG_SYMPTOM,
  * APP_LOG_CYCLE, APP_SWITCH_MODE, SEE_DOCTOR_GUIDE, RESOLUTION_CHECK,
  * RESOLUTION_ASK, RESOLUTION_YES, RESOLUTION_NO, END_CHAT_CONFIRM,
+ * CLOSE_UNRESOLVED_CONFIRM,
  * CLOSE (the node), SUMMARY.
  */
 export function createCoreNodes(env, helpers) {
@@ -51,7 +52,11 @@ export function createCoreNodes(env, helpers) {
           return [...INTRO, gapNote];
         }
         const cycleSignalLine = buildCycleSignalLine("general");
-        return cycleSignalLine ? [...INTRO, cycleSignalLine] : INTRO;
+        const minorLead = ctx.isMinor
+          ? ["This is a safe space 🩷 You can share as much or as little as you want."]
+          : [];
+        const base = cycleSignalLine ? [...INTRO, cycleSignalLine] : INTRO;
+        return [...minorLead, ...base];
       },
       delayMs: 1300,
       choices: [
@@ -63,6 +68,17 @@ export function createCoreNodes(env, helpers) {
         { id: "hormones", label: "Hormones and skin",                 next: "HORMONES_SKIN_TRIAGE" },
         { id: "contra",   label: "Contraception or sexual health",    next: "EDUC_CONTRACEPTION" },
         { id: "else",     label: "Something else",                    next: "ELSE_INTRO" },
+      ],
+    },
+    POLICY_MINOR_CONSENT_REQUIRED: {
+      say: [
+        "I want to support you safely 🩷",
+        "For reproductive health chat, a parent or guardian needs to complete consent first.",
+        "Please ask a parent/guardian to help with consent, or speak with a school nurse or another trusted adult.",
+      ],
+      choices: [
+        { id: "menu", label: "Back to main options", next: "START_MENU", primary: true },
+        { id: "close", label: pickCloseLabel(), next: "CLOSE" },
       ],
     },
 
@@ -315,6 +331,62 @@ export function createCoreNodes(env, helpers) {
           { id: "else",   label: "Something else",           next: "ELSE_INTRO" },
         ];
       },
+    },
+
+    VAGUE_TRIAGE: {
+      say: [
+        "I hear you 🩷 Let's narrow it down together.",
+        "What feels off most right now?",
+      ],
+      question: "Main concern right now",
+      choices: [
+        { id: "pain",      label: "Pain",               next: "PELVIC_INTRO", primary: true, onSelect() { ctx.topic = "pelvic_pain"; } },
+        { id: "bleeding",  label: "Bleeding",           next: "HEAVY_INTRO", onSelect() { ctx.topic = "heavy_bleeding"; } },
+        { id: "discharge", label: "Discharge",          next: "ELSE_DISCHARGE_ENTRY", onSelect() { ctx.topic = "discharge"; } },
+        { id: "missed",    label: "Missed period",      next: "LATE_INTRO", onSelect() { ctx.topic = "late_period"; } },
+        { id: "mood",      label: "Mood",               next: "MOOD_SAFETY_CHECK", onSelect() { ctx.topic = "mood_changes"; } },
+        { id: "preg",      label: "Pregnancy concern",  next: "PREGNANCY_ENTRY", onSelect() { ctx.topic = "pregnancy"; } },
+        { id: "other",     label: "Other",              next: "ELSE_NOT_SURE_ROUTE" },
+      ],
+    },
+
+    ANXIETY_TIMELINE: {
+      say: [
+        "I get why this feels scary 🩷 Let's take this step by step.",
+        "When did this happen?",
+      ],
+      question: "Pregnancy concern timeline",
+      choices: [
+        { id: "lt3d", label: "Within the last 3 days", next: "ANXIETY_KEY_CHECK", primary: true },
+        { id: "3to7", label: "About 3–7 days ago", next: "ANXIETY_KEY_CHECK" },
+        { id: "gt7",  label: "More than a week ago", next: "ANXIETY_KEY_CHECK" },
+        { id: "ns",   label: "Not sure", next: "ANXIETY_KEY_CHECK" },
+      ],
+    },
+    ANXIETY_KEY_CHECK: {
+      say: [
+        "Thanks for sharing that 🩷",
+        "Quick key check: was there unprotected sex, a condom break/slip, or a clearly late period?",
+      ],
+      question: "Key pregnancy risk check",
+      choices: [
+        { id: "yes", label: "Yes / maybe", next: "ANXIETY_GUIDE", primary: true },
+        { id: "no",  label: "No", next: "ANXIETY_GUIDE" },
+        { id: "ns",  label: "Not sure", next: "ANXIETY_GUIDE" },
+      ],
+    },
+    ANXIETY_GUIDE: {
+      say: [
+        "A lot of people feel overwhelmed in this moment, and you're not alone 🩷",
+        "I can't diagnose from chat, but we can reduce uncertainty step by step: check timing, consider a test window, and watch for any urgent symptoms.",
+        "If severe one-sided pain, very heavy bleeding, dizziness, or fainting shows up, seek urgent care right away.",
+      ],
+      choices: [
+        { id: "test", label: "Help me with test timing", next: "TEST_INTRO", primary: true },
+        { id: "late", label: "My period is late", next: "LATE_INTRO" },
+        { id: "preg", label: "Pregnancy concern options", next: "PREGNANCY_ENTRY" },
+        { id: "menu", label: pickMainLabel(), next: "START_MENU" },
+      ],
     },
 
     /* ─────────────── SAFETY & CRITICAL REDIRECT NODES ─────────────── */
@@ -666,6 +738,32 @@ export function createCoreNodes(env, helpers) {
       ],
     },
 
+    // Minor-safe support: fear of telling a parent/guardian
+    MINOR_TRUSTED_ADULT_SUPPORT: {
+      say: [
+        "I understand that fear 🩷 You're not in trouble, and you're not alone in this.",
+        "If your period is irregular or confusing, that's common in the first 1–3 years after periods start.",
+        "If telling your mom feels hard, could a school nurse, guidance counselor, aunt, or another trusted adult support you?",
+      ],
+      choices: [
+        { id: "cycle", label: "I want help with my symptoms first", next: "ELSE_NOT_SURE_ROUTE", primary: true },
+        { id: "safe",  label: "How do I start that conversation?",  next: "MINOR_SAFE_PROVIDER_NUDGE" },
+        { id: "menu",  label: pickMainLabel(),                        next: "START_MENU" },
+      ],
+    },
+
+    MINOR_SAFE_PROVIDER_NUDGE: {
+      say: [
+        "You can keep it simple: “My period feels off and I want support.” 🩷",
+        "You don't need perfect words, just enough to ask for help.",
+        "If bleeding gets very heavy, pain is severe, or you feel faint, seek urgent care with an adult right away.",
+      ],
+      choices: [
+        { id: "cycle", label: "Okay, check my symptoms", next: "ELSE_NOT_SURE_ROUTE", primary: true },
+        { id: "menu",  label: pickMainLabel(),            next: "START_MENU" },
+      ],
+    },
+
     // Privacy / data info
     PRIVACY_INFO: {
       say: [
@@ -716,8 +814,11 @@ export function createCoreNodes(env, helpers) {
         }
         const lmp = effectiveLmp();
         const cycleLen = effectiveCycleLength();
-        const expectedNext = cd.nextPeriodDate || addDays(lmp, cycleLen);
-        const daysLate = daysBetween(expectedNext, new Date());
+        const daysUntil = daysUntilNextPeriod();
+        if (typeof daysUntil !== "number") {
+          return ["I couldn't line up your next expected period right now 🩷 Check that your logged dates are up to date and try again."];
+        }
+        const daysLate = -daysUntil;
 
         if (daysLate < 0) {
           const daysLeft = Math.abs(daysLate);
@@ -759,8 +860,8 @@ export function createCoreNodes(env, helpers) {
       },
       choices() {
         const late = hasLmpData() && (() => {
-          const expected = cd.nextPeriodDate || addDays(effectiveLmp(), effectiveCycleLength());
-          return daysBetween(expected, new Date()) > 0;
+          const daysUntil = daysUntilNextPeriod();
+          return typeof daysUntil === "number" ? daysUntil < 0 : false;
         })();
         const base = [
           { id: "walk",  label: "Walk me through possible reasons", next: "LATE_INTRO", primary: true },
@@ -1049,6 +1150,27 @@ export function createCoreNodes(env, helpers) {
       choices: [
         { id: "end_chat_confirm", label: "End Chat", next: "_END_CHAT_RESET",  primary: true },
         { id: "cancel",           label: "Cancel",   next: "_END_CHAT_CANCEL" },
+      ],
+    },
+
+    CLOSE_UNRESOLVED_CONFIRM: {
+      say(ctx, payload) {
+        const TOPIC_LABELS = {
+          late: "late or missed period",
+          heavy: "heavy bleeding",
+          spot: "spotting",
+          mood: "mood or energy changes",
+          pelvic: "pelvic pain or cramps",
+          pregnancy: "pregnancy concerns",
+          discharge: "discharge",
+        };
+        const topic = ctx.pendingUnresolvedTopic;
+        const label = payload?.unresolvedLabel || TOPIC_LABELS[topic] || topic || "something you mentioned";
+        return [`Before you go - you also mentioned ${label} earlier. Do you want to quickly look at that too? 💗`];
+      },
+      choices: [
+        { id: "yes_unresolved", label: "Yes, let’s look at that", next: "_UNRESOLVED_YES", primary: true },
+        { id: "no_done", label: "No, I’m done", next: "_UNRESOLVED_NO" },
       ],
     },
 

@@ -379,6 +379,33 @@ describe("confidence router — MEDIUM tier", () => {
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().lastConfidence?.competitors.length).toBeGreaterThan(0);
   });
+
+  it("vague reply in MEDIUM_CONFIRM does not silently clear pendingRoute", () => {
+    withConfidence("medium", "late", ["pelvic"]);
+    sendMessage(CANONICAL_INPUT);
+    expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
+    expect(chat.getState().pendingRoute).not.toBeNull();
+
+    sendMessage("hmm");
+    expect(chat.getState().pendingRoute).not.toBeNull();
+  });
+
+  it("stale pendingRoute does not hijack unrelated turns outside MEDIUM_CONFIRM", () => {
+    withConfidence("medium", "late", ["pelvic"]);
+    sendMessage(CANONICAL_INPUT);
+    const expectedRoute = chat.getState().pendingRoute?.next;
+    expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
+    expect(expectedRoute).toBeTruthy();
+
+    // Leave MEDIUM_CONFIRM via an unrelated urgent message; pendingRoute remains stale.
+    sendMessage("i am fainting and bleeding heavily right now");
+    expect(chat.getState().state).toBe("HEAVY_URGENT");
+    expect(chat.getState().pendingRoute).not.toBeNull();
+
+    // Unrelated follow-up must not consume/route using stale pendingRoute.
+    sendMessage("hmm");
+    expect(chat.getState().state).not.toBe(expectedRoute);
+  });
 });
 
 

@@ -5,7 +5,7 @@ import { isAccountMode, isAnonMode } from "./mode.js";
 import { getUser } from "./auth.js";
 import { initTheme } from "./theme-manager.js";
 
-// ✅ Single source of truth for this key
+// Single source of truth for this key
 export const MODE_BANNER_ONCE_KEY = "bloom_show_mode_banner_once";
 
 // Initialize theme on every page load (prevents flash of wrong theme)
@@ -113,7 +113,22 @@ export function renderNav(activePage = "") {
   });
 
   linkContainer.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => linkContainer.classList.remove("open"));
+    a.addEventListener("click", () => {
+      linkContainer.classList.remove("open");
+      // Optional perf trace: records nav click timing for next page.
+      const perfOn =
+        localStorage.getItem("bloom_perf_debug") === "1" ||
+        new URLSearchParams(window.location.search).get("perf") === "1";
+      if (perfOn) {
+        try {
+          sessionStorage.setItem("bloom_nav_perf", JSON.stringify({
+            from: activePage || "unknown",
+            to: a.getAttribute("href") || "",
+            ts: Date.now(),
+          }));
+        } catch (_) {}
+      }
+    });
   });
 
   // ── Back button (inject for non-primary pages) ───────────────────────────

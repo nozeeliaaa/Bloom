@@ -5,10 +5,127 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bloom</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: #fff7fb;
+        color: #3b2a33;
+      }
+      .root-redirect-wrap {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1.25rem;
+      }
+      .root-redirect-card {
+        width: min(540px, 92vw);
+        background: #ffffff;
+        border: 1px solid #f4d7e7;
+        border-radius: 14px;
+        padding: 1rem 1rem 1.1rem;
+        box-shadow: 0 8px 24px rgba(31, 22, 28, 0.06);
+      }
+      .root-redirect-title {
+        font-weight: 700;
+        margin: 0 0 0.35rem;
+      }
+      .root-redirect-text {
+        margin: 0;
+        color: #674b59;
+        font-size: 0.95rem;
+        line-height: 1.45;
+      }
+      .root-redirect-actions {
+        margin-top: 0.8rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .root-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 0.5rem 0.9rem;
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border: 1px solid #e4b8d2;
+        color: #7b3f63;
+        background: #fff;
+        cursor: pointer;
+      }
+      .root-btn--primary {
+        background: #d85a98;
+        color: #fff;
+        border-color: #d85a98;
+      }
+    </style>
   </head>
   <body>
+    <div class="root-redirect-wrap" id="root-redirect-fallback" hidden>
+      <div class="root-redirect-card">
+        <p class="root-redirect-title">We are having trouble opening Bloom.</p>
+        <p class="root-redirect-text" id="root-redirect-message">
+          You can try again, or open the home page directly.
+        </p>
+        <div class="root-redirect-actions">
+          <button class="root-btn" type="button" id="root-retry-btn">Try again</button>
+          <a class="root-btn root-btn--primary" id="root-open-home" href="#">Open Home</a>
+        </div>
+      </div>
+    </div>
     <script>
-      window.location.replace("/pages/home.html");
+      (function redirectFromRootSafely() {
+        const fallback = document.getElementById("root-redirect-fallback");
+        const msg = document.getElementById("root-redirect-message");
+        const retryBtn = document.getElementById("root-retry-btn");
+        const homeLink = document.getElementById("root-open-home");
+
+        const homeUrl = new URL("pages/home.html", window.location.href);
+        const privacyUrl = new URL("pages/privacy.html", window.location.href);
+        const termsUrl = new URL("pages/terms.html", window.location.href);
+        const alreadyOnHome = /\/pages\/home\.html\/?$/.test(window.location.pathname);
+        if (homeLink) homeLink.href = homeUrl.href;
+
+        function showFallback(text) {
+          if (msg) msg.textContent = text || "You can try again, or open the home page directly.";
+          if (fallback) fallback.hidden = false;
+        }
+
+        async function goHome() {
+          try {
+            const ctrl = new AbortController();
+            const timeout = setTimeout(() => ctrl.abort(), 1800);
+            const res = await fetch(homeUrl.href, { method: "GET", cache: "no-store", signal: ctrl.signal });
+            clearTimeout(timeout);
+            if (!res.ok) {
+              showFallback("Home is not reachable right now. Please try again in a moment.");
+              return;
+            }
+            window.location.replace(homeUrl.href);
+          } catch (_) {
+            showFallback("We could not reach home right now. Check your connection and try again.");
+          }
+        }
+
+        if (retryBtn) retryBtn.addEventListener("click", goHome);
+
+        // Support clean legal routes and root fallback.
+        const p = window.location.pathname;
+        if (p === "/privacy" || p === "/privacy/") {
+          window.location.replace(privacyUrl.href);
+          return;
+        }
+        if (p === "/terms" || p === "/terms/") {
+          window.location.replace(termsUrl.href);
+          return;
+        }
+        // Only redirect from root/index-like entry paths and avoid loops.
+        const isRootEntry = p === "/" || p === "/index.html" || p.endsWith("/index.html");
+        if (isRootEntry && !alreadyOnHome) goHome();
+      })();
     </script>
   </body>
 </html>

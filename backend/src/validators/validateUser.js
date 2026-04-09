@@ -1,6 +1,6 @@
 // src/validators/validateUser.js
 
-const VALID_GOALS = ["period", "no_period", "ttc", "perimenopause", "pregnancy"];
+const VALID_GOALS = ["period", "track_symptoms", "ttc", "perimenopause", "pregnancy"];
 const VALID_MODES = ["account", "guest"];
 const VALID_ROLES = ["user", "teen", "guardian", "admin"];
 

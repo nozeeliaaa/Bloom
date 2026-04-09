@@ -209,8 +209,12 @@ function normaliseMemoryForRead(data) {
     ? data.lastSessionDate.slice(0, 10)
     : null;
 
-  // Same-day session — return as-is; stale session — reset transient flags.
-  if (lastDate && lastDate >= todayUTC) return data;
+  // Same-day session — return as-is.
+  // Any other date (past OR future) resets transient flags:
+  //   lastDate < todayUTC  → stale session from a prior day
+  //   lastDate > todayUTC  → future-dated timestamp (device clock skew, bad write)
+  // Using strict equality means clock skew can never keep sticky flags alive.
+  if (lastDate && lastDate === todayUTC) return data;
 
   return {
     ...data,

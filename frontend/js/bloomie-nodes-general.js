@@ -372,7 +372,7 @@ export function createGeneralNodes(env, helpers) {
         "What you're describing, especially the smell, colour, or irritation, is worth getting checked 🩷",
         "Unusual discharge with those qualities can sometimes signal a bacterial or yeast infection, or occasionally an STI, and those are all treatable.",
         "A healthcare provider or pharmacist can do a proper check. It's a quick visit and you deserve to know what's going on.",
-        "In the meantime, avoid scented products down there and wear breathable cotton underwear if you can.",
+        "In the meantime, avoid scented products or harsh home remedies down there, and wear breathable cotton underwear if you can.",
       ],
       choices: [
         { id: "map",  label: "Find care near me",  next: "START", action: "OPEN_MAP", primary: true },
@@ -569,7 +569,7 @@ export function createGeneralNodes(env, helpers) {
         if (!p) return ["Couldn't work that out right now 🩷 Check that your last period date is up to date on the dashboard."];
         const lmp = effectiveLmp();
         const next = cd.nextPeriodDate || addDays(lmp, effectiveCycleLength());
-        const daysLeft = daysBetween(new Date(), next);
+        const daysLeft = daysUntilNextPeriod();
         const periodNote = daysLeft > 0
           ? `Your next period is expected in about ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`
           : "Your period may be due around now if it hasn't come, keep an eye on it.";
@@ -623,7 +623,10 @@ export function createGeneralNodes(env, helpers) {
           ];
         }
         const next = cd.nextPeriodDate || addDays(cd.lmp, cd.cycleLength);
-        const daysLeft = daysBetween(new Date(), next);
+        const daysLeft = daysUntilNextPeriod();
+        if (typeof daysLeft !== "number") {
+          return ["I couldn't line up your next expected period right now 🩷 Check that your logged dates are up to date and try again."];
+        }
         const nextStr = fmtDate(next);
         const ttcNote = userMode.isTTC
           ? `In TTC mode, ovulation likely falls around ${fmtDate(addDays(cd.lmp, Math.round(cd.cycleLength / 2)))} about ${Math.round(cd.cycleLength / 2)} days into your cycle.`

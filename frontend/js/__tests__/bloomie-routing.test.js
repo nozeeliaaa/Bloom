@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { createNodes } from "../bloomie-nodes.js";
 import {
   normalizeText,
   looksLikeGibberish,
@@ -13,6 +14,41 @@ import {
   computeRouteConfidence,
   INTENT_TO_NODE,
 } from "../bloomie-routing.js";
+
+function getRegisteredNodeIds() {
+  const envBase = {
+    ctx: {
+      state: "START",
+      history: [],
+      answers: [],
+      entityHistory: [],
+      timers: new Set(),
+      adviceGiven: new Set(),
+      conversationProfile: { sessionDepth: 1, concernsResolved: [], concernsUnresolved: [] },
+      contentSuggestionsShown: new Set(),
+      declinedSuggestions: new Set(),
+      reportedConditions: [],
+      captureData: {},
+    },
+    cd: {},
+    userMode: {
+      isCycleTracking: false, isTTC: false, isPregnancy: false, isPostpartum: false, isBrowsing: true,
+    },
+    pick: (arr) => (Array.isArray(arr) ? arr[0] : arr),
+    greet: () => "Hey",
+    say: () => {},
+    transition: () => {},
+  };
+  const env = new Proxy(envBase, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      return () => [];
+    },
+  });
+  return new Set(Object.keys(createNodes(env)));
+}
+
+const REGISTERED_NODE_IDS = getRegisteredNodeIds();
 
 // ─── normalizeText ────────────────────────────────────────────────────────────
 
@@ -174,11 +210,12 @@ describe("resolveSignals — safety-critical combinations", () => {
     expect(route.next).toBe("HEAVY_INTRO");
   });
 
-  it("pelvic + heavy → HEAVY_RISK_SYMPTOMS", () => {
+  it("pelvic + heavy → HEAVY_ROUTE_C and node exists", () => {
     const { sig, has } = scoreSignals("heavy bleeding with bad pelvic pain and cramps");
     const route = resolveSignals(sig, has);
     expect(route).not.toBeNull();
-    expect(route.next).toBe("HEAVY_RISK_SYMPTOMS");
+    expect(route.next).toBe("HEAVY_ROUTE_C");
+    expect(REGISTERED_NODE_IDS.has(route.next)).toBe(true);
   });
 
   it("late + pelvic (no heavy) → LATE_INTRO", () => {
