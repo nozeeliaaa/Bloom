@@ -21,6 +21,11 @@ import {
   saveBloomieMemoryLocal,
   clearBloomieMemoryLocal,
 } from "./bloom-storage.js";
+import {
+  normalizeCustomSymptomText,
+  sanitizeCustomSymptomNote,
+  sanitizeCustomSymptomText,
+} from "./custom-symptoms.js";
 
 const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
@@ -52,6 +57,11 @@ function setCloudSyncedBanner() {
 let _logsCache = null;
 let _logsCacheMode = null;
 let _logsInFlight = null;
+let _symptomCatalogCache = null;
+let _symptomCatalogFetchedAt = 0;
+let _symptomCatalogByCode = new Map();
+let _symptomCatalogByLabel = new Map();
+const SYMPTOM_CATALOG_TTL_MS = 10 * 60 * 1000;
 
 export function invalidateLogsCache() {
   _logsCache = null;
@@ -98,9 +108,14 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   }
 }
 
-// Convert UI label to backend symptom code.
-// Example: "Back pain" -> "BACK_PAIN"
-function toSymptomCode(label) {
+function normalizeSymptomLabel(label) {
+  return String(label || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function fallbackSymptomCodeFromLabel(label) {
   return String(label || "")
     .trim()
     .toUpperCase()
@@ -108,9 +123,7 @@ function toSymptomCode(label) {
     .replace(/^_+|_+$/g, "");
 }
 
-// Convert backend code back to readable label for UI.
-// Example: "BACK_PAIN" -> "Back Pain"
-function fromSymptomCode(code) {
+function fallbackLabelFromSymptomCode(code) {
   return String(code || "")
     .trim()
     .toLowerCase()
@@ -118,6 +131,77 @@ function fromSymptomCode(code) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function indexSymptomCatalog(symptoms = []) {
+  _symptomCatalogByCode = new Map();
+  _symptomCatalogByLabel = new Map();
+
+  for (const item of symptoms) {
+    const code = String(item?.key || item?.id || "").trim().toUpperCase();
+    const label = String(item?.label || "").trim();
+    if (code) _symptomCatalogByCode.set(code, { ...item, key: code, label });
+    if (label) _symptomCatalogByLabel.set(normalizeSymptomLabel(label), code);
+  }
+}
+
+export async function getSymptomCatalog({ timeoutMs = 3500, force = false } = {}) {
+  if (!isAccountMode()) return _symptomCatalogCache || [];
+
+  const now = Date.now();
+  if (
+    !force &&
+    Array.isArray(_symptomCatalogCache) &&
+    _symptomCatalogCache.length > 0 &&
+    now - _symptomCatalogFetchedAt < SYMPTOM_CATALOG_TTL_MS
+  ) {
+    return _symptomCatalogCache;
+  }
+
+  try {
+    const headers = await authHeaders();
+    if (!headers) return _symptomCatalogCache || [];
+
+    const res = await fetchWithTimeout(
+      apiUrl("/catalog/symptoms?teenSafe=true&excludeSensitive=true"),
+      { headers },
+      timeoutMs
+    );
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.warn("Symptom catalog fetch failed:", res.status, txt);
+      return _symptomCatalogCache || [];
+    }
+
+    const data = await res.json();
+    const symptoms = Array.isArray(data?.symptoms) ? data.symptoms : [];
+    _symptomCatalogCache = symptoms;
+    _symptomCatalogFetchedAt = Date.now();
+    indexSymptomCatalog(symptoms);
+    return symptoms;
+  } catch (e) {
+    console.warn("Symptom catalog fetch error:", e);
+    return _symptomCatalogCache || [];
+  }
+}
+
+// Convert UI label to backend symptom code.
+// Example: "Back pain" -> "BACK_PAIN"
+function toSymptomCode(label) {
+  const normalized = normalizeSymptomLabel(label);
+  const mapped = normalized ? _symptomCatalogByLabel.get(normalized) : null;
+  if (mapped) return mapped;
+  return fallbackSymptomCodeFromLabel(label);
+}
+
+// Convert backend code back to readable label for UI.
+// Example: "BACK_PAIN" -> "Back Pain"
+function fromSymptomCode(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  const mapped = _symptomCatalogByCode.get(normalized);
+  if (mapped?.label) return mapped.label;
+  return fallbackLabelFromSymptomCode(normalized);
 }
 
 // Merge cloud cycle logs + cloud symptom logs into one calendar-friendly object
@@ -130,9 +214,15 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
 
     // Map numeric flowLevel back to string used by the frontend
     const NUM_TO_FLOW = { 0: "none", 1: "light", 2: "medium", 3: "heavy" };
-    const flowStr = entry.flowLevel != null
-      ? (NUM_TO_FLOW[entry.flowLevel] ?? "none")
-      : "none";
+    let flowStr = "none";
+
+    if (entry.flowLevel != null) {
+      flowStr = NUM_TO_FLOW[entry.flowLevel] ?? "none";
+    }
+    // Fallback in case backend sends string flow instead of numeric flowLevel.
+    if (flowStr === "none" && entry.flow) {
+      flowStr = String(entry.flow);
+    }
 
     merged[dateKey] = {
       ...(merged[dateKey] || {}),
@@ -146,23 +236,47 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
     const dateKey = entry?.dateKey;
     if (!dateKey) continue;
 
-    const symptoms = Array.isArray(entry.items)
-      ? entry.items.map((it) => fromSymptomCode(it?.code)).filter(Boolean)
-      : [];
+    const symptoms = [];
+    const symptomCodes = {};
+    if (Array.isArray(entry.items)) {
+      entry.items.forEach((it) => {
+        const code = String(it?.code || "").trim().toUpperCase();
+        const label = fromSymptomCode(code);
+        if (!label) return;
+        symptoms.push(label);
+        if (code) symptomCodes[label] = code;
+      });
+    }
 
     const symptomSeverity = {};
     if (Array.isArray(entry.items)) {
       entry.items.forEach((it) => {
-        const label = fromSymptomCode(it?.code);
+        const code = String(it?.code || "").trim().toUpperCase();
+        const label = fromSymptomCode(code);
         if (label) symptomSeverity[label] = Number(it?.severity ?? 3);
       });
     }
+
+    const otherSymptoms = Array.isArray(entry.otherSymptoms)
+      ? entry.otherSymptoms
+          .map((it) => ({
+            text: sanitizeCustomSymptomText(it?.text),
+            normalizedText: normalizeCustomSymptomText(it?.normalizedText || it?.text),
+            severity: Number(it?.severity ?? 3),
+            note: sanitizeCustomSymptomNote(it?.note),
+            createdAt: typeof it?.createdAt === "string" ? it.createdAt : "",
+            dateKey: it?.dateKey || dateKey,
+          }))
+          .filter((it) => it.text)
+      : [];
 
     merged[dateKey] = {
       ...(merged[dateKey] || {}),
       date: dateKey,
       symptoms,
       symptomSeverity,
+      symptomCodes,
+      otherSymptoms,
     };
   }
 
@@ -176,12 +290,30 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
 export async function saveDailyLog(dateKey, log) {
   // Always write local first
   const all = readJSON(LOGS_KEY, {});
-  all[dateKey] = { ...(all[dateKey] || {}), ...log, date: dateKey };
+  const localSymptomLabels = Array.isArray(log?.symptoms) ? log.symptoms : [];
+  const localSymptomCodes = {};
+  localSymptomLabels.forEach((label) => {
+    const code = toSymptomCode(label);
+    if (code) localSymptomCodes[label] = code;
+  });
+
+  all[dateKey] = {
+    ...(all[dateKey] || {}),
+    ...log,
+    date: dateKey,
+    symptomCodes: {
+      ...(all[dateKey]?.symptomCodes || {}),
+      ...localSymptomCodes,
+    },
+  };
   writeJSON(LOGS_KEY, all);
 
   if (!isAccountMode()) return all[dateKey];
 
   try {
+    // Hydrate label->code map so we send canonical backend keys when available.
+    await getSymptomCatalog({ timeoutMs: 3000 }).catch(() => []);
+
     const headers = await authHeaders();
     if (!headers) return all[dateKey];
 
@@ -214,18 +346,46 @@ export async function saveDailyLog(dateKey, log) {
     const symptomsArray = Array.isArray(localEntry.symptoms)
       ? localEntry.symptoms
       : [];
+    const otherSymptomsArray = Array.isArray(localEntry.otherSymptoms)
+      ? localEntry.otherSymptoms
+          .map((it) => ({
+            text: sanitizeCustomSymptomText(it?.text),
+            normalizedText: normalizeCustomSymptomText(it?.normalizedText || it?.text),
+            severity: Number(it?.severity ?? 3),
+            note: sanitizeCustomSymptomNote(it?.note),
+            createdAt: typeof it?.createdAt === "string" ? it.createdAt : new Date().toISOString(),
+            dateKey,
+          }))
+          .filter((it) => it.text)
+      : [];
 
     if (symptomsArray.length > 0) {
+      const symptomCodeMap = {};
       const items = symptomsArray.map((symptom) => ({
-        code: toSymptomCode(symptom),
+        code: (() => {
+          const code = toSymptomCode(symptom);
+          if (code) symptomCodeMap[symptom] = code;
+          return code;
+        })(),
         severity: Number(localEntry.symptomSeverity?.[symptom] ?? 3),
         note: "",
       }));
 
+      if (Object.keys(symptomCodeMap).length) {
+        all[dateKey] = {
+          ...(all[dateKey] || {}),
+          symptomCodes: {
+            ...(all[dateKey]?.symptomCodes || {}),
+            ...symptomCodeMap,
+          },
+        };
+        writeJSON(LOGS_KEY, all);
+      }
+
       const symptomRes = await fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
         method: "PUT",
         headers,
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, otherSymptoms: otherSymptomsArray }),
       });
 
       if (!symptomRes.ok) {
@@ -281,11 +441,13 @@ export async function getAllLogs({ timeoutMs = 4500 } = {}) {
     try {
       const headers = await authHeaders();
       if (!headers) return local;
+      const catalogPromise = getSymptomCatalog({ timeoutMs: Math.min(timeoutMs, 3500) }).catch(() => []);
 
       const [cycleRes, symptomRes] = await Promise.all([
         fetchWithTimeout(apiUrl("/api/logs"), { headers }, timeoutMs),
         fetchWithTimeout(apiUrl("/api/symptoms"), { headers }, timeoutMs),
       ]);
+      await catalogPromise;
 
       if (!cycleRes.ok) {
         const txt = await cycleRes.text().catch(() => "");

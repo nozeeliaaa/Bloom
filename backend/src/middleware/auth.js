@@ -46,7 +46,6 @@ export async function requireAuth(req, res, next) {
         role: "user",
         ageBand: null,
         yob: null,
-        consentSensitive: false,
       };
 
       return next();
@@ -118,14 +117,27 @@ export async function requireAuth(req, res, next) {
     const safeProfile = data.profile || {};
     const ageBand = deriveAgeBand(safeProfile.yearOfBirth);
 
+    if (safeProfile.yearOfBirth && safeProfile.ageBand !== ageBand) {
+      await userRef.set(
+        {
+          profile: { ageBand },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      data.profile = {
+        ...safeProfile,
+        ageBand,
+      };
+    }
+
     req.user = {
       uid: decoded.uid,
       email: decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role: decoded.role || data.role || profile.role || "user",
+      role: decoded.role || data.role || "user",
       ageBand,
       yob: safeProfile.yearOfBirth || null,
-      consentSensitive: safeProfile.consentSensitive === true,
     };
 
     return next();

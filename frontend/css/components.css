@@ -888,21 +888,25 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--color-primary-lightest);
   flex-shrink: 0;
   transition: background var(--transition);
 }
-.chip-icon-img {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-  display: block;
+.chip-icon-emoji {
+  font-size: 0.9rem;
+  background: transparent;
+  width: auto;
+  height: auto;
+  margin-right: 0.1rem;
 }
 .chip.selected .chip-icon-wrap {
   background: color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+.chip.selected .chip-icon-emoji {
+  background: transparent;
 }
 .severity-symptom-name {
   display: inline-flex;

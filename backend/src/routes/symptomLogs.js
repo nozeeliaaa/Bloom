@@ -19,8 +19,14 @@ function sanitizeText(s, max = 300) {
   return s.trim().slice(0, max);
 }
 
-function normalizeOtherSymptomText(s) {
-  return sanitizeText(s, 80).toLowerCase().replace(/\s+/g, " ").trim();
+async function ensureSymptomLogsParent(uid) {
+  const parentRef = db.collection("symptomLogs").doc(uid);
+  const snap = await parentRef.get();
+  if (!snap.exists) {
+    await parentRef.set({ uid, createdAt: new Date(), updatedAt: new Date() });
+  } else {
+    await parentRef.set({ updatedAt: new Date() }, { merge: true });
+  }
 }
 
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
@@ -37,17 +43,13 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
     }
 
     const items = Array.isArray(req.body.items) ? req.body.items : [];
-    const otherSymptoms = Array.isArray(req.body.otherSymptoms) ? req.body.otherSymptoms : [];
 
-    if (items.length === 0 && otherSymptoms.length === 0) {
-      return res.status(400).json({ error: "items or otherSymptoms is required and cannot be empty" });
+    if (items.length === 0) {
+      return res.status(400).json({ error: "items array is required and cannot be empty" });
     }
 
     if (items.length > 40) {
       return res.status(400).json({ error: "Too many symptom items for one day (max 40)" });
-    }
-    if (otherSymptoms.length > 15) {
-      return res.status(400).json({ error: "Too many custom symptoms for one day (max 15)" });
     }
 
     const cleaned = [];
@@ -91,31 +93,6 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       });
     }
 
-    const cleanedOther = [];
-    for (let idx = 0; idx < otherSymptoms.length; idx++) {
-      const it = otherSymptoms[idx];
-      const text = sanitizeText(it?.text, 80);
-      if (!text) {
-        return res.status(400).json({ error: `otherSymptoms[${idx}].text is required` });
-      }
-
-      const severity = Number(it?.severity);
-      if (!isValidSeverity(severity)) {
-        return res.status(400).json({
-          error: `otherSymptoms[${idx}].severity must be an integer between 0 and 5`,
-        });
-      }
-
-      cleanedOther.push({
-        text,
-        normalizedText: normalizeOtherSymptomText(text),
-        severity,
-        note: sanitizeText(it?.note, 200),
-        createdAt: sanitizeText(it?.createdAt, 40) || new Date().toISOString(),
-        dateKey,
-      });
-    }
-
     const docRef = db
       .collection("symptomLogs")
       .doc(uid)
@@ -125,12 +102,13 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
     const payload = {
       dateKey,
       items: cleaned,
-      otherSymptoms: cleanedOther,
       updatedAt: new Date(),
     };
 
     const snap = await docRef.get();
     if (!snap.exists) payload.createdAt = new Date();
+
+    await ensureSymptomLogsParent(uid);
 
     await docRef.set(payload, { merge: true });
 
@@ -219,7 +197,10 @@ router.delete("/", requireAuth, async (req, res) => {
       docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
       await batch.commit();
     }
-
+    await db.collection("symptomLogs").doc(uid).set(
+      { updatedAt: new Date() },
+      { merge: true }
+    );
     return res.json({ ok: true, deleted: docs.length });
   } catch (err) {
     console.error("DELETE /api/symptoms error:", err);
@@ -243,6 +224,11 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey)
       .delete();
+
+    await db.collection("symptomLogs").doc(uid).set(
+      { updatedAt: new Date() },
+      { merge: true }
+    );
 
     return res.json({ ok: true });
   } catch (err) {

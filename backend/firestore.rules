@@ -1,368 +1,178 @@
-/**
- * Bloom Firestore Security Rules
- *
- * ── Design principles ─────────────────────────────────────────────────────
- *  1. Every authenticated user can only access their own personal data.
- *     Ownership is checked by comparing request.auth.uid to:
- *       • the document ID when the collection is keyed by UID, OR
- *       • a `uid` field inside the document.
- *  2. Backend-only collections (written exclusively via Admin SDK) deny all
- *     client writes with `allow write: if false`.
- *  3. Public reference data (clinics, symptom catalog, published pamphlets)
- *     is readable by any authenticated user.
- *  4. A catch-all at the end denies everything not explicitly listed.
- *
- * ── Schema assumptions ────────────────────────────────────────────────────
- *  • users/{uid}
- *      { profile: { role, goal, mode, yearOfBirth, nickname, consentSensitive,
- *                   remindersEnabled, reminderTime },
- *        createdAt, updatedAt }
- *
- *  • preferences/{uid}
- *      { theme, blurMode, discreetMode, compact, hideSensitive,
- *        reminders: { enabled, types, quietHours }, notifications, updatedAt }
- *
- *  • cycleLogs/{uid}/entries/{dateKey}
- *      { dateKey, periodDay, flowLevel, hadSex, contraceptionUsed,
- *        notes, createdAt, updatedAt }
- *      The parent document cycleLogs/{uid} itself is never written by the
- *      client — it is implicit in the subcollection path.
- *
- *  • symptomLogs/{uid}/entries/{dateKey}
- *      { dateKey, items: [{ code, severity, note }], createdAt, updatedAt }
- *      Same parent-doc note as cycleLogs above.
- *
- *  • bloomieMemory/{uid}
- *      { uid, createdAt, updatedAt, lastSessionDate, sessionCount,
- *        lastIntent, lastPatternSummary, lastSeverity, lastRedFlagRoute,
- *        lastSymptoms, recentTopics, recentConcernCategory,
- *        lastUrgencyLevel, lastDuration, lastPregnancyChance,
- *        lastGreetingUsed, contentSuggestionsShown, declinedSuggestions,
- *        lastResolutionStatus, closeIntentDetected, lastOosCategory,
- *        oosCount, lastSafeRedirect, urgentFlag, redFlagNoticeShown,
- *        reportedConditions, activeTopicCluster, lastConcernsResolved,
- *        lastConcernsUnresolved, lastAdviceGiven }
- *      All writes go through /api/bloomie-memory (Admin SDK). No client writes.
- *
- *  • consents/{teenUid_guardianUid}
- *      Composite key. Fields: teenUid, guardianUid, status, scope,
- *      requestedAt, statusUpdatedAt, decidedAt
- *
- *  • relationships/{teenUid_guardianUid}
- *      Mirrors consents. Fields: teenUid, guardianUid, status,
- *      invitedAt, activatedAt, revokedAt
- *
- *  • exports/{exportId}
- *      { uid, ... }  — uid must match the requesting user
- *
- *  • deviceTokens/{tokenId}
- *      { uid, token, ... }  — uid must match the requesting user
- *
- *  • bloomieSafetyLogs, bloomie_analytics, bloomieFeedback,
- *    notificationsQueue, reports, guardianSummaries, auditLogs
- *      — backend-only write; admin-only or owner-only read
- *
- * ── Admin SDK note ────────────────────────────────────────────────────────
- *  All backend routes run under the Firebase Admin SDK which bypasses these
- *  rules entirely. Rules here protect only direct Firestore SDK calls made
- *  from the browser client.
- */
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Helper functions ─────────────────────────────────────────────────
+    // ─── Helpers ────────────────────────────────────────────────────────────
 
-    /** Returns true when the request comes from a signed-in user. */
+    // Is the request from a signed-in user?
     function isAuth() {
       return request.auth != null;
     }
 
-    /**
-     * Returns true when the signed-in user's UID matches the given path
-     * segment. Use this for collections keyed by UID (e.g. users/{uid}).
-     */
+    // Is the requester the owner of this document?
     function isOwner(uid) {
       return isAuth() && request.auth.uid == uid;
     }
 
-    /**
-     * Admin check: the adminUsers/{uid} document must exist.
-     * That document is written exclusively by the backend — never by the client.
-     * We check existence rather than a field value to keep the logic simple and
-     * to avoid the cost of a field read on every admin check.
-     */
+    // Load the requester's Firestore profile
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // What role does the requester have?
+    function getRole() {
+      return getUserData().profile.role;
+    }
+
     function isAdmin() {
       return isAuth() &&
         exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid));
     }
 
-    /**
-     * Guardian relationship guard.
-     * The relationships/{teenUid_guardianUid} document must exist AND its
-     * status field must equal "active". Written by the backend only.
-     */
+    // Does an active guardian relationship exist for this teen?
     function hasActiveRelationship(teenUid, guardianUid) {
-      let relId = teenUid + "_" + guardianUid;
-      return exists(/databases/$(database)/documents/relationships/$(relId)) &&
-        get(/databases/$(database)/documents/relationships/$(relId)).data.status == "active";
+      return exists(/databases/$(database)/documents/relationships/$(teenUid + "_" + guardianUid)) &&
+        get(/databases/$(database)/documents/relationships/$(teenUid + "_" + guardianUid)).data.status == "active";
     }
 
-
-    // =========================================================================
-    // PRIVATE USER DATA
-    // Each collection below is tied to a single user by UID, either as the
-    // document ID or as a `uid` field inside the document.
-    // =========================================================================
-
-    // ─── users/{uid} ──────────────────────────────────────────────────────
-    //
-    // The user document is created by the backend on first sign-in and updated
-    // by the /api/user/profile endpoint (Admin SDK). The frontend may also
-    // write directly after authentication.
-    //
-    // Protections:
-    //   • Only the owner can read their own document (+ admins for support).
-    //   • Only the owner can create/update — deletes are blocked entirely.
-    //   • `role` is locked: the client cannot change it (role changes route
-    //     through the admin API which uses Admin SDK and bypasses these rules).
+    // ─── users/{uid} ────────────────────────────────────────────────────────
+    // Users read/write their own doc only
+    // Admins can read (but not write) for support purposes - logged separately
     match /users/{uid} {
-      allow read:   if isOwner(uid) || isAdmin();
+      allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid);
       allow update: if isOwner(uid) &&
-        // Prevent the browser from promoting its own role
+        // Prevent client from changing role directly
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role"]);
-      allow delete: if false; // account deletion is a backend-only operation
+      allow delete: if false; // never delete via client
     }
 
-    // ─── preferences/{uid} ────────────────────────────────────────────────
-    //
-    // UI preferences (theme, blur mode, reminders, etc.) are keyed by UID.
-    // Owners can read and write their own preferences.
-    // Delete is blocked — preferences should be reset, not removed, to avoid
-    // the app starting with no defaults for a returning user.
+    // ─── preferences/{uid} ──────────────────────────────────────────────────
+    // Only the owner can read/write their preferences
     match /preferences/{uid} {
-      allow read:          if isOwner(uid);
-      allow create, update: if isOwner(uid);
-      allow delete:        if false;
+      allow read, write: if isOwner(uid);
     }
 
-    // ─── cycleLogs/{uid}/entries/{dateKey} ────────────────────────────────
-    //
-    // Cycle log entries are stored in a subcollection under the user's UID.
-    // Health data — guardians and admins cannot access these.
-    //
-    // The parent document cycleLogs/{uid} is implicit (never explicitly
-    // written by the client). The wildcard below covers the subcollection only.
+    // ─── cycleLogs/{uid}/entries/{dateKey} ──────────────────────────────────
+    // Only the owner can read/write their cycle logs
+    // Admins and guardians cannot access
     match /cycleLogs/{uid}/entries/{dateKey} {
       allow read, write: if isOwner(uid);
     }
 
-    // ─── symptomLogs/{uid}/entries/{dateKey} ──────────────────────────────
-    //
-    // Same access model as cycleLogs. Health data — owner only.
+    // ─── symptomLogs/{uid}/entries/{dateKey} ────────────────────────────────
+    // Only the owner can read/write their symptom logs
+    // Admins and guardians cannot access
     match /symptomLogs/{uid}/entries/{dateKey} {
       allow read, write: if isOwner(uid);
     }
 
-    // ─── bloomieMemory/{uid} ──────────────────────────────────────────────
-    //
-    // Compact conversational snapshot for the Bloomie assistant, keyed by UID.
-    // The frontend reads this via the /api/bloomie-memory endpoint (Admin SDK),
-    // so the read rule here is a safety net for any future direct SDK reads.
-    //
-    // Writes are strictly backend-only — the /api/bloomie-memory PUT endpoint
-    // validates and sanitises every field before writing with the Admin SDK.
-    // Allowing direct client writes would bypass that validation layer.
-    match /bloomieMemory/{uid} {
-      allow read:  if isOwner(uid);
-      allow write: if false; // backend Admin SDK only — see bloomieMemory.js
-    }
-
-    // ─── relationships/{relId} ────────────────────────────────────────────
-    //
-    // Document ID: {teenUid}_{guardianUid} (Firebase UIDs never contain _).
-    // A user can read any relationship document that names them (as teen or
-    // guardian). All writes go through the backend consent flow.
+    // ─── relationships/{relId} ──────────────────────────────────────────────
+    // Only the teen or guardian involved can read
+    // Writes go through Cloud Functions / backend only (not direct client writes)
     match /relationships/{relId} {
       allow read: if isAuth() &&
-        (resource.data.teenUid    == request.auth.uid ||
+        (resource.data.teenUid == request.auth.uid ||
          resource.data.guardianUid == request.auth.uid);
-      allow write: if false; // backend only — see consent.js
+      allow write: if false; // backend only
     }
 
-    // ─── consents/{consentId} ─────────────────────────────────────────────
-    //
-    // Document ID: {teenUid}_{guardianUid}.
-    // Both the teen and guardian can read their consent record.
-    // Only the guardian may update — and only the response fields (status,
-    // statusUpdatedAt, decidedAt, scope). The parties involved (teenUid,
-    // guardianUid) are immutable from the client.
-    // Create and delete are handled by the backend only.
+    // ─── consents/{consentId} ───────────────────────────────────────────────
+    // Teen can read their own consent status
+    // Guardian can read and update consents linked to them
+    // Writes (create) go through backend only
     match /consents/{consentId} {
       allow read: if isAuth() &&
-        (resource.data.teenUid    == request.auth.uid ||
+        (resource.data.teenUid == request.auth.uid ||
          resource.data.guardianUid == request.auth.uid);
-
       allow update: if isAuth() &&
         resource.data.guardianUid == request.auth.uid &&
+        // Guardian can only update status, not change who is linked
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(["status", "statusUpdatedAt", "decidedAt", "scope"]);
-
       allow create: if false; // backend only
-      allow delete: if false; // backend only
+      allow delete: if false;
     }
 
-    // ─── exports/{exportId} ───────────────────────────────────────────────
-    //
-    // Data export documents include a `uid` field that must match the caller.
-    // On CREATE, resource.data does not exist yet — validate incoming data
-    // (request.resource.data) instead.
-    // Admins can read any export for support purposes.
+    // ─── exports/{exportId} ─────────────────────────────────────────────────
+    // Users can read/write their own export requests
+    // Admins can read metadata only (no file content here)
     match /exports/{exportId} {
-      allow read:   if (isAuth() && resource.data.uid == request.auth.uid) || isAdmin();
-      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && resource.data.uid == request.auth.uid;
-      allow delete: if isAuth() && resource.data.uid == request.auth.uid;
+      allow read, write: if isAuth() && resource.data.uid == request.auth.uid;
+      allow read: if isAdmin();
     }
 
-    // ─── deviceTokens/{tokenId} ───────────────────────────────────────────
-    //
-    // Push notification tokens include a `uid` field.
-    // CREATE uses request.resource.data (pre-write) because the document
-    // doesn't exist yet. READ, UPDATE, DELETE use resource.data (stored).
+    // ─── auditLogs/{logId} ──────────────────────────────────────────────────
+    // No client writes ever - backend only
+    // Admins can read all, users can read their own actions only
+    match /auditLogs/{logId} {
+      allow read: if isAdmin() ||
+        (isAuth() && resource.data.actorUid == request.auth.uid);
+      allow write: if false; // backend only
+    }
+
+    // ─── adminUsers/{uid} ───────────────────────────────────────────────────
+    // Only admins can read their own entry
+    // No client writes - managed manually or via super-admin only
+    match /adminUsers/{uid} {
+      allow read: if isAdmin() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ─── symptomCatalog/{symptomKey} ────────────────────────────────────────
+    // Anyone authenticated can read the catalog
+    // Only admins can write (manage the catalog)
+    match /symptomCatalog/{symptomKey} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ─── clinicDirectory/{entryId} ──────────────────────────────────────────
+    // Anyone authenticated can read clinic data
+    // Only admins can write
+    match /clinicDirectory/{entryId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ─── pamphlets/{pamphletId} ─────────────────────────────────────────────
+    // Anyone authenticated can read published pamphlets
+    // Only admins can write
+    match /pamphlets/{pamphletId} {
+      allow read: if isAuth() && resource.data.status == "published";
+      allow write: if isAdmin();
+    }
+
+    // ─── deviceTokens/{tokenId} ─────────────────────────────────────────────
+    // Users can manage their own device tokens only
     match /deviceTokens/{tokenId} {
-      allow read, update, delete: if isAuth() && resource.data.uid == request.auth.uid;
-      allow create:               if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow read, write: if isAuth() && resource.data.uid == request.auth.uid;
     }
 
+    // ─── notificationsQueue/{notifId} ───────────────────────────────────────
+    // No client access - backend/Cloud Functions only
+    match /notificationsQueue/{notifId} {
+      allow read, write: if false;
+    }
 
-    // =========================================================================
-    // SHARED / GUARDIAN ACCESS
-    // =========================================================================
+    // ─── reports/{reportId} ─────────────────────────────────────────────────
+    // Admin read only - aggregated data, no private logs
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
 
-    // ─── guardianSummaries/{teenUid} ──────────────────────────────────────
-    //
-    // Keyed by teen UID. The teen can read their own summary. A guardian with
-    // an active relationship may also read. All writes are backend-only (these
-    // documents are assembled server-side from cycle and symptom data).
+    // ─── guardianSummaries/{teenUid} ────────────────────────────────────────
+    // Guardian can read if active relationship exists
+    // Teens can read their own summary
+    // Written by backend only
     match /guardianSummaries/{teenUid} {
       allow read: if isOwner(teenUid) ||
         (isAuth() && hasActiveRelationship(teenUid, request.auth.uid));
       allow write: if false; // backend only
     }
 
-
-    // =========================================================================
-    // BACKEND-ONLY WRITE COLLECTIONS
-    // These are written exclusively via Admin SDK routes. Clients may read
-    // their own records where the UI surfaces them; otherwise all reads are
-    // restricted to admins.
-    // =========================================================================
-
-    // ─── auditLogs/{logId} ────────────────────────────────────────────────
-    //
-    // Audit trail written by the backend after sensitive profile actions.
-    // Users can read audit events where they were the actor (for transparency).
-    // Admins can read all. No client writes.
-    match /auditLogs/{logId} {
-      allow read:  if isAdmin() ||
-        (isAuth() && resource.data.actorUid == request.auth.uid);
-      allow write: if false; // backend only
-    }
-
-    // ─── bloomieSafetyLogs/{logId} ────────────────────────────────────────
-    //
-    // Safety escalation events. Written by bloomieSafetyLog.js (Admin SDK).
-    // Admin read only — users do not have a UI for their own safety logs.
-    match /bloomieSafetyLogs/{logId} {
-      allow read:  if isAdmin();
-      allow write: if false; // backend only
-    }
-
-    // ─── bloomie_analytics/{logId} ────────────────────────────────────────
-    //
-    // Bloomie engagement analytics. Written by bloomieAnalytics.js (Admin SDK).
-    // Admin read only.
-    match /bloomie_analytics/{logId} {
-      allow read:  if isAdmin();
-      allow write: if false; // backend only
-    }
-
-    // ─── bloomieFeedback/{logId} ──────────────────────────────────────────
-    //
-    // Thumbs-up / thumbs-down ratings on Bloomie responses.
-    // Written by feedback.js (Admin SDK). Admin read only for quality review.
-    match /bloomieFeedback/{logId} {
-      allow read:  if isAdmin();
-      allow write: if false; // backend only
-    }
-
-    // ─── notificationsQueue/{notifId} ─────────────────────────────────────
-    //
-    // Push notification jobs consumed by Cloud Functions. No client access.
-    match /notificationsQueue/{notifId} {
-      allow read, write: if false;
-    }
-
-    // ─── reports/{reportId} ───────────────────────────────────────────────
-    //
-    // Aggregated stats assembled by Cloud Functions. Admin read only.
-    match /reports/{reportId} {
-      allow read:  if isAdmin();
-      allow write: if false;
-    }
-
-
-    // =========================================================================
-    // ADMIN-MANAGED COLLECTIONS
-    // =========================================================================
-
-    // ─── adminUsers/{uid} ─────────────────────────────────────────────────
-    //
-    // Presence in this collection grants admin access. Documents are written
-    // exclusively by a super-admin or Cloud Function. An admin may read their
-    // own record; no one can write via the client.
-    match /adminUsers/{uid} {
-      allow read:  if isAdmin() && request.auth.uid == uid;
-      allow write: if false;
-    }
-
-    // ─── symptomCatalog/{symptomKey} ──────────────────────────────────────
-    //
-    // Reference list of symptom codes, labels, and metadata.
-    // Any authenticated user may read; only admins may update entries.
-    match /symptomCatalog/{symptomKey} {
-      allow read:  if isAuth();
-      allow write: if isAdmin();
-    }
-
-    // ─── clinicDirectory/{entryId} ────────────────────────────────────────
-    //
-    // Jamaica health-service listings. Any authenticated user may read so the
-    // clinic finder works without extra auth checks. Admins manage the content.
-    match /clinicDirectory/{entryId} {
-      allow read:  if isAuth();
-      allow write: if isAdmin();
-    }
-
-    // ─── pamphlets/{pamphletId} ───────────────────────────────────────────
-    //
-    // Educational pamphlets. Only documents with status == "published" are
-    // visible to regular users; drafts and archived items are admin-only.
-    match /pamphlets/{pamphletId} {
-      allow read:  if isAuth() && resource.data.status == "published";
-      allow read:  if isAdmin(); // admins can read drafts and archived items
-      allow write: if isAdmin();
-    }
-
-
-    // =========================================================================
-    // DENY-ALL FALLBACK
-    // Any collection not listed above is locked. This prevents accidental
-    // exposure of new collections added before rules are written for them.
-    // =========================================================================
+    // ─── Deny everything else ───────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

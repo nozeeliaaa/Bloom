@@ -16,7 +16,7 @@ import {
   SYMPTOM_CATEGORIES, SYMPTOM_ICONS, FLOW_OPTIONS, openModal, closeModal, showToast
 } from "./utils.js";
 
-import { saveDailyLog, getAllLogs, deleteDailyLog, clearAllLogs } from "./db.js";
+import { saveDailyLog, getAllLogs, deleteDailyLog, clearAllLogs, getSymptomCatalog } from "./db.js";
 import { getUserGoal } from "./goals.js";
 import { onAuthChange } from "./auth.js";
 import { fetchCycleState } from "./cycle-state.js";
@@ -66,6 +66,9 @@ let selectedFlow = "none";
 let selectedSymptoms = new Set();
 let selectedSymptomSeverity = new Map(); // symptom -> 1-5
 let selectedOtherSymptoms = []; // [{ text, normalizedText, severity, note, createdAt, dateKey }]
+let symptomCategories = Object.fromEntries(
+  Object.entries(SYMPTOM_CATEGORIES).map(([cat, list]) => [cat, [...list]])
+);
 
 const today = new Date();
 currentYear = today.getFullYear();
@@ -73,6 +76,31 @@ currentMonth = today.getMonth();
 
 function setPredictionPanelState(status, errorMessage = "") {
   predictionPanelState = { status, errorMessage };
+}
+
+function buildSymptomCategoriesFromCatalog(catalogItems = []) {
+  const grouped = {};
+  for (const item of catalogItems) {
+    const category = String(item?.category || "Other").trim() || "Other";
+    const label = String(item?.label || "").trim();
+    if (!label) continue;
+    if (!grouped[category]) grouped[category] = [];
+    if (!grouped[category].includes(label)) grouped[category].push(label);
+  }
+  return grouped;
+}
+
+async function loadCatalogSymptomsForUI() {
+  const catalog = await getSymptomCatalog({ timeoutMs: 3500 });
+  if (!Array.isArray(catalog) || !catalog.length) return;
+
+  const grouped = buildSymptomCategoriesFromCatalog(catalog);
+  if (!Object.keys(grouped).length) return;
+
+  symptomCategories = grouped;
+  buildSymptomUI();
+  updateSymptomChips();
+  updateSeverityPanel();
 }
 
 // ── Load & compute ─────────────────────────────────────────────────────────
@@ -208,7 +236,7 @@ function buildSymptomUI() {
   const container = document.getElementById("symptom-categories");
   container.innerHTML = "";
 
-  Object.entries(SYMPTOM_CATEGORIES).forEach(([cat, symptoms]) => {
+  Object.entries(symptomCategories).forEach(([cat, symptoms]) => {
     const section = document.createElement("div");
     section.className = "symptom-cat";
     section.dataset.category = cat;
@@ -225,9 +253,9 @@ function buildSymptomUI() {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "chip";
-      const iconUrl = SYMPTOM_ICONS[s];
-      chip.innerHTML = iconUrl
-        ? `<span class="chip-icon-wrap"><img src="${iconUrl}" alt="" class="chip-icon-img" loading="lazy"></span>${s}`
+      const icon = SYMPTOM_ICONS[s];
+      chip.innerHTML = icon
+        ? `<span class="chip-icon-wrap chip-icon-emoji" aria-hidden="true">${icon}</span>${s}`
         : s;
       chip.dataset.symptom = s;
       chip.addEventListener("click", () => toggleSymptom(s));
@@ -277,7 +305,7 @@ function updateSeverityPanel() {
     nameEl.className = "severity-symptom-name";
     const sIconUrl = SYMPTOM_ICONS[s];
     nameEl.innerHTML = sIconUrl
-      ? `<span class="chip-icon-wrap"><img src="${sIconUrl}" alt="" class="chip-icon-img" loading="lazy"></span>${s}`
+      ? `<span class="chip-icon-wrap chip-icon-emoji" aria-hidden="true">${sIconUrl}</span>${s}`
       : s;
     row.appendChild(nameEl);
 
@@ -309,7 +337,7 @@ function renderOtherSymptoms() {
   if (!list) return;
 
   if (!selectedOtherSymptoms.length) {
-    list.innerHTML = `<p class="custom-symptom-empty">No custom symptoms added for this day.</p>`;
+    list.innerHTML = "";
     return;
   }
 
@@ -319,6 +347,7 @@ function renderOtherSymptoms() {
     const row = document.createElement("div");
     row.className = "custom-symptom-item";
 
+    // Name + remove
     const top = document.createElement("div");
     top.className = "custom-symptom-top";
 
@@ -329,8 +358,9 @@ function renderOtherSymptoms() {
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
-    removeBtn.className = "btn btn-outline btn-sm";
-    removeBtn.textContent = "Remove";
+    removeBtn.className = "custom-sym-remove";
+    removeBtn.innerHTML = "&times;";
+    removeBtn.setAttribute("aria-label", `Remove ${item.text}`);
     removeBtn.addEventListener("click", () => {
       selectedOtherSymptoms.splice(idx, 1);
       renderOtherSymptoms();
@@ -338,8 +368,17 @@ function renderOtherSymptoms() {
     top.appendChild(removeBtn);
     row.appendChild(top);
 
-    const sevWrap = document.createElement("div");
-    sevWrap.className = "severity-btns";
+    // Severity
+    const sevRow = document.createElement("div");
+    sevRow.className = "custom-sym-sev-row";
+
+    const sevLabel = document.createElement("span");
+    sevLabel.className = "custom-sym-sev-label";
+    sevLabel.textContent = "Severity:";
+    sevRow.appendChild(sevLabel);
+
+    const sevBtns = document.createElement("div");
+    sevBtns.className = "severity-btns";
     for (let i = 1; i <= 5; i++) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -349,14 +388,16 @@ function renderOtherSymptoms() {
         selectedOtherSymptoms[idx].severity = i;
         renderOtherSymptoms();
       });
-      sevWrap.appendChild(btn);
+      sevBtns.appendChild(btn);
     }
-    row.appendChild(sevWrap);
+    sevRow.appendChild(sevBtns);
+    row.appendChild(sevRow);
 
+    // Optional note
     const note = document.createElement("input");
     note.type = "text";
     note.className = "form-input custom-symptom-note";
-    note.placeholder = "Optional detail";
+    note.placeholder = "Optional note…";
     note.maxLength = 160;
     note.value = item.note || "";
     note.addEventListener("input", (e) => {
@@ -503,8 +544,8 @@ function renderCalendar() {
   const todayKey = toDateKey(today);
 
   const goal = getUserGoal();
-  const allowPredictedPeriod = ["period", "ttc", "perimenopause", "no_period"].includes(goal);
-  const allowFertilityMarkers = ["period", "ttc", "perimenopause", "no_period"].includes(goal);
+  const allowPredictedPeriod = ["period", "ttc", "perimenopause", "no_period", "track_symptoms"].includes(goal);
+  const allowFertilityMarkers = ["period", "ttc", "perimenopause", "no_period", "track_symptoms"].includes(goal);
 
   const predictedSet = new Set(
     allowPredictedPeriod && cycleData?.predictedPeriodDays ? cycleData.predictedPeriodDays : []
@@ -826,7 +867,7 @@ function renderPredictionPanel() {
   if (!panel) return;
 
   const goal = getUserGoal();
-  if (!["period", "ttc", "perimenopause", "no_period"].includes(goal)) {
+  if (!["period", "ttc", "perimenopause", "no_period", "track_symptoms"].includes(goal)) {
     panel.innerHTML = "";
     return;
   }
@@ -940,6 +981,7 @@ let _initDone = false;
 
 async function init() {
   buildSymptomUI();
+  loadCatalogSymptomsForUI().catch(() => {});
   setPredictionPanelState("loading");
   renderPredictionPanel();
   // Render calendar shell immediately with logged days (no predictions yet)
@@ -955,6 +997,7 @@ async function init() {
   onAuthChange(async () => {
     if (_initDone) return; // fire only once per page load
     _initDone = true;
+    await loadCatalogSymptomsForUI().catch(() => {});
     setPredictionPanelState("loading");
     renderPredictionPanel();
     try {

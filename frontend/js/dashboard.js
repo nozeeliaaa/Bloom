@@ -30,6 +30,11 @@ import { getUserGoal, goalLabel, goalDesc, isGoalAgeLocked } from "./goals.js";
 import { triggerNotifications } from "./notifications.js";
 import { getTodaysPhaseInsights } from "./phase-education.js";
 import { fetchCycleState } from "./cycle-state.js";
+import {
+  collectCustomSymptomRecurrence,
+  customSymptomLooksUrgent,
+  summarizeCustomSymptoms,
+} from "./custom-symptoms.js";
 // Algorithm modules loaded lazily inside loadDashboard() = no top-level await
 let algoPregnancy    = null;
 let algoCycleEngine  = null;
@@ -40,6 +45,7 @@ let _logsPromise = null;
 let _logsPromiseMode = null;
 let _cycleStatePromise = null;
 let _dashboardLoadEpoch = 0;
+let _plotlyLoadPromise = null;
 
 renderNav("dashboard");
 renderFooter();
@@ -58,6 +64,88 @@ function addDaysStr(dateStr, n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function symptomLabelToCode(label) {
+  return String(label || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function buildEngineSymptomHistory(logsByDate) {
+  return Object.entries(logsByDate || {})
+    .filter(([, log]) => Array.isArray(log?.symptoms) && log.symptoms.length > 0)
+    .map(([dateKey, log]) => ({
+      dateKey,
+      items: (log.symptoms || [])
+        .map((label) => {
+          const hintedCode = String(
+            log?.symptomCodes?.[label] ||
+            log?.symptomCodes?.[symptomLabelToCode(label)] ||
+            ""
+          ).trim().toUpperCase();
+          const code = hintedCode || symptomLabelToCode(label);
+          if (!code) return null;
+          const severity = Number(
+            log?.symptomSeverity?.[label] ??
+            log?.symptomSeverity?.[hintedCode] ??
+            log?.symptomSeverity?.[code] ??
+            3
+          );
+          return { code, severity: Number.isFinite(severity) ? severity : 3 };
+        })
+        .filter(Boolean),
+    }))
+    .filter((entry) => entry.items.length > 0)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
+function isLoggedPeriodDay(entry) {
+  if (!entry) return false;
+  if (entry.flow && entry.flow !== "none") return true;
+  if (typeof entry.flowLevel === "number" && entry.flowLevel > 0) return true;
+  if (entry.periodDay === true) return true;
+  return false;
+}
+
+function buildCustomSymptomInsight(logsByDate, days = 30) {
+  const recurrence = collectCustomSymptomRecurrence(logsByDate, days);
+  if (!recurrence.length) return null;
+
+  const top = recurrence[0];
+  const recurringMessage = top.count >= 2
+    ? `You've logged "${top.displayText}" ${top.count} times in the last ${days} days.`
+    : `You've logged "${top.displayText}" in your recent history.`;
+
+  const urgent = Object.values(logsByDate || {}).some((log) =>
+    (log?.otherSymptoms || []).some((item) => customSymptomLooksUrgent(item?.text))
+  );
+
+  return {
+    recurringMessage,
+    extraCount: recurrence.length > 1 ? recurrence.length - 1 : 0,
+    urgent,
+  };
+}
+
+function renderCustomSymptomAdvancedInsights(logsByDate, today = new Date()) {
+  const insights = summarizeCustomSymptoms(logsByDate, { days: 30, maxItems: 2, fromDate: today });
+  if (!insights.length) return "";
+
+  return `
+    <div style="margin-top:0.9rem;padding-top:0.8rem;border-top:1px solid var(--color-border);">
+      <div style="font-size:0.74rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:0.55rem;">
+        Custom Symptoms From Your History
+      </div>
+      ${insights.map((item) => `
+        <div class="insight-item" style="background:rgba(212,116,154,0.05);border:1px solid rgba(212,116,154,0.14);border-radius:12px;padding:0.7rem 0.85rem;margin-bottom:0.55rem;">
+          <strong>${item.kind === "recurring" ? "Custom symptom pattern" : "Custom symptom saved"}:</strong> ${item.message}${item.guidance ? ` ${item.guidance}` : ""}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 /**
  * Data preparation only - identifies period cluster starts from logs.
  * Used to derive cycleLengths and lastPeriodStart for passing to the approved engines.
@@ -68,7 +156,7 @@ function addDaysStr(dateStr, n) {
  */
 function buildCycleBase(logsByDate) {
   const periodDays = Object.keys(logsByDate)
-    .filter(k => logsByDate[k]?.flow && logsByDate[k].flow !== "none")
+    .filter(k => isLoggedPeriodDay(logsByDate[k]))
     .sort();
 
   const cycleStarts = [];
@@ -95,9 +183,10 @@ function show(el, on) {
 }
 
 function applyGoalClasses(goal) {
+  const isSymptomGoal = goal === "no_period" || goal === "track_symptoms";
   document.body.classList.toggle("goal-ttc", goal === "ttc");
   document.body.classList.toggle("goal-pregnancy", goal === "pregnancy");
-  document.body.classList.toggle("goal-no-period", goal === "no_period");
+  document.body.classList.toggle("goal-no-period", isSymptomGoal);
   document.body.classList.toggle("goal-perimenopause", goal === "perimenopause");
 }
 
@@ -112,6 +201,30 @@ function ensureLogsPromise() {
 
 function afterFirstPaint(fn) {
   requestAnimationFrame(() => setTimeout(fn, 0));
+}
+
+function ensurePlotlyLoaded() {
+  if (typeof window !== "undefined" && window.Plotly) return Promise.resolve(window.Plotly);
+  if (_plotlyLoadPromise) return _plotlyLoadPromise;
+
+  _plotlyLoadPromise = new Promise((resolve) => {
+    const existing = document.querySelector('script[data-bloom-plotly="1"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.Plotly || null), { once: true });
+      existing.addEventListener("error", () => resolve(null), { once: true });
+      return;
+    }
+
+    const s = document.createElement("script");
+    s.src = "https://cdn.plot.ly/plotly-2.32.0.min.js";
+    s.async = true;
+    s.dataset.bloomPlotly = "1";
+    s.onload = () => resolve(window.Plotly || null);
+    s.onerror = () => resolve(null);
+    document.head.appendChild(s);
+  });
+
+  return _plotlyLoadPromise;
 }
 
 // ─── Phase-based insights ─────────────────────────────────────────────────────
@@ -215,7 +328,7 @@ function renderGoalToolCard(goal, cycle) {
   if (!el) return;
   const todayKey = toDateKey(new Date());
 
-  if (goal === "no_period" || goal === "perimenopause") {
+  if (goal === "no_period" || goal === "track_symptoms" || goal === "perimenopause") {
     el.innerHTML = `
       <div class="stat-number">Symptom Mode</div>
       <p class="text-muted">Log symptoms freely.</p>
@@ -798,8 +911,8 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   const subtitle = document.getElementById("symptom-tools-subtitle");
   if (!card || !body) return;
 
-  const on = goal === "no_period" || goal === "perimenopause";
-  document.body.classList.toggle("goal-no-period", goal === "no_period");
+  const on = goal === "no_period" || goal === "track_symptoms" || goal === "perimenopause";
+  document.body.classList.toggle("goal-no-period", goal === "no_period" || goal === "track_symptoms");
   document.body.classList.toggle("goal-perimenopause", goal === "perimenopause");
   show(card, on);
   if (!on) return;
@@ -832,6 +945,7 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   // Use the most recently logged day within the last 7 days, not strictly today.
   const labelToCode = s => String(s || "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_");
   const todayKey = toDateKey(new Date());
+  const customInsight = buildCustomSymptomInsight(logsByDate, 30);
 
   let recentEntry = null;
   for (let d = 0; d < 7; d++) {
@@ -860,7 +974,7 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
     });
   }
 
-  if (!symptomHistory.length) {
+  if (!symptomHistory.length && !customInsight) {
     body.innerHTML = `
       <p class="text-muted">No symptoms logged yet. Open the calendar to start tracking.</p>
       <a class="btn btn-outline btn-log-today" href="/pages/calendar.html">Open calendar</a>
@@ -892,11 +1006,16 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   const levelColor = { high: "var(--color-danger)", medium: "var(--color-warning)", low: "var(--color-text-muted)" };
 
   if (signals.length) {
+    const customHtml = customInsight ? `
+      <div class="preg-insight-item">
+        <span class="preg-insight-title">Custom symptom history</span>
+        <span class="preg-insight-body">${customInsight.recurringMessage}${customInsight.extraCount > 0 ? ` ${customInsight.extraCount} other custom symptom${customInsight.extraCount === 1 ? " has" : "s have"} also appeared in your recent history.` : ""} Custom symptoms are tracked in your history, but are not yet used in pattern predictions.${customInsight.urgent ? " If a custom symptom feels severe, sudden, or worrying, consider seeking medical advice." : ""}</span>
+      </div>` : "";
     body.innerHTML = signals.map(s => `
       <div class="preg-insight-item">
         <span class="preg-insight-title" style="color:${levelColor[s.level] ?? "var(--color-primary-dark)"};">${s.title}</span>
         <span class="preg-insight-body">${s.message}${s.guidance ? ` ${s.guidance}` : ""}</span>
-      </div>`).join("");
+      </div>`).join("") + customHtml;
     return;
   }
 
@@ -909,7 +1028,7 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   symptomHistory.slice(0, 7).forEach(e => e.items?.forEach(i => allRecentCodes.add(i.code)));
   todaySyms.forEach(i => allRecentCodes.add(i.code));
 
-  if (!allRecentCodes.size) {
+  if (!allRecentCodes.size && !customInsight) {
     body.innerHTML = `<p class="text-muted">No recent symptoms found. Open the calendar to log symptoms.</p><a class="btn btn-outline btn-log-today" href="/pages/calendar.html">Open calendar</a>`;
     return;
   }
@@ -1065,7 +1184,13 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
       </div>`;
     });
 
-  body.innerHTML = items.join("");
+  const customHtml = customInsight ? `
+    <div class="preg-insight-item">
+      <span class="preg-insight-title">Custom symptom history</span>
+      <span class="preg-insight-body">${customInsight.recurringMessage}${customInsight.extraCount > 0 ? ` ${customInsight.extraCount} other custom symptom${customInsight.extraCount === 1 ? " has" : "s have"} also appeared in your recent history.` : ""} Custom symptoms are tracked in your history, but are not yet used in pattern predictions.${customInsight.urgent ? " If a custom symptom feels severe, sudden, or worrying, consider seeking medical advice." : ""}</span>
+    </div>` : "";
+
+  body.innerHTML = items.join("") + customHtml;
 }
 
 // ─── Cycle history + trend chart ──────────────────────────────────────────────
@@ -1092,7 +1217,7 @@ function buildCycleCards(cycleStarts, cycleLengths, logsByDate) {
     for (let d = 0; d < displayLen; d++) {
       const dk = addDaysStr(start, d);
       const log = logsByDate[dk];
-      const isPeriod = !!(log && log.flow && log.flow !== "none");
+      const isPeriod = isLoggedPeriodDay(log);
       let cls = "dot-follicular"; // default: follicular phase
       if (isPeriod) {
         cls = "dot-period";
@@ -1123,10 +1248,11 @@ function buildCycleCards(cycleStarts, cycleLengths, logsByDate) {
   });
 }
 
-function renderCycleHistoryAndChart(cycle, logsByDate) {
+async function renderCycleHistoryAndChart(cycle, logsByDate) {
   const cycleStarts = cycle.cycleStarts || [];
   const dotsEl = document.getElementById("cycle-dots");
   const canvas = document.getElementById("cycleChart");
+  const todayKey = toDateKey(new Date());
 
   // Compute cycle lengths (days between consecutive period starts)
   const cycleLengths = [];
@@ -1176,34 +1302,61 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
   // ── Trend chart (Plotly) ──
   if (!canvas) return;
 
-  if (cycleLengths.length < 1) {
+  const chartLengths = [...cycleLengths];
+  const chartLabels = cycleStarts.slice(0, -1).map((s) => formatDate(s));
+
+  // Include the in-progress cycle so the chart represents all observed cycles.
+  if (cycleStarts.length) {
+    const currentStart = cycleStarts[cycleStarts.length - 1];
+    const currentDays = Math.max(1, diffDays(currentStart, todayKey) + 1);
+    chartLengths.push(currentDays);
+    chartLabels.push(`${formatDate(currentStart)} (current)`);
+  }
+
+  if (chartLengths.length < 1) {
     canvas.closest(".chart-frame").innerHTML =
       `<p class="text-muted" style="font-size:0.9rem;text-align:center;padding:1.25rem 0;">Log at least 2 periods to view the cycle trend.</p>`;
     return;
   }
 
-  const avg = Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length);
-  const labels = cycleStarts.slice(0, -1).map((s) => formatDate(s));
+  const avgBase = cycleLengths.length ? cycleLengths : chartLengths;
+  const avg = Math.round(avgBase.reduce((a, b) => a + b, 0) / avgBase.length);
   const yPad = 6;
-  const yMin = Math.max(0, Math.min(...cycleLengths) - yPad);
-  const yMax = Math.max(...cycleLengths) + yPad;
+  const yMin = Math.max(0, Math.min(...chartLengths) - yPad);
+  const yMax = Math.max(...chartLengths) + yPad;
 
   // Marker colours: red if outside typical 21-35 day range
-  const markerColors = cycleLengths.map((l) => (l < 21 || l > 35 ? "#e05c7a" : "#D4749A"));
+  const markerColors = chartLengths.map((l, idx) => {
+    const isCurrent = idx === chartLengths.length - 1 && cycleStarts.length > 0;
+    if (isCurrent) return "#8c6bb1";
+    return l < 21 || l > 35 ? "#e05c7a" : "#D4749A";
+  });
 
-  Plotly.newPlot(canvas, [
+  const plotly = (typeof window !== "undefined" && window.Plotly)
+    ? window.Plotly
+    : await ensurePlotlyLoaded();
+
+  if (!plotly) {
+    const frame = canvas.closest(".chart-frame");
+    if (frame) {
+      frame.innerHTML = `<p class="text-muted" style="font-size:0.9rem;text-align:center;padding:1.25rem 0;">Cycle trend is temporarily unavailable. Please refresh.</p>`;
+    }
+    return;
+  }
+
+  plotly.newPlot(canvas, [
     // ── Typical range ribbon (21-35 days) ──
     {
-      x: labels,
-      y: Array(labels.length).fill(35),
+      x: chartLabels,
+      y: Array(chartLabels.length).fill(35),
       type: "scatter",
       mode: "none",
       showlegend: false,
       hoverinfo: "skip",
     },
     {
-      x: labels,
-      y: Array(labels.length).fill(21),
+      x: chartLabels,
+      y: Array(chartLabels.length).fill(21),
       type: "scatter",
       mode: "none",
       fill: "tonexty",
@@ -1213,8 +1366,8 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
     },
     // ── Average line ──
     {
-      x: labels,
-      y: Array(cycleLengths.length).fill(avg),
+      x: chartLabels,
+      y: Array(chartLengths.length).fill(avg),
       type: "scatter",
       mode: "lines",
       name: `Avg: ${avg}d`,
@@ -1223,8 +1376,8 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
     },
     // ── Cycle length line ──
     {
-      x: labels,
-      y: cycleLengths,
+      x: chartLabels,
+      y: chartLengths,
       type: "scatter",
       mode: "lines+markers",
       name: "Cycle length",
@@ -1266,7 +1419,7 @@ function renderCycleHistoryAndChart(cycle, logsByDate) {
     },
     hovermode: "closest",
     annotations: [{
-      x: labels[labels.length - 1],
+      x: chartLabels[chartLabels.length - 1],
       y: avg,
       xanchor: "right",
       yanchor: "bottom",
@@ -1322,6 +1475,7 @@ function signalLabel(code) {
 
 function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodStart, lastLogDate, logsByDate, mlPredictedCycleLength }) {
   if (!advancedEl) return;
+  const customInsightsHtml = renderCustomSymptomAdvancedInsights(logsByDate, new Date());
 
   const signals = [];
 
@@ -1343,7 +1497,7 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
         lastLogDate:     lastLogDateObj,
         cycleLengths,
       });
-      signals.push(...cycleSignals);
+      signals.push(...(cycleSignals || []).map((s) => ({ ...s, _source: "cycle" })));
     } catch (e) {
       console.warn("[dashboard] cycle engine error:", e.message);
     }
@@ -1356,7 +1510,7 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
         actualCycleLengths:   cycleLengths,
         predictedCycleLength: mlPredictedCycleLength,
       });
-      signals.push(...(anomalyResult.shownSignals || []));
+      signals.push(...(anomalyResult.shownSignals || []).map((s) => ({ ...s, _source: "anomaly" })));
     } catch (e) {
       console.warn("[dashboard] anomaly engine error:", e.message);
     }
@@ -1365,35 +1519,34 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
   // Symptom engine
   if (algoSymptomEngine && logsByDate) {
     try {
-      const todayKey   = toDateKey(today);
-      const todayLog   = logsByDate[todayKey] || {};
-      const rawSymptoms = todayLog.symptoms || [];
-      const loggedSymptoms = rawSymptoms.map(code => ({
-        code,
-        severity: todayLog.symptomSeverity?.[code] ?? 3,
-      }));
-      const symptomHistory = Object.entries(logsByDate)
-        .filter(([, l]) => l?.symptoms?.length)
-        .map(([dateKey, l]) => ({
-          dateKey,
-          symptoms: (l.symptoms || []).map(code => ({
-            code,
-            severity: l.symptomSeverity?.[code] ?? 3,
-          })),
-        }))
-        .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+      const symptomHistory = buildEngineSymptomHistory(logsByDate);
+      const latestWithSymptoms = symptomHistory.length
+        ? symptomHistory[symptomHistory.length - 1]
+        : null;
+      const loggedSymptoms = latestWithSymptoms?.items || [];
+      const ENGINE_PHASE_MAP = { late_luteal: "luteal", ovulatory: "ovulation" };
+      const enginePhase = ENGINE_PHASE_MAP[cycle.phase] ?? cycle.phase;
 
       const symptomSignals = algoSymptomEngine.generateSymptomSignals({
         loggedSymptoms,
-        phase:           cycle.phase,
+        phase:           enginePhase,
         dayOfCycle:      cycle.dayInCycle,
         cycleLengths,
-        cycleCount:      (cycle.cycleStarts || []).length,
+        cycleCount:      Math.max((cycle.cycleStarts || []).length, symptomHistory.length > 0 ? 2 : 0),
         symptomHistory,
         lastPeriodStart: lastPeriodDate,
         today,
       });
-      signals.push(...symptomSignals);
+      signals.push(...(symptomSignals || []).map((s) => ({ ...s, _source: "symptom" })));
+
+      if (typeof algoSymptomEngine.generateAdvancedSymptomInsights === "function") {
+        const advancedSymptom = algoSymptomEngine.generateAdvancedSymptomInsights({
+          loggedSymptoms,
+          phase: enginePhase,
+          symptomHistory,
+        });
+        signals.push(...(advancedSymptom?.signals || []).map((s) => ({ ...s, _source: "symptom" })));
+      }
     } catch (e) {
       console.warn("[dashboard] symptom engine error:", e.message);
     }
@@ -1401,25 +1554,34 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
 
   // ── Basic avg-cycle outlier flags (all goals) ──
   if (cycle.avgCycleLength && cycle.avgCycleLength < 21 && !signals.some(s => s.code === "SHORT_CYCLE")) {
-    signals.push({ code: "SHORT_CYCLE", level: "medium", show: true, message: "Your average cycle is shorter than 21 days. This may be worth discussing with a healthcare provider." });
+    signals.push({ code: "SHORT_CYCLE", level: "medium", show: true, message: "Your average cycle is shorter than 21 days. This may be worth discussing with a healthcare provider.", _source: "cycle" });
   }
   if (cycle.avgCycleLength && cycle.avgCycleLength > 35 && !signals.some(s => s.code === "LONG_CYCLE")) {
-    signals.push({ code: "LONG_CYCLE", level: "medium", show: true, message: "Your average cycle is longer than 35 days. This can be worth monitoring with a provider." });
+    signals.push({ code: "LONG_CYCLE", level: "medium", show: true, message: "Your average cycle is longer than 35 days. This can be worth monitoring with a provider.", _source: "cycle" });
   }
 
   if (!signals.length) {
-    advancedEl.innerHTML = `<div class="insight-item">No unusual patterns detected. Keep logging for more detailed insights.</div>`;
+    advancedEl.innerHTML = `${customInsightsHtml || `<div class="insight-item">No unusual patterns detected. Keep logging for more detailed insights.</div>`}`;
     return;
   }
 
-  // Sort: high → medium → low, deduplicate by code
+  // Sort: symptom-engine first, then by severity, and dedupe by code.
+  const srcPri = { symptom: 3, cycle: 2, anomaly: 1 };
   const seen = new Set();
   const pri = { high: 3, medium: 2, low: 1 };
   const deduped = signals
+    .filter((s) => s?.show !== false)
     .filter(s => { if (seen.has(s.code)) return false; seen.add(s.code); return true; })
-    .sort((a, b) => (pri[b.level] || 0) - (pri[a.level] || 0));
+    .sort((a, b) => {
+      const bySrc = (srcPri[b._source] || 0) - (srcPri[a._source] || 0);
+      if (bySrc !== 0) return bySrc;
+      const byLevel = (pri[b.level] || 0) - (pri[a.level] || 0);
+      if (byLevel !== 0) return byLevel;
+      return String(a.code || "").localeCompare(String(b.code || ""));
+    })
+    .slice(0, 6);
 
-  advancedEl.innerHTML = deduped.map(s => {
+  const structuredHtml = deduped.map(s => {
     const label = signalLabel(s.code);
     const guidance = s.guidance ? ` ${s.guidance}` : "";
     if (s.level === "high") {
@@ -1438,6 +1600,8 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
     }
     return `<div class="insight-item"><strong>${label}:</strong> ${s.message}${guidance}</div>`;
   }).join("");
+
+  advancedEl.innerHTML = structuredHtml + customInsightsHtml;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -1633,10 +1797,14 @@ async function loadDashboard() {
     await renderSymptomTools(goal, logsByDate, cycle);
 
     // Chart + advanced insights are the heaviest; run them after another paint.
-    afterFirstPaint(() => {
+    afterFirstPaint(async () => {
       if (loadEpoch !== _dashboardLoadEpoch) return;
 
-      renderCycleHistoryAndChart(cycle, logsByDate);
+      try {
+        await renderCycleHistoryAndChart(cycle, logsByDate);
+      } catch (e) {
+        console.warn("[dashboard] cycle chart render failed:", e?.message || e);
+      }
 
       const allLogDates = Object.keys(logsByDate)
         .filter(k => { const l = logsByDate[k]; return l?.flow || l?.symptoms?.length || l?.notes; })

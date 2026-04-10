@@ -11,6 +11,15 @@ function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 }
 
+async function ensureCycleLogsParent(uid) {
+  const parentRef = db.collection("cycleLogs").doc(uid);
+  const snap = await parentRef.get();
+  if (!snap.exists) {
+    await parentRef.set({ uid, createdAt: new Date(), updatedAt: new Date() });
+  } else {
+    await parentRef.set({ updatedAt: new Date() }, { merge: true });
+  }
+}
 // Collection path: cycleLogs/{uid}/entries/{dateKey}
 
 // Create/Update one day's cycle log
@@ -48,6 +57,7 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
     const snap = await docRef.get();
     if (!snap.exists) payload.createdAt = new Date();
 
+    await ensureCycleLogsParent(uid);
     await docRef.set(payload, { merge: true });
 
     return res.json({ ok: true, entry: payload });
@@ -137,8 +147,12 @@ router.delete("/", requireAuth, async (req, res) => {
       docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref));
       await batch.commit();
     }
-
+    await db.collection("cycleLogs").doc(uid).set(
+      { updatedAt: new Date() },
+      { merge: true }
+    );
     return res.json({ ok: true, deleted: docs.length });
+
   } catch (err) {
     console.error("DELETE /api/logs error:", err);
     return res.status(500).json({ error: "Failed to delete all cycle logs" });
@@ -161,6 +175,11 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey)
       .delete();
+
+    await db.collection("cycleLogs").doc(uid).set(
+      { updatedAt: new Date() },
+      { merge: true }
+    );
 
     return res.json({ ok: true });
   } catch (err) {

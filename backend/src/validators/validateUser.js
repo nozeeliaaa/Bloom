@@ -35,6 +35,15 @@ export function validateUserProfile(body, existingProfile = null) {
       return { valid: false, error: "User must be at least 10 years old" };
     }
   }
+  // --- nickname ---
+  if (body.nickname !== undefined && body.nickname !== null) {
+    if (typeof body.nickname !== "string") {
+      return { valid: false, error: "nickname must be a string" };
+    }
+    if (body.nickname.trim().length > 40) {
+      return { valid: false, error: "nickname must be 40 characters or fewer" };
+    }
+  }
 
   // --- avgCycleLength ---
   if (body.avgCycleLength !== undefined && body.avgCycleLength !== null) {

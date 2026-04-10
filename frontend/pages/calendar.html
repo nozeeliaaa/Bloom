@@ -126,51 +126,68 @@
       border-color: var(--color-primary);
       color: #fff;
     }
-    .custom-symptom-add {
+    /* ── Custom / "Other" symptom section ── */
+    .custom-sym-input-row {
       display: flex;
       gap: 0.5rem;
-      align-items: flex-start;
-      margin-bottom: 0.65rem;
+      align-items: center;
     }
-    .custom-symptom-add input { flex: 1; }
-    .custom-symptom-helper {
-      margin: 0.25rem 0 0.6rem;
-      font-size: 0.84rem;
+    .custom-sym-input-row input { flex: 1; min-width: 0; }
+    .custom-sym-add-btn { flex-shrink: 0; white-space: nowrap; }
+    .custom-sym-meta {
+      margin: 0.3rem 0 0.55rem;
+      font-size: 0.79rem;
       color: var(--color-text-muted);
-      line-height: 1.5;
     }
     .custom-symptom-list {
       display: flex;
       flex-direction: column;
-      gap: 0.65rem;
+      gap: 0.45rem;
     }
     .custom-symptom-item {
       border: 1px solid var(--color-border);
       border-radius: var(--radius);
-      padding: 0.8rem;
+      padding: 0.6rem 0.75rem;
       background: var(--color-bg);
     }
     .custom-symptom-top {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.55rem;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
     }
     .custom-symptom-name {
-      font-size: 0.92rem;
+      font-size: 0.9rem;
       font-weight: 700;
       color: var(--color-text);
       flex: 1;
       min-width: 0;
       word-break: break-word;
     }
-    .custom-symptom-note { margin-top: 0.55rem; }
-    .custom-symptom-empty {
-      margin: 0;
-      font-size: 0.88rem;
+    .custom-sym-remove {
+      background: none;
+      border: none;
+      font-size: 1.05rem;
+      line-height: 1;
       color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 0.1rem 0.25rem;
+      border-radius: 4px;
+      flex-shrink: 0;
     }
+    .custom-sym-remove:hover { color: var(--color-primary); background: rgba(0,0,0,0.05); }
+    .custom-sym-sev-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.35rem;
+    }
+    .custom-sym-sev-label {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      flex-shrink: 0;
+    }
+    .custom-symptom-note { margin-top: 0.35rem; }
 
     /* ── Prediction panel ── */
     .pred-section { margin-top: 1rem; }
@@ -303,15 +320,13 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="other-symptom-input">Other symptom</label>
-          <div class="custom-symptom-add">
-            <input type="text" class="form-input" id="other-symptom-input" maxlength="80" placeholder="Type a symptom that is not in the list" />
-            <button type="button" class="btn btn-outline" id="add-other-symptom-btn">Add</button>
+          <label class="form-label">Can't find your symptom?</label>
+          <div class="custom-sym-input-row">
+            <input type="text" class="form-input" id="other-symptom-input" maxlength="80" placeholder="e.g. Back pain, light sensitivity…" />
+            <button type="button" class="btn btn-primary btn-sm custom-sym-add-btn" id="add-other-symptom-btn">+ Add</button>
           </div>
-          <p class="custom-symptom-helper">Saved to your symptom history. Custom symptoms are tracked in your history, but are not yet used in pattern predictions.</p>
-          <div class="custom-symptom-list" id="other-symptom-list">
-            <p class="custom-symptom-empty">No custom symptoms added for this day.</p>
-          </div>
+          <p class="custom-sym-meta">Tracked in history · won't affect predictions</p>
+          <div class="custom-symptom-list" id="other-symptom-list"></div>
         </div>
 
         <div class="form-group">
