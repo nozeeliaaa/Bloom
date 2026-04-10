@@ -35,6 +35,11 @@ export async function requireAuth(req, res, next) {
           weightKg: null,
           heightCm: null,
         },
+        game: {
+          xp: 0,
+          level: 1,
+          sessionsPlayed: 0,
+        },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -59,6 +64,7 @@ export async function requireAuth(req, res, next) {
       !data.role ||
       !data.profile ||
       !data.healthProfile ||
+      !data.game ||
       profile.nickname === undefined ||
       profile.avatar === undefined ||
       profile.yearOfBirth === undefined ||
@@ -102,6 +108,11 @@ export async function requireAuth(req, res, next) {
             healthProfile.weightKg ?? profile.weightKg ?? null,
           heightCm:
             healthProfile.heightCm ?? profile.heightCm ?? null,
+        },
+        game: {
+          xp: data.game?.xp ?? 0,
+          level: data.game?.level ?? 1,
+          sessionsPlayed: data.game?.sessionsPlayed ?? 0,
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
