@@ -452,34 +452,49 @@
       }
 
       // Persist everything to backend if signed in
+      let backendSaved = false;
+
       if (getUser()) {
         try {
           const token = await getIdToken();
           const apiBase = window.BLOOM_API_BASE ?? '';
           const payload = {
             nickname,
-            avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
-            periodDuration: periodDur ? Number(periodDur) : null,
-            weightKg:  weightKg  ?? null,
-            heightCm:  heightCm  ?? null,
-            avatar:    selectedAvatar,
+            avatar: selectedAvatar,
           };
+
           if (yob) payload.yearOfBirth = Number(yob);
+
+          if (avgCycle !== "") payload.avgCycleLength = Number(avgCycle);
+          if (periodDur !== "") payload.periodDuration = Number(periodDur);
+          if (!isNaN(weightRaw)) payload.weightKg = weightKg;
+          if (heightCm !== null) payload.heightCm = heightCm;
+
           const r = await fetch(`${apiBase}/api/user/profile`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
             body: JSON.stringify(payload),
           });
+
           if (!r.ok) {
             const err = await r.json().catch(() => ({}));
             console.error("[Bloom] profile save failed:", r.status, err);
-          } else {
-            console.log("[Bloom] profile saved to backend ✓");
+            showStatus(`Profile save failed (${r.status})`);
+            return;
           }
-        } catch (e) { console.error("[Bloom] profile save error:", e); }
-      }
+          backendSaved = true;
+          console.log("[Bloom] profile saved to backend ✓");
+          } catch (e) {
+            console.error("[Bloom] profile save error:", e);
+            showStatus("Profile save failed");
+            return;
+          }
+        }
 
-      showStatus("Profile saved ✓");
+        showStatus(backendSaved || !getUser() ? "Profile saved ✓" : "Saved locally only");
     });
 
     // Delete account
@@ -531,31 +546,6 @@
     fillFields();
     toggleLmpField();
 
-    // Background sync on page load
-    (async () => {
-      if (!getUser()) return;
-      try {
-        const token = await getIdToken();
-        if (!token) return;
-        const p = loadProfile();
-        const avatar = localStorage.getItem(LS_AVATAR);
-        const payload = {};
-        if (p.nickname)       payload.nickname       = p.nickname;
-        if (p.yob)            payload.yearOfBirth    = Number(p.yob);
-        if (p.avgCycleLength) payload.avgCycleLength = Number(p.avgCycleLength);
-        if (p.periodDuration) payload.periodDuration = Number(p.periodDuration);
-        if (p.weightKg)       payload.weightKg       = Number(p.weightKg);
-        if (p.heightCm)       payload.heightCm       = Number(p.heightCm);
-        if (avatar && avatar !== "👤") payload.avatar = avatar;
-        if (Object.keys(payload).length === 0) return;
-        const apiBase = window.BLOOM_API_BASE ?? '';
-        await fetch(`${apiBase}/api/user/profile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-          body: JSON.stringify(payload),
-        });
-      } catch (_) {}
-    })();
   </script>
 </body>
 </html>

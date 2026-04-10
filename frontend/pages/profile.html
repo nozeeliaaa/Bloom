@@ -317,10 +317,59 @@
         user ? "Signed in • View Profile to edit details" : "Not signed in • View Profile to edit details";
     }
 
-    onAuthChange((user) => {
+    onAuthChange(async (user) => {
       updateMiniProfile(user);
-      const logoutBtn = document.getElementById("profile-logout-btn");
-      if (logoutBtn) logoutBtn.hidden = !user;
+
+      if (user) {
+        try {
+          const token = await getIdToken();
+          const apiBase = window.BLOOM_API_BASE || "";
+
+          const res = await fetch(`${apiBase}/api/user/profile`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const profile = data.profile || {};
+
+            // update localStorage with fresh backend data
+            const existing = (() => {
+              try { return JSON.parse(localStorage.getItem("bloom_profile")) || {}; }
+              catch { return {}; }
+            })();
+
+            const updated = {
+              ...existing,
+              nickname: profile.nickname || "",
+              yob: profile.yearOfBirth || ""
+            };
+
+            if (data.healthProfile?.avgCycleLength !== undefined && data.healthProfile?.avgCycleLength !== null) {
+              updated.avgCycleLength = data.healthProfile.avgCycleLength;
+            }
+            if (data.healthProfile?.periodDuration !== undefined && data.healthProfile?.periodDuration !== null) {
+              updated.periodDuration = data.healthProfile.periodDuration;
+            }
+            if (data.healthProfile?.weightKg !== undefined && data.healthProfile?.weightKg !== null) {
+              updated.weightKg = data.healthProfile.weightKg;
+            }
+            if (data.healthProfile?.heightCm !== undefined && data.healthProfile?.heightCm !== null) {
+              updated.heightCm = data.healthProfile.heightCm;
+            }
+
+            localStorage.setItem("bloom_profile", JSON.stringify(updated));
+
+            if (profile.avatar) {
+              localStorage.setItem("bloom_avatar", profile.avatar);
+            }
+
+            updateMiniProfile(user); // refresh UI
+          }
+        } catch (e) {
+          console.error("Profile sync failed", e);
+        }
+      }
     });
 
     document.getElementById("profile-logout-btn")?.addEventListener("click", async () => {
