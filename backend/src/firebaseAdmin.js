@@ -1,11 +1,11 @@
 // src/firebaseAdmin.js
+import dotenv from "dotenv";
+dotenv.config();
+
 import admin from "firebase-admin";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,13 +16,21 @@ function initAdmin() {
 
   let credential;
 
-  // 1) Full JSON string in env
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // 1) Local dev: use service account JSON file if it exists
+  if (fs.existsSync(serviceAccountPath)) {
+    const serviceAccount = JSON.parse(
+      fs.readFileSync(serviceAccountPath, "utf8")
+    );
+    credential = admin.credential.cert(serviceAccount);
+    console.log("Using local serviceAccountKey.json");
+  }
+  // 2) Full JSON string in env (for production)
+  else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     credential = admin.credential.cert(serviceAccount);
     console.log("Using FIREBASE_SERVICE_ACCOUNT");
   }
-  // 2) Split env vars
+  // 3) Split env vars (for production)
   else if (
     process.env.FIREBASE_PROJECT_ID &&
     process.env.FIREBASE_CLIENT_EMAIL &&
@@ -35,14 +43,6 @@ function initAdmin() {
     };
     credential = admin.credential.cert(serviceAccount);
     console.log("Using split FIREBASE_* env vars");
-  }
-  // 3) Local dev fallback only
-  else if (fs.existsSync(serviceAccountPath)) {
-    const serviceAccount = JSON.parse(
-      fs.readFileSync(serviceAccountPath, "utf8")
-    );
-    credential = admin.credential.cert(serviceAccount);
-    console.log("Using local serviceAccountKey.json");
   }
   // 4) Platform-provided credentials
   else {

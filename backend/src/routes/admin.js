@@ -244,7 +244,27 @@ router.post("/users/:uid/promote", async (req, res) => {
     if (!allowed.includes(role)) {
       return res.status(400).json({ error: "Invalid role" });
     }
+
+    if (uid === req.user.uid && role !== "admin") {
+      return res.status(400).json({ error: "Cannot demote your own admin account" });
+    }
+
+    // 1. Set Firebase custom claims
     await auth.setCustomUserClaims(uid, { role });
+
+    // 2. Sync role to Firestore users doc
+    await db.collection("users").doc(uid).set(
+      { role, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+
+    // 3. Sync adminUsers collection to match Firestore rules isAdmin() check
+    const adminRef = db.collection("adminUsers").doc(uid);
+    if (role === "admin") {
+      await adminRef.set({ grantedAt: admin.firestore.FieldValue.serverTimestamp(), grantedBy: req.user.uid });
+    } else {
+      await adminRef.delete();
+    }
 
     await logAudit({
       actorUid:   req.user.uid,

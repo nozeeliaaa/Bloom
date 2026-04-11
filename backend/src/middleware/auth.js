@@ -12,6 +12,7 @@ export async function requireAuth(req, res, next) {
 
   try {
     const decoded = await auth.verifyIdToken(token);
+
     const userRef = db.collection("users").doc(decoded.uid);
     const userDoc = await userRef.get();
 
@@ -64,11 +65,29 @@ export async function requireAuth(req, res, next) {
 
       return next();
     }
+    if (!decoded.email_verified) {
+      return res.status(403).json({
+        error: "Email not verified",
+        code: "EMAIL_NOT_VERIFIED",
+      });
+    }
 
     const data = userDoc.data() || {};
     const profile = data.profile || {};
     const healthProfile = data.healthProfile || {};
     const biometricProfile = data.biometricProfile || {};
+
+    if (!data.email && decoded.email) {
+      await userRef.set(
+      {
+        email: decoded.email,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    data.email = decoded.email;
+  }
 
     const needsBackfill =
       !data.role ||
@@ -187,7 +206,7 @@ export async function requireAuth(req, res, next) {
       uid: decoded.uid,
       email: decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role: decoded.role || data.role || "user",
+      role: decoded.role || "user",
       ageBand,
       yob: safeProfile.yearOfBirth || null,
     };

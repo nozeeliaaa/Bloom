@@ -1,6 +1,3 @@
-// server.js
-import dotenv from "dotenv";
-dotenv.config();
 
 // ── Startup env var checks ──────────────────────────────────
 // Firebase credentials are handled by firebaseAdmin.js (uses serviceAccountKey.json as local fallback)
