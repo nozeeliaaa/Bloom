@@ -299,7 +299,15 @@
     const LS_AVATAR  = "bloom_avatar";
 
     function loadProfile(){
-      try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
+      try {
+        const data = JSON.parse(localStorage.getItem(LS_PROFILE)) || {};
+        return {
+          ...(data.profile || {}),
+          ...(data.healthProfile || {}),
+          biometricProfile: data.biometricProfile || {},
+          phaseProfile: data.phaseProfile || {}
+        };
+      }
       catch { return {}; }
     }
 
@@ -341,22 +349,30 @@
 
             const updated = {
               ...existing,
-              nickname: profile.nickname || "",
-              yob: profile.yearOfBirth || ""
+              profile: {
+                ...(existing.profile || {}),
+                nickname: profile.nickname || "",
+                yob: profile.yearOfBirth || ""
+              },
+              healthProfile: {
+                ...(existing.healthProfile || {}),
+                avgCycleLength: data.healthProfile?.avgCycleLength ?? existing.healthProfile?.avgCycleLength ?? null,
+                periodDuration: data.healthProfile?.periodDuration ?? existing.healthProfile?.periodDuration ?? null,
+                weightKg: data.healthProfile?.weightKg ?? existing.healthProfile?.weightKg ?? null,
+                heightCm: data.healthProfile?.heightCm ?? existing.healthProfile?.heightCm ?? null
+              },
+              biometricProfile: {
+                ...(existing.biometricProfile || {}),
+                sleepScore: data.biometricProfile?.sleepScore ?? existing.biometricProfile?.sleepScore ?? null,
+                stressLevel: data.biometricProfile?.stressLevel ?? existing.biometricProfile?.stressLevel ?? null,
+                activityLevel: data.biometricProfile?.activityLevel ?? existing.biometricProfile?.activityLevel ?? null
+              },
+              phaseProfile: {
+                ...(existing.phaseProfile || {}),
+                lastPeriodStart: data.phaseProfile?.lastPeriodStart ?? existing.phaseProfile?.lastPeriodStart ?? null,
+                phaseEstimation: data.phaseProfile?.phaseEstimation ?? existing.phaseProfile?.phaseEstimation ?? null
+              }
             };
-
-            if (data.healthProfile?.avgCycleLength !== undefined && data.healthProfile?.avgCycleLength !== null) {
-              updated.avgCycleLength = data.healthProfile.avgCycleLength;
-            }
-            if (data.healthProfile?.periodDuration !== undefined && data.healthProfile?.periodDuration !== null) {
-              updated.periodDuration = data.healthProfile.periodDuration;
-            }
-            if (data.healthProfile?.weightKg !== undefined && data.healthProfile?.weightKg !== null) {
-              updated.weightKg = data.healthProfile.weightKg;
-            }
-            if (data.healthProfile?.heightCm !== undefined && data.healthProfile?.heightCm !== null) {
-              updated.heightCm = data.healthProfile.heightCm;
-            }
 
             localStorage.setItem("bloom_profile", JSON.stringify(updated));
 

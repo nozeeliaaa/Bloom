@@ -408,6 +408,36 @@ router.post('/state', requireAuth, requireConsent, async (req, res) => {
         .set({ ...state, updatedAt: admin.firestore.FieldValue.serverTimestamp() })
         .catch(err => console.warn('[cyclesML/state] Firestore persist failed:', err.message));
     }
+    // 🔥 ALSO SAVE TO phaseProfile (this is what dashboard should use)
+    if (uid && db) {
+      db.collection('users').doc(uid).set(
+        {
+          phaseProfile: {
+            lastPeriodStart: lastStart ?? null,
+            phaseEstimation: {
+              estimatedPhase: state.phase ?? null,
+              phaseLabel: state.phaseLabel ?? null,
+              cycleDay: state.dayInCycle ?? null,
+              confidence: {
+                level: state.confidence?.level ?? null,
+                score:
+                  state.confidence?.level === "High"
+                    ? 0.9
+                    : state.confidence?.level === "Medium"
+                    ? 0.6
+                    : 0.3,
+              },
+              override: null,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      ).catch(err =>
+        console.warn("[cyclesML/state] phaseProfile save failed:", err.message)
+      );
+    }
 
     return res.json({ ok: true, state });
   } catch (err) {

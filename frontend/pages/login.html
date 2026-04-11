@@ -194,26 +194,34 @@
             const data = await profileRes.json();
             const profile = data?.profile || {};
             const health = data?.healthProfile || {};
+            const biometric = data?.biometricProfile || {};
+            const phase = data?.phaseProfile || {};
 
             localStorage.setItem('bloom_onboarded', '1');
             const realGoal = (profile.goal === "track_cycle" || !profile.goal) ? "period" : profile.goal;setUserGoal(realGoal);
 
-            const restored = {};
-            if (profile.nickname) restored.nickname = profile.nickname;
-            if (profile.yearOfBirth) restored.yob = profile.yearOfBirth;
+            const restored = {
+              profile: {
+                nickname: profile.nickname || "",
+                yob: profile.yearOfBirth || ""
+              },
+              healthProfile: {
+                avgCycleLength: health.avgCycleLength ?? null,
+                periodDuration: health.periodDuration ?? null,
+                weightKg: health.weightKg ?? null,
+                heightCm: health.heightCm ?? null
+              },
+              biometricProfile: {
+                sleepScore: biometric.sleepScore ?? null,
+                stressLevel: biometric.stressLevel ?? null,
+                activityLevel: biometric.activityLevel ?? null
+              },
+              phaseProfile: {
+                lastPeriodStart: phase.lastPeriodStart ?? null,
+                phaseEstimation: phase.phaseEstimation ?? null
+              }
+            };
 
-            if (health.avgCycleLength !== undefined && health.avgCycleLength !== null) {
-              restored.avgCycleLength = health.avgCycleLength;
-            }
-            if (health.periodDuration !== undefined && health.periodDuration !== null) {
-              restored.periodDuration = health.periodDuration;
-            }
-            if (health.weightKg !== undefined && health.weightKg !== null) {
-              restored.weightKg = health.weightKg;
-            }
-            if (health.heightCm !== undefined && health.heightCm !== null) {
-              restored.heightCm = health.heightCm;
-            }
             if (profile.avatar) localStorage.setItem('bloom_avatar', profile.avatar);
             localStorage.setItem('bloom_profile', JSON.stringify(restored));
           } else {

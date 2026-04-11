@@ -331,8 +331,17 @@
     }
 
     function loadProfile() {
-      try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
-      catch { return {}; }
+      try {
+        const data = JSON.parse(localStorage.getItem(LS_PROFILE)) || {};
+        return {
+          ...(data.profile || {}),
+          ...(data.healthProfile || {}),
+          biometricProfile: data.biometricProfile || {},
+          phaseProfile: data.phaseProfile || {}
+        };
+      } catch {
+        return {};
+      }
     }
 
     function selectAvatar(emoji) {
@@ -429,16 +438,35 @@
       localStorage.setItem(LS_AVATAR, selectedAvatar);
 
       // Save all profile fields to localStorage
-      const profile = {
-        ...loadProfile(),
-        nickname,
-        yob: yob ? Number(yob) : "",
-        avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
-        periodDuration: periodDur ? Number(periodDur) : null,
-        weightKg,
-        heightCm,
+      const existing = (() => {
+        try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
+        catch { return {}; }
+      })();
+
+      const localProfile = {
+        ...existing,
+        profile: {
+          ...(existing.profile || {}),
+          nickname,
+          yob: yob ? Number(yob) : ""
+        },
+        healthProfile: {
+          ...(existing.healthProfile || {}),
+        },
+        biometricProfile: {
+          ...(existing.biometricProfile || {}),
+        },
+        phaseProfile: {
+          ...(existing.phaseProfile || {}),
+        }
       };
-      localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+
+      if (avgCycle !== "") localProfile.healthProfile.avgCycleLength = Number(avgCycle);
+      if (periodDur !== "") localProfile.healthProfile.periodDuration = Number(periodDur);
+      if (!isNaN(weightRaw)) localProfile.healthProfile.weightKg = weightKg;
+      if (heightCm !== null) localProfile.healthProfile.heightCm = heightCm;
+
+      localStorage.setItem(LS_PROFILE, JSON.stringify(localProfile));
 
       if (yob && !wasLocked) {
         localStorage.setItem(LS_YOB_LOCKED, "true");

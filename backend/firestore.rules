@@ -4,22 +4,18 @@ service cloud.firestore {
 
     // ─── Helpers ────────────────────────────────────────────────────────────
 
-    // Is the request from a signed-in user?
     function isAuth() {
       return request.auth != null;
     }
 
-    // Is the requester the owner of this document?
     function isOwner(uid) {
       return isAuth() && request.auth.uid == uid;
     }
 
-    // Load the requester's Firestore profile
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    // What role does the requester have?
     function getRole() {
       return getUserData().profile.role;
     }
@@ -29,153 +25,143 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid));
     }
 
-    // Does an active guardian relationship exist for this teen?
     function hasActiveRelationship(teenUid, guardianUid) {
       return exists(/databases/$(database)/documents/relationships/$(teenUid + "_" + guardianUid)) &&
         get(/databases/$(database)/documents/relationships/$(teenUid + "_" + guardianUid)).data.status == "active";
     }
 
     // ─── users/{uid} ────────────────────────────────────────────────────────
-    // Users read/write their own doc only
-    // Admins can read (but not write) for support purposes - logged separately
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid) &&
-        // Prevent client from changing role directly
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role"]);
-      allow delete: if false; // never delete via client
+
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role"])
+        // 🚫 Prevent sleepScore from being written in wrong place
+        && (
+          !("healthProfile" in request.resource.data)
+          || !("sleepScore" in request.resource.data.healthProfile)
+        );
+
+      allow delete: if false;
     }
 
     // ─── preferences/{uid} ──────────────────────────────────────────────────
-    // Only the owner can read/write their preferences
     match /preferences/{uid} {
       allow read, write: if isOwner(uid);
     }
 
     // ─── cycleLogs/{uid}/entries/{dateKey} ──────────────────────────────────
-    // Only the owner can read/write their cycle logs
-    // Admins and guardians cannot access
     match /cycleLogs/{uid}/entries/{dateKey} {
       allow read, write: if isOwner(uid);
     }
 
     // ─── symptomLogs/{uid}/entries/{dateKey} ────────────────────────────────
-    // Only the owner can read/write their symptom logs
-    // Admins and guardians cannot access
     match /symptomLogs/{uid}/entries/{dateKey} {
       allow read, write: if isOwner(uid);
     }
 
+    // ✅ FIXED: moved biometricLogs into correct section
+    // ─── biometricLogs/{uid}/entries/{dateKey} ──────────────────────────────
+    match /biometricLogs/{uid}/entries/{dateKey} {
+      allow read, write: if isOwner(uid);
+    }
+
     // ─── relationships/{relId} ──────────────────────────────────────────────
-    // Only the teen or guardian involved can read
-    // Writes go through Cloud Functions / backend only (not direct client writes)
     match /relationships/{relId} {
       allow read: if isAuth() &&
         (resource.data.teenUid == request.auth.uid ||
          resource.data.guardianUid == request.auth.uid);
-      allow write: if false; // backend only
+      allow write: if false;
     }
 
     // ─── consents/{consentId} ───────────────────────────────────────────────
-    // Teen can read their own consent status
-    // Guardian can read and update consents linked to them
-    // Writes (create) go through backend only
     match /consents/{consentId} {
       allow read: if isAuth() &&
         (resource.data.teenUid == request.auth.uid ||
          resource.data.guardianUid == request.auth.uid);
+
       allow update: if isAuth() &&
         resource.data.guardianUid == request.auth.uid &&
-        // Guardian can only update status, not change who is linked
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(["status", "statusUpdatedAt", "decidedAt", "scope"]);
-      allow create: if false; // backend only
+
+      allow create: if false;
       allow delete: if false;
     }
 
     // ─── exports/{exportId} ─────────────────────────────────────────────────
-    // Users can read/write their own export requests
-    // Admins can read metadata only (no file content here)
     match /exports/{exportId} {
       allow read, write: if isAuth() && resource.data.uid == request.auth.uid;
       allow read: if isAdmin();
     }
 
     // ─── auditLogs/{logId} ──────────────────────────────────────────────────
-    // No client writes ever - backend only
-    // Admins can read all, users can read their own actions only
     match /auditLogs/{logId} {
       allow read: if isAdmin() ||
         (isAuth() && resource.data.actorUid == request.auth.uid);
-      allow write: if false; // backend only
+      allow write: if false;
     }
 
     // ─── adminUsers/{uid} ───────────────────────────────────────────────────
-    // Only admins can read their own entry
-    // No client writes - managed manually or via super-admin only
     match /adminUsers/{uid} {
       allow read: if isAdmin() && request.auth.uid == uid;
       allow write: if false;
     }
 
     // ─── symptomCatalog/{symptomKey} ────────────────────────────────────────
-    // Anyone authenticated can read the catalog
-    // Only admins can write (manage the catalog)
     match /symptomCatalog/{symptomKey} {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
 
     // ─── clinicDirectory/{entryId} ──────────────────────────────────────────
-    // Anyone authenticated can read clinic data
-    // Only admins can write
     match /clinicDirectory/{entryId} {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
 
     // ─── pamphlets/{pamphletId} ─────────────────────────────────────────────
-    // Anyone authenticated can read published pamphlets
-    // Only admins can write
     match /pamphlets/{pamphletId} {
       allow read: if isAuth() && resource.data.status == "published";
       allow write: if isAdmin();
     }
 
     // ─── deviceTokens/{tokenId} ─────────────────────────────────────────────
-    // Users can manage their own device tokens only
     match /deviceTokens/{tokenId} {
       allow read, write: if isAuth() && resource.data.uid == request.auth.uid;
     }
 
     // ─── notificationsQueue/{notifId} ───────────────────────────────────────
-    // No client access - backend/Cloud Functions only
     match /notificationsQueue/{notifId} {
       allow read, write: if false;
     }
 
     // ─── reports/{reportId} ─────────────────────────────────────────────────
-    // Admin read only - aggregated data, no private logs
     match /reports/{reportId} {
       allow read: if isAdmin();
       allow write: if false;
     }
 
     // ─── guardianSummaries/{teenUid} ────────────────────────────────────────
-    // Guardian can read if active relationship exists
-    // Teens can read their own summary
-    // Written by backend only
     match /guardianSummaries/{teenUid} {
       allow read: if isOwner(teenUid) ||
         (isAuth() && hasActiveRelationship(teenUid, request.auth.uid));
-      allow write: if false; // backend only
+      allow write: if false;
+    }
+
+    // ─── phaseFeedback/{uid}/entries/{entryId} ───────────────────────────────
+    match /phaseFeedback/{uid}/entries/{entryId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /phaseFeedback/{uid}/entries/{entryId} {
+      allow read, write: if isOwner(uid);
     }
 
     // ─── Deny everything else ───────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }
-
   }
 }
