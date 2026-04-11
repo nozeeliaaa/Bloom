@@ -123,6 +123,7 @@ app.use("/api/bloomie-safety-log", bloomieSafetyLogRoutes);
 app.use("/api/biometric-logs", biometricLogRoutes);
 app.use("/api/phase-feedback", phaseFeedbackRoutes);
 app.use("/api/feedback",           feedbackRoutes);
+app.use("/api/cycle-logs", cycleLogRoutes);
 app.use("/api/preferences",        preferencesRoutes);
 app.use("/api/cycles",             cyclesMLRoutes);
 app.use("/api/contact",            contactRoutes);

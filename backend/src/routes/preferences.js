@@ -96,13 +96,24 @@ router.put("/", requireAuth, async (req, res) => {
         prefs.reminders.types = [];
       }
 
-      if (r.quietHours?.start || r.quietHours?.end) {
-        if (!isValidTime(r.quietHours.start) || !isValidTime(r.quietHours.end)) {
-          return res.status(400).json({ error: "Invalid quietHours format. Use HH:mm (e.g. 09:00)" });
+      if (r.quietHours !== undefined) {
+        const { start, end } = r.quietHours || {};
+
+        if (!start || !end) {
+          return res.status(400).json({
+            error: "quietHours requires both start and end in HH:mm format",
+          });
         }
+
+        if (!isValidTime(start) || !isValidTime(end)) {
+          return res.status(400).json({
+            error: "Invalid quietHours format. Use HH:mm (e.g. 09:00)",
+          });
+        }
+
         prefs.reminders.quietHours = {
-          start: r.quietHours.start,
-          end:   r.quietHours.end,
+          start,
+          end,
         };
       }
     }
