@@ -104,13 +104,6 @@
         { "fieldPath": "teenSafe", "order": "ASCENDING" },
         { "fieldPath": "sensitive", "order": "ASCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "entries",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "dateKey", "order": "DESCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []

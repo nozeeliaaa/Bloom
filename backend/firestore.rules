@@ -61,7 +61,6 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
-    // ✅ FIXED: moved biometricLogs into correct section
     // ─── biometricLogs/{uid}/entries/{dateKey} ──────────────────────────────
     match /biometricLogs/{uid}/entries/{dateKey} {
       allow read, write: if isOwner(uid);
@@ -109,9 +108,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ─── symptomLogs/{uid}/entries/{dateKey} ────────────────────────────────────────
-    match /symptomLogs/{uid}/entries/{dateKey} {
+    // ─── symptomLogs/{uid} ────────────────────────────────────────
+    match /symptomLogs/{uid} {
       allow read, write: if isOwner(uid);
+    }
+    
+    // ─── symptomCatalog/{symptomKey} ────────────────────────────────────────
+    match /symptomCatalog/{symptomKey} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
     }
 
     // ─── clinicDirectory/{entryId} ──────────────────────────────────────────
