@@ -13,12 +13,18 @@ function isValidDateKey(dateKey) {
   return /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 }
 
+function toScore(val) {
+  if (val === null || val === undefined) return val;
+  const n = Number(val);
+  return Number.isInteger(n) ? n : val; // let validator catch non-integers
+}
+
 // PUT /api/biometric-logs/:dateKey
 router.put("/:dateKey", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const { dateKey } = req.params;
-    const { sleepScore, stressLevel, activityLevel } = req.body || {};
+    const raw = req.body || {};
 
     if (!isValidDateKey(dateKey)) {
       return res.status(400).json({ error: "Invalid dateKey format. Use YYYY-MM-DD." });
@@ -26,25 +32,28 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
 
     const update = {};
 
-    if (sleepScore !== undefined) {
-      if (sleepScore !== null && !isValidScore(sleepScore)) {
+    if (raw.sleepScore !== undefined) {
+      const val = toScore(raw.sleepScore);
+      if (val !== null && !isValidScore(val)) {
         return res.status(400).json({ error: "sleepScore must be an integer from 0 to 5 or null." });
       }
-      update.sleepScore = sleepScore;
+      update.sleepScore = val;
     }
 
-    if (stressLevel !== undefined) {
-      if (stressLevel !== null && !isValidScore(stressLevel)) {
+    if (raw.stressLevel !== undefined) {
+      const val = toScore(raw.stressLevel);
+      if (val !== null && !isValidScore(val)) {
         return res.status(400).json({ error: "stressLevel must be an integer from 0 to 5 or null." });
       }
-      update.stressLevel = stressLevel;
+      update.stressLevel = val;
     }
 
-    if (activityLevel !== undefined) {
-      if (activityLevel !== null && !isValidScore(activityLevel)) {
+    if (raw.activityLevel !== undefined) {
+      const val = toScore(raw.activityLevel);
+      if (val !== null && !isValidScore(val)) {
         return res.status(400).json({ error: "activityLevel must be an integer from 0 to 5 or null." });
       }
-      update.activityLevel = activityLevel;
+      update.activityLevel = val;
     }
 
     if (Object.keys(update).length === 0) {

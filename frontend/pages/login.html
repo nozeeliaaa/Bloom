@@ -145,6 +145,7 @@
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
+    import { setTheme } from "/js/theme-manager.js";
     import { setUserGoal } from '/js/goals.js';
 
     renderFooter();
@@ -233,7 +234,6 @@
             const prefsData = await prefsRes.json();
             const prefs = prefsData?.preferences;
             if (prefs) {
-              // Flatten backend prefs shape into local storage shape
               const local = {
                 hideSensitive:  !!prefs.hideSensitive,
                 compact:        !!prefs.compact,
@@ -242,10 +242,14 @@
                 fertileAlert:   !!(prefs.reminders?.types?.includes('FERTILE_WINDOW')),
                 discreetNotif:  !!(prefs.reminders?.discreetCopy),
               };
-              if (prefs.theme) local.theme = prefs.theme;
-              localStorage.setItem('bloom_preferences', JSON.stringify(local));
+            if (prefs.theme) local.theme = prefs.theme;
+            localStorage.setItem('bloom_preferences', JSON.stringify(local));
+
+            if (prefs.theme) {
+              setTheme(prefs.theme);
             }
           }
+        }
         }
       } catch (e) { console.error("[Bloom] login restore error:", e); }
 

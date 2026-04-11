@@ -11,12 +11,14 @@ import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
-
 const router = express.Router();
 
-// Valid preference values for server-side validation
 const VALID_THEMES = ["light", "dark", "system"];
 const VALID_REMINDER_TYPES = ["PERIOD_SOON", "LOG_REMINDER", "CHECK_IN", "FERTILE_WINDOW"];
+
+function isValidTime(str) {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(str);
+}
 
 // ─── GET /preferences ────────────────────────────────────────────────────────
 router.get("/", requireAuth, async (req, res) => {
@@ -25,7 +27,7 @@ router.get("/", requireAuth, async (req, res) => {
     const doc = await db.collection("preferences").doc(uid).get();
 
     if (!doc.exists) {
-      return res.json({ ok: true, preferences: null }); // frontend uses defaults
+      return res.json({ ok: true, preferences: null });
     }
 
     return res.json({ ok: true, preferences: doc.data() });
@@ -40,10 +42,13 @@ router.put("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
     const body = req.body;
-    console.log(`[preferences] PUT from uid=${uid} body=`, JSON.stringify(body));
+
+    // Guard against malformed body
+    if (typeof body !== "object" || body === null) {
+      return res.status(400).json({ error: "Invalid request body" });
+    }
 
     if (body.pregnancyMode !== undefined && req.user.ageBand === "10-17") {
-      // Run the consent check manually for this field only
       const consentSnap = await db.collection("consents")
         .where("teenUid", "==", req.user.uid)
         .where("status", "==", "approved")
@@ -57,7 +62,7 @@ router.put("/", requireAuth, async (req, res) => {
         });
       }
     }
-    // Build a validated preferences object - never blindly store req.body
+
     const prefs = {};
 
     if (body.theme !== undefined) {
@@ -67,9 +72,9 @@ router.put("/", requireAuth, async (req, res) => {
       prefs.theme = body.theme;
     }
 
-    if (body.blurMode !== undefined)    prefs.blurMode    = body.blurMode    === true;
-    if (body.discreetMode !== undefined) prefs.discreetMode = body.discreetMode === true;
-    if (body.compact !== undefined)     prefs.compact     = body.compact     === true;
+    if (body.blurMode      !== undefined) prefs.blurMode      = body.blurMode      === true;
+    if (body.discreetMode  !== undefined) prefs.discreetMode  = body.discreetMode  === true;
+    if (body.compact       !== undefined) prefs.compact       = body.compact       === true;
     if (body.hideSensitive !== undefined) prefs.hideSensitive = body.hideSensitive === true;
 
     if (body.reminders !== undefined) {
@@ -77,15 +82,27 @@ router.put("/", requireAuth, async (req, res) => {
       prefs.reminders = {
         enabled:      r.enabled      === true,
         discreetCopy: r.discreetCopy === true,
-        types: Array.isArray(r.types)
-          ? r.types.filter(t => VALID_REMINDER_TYPES.includes(t))
-          : [],
       };
 
-      if (r.quietHours?.start && r.quietHours?.end) {
+      if (Array.isArray(r.types)) {
+        const invalidTypes = r.types.filter(t => !VALID_REMINDER_TYPES.includes(t));
+        if (invalidTypes.length) {
+          return res.status(400).json({
+            error: `Invalid reminder types: ${invalidTypes.join(", ")}`,
+          });
+        }
+        prefs.reminders.types = r.types;
+      } else {
+        prefs.reminders.types = [];
+      }
+
+      if (r.quietHours?.start || r.quietHours?.end) {
+        if (!isValidTime(r.quietHours.start) || !isValidTime(r.quietHours.end)) {
+          return res.status(400).json({ error: "Invalid quietHours format. Use HH:mm (e.g. 09:00)" });
+        }
         prefs.reminders.quietHours = {
-          start: String(r.quietHours.start).slice(0, 5),
-          end:   String(r.quietHours.end).slice(0, 5),
+          start: r.quietHours.start,
+          end:   r.quietHours.end,
         };
       }
     }
@@ -100,7 +117,6 @@ router.put("/", requireAuth, async (req, res) => {
 
     await db.collection("preferences").doc(uid).set(prefs, { merge: true });
 
-    // Audit log
     await logAudit({
       actorUid:   uid,
       actorRole:  req.user.role,
