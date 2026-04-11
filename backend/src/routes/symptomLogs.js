@@ -21,6 +21,20 @@ async function ensureSymptomLogsParent(uid) {
   }
 }
 
+async function hasSensitiveConsent(uid) {
+  const snap = await db
+    .collection("consents")
+    .where("teenUid", "==", uid)
+    .where("status", "==", "approved")
+    .limit(1)
+    .get();
+
+  if (snap.empty) return false;
+
+  const consent = snap.docs[0].data();
+  return !!consent.scope?.sensitiveModules;
+}
+
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
 // Each doc holds an items[] array - multiple symptoms per day
 
@@ -46,18 +60,25 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
 
     const cleaned = [];
 
+    const teenHasSensitiveConsent =
+        req.user.ageBand === "10-17"
+          ? await hasSensitiveConsent(uid)
+          : true;
+
+
     for (let idx = 0; idx < items.length; idx++) {
       const result = await validateSymptomItem(items[idx], idx);
 
       if (!result.valid) {
         return res.status(400).json({ error: result.error });
       }
-
+      
       const { normalized, catalogData } = result;
 
-      if (catalogData.sensitive && req.user.ageBand === "10-17") {
+      if (catalogData.sensitive && !teenHasSensitiveConsent) {
         return res.status(403).json({
           error: `Symptom "${normalized.code}" requires guardian consent`,
+          code: "CONSENT_REQUIRED",
         });
       }
 

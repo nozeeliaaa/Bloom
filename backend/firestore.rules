@@ -109,10 +109,9 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ─── symptomCatalog/{symptomKey} ────────────────────────────────────────
-    match /symptomCatalog/{symptomKey} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+    // ─── symptomLogs/{uid}/entries/{dateKey} ────────────────────────────────────────
+    match /symptomLogs/{uid}/entries/{dateKey} {
+      allow read, write: if isOwner(uid);
     }
 
     // ─── clinicDirectory/{entryId} ──────────────────────────────────────────
