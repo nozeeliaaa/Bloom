@@ -16,17 +16,14 @@ function initAdmin() {
 
   let credential;
 
-  if (fs.existsSync(serviceAccountPath)) {
-    const serviceAccount = JSON.parse(
-      fs.readFileSync(serviceAccountPath, "utf8")
-    );
-    credential = admin.credential.cert(serviceAccount);
-    console.log("Using serviceAccountKey.json");
-  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // 1) Full JSON string in env
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     credential = admin.credential.cert(serviceAccount);
     console.log("Using FIREBASE_SERVICE_ACCOUNT");
-  } else if (
+  }
+  // 2) Split env vars
+  else if (
     process.env.FIREBASE_PROJECT_ID &&
     process.env.FIREBASE_CLIENT_EMAIL &&
     process.env.FIREBASE_PRIVATE_KEY
@@ -38,7 +35,17 @@ function initAdmin() {
     };
     credential = admin.credential.cert(serviceAccount);
     console.log("Using split FIREBASE_* env vars");
-  } else {
+  }
+  // 3) Local dev fallback only
+  else if (fs.existsSync(serviceAccountPath)) {
+    const serviceAccount = JSON.parse(
+      fs.readFileSync(serviceAccountPath, "utf8")
+    );
+    credential = admin.credential.cert(serviceAccount);
+    console.log("Using local serviceAccountKey.json");
+  }
+  // 4) Platform-provided credentials
+  else {
     credential = admin.credential.applicationDefault();
     console.log("Using applicationDefault()");
   }
@@ -58,3 +65,6 @@ initAdmin();
 export { admin };
 export const db = admin.firestore();
 export const auth = admin.auth();
+
+// Optional:
+// db.settings({ ignoreUndefinedProperties: true });
