@@ -73,6 +73,13 @@ export async function requireAuth(req, res, next) {
     }
 
     const data = userDoc.data() || {};
+
+    // Only check adminUsers collection if Firestore already shows role: "admin"
+    // Avoids extra read on every request for regular users
+    const isAdminUser = data.role === "admin"
+      ? (await db.collection("adminUsers").doc(decoded.uid).get()).exists
+      : false;
+
     const profile = data.profile || {};
     const healthProfile = data.healthProfile || {};
     const biometricProfile = data.biometricProfile || {};
@@ -206,7 +213,7 @@ export async function requireAuth(req, res, next) {
       uid: decoded.uid,
       email: decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role: decoded.role || "user",
+      role: isAdminUser ? "admin" : (data.role || "user"),
       ageBand,
       yob: safeProfile.yearOfBirth || null,
     };

@@ -58,6 +58,7 @@ service cloud.firestore {
       allow read: if isOwner(uid);
       allow create, update: if isOwner(uid)
         && request.resource.data.dateKey == entryId;
+      allow delete: if isOwner(uid);
     }
 
     // ─── symptomLogs/{uid}/entries/{entryId} { ────────────────────────────────
@@ -65,6 +66,7 @@ service cloud.firestore {
       allow read: if isOwner(uid);
       allow create, update: if isOwner(uid)
         && request.resource.data.dateKey == entryId;
+      allow delete: if isOwner(uid);
     }
 
     // ─── biometricLogs/{uid}/entries/{entryId} { ──────────────────────────────
@@ -73,6 +75,7 @@ service cloud.firestore {
       allow create, update: if isOwner(uid)
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.dateKey == entryId;
+      allow delete: if isOwner(uid);
     }
 
     // ─── relationships/{relId} ──────────────────────────────────────────────
