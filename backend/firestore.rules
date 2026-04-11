@@ -43,19 +43,36 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
-    // ─── cycleLogs/{uid}/entries/{dateKey} ──────────────────────────────────
-    match /cycleLogs/{uid}/entries/{dateKey} {
+    // ─── cycleLogs/{uid} ───────────────────────────────────────────────────────
+    match /cycleLogs/{uid} {
       allow read, write: if isOwner(uid);
     }
 
-    // ─── symptomLogs/{uid}/entries/{dateKey} ────────────────────────────────
-    match /symptomLogs/{uid}/entries/{dateKey} {
+    // ─── biometricLogs/{uid} ───────────────────────────────────────────────────
+    match /biometricLogs/{uid} {
       allow read, write: if isOwner(uid);
     }
 
-    // ─── biometricLogs/{uid}/entries/{dateKey} ──────────────────────────────
-    match /biometricLogs/{uid}/entries/{dateKey} {
-      allow read, write: if isOwner(uid);
+    // ─── cycleLogs/{uid}/entries/{entryId} ──────────────────────────────────
+    match /cycleLogs/{uid}/entries/{entryId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.dateKey == entryId;
+    }
+
+    // ─── symptomLogs/{uid}/entries/{entryId} { ────────────────────────────────
+    match /symptomLogs/{uid}/entries/{entryId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.dateKey == entryId;
+    }
+
+    // ─── biometricLogs/{uid}/entries/{entryId} { ──────────────────────────────
+    match /biometricLogs/{uid}/entries/{entryId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.dateKey == entryId;
     }
 
     // ─── relationships/{relId} ──────────────────────────────────────────────
@@ -113,13 +130,13 @@ service cloud.firestore {
 
     // ─── clinicDirectory/{entryId} ──────────────────────────────────────────
     match /clinicDirectory/{entryId} {
-      allow read: if isAuth();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // ─── pamphlets/{pamphletId} ─────────────────────────────────────────────
     match /pamphlets/{pamphletId} {
-      allow read: if isAuth() && resource.data.status == "published";
+      allow read: if resource.data.status == "published";
       allow write: if isAdmin();
     }
 
@@ -144,6 +161,10 @@ service cloud.firestore {
       allow read: if isOwner(teenUid) ||
         (isAuth() && hasActiveRelationship(teenUid, request.auth.uid));
       allow write: if false;
+    }
+    // ─── phaseFeedback/{uid} ──────────────────────────────────────────────────
+    match /phaseFeedback/{uid} {
+      allow read, write: if isOwner(uid);
     }
 
     // ─── phaseFeedback/{uid}/entries/{entryId} ───────────────────────────────
