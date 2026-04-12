@@ -33,7 +33,7 @@ async function initFirebase() {
  
   auth = getAuth(app);
   db   = getFirestore(app);
- 
+  window.auth = auth;
   // FCM is only supported in browsers that support service workers
   try {
     const supported = await isSupported();

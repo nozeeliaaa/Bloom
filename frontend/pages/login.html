@@ -145,6 +145,7 @@
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
+    import { setTheme } from "/js/theme-manager.js";
     import { setUserGoal } from '/js/goals.js';
 
     renderFooter();
@@ -192,33 +193,38 @@
           // ── Restore profile ──
           if (profileRes.ok) {
             const data = await profileRes.json();
-            const profile = data?.profile || data || {};
-            const healthProfile = data?.healthProfile || {};
-            if (profile) {
-              localStorage.setItem('bloom_onboarded', '1');
-              let realGoal = profile.goal;
-              if (!realGoal || realGoal === "track_cycle") {
-                realGoal = "period";
-              } else if (realGoal === "no_period") {
-                realGoal = "track_symptoms";
+            const profile = data?.profile || {};
+            const health = data?.healthProfile || {};
+            const biometric = data?.biometricProfile || {};
+            const phase = data?.phaseProfile || {};
+
+            localStorage.setItem('bloom_onboarded', '1');
+            const realGoal = (profile.goal === "track_cycle" || !profile.goal) ? "period" : profile.goal;setUserGoal(realGoal);
+
+            const restored = {
+              profile: {
+                nickname: profile.nickname || "",
+                yob: profile.yearOfBirth || ""
+              },
+              healthProfile: {
+                avgCycleLength: health.avgCycleLength ?? null,
+                periodDuration: health.periodDuration ?? null,
+                weightKg: health.weightKg ?? null,
+                heightCm: health.heightCm ?? null
+              },
+              biometricProfile: {
+                sleepScore: biometric.sleepScore ?? null,
+                stressLevel: biometric.stressLevel ?? null,
+                activityLevel: biometric.activityLevel ?? null
+              },
+              phaseProfile: {
+                lastPeriodStart: phase.lastPeriodStart ?? null,
+                phaseEstimation: phase.phaseEstimation ?? null
               }
-              setUserGoal(realGoal);
-              const restored = {};
-              if (profile.nickname)       restored.nickname       = profile.nickname;
-              if (profile.yearOfBirth)    restored.yob            = profile.yearOfBirth;
-              const avgCycleLength = profile.avgCycleLength ?? healthProfile.avgCycleLength;
-              const periodDuration = profile.periodDuration ?? healthProfile.periodDuration;
-              const sleepScore = profile.sleepScore ?? healthProfile.sleepScore;
-              const weightKg = profile.weightKg ?? healthProfile.weightKg;
-              const heightCm = profile.heightCm ?? healthProfile.heightCm;
-              if (avgCycleLength != null) restored.avgCycleLength = avgCycleLength;
-              if (periodDuration != null) restored.periodDuration = periodDuration;
-              if (sleepScore != null)     restored.sleepScore     = sleepScore;
-              if (weightKg != null)       restored.weightKg       = weightKg;
-              if (heightCm != null)       restored.heightCm       = heightCm;
-              if (profile.avatar)         localStorage.setItem('bloom_avatar', profile.avatar);
-              localStorage.setItem('bloom_profile', JSON.stringify(restored));
-            }
+            };
+
+            if (profile.avatar) localStorage.setItem('bloom_avatar', profile.avatar);
+            localStorage.setItem('bloom_profile', JSON.stringify(restored));
           } else {
             console.error("[Bloom] profile fetch failed:", profileRes.status);
           }
@@ -228,7 +234,6 @@
             const prefsData = await prefsRes.json();
             const prefs = prefsData?.preferences;
             if (prefs) {
-              // Flatten backend prefs shape into local storage shape
               const local = {
                 hideSensitive:  !!prefs.hideSensitive,
                 compact:        !!prefs.compact,
@@ -237,10 +242,14 @@
                 fertileAlert:   !!(prefs.reminders?.types?.includes('FERTILE_WINDOW')),
                 discreetNotif:  !!(prefs.reminders?.discreetCopy),
               };
-              if (prefs.theme) local.theme = prefs.theme;
-              localStorage.setItem('bloom_preferences', JSON.stringify(local));
+            if (prefs.theme) local.theme = prefs.theme;
+            localStorage.setItem('bloom_preferences', JSON.stringify(local));
+
+            if (prefs.theme) {
+              setTheme(prefs.theme);
             }
           }
+        }
         }
       } catch (e) { console.error("[Bloom] login restore error:", e); }
 

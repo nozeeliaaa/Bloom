@@ -11,6 +11,9 @@ function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 }
 
+function toBool(val) {
+  return val === true || val === "true";
+}
 async function ensureCycleLogsParent(uid) {
   const parentRef = db.collection("cycleLogs").doc(uid);
   const snap = await parentRef.get();
@@ -32,7 +35,6 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
     }
 
-    // ---- Validate body ----
     const validation = validateCycleLog(req.body);
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
@@ -44,13 +46,25 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey);
 
+    const periodDay =
+      req.body.periodDay === null || req.body.periodDay === undefined
+        ? null
+        : Number(req.body.periodDay);
+
+    if (periodDay !== null && (!Number.isInteger(periodDay) || periodDay < 1 || periodDay > 10)) {
+      return res.status(400).json({ error: "periodDay must be an integer between 1 and 10" });
+    }
+
     const payload = {
       dateKey,
-      periodDay: req.body.periodDay ?? null,
+      periodDay,
       flowLevel: req.body.flowLevel ?? null,
-      hadSex: req.body.hadSex ?? false,
-      contraceptionUsed: req.body.contraceptionUsed ?? false,
-      notes: typeof req.body.notes === "string" ? req.body.notes.trim() : "",
+      hadSex: toBool(req.body.hadSex),
+      contraceptionUsed: toBool(req.body.contraceptionUsed),
+      notes:
+        typeof req.body.notes === "string"
+          ? req.body.notes.trim().slice(0, 500)
+          : "",
       updatedAt: new Date(),
     };
 
@@ -106,15 +120,14 @@ router.get("/", requireAuth, async (req, res) => {
     }
 
     let q = db
-    .collection("cycleLogs")
-    .doc(uid)
-    .collection("entries")
-    .orderBy("dateKey", "desc");
+      .collection("cycleLogs")
+      .doc(uid)
+      .collection("entries")
+      .orderBy("dateKey", "desc");
 
     if (start) q = q.where("dateKey", ">=", start);
     if (end) q = q.where("dateKey", "<=", end);
 
-    // Only apply a cap when filtering by range - not on full history fetch
     if (start || end) q = q.limit(3650);
 
     const snap = await q.get();
@@ -139,7 +152,6 @@ router.delete("/", requireAuth, async (req, res) => {
 
     if (snap.empty) return res.json({ ok: true, deleted: 0 });
 
-    // Firestore batch max 500 ops - chunk if needed
     const BATCH_SIZE = 500;
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += BATCH_SIZE) {
@@ -187,6 +199,5 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to delete cycle log" });
   }
 });
-
 
 export default router;

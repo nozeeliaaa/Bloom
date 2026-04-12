@@ -38,7 +38,7 @@ export const GOALS = [
     desc: "See conception timing tools and fertility insights.",
   },
   {
-    id: "track_symptoms",
+    id: "no_period",
     title: "Track symptoms",
     desc: "Log symptoms and patterns without bleeding-based predictions.",
   },

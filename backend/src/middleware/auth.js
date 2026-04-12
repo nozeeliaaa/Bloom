@@ -12,6 +12,7 @@ export async function requireAuth(req, res, next) {
 
   try {
     const decoded = await auth.verifyIdToken(token);
+
     const userRef = db.collection("users").doc(decoded.uid);
     const userDoc = await userRef.get();
 
@@ -35,6 +36,20 @@ export async function requireAuth(req, res, next) {
           weightKg: null,
           heightCm: null,
         },
+        biometricProfile: {
+          sleepScore: null,
+          stressLevel: null,
+          activityLevel: null,
+        },
+        phaseProfile: {
+          lastPeriodStart: null,
+          phaseEstimation: null,
+        },
+        game: {
+          xp: 0,
+          level: 1,
+          sessionsPlayed: 0,
+        },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -50,15 +65,44 @@ export async function requireAuth(req, res, next) {
 
       return next();
     }
+    if (!decoded.email_verified) {
+      return res.status(403).json({
+        error: "Email not verified",
+        code: "EMAIL_NOT_VERIFIED",
+      });
+    }
 
     const data = userDoc.data() || {};
+
+    // Only check adminUsers collection if Firestore already shows role: "admin"
+    // Avoids extra read on every request for regular users
+    const isAdminUser = data.role === "admin"
+      ? (await db.collection("adminUsers").doc(decoded.uid).get()).exists
+      : false;
+
     const profile = data.profile || {};
     const healthProfile = data.healthProfile || {};
+    const biometricProfile = data.biometricProfile || {};
+
+    if (!data.email && decoded.email) {
+      await userRef.set(
+      {
+        email: decoded.email,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    data.email = decoded.email;
+  }
 
     const needsBackfill =
       !data.role ||
       !data.profile ||
       !data.healthProfile ||
+      !data.biometricProfile ||
+      !data.game ||
+      !data.phaseProfile ||
       profile.nickname === undefined ||
       profile.avatar === undefined ||
       profile.yearOfBirth === undefined ||
@@ -72,12 +116,16 @@ export async function requireAuth(req, res, next) {
       profile.periodDuration !== undefined ||
       profile.weightKg !== undefined ||
       profile.heightCm !== undefined ||
+      profile.sleepScore !== undefined ||
+      healthProfile.sleepScore !== undefined ||
       profile.goal === "track_cycle";
 
     if (needsBackfill) {
       const backfill = {
         role: data.role || "user",
         email: data.email || decoded.email || null,
+        lastPeriodStart: admin.firestore.FieldValue.delete(),
+        phaseEstimation: admin.firestore.FieldValue.delete(),
         profile: {
           nickname: profile.nickname ?? null,
           avatar: profile.avatar ?? "👤",
@@ -103,6 +151,32 @@ export async function requireAuth(req, res, next) {
           heightCm:
             healthProfile.heightCm ?? profile.heightCm ?? null,
         },
+        biometricProfile: {
+          sleepScore:
+            biometricProfile.sleepScore ??
+            healthProfile.sleepScore ??
+            profile.sleepScore ??
+            null,
+          stressLevel: biometricProfile.stressLevel ?? null,
+          activityLevel: biometricProfile.activityLevel ?? null,
+        },
+        phaseProfile: {
+          lastPeriodStart:
+            data.phaseProfile?.lastPeriodStart ??
+            data.lastPeriodStart ??
+            null,
+
+          phaseEstimation:
+            data.phaseProfile?.phaseEstimation ??
+            data.phaseEstimation ??
+            null,
+      },
+        game: {
+          xp: data.game?.xp ?? 0,
+          level: data.game?.level ?? 1,
+          sessionsPlayed: data.game?.sessionsPlayed ?? 0,
+        },
+        "healthProfile.sleepScore": admin.firestore.FieldValue.delete(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
@@ -112,6 +186,9 @@ export async function requireAuth(req, res, next) {
       data.email = backfill.email;
       data.profile = backfill.profile;
       data.healthProfile = backfill.healthProfile;
+      data.biometricProfile = backfill.biometricProfile;
+      data.phaseProfile = backfill.phaseProfile;
+      data.game = backfill.game;
     }
 
     const safeProfile = data.profile || {};
@@ -135,7 +212,7 @@ export async function requireAuth(req, res, next) {
       uid: decoded.uid,
       email: decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role: decoded.role || data.role || "user",
+      role: isAdminUser ? "admin" : (data.role || "user"),
       ageBand,
       yob: safeProfile.yearOfBirth || null,
     };

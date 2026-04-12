@@ -128,6 +128,7 @@ router.get("/pamphlets", async (req, res) => {
     // newly-added pamphlets to disappear. Filter in JS instead.
     const snap = await db.collection("pamphlets").get();
     let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    list = list.filter(p => p.status === "published");
     if (!showSensitive) list = list.filter(p => p.sensitive !== true);
     // Sort newest first, then by title
     list.sort((a, b) => {
@@ -159,6 +160,11 @@ router.get("/pamphlets/:id", async (req, res) => {
   try {
     const doc = await db.collection("pamphlets").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Pamphlet not found" });
+
+    if (doc.data().status !== "published") {
+      return res.status(404).json({ error: "Pamphlet not found" });
+    }
+
     return res.json({ ok: true, pamphlet: { id: doc.id, ...doc.data() } });
   } catch (err) {
     console.error("GET /catalog/pamphlets/:id error:", err);

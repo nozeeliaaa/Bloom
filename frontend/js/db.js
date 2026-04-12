@@ -14,24 +14,24 @@
 
 import { getIdToken } from "./auth.js";
 import { isAccountMode } from "./mode.js";
+import symptomsCatalog from "../data/symptoms.json";
 import { MODE_BANNER_ONCE_KEY } from "./utils.js";
-import { bloomieDiagnostic } from "./bloomie-logger.js";
-import {
-  loadBloomieMemoryLocal,
-  saveBloomieMemoryLocal,
-  clearBloomieMemoryLocal,
-} from "./bloom-storage.js";
-import {
-  normalizeCustomSymptomText,
-  sanitizeCustomSymptomNote,
-  sanitizeCustomSymptomText,
-} from "./custom-symptoms.js";
 
 const LOGS_KEY = "bloom_daily_logs";
 const ASSIST_KEY = "bloom_assistant_session";
+const MEMORY_KEY = "bloom_bloomie_memory";
 
 // Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → localhost:4000)
 const API_BASE = window.BLOOM_API_BASE || "";
+
+// Label ↔ key lookup maps from symptoms catalog
+const LABEL_TO_KEY = {};
+const KEY_TO_LABEL = {};
+
+symptomsCatalog.forEach((s) => {
+  LABEL_TO_KEY[s.label] = s.key;
+  KEY_TO_LABEL[s.key] = s.label;
+});
 
 // --------------------
 // localStorage helpers
@@ -56,17 +56,9 @@ function setCloudSyncedBanner() {
 // In-memory cache for getAllLogs - avoids repeated API calls within the same page session
 let _logsCache = null;
 let _logsCacheMode = null;
-let _logsInFlight = null;
-let _symptomCatalogCache = null;
-let _symptomCatalogFetchedAt = 0;
-let _symptomCatalogByCode = new Map();
-let _symptomCatalogByLabel = new Map();
-const SYMPTOM_CATALOG_TTL_MS = 10 * 60 * 1000;
 
 export function invalidateLogsCache() {
   _logsCache = null;
-  _logsCacheMode = null;
-  _logsInFlight = null;
 }
 
 function showSyncWarning() {
@@ -98,24 +90,9 @@ function apiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function normalizeSymptomLabel(label) {
-  return String(label || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
-function fallbackSymptomCodeFromLabel(label) {
+// Convert UI label to backend symptom code.
+// Example: "Back pain" -> "BACK_PAIN"
+function toSymptomCode(label) {
   return String(label || "")
     .trim()
     .toUpperCase()
@@ -123,85 +100,19 @@ function fallbackSymptomCodeFromLabel(label) {
     .replace(/^_+|_+$/g, "");
 }
 
-function fallbackLabelFromSymptomCode(code) {
-  return String(code || "")
-    .trim()
-    .toLowerCase()
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function indexSymptomCatalog(symptoms = []) {
-  _symptomCatalogByCode = new Map();
-  _symptomCatalogByLabel = new Map();
-
-  for (const item of symptoms) {
-    const code = String(item?.key || item?.id || "").trim().toUpperCase();
-    const label = String(item?.label || "").trim();
-    if (code) _symptomCatalogByCode.set(code, { ...item, key: code, label });
-    if (label) _symptomCatalogByLabel.set(normalizeSymptomLabel(label), code);
-  }
-}
-
-export async function getSymptomCatalog({ timeoutMs = 3500, force = false } = {}) {
-  if (!isAccountMode()) return _symptomCatalogCache || [];
-
-  const now = Date.now();
-  if (
-    !force &&
-    Array.isArray(_symptomCatalogCache) &&
-    _symptomCatalogCache.length > 0 &&
-    now - _symptomCatalogFetchedAt < SYMPTOM_CATALOG_TTL_MS
-  ) {
-    return _symptomCatalogCache;
-  }
-
-  try {
-    const headers = await authHeaders();
-    if (!headers) return _symptomCatalogCache || [];
-
-    const res = await fetchWithTimeout(
-      apiUrl("/catalog/symptoms?teenSafe=true&excludeSensitive=true"),
-      { headers },
-      timeoutMs
-    );
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      console.warn("Symptom catalog fetch failed:", res.status, txt);
-      return _symptomCatalogCache || [];
-    }
-
-    const data = await res.json();
-    const symptoms = Array.isArray(data?.symptoms) ? data.symptoms : [];
-    _symptomCatalogCache = symptoms;
-    _symptomCatalogFetchedAt = Date.now();
-    indexSymptomCatalog(symptoms);
-    return symptoms;
-  } catch (e) {
-    console.warn("Symptom catalog fetch error:", e);
-    return _symptomCatalogCache || [];
-  }
-}
-
-// Convert UI label to backend symptom code.
-// Example: "Back pain" -> "BACK_PAIN"
-function toSymptomCode(label) {
-  const normalized = normalizeSymptomLabel(label);
-  const mapped = normalized ? _symptomCatalogByLabel.get(normalized) : null;
-  if (mapped) return mapped;
-  return fallbackSymptomCodeFromLabel(label);
-}
-
 // Convert backend code back to readable label for UI.
 // Example: "BACK_PAIN" -> "Back Pain"
 function fromSymptomCode(code) {
   const normalized = String(code || "").trim().toUpperCase();
-  const mapped = _symptomCatalogByCode.get(normalized);
-  if (mapped?.label) return mapped.label;
-  return fallbackLabelFromSymptomCode(normalized);
+  return (
+    KEY_TO_LABEL[normalized] ||
+    normalized
+      .toLowerCase()
+      .split("_")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
+  );
 }
 
 // Merge cloud cycle logs + cloud symptom logs into one calendar-friendly object
@@ -219,9 +130,10 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
     if (entry.flowLevel != null) {
       flowStr = NUM_TO_FLOW[entry.flowLevel] ?? "none";
     }
-    // Fallback in case backend sends string flow instead of numeric flowLevel.
+
+    // fallback if backend ever sends string flow
     if (flowStr === "none" && entry.flow) {
-      flowStr = String(entry.flow);
+      flowStr = entry.flow;
     }
 
     merged[dateKey] = {
@@ -236,47 +148,23 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
     const dateKey = entry?.dateKey;
     if (!dateKey) continue;
 
-    const symptoms = [];
-    const symptomCodes = {};
-    if (Array.isArray(entry.items)) {
-      entry.items.forEach((it) => {
-        const code = String(it?.code || "").trim().toUpperCase();
-        const label = fromSymptomCode(code);
-        if (!label) return;
-        symptoms.push(label);
-        if (code) symptomCodes[label] = code;
-      });
-    }
+    const symptoms = Array.isArray(entry.items)
+      ? entry.items.map((it) => fromSymptomCode(it?.code)).filter(Boolean)
+      : [];
 
     const symptomSeverity = {};
     if (Array.isArray(entry.items)) {
       entry.items.forEach((it) => {
-        const code = String(it?.code || "").trim().toUpperCase();
-        const label = fromSymptomCode(code);
+        const label = fromSymptomCode(it?.code);
         if (label) symptomSeverity[label] = Number(it?.severity ?? 3);
       });
     }
-
-    const otherSymptoms = Array.isArray(entry.otherSymptoms)
-      ? entry.otherSymptoms
-          .map((it) => ({
-            text: sanitizeCustomSymptomText(it?.text),
-            normalizedText: normalizeCustomSymptomText(it?.normalizedText || it?.text),
-            severity: Number(it?.severity ?? 3),
-            note: sanitizeCustomSymptomNote(it?.note),
-            createdAt: typeof it?.createdAt === "string" ? it.createdAt : "",
-            dateKey: it?.dateKey || dateKey,
-          }))
-          .filter((it) => it.text)
-      : [];
 
     merged[dateKey] = {
       ...(merged[dateKey] || {}),
       date: dateKey,
       symptoms,
       symptomSeverity,
-      symptomCodes,
-      otherSymptoms,
     };
   }
 
@@ -290,30 +178,12 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
 export async function saveDailyLog(dateKey, log) {
   // Always write local first
   const all = readJSON(LOGS_KEY, {});
-  const localSymptomLabels = Array.isArray(log?.symptoms) ? log.symptoms : [];
-  const localSymptomCodes = {};
-  localSymptomLabels.forEach((label) => {
-    const code = toSymptomCode(label);
-    if (code) localSymptomCodes[label] = code;
-  });
-
-  all[dateKey] = {
-    ...(all[dateKey] || {}),
-    ...log,
-    date: dateKey,
-    symptomCodes: {
-      ...(all[dateKey]?.symptomCodes || {}),
-      ...localSymptomCodes,
-    },
-  };
+  all[dateKey] = { ...(all[dateKey] || {}), ...log, date: dateKey };
   writeJSON(LOGS_KEY, all);
 
   if (!isAccountMode()) return all[dateKey];
 
   try {
-    // Hydrate label->code map so we send canonical backend keys when available.
-    await getSymptomCatalog({ timeoutMs: 3000 }).catch(() => []);
-
     const headers = await authHeaders();
     if (!headers) return all[dateKey];
 
@@ -346,46 +216,18 @@ export async function saveDailyLog(dateKey, log) {
     const symptomsArray = Array.isArray(localEntry.symptoms)
       ? localEntry.symptoms
       : [];
-    const otherSymptomsArray = Array.isArray(localEntry.otherSymptoms)
-      ? localEntry.otherSymptoms
-          .map((it) => ({
-            text: sanitizeCustomSymptomText(it?.text),
-            normalizedText: normalizeCustomSymptomText(it?.normalizedText || it?.text),
-            severity: Number(it?.severity ?? 3),
-            note: sanitizeCustomSymptomNote(it?.note),
-            createdAt: typeof it?.createdAt === "string" ? it.createdAt : new Date().toISOString(),
-            dateKey,
-          }))
-          .filter((it) => it.text)
-      : [];
 
     if (symptomsArray.length > 0) {
-      const symptomCodeMap = {};
       const items = symptomsArray.map((symptom) => ({
-        code: (() => {
-          const code = toSymptomCode(symptom);
-          if (code) symptomCodeMap[symptom] = code;
-          return code;
-        })(),
+        code: LABEL_TO_KEY[symptom] || toSymptomCode(symptom),
         severity: Number(localEntry.symptomSeverity?.[symptom] ?? 3),
         note: "",
       }));
 
-      if (Object.keys(symptomCodeMap).length) {
-        all[dateKey] = {
-          ...(all[dateKey] || {}),
-          symptomCodes: {
-            ...(all[dateKey]?.symptomCodes || {}),
-            ...symptomCodeMap,
-          },
-        };
-        writeJSON(LOGS_KEY, all);
-      }
-
       const symptomRes = await fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
         method: "PUT",
         headers,
-        body: JSON.stringify({ items, otherSymptoms: otherSymptomsArray }),
+        body: JSON.stringify({ items }),
       });
 
       if (!symptomRes.ok) {
@@ -427,78 +269,76 @@ export async function getDailyLog(dateKey) {
   return all[dateKey] || null;
 }
 
-export async function getAllLogs({ timeoutMs = 4500 } = {}) {
+export async function getAllLogs() {
   const local = readJSON(LOGS_KEY, {});
 
   if (!isAccountMode()) return local;
 
   // Return cached result if available for this session
   if (_logsCache && _logsCacheMode === "account") return _logsCache;
-  // Reuse in-flight fetch so dashboard bootstrap + notifications don't duplicate calls
-  if (_logsInFlight) return _logsInFlight;
 
-  _logsInFlight = (async () => {
-    try {
-      const headers = await authHeaders();
-      if (!headers) return local;
-      const catalogPromise = getSymptomCatalog({ timeoutMs: Math.min(timeoutMs, 3500) }).catch(() => []);
+  try {
+    const headers = await authHeaders();
+    if (!headers) return local;
 
-      const [cycleRes, symptomRes] = await Promise.all([
-        fetchWithTimeout(apiUrl("/api/logs"), { headers }, timeoutMs),
-        fetchWithTimeout(apiUrl("/api/symptoms"), { headers }, timeoutMs),
-      ]);
-      await catalogPromise;
+    const [cycleRes, symptomRes] = await Promise.all([
+      fetch(apiUrl("/api/logs"), { headers }),
+      fetch(apiUrl("/api/symptoms"), { headers }),
+    ]);
 
-      if (!cycleRes.ok) {
-        const txt = await cycleRes.text().catch(() => "");
-        console.warn("Cycle cloud fetch failed:", cycleRes.status, txt);
-        return local;
-      }
-
-      if (!symptomRes.ok) {
-        const txt = await symptomRes.text().catch(() => "");
-        console.warn("Symptom cloud fetch failed:", symptomRes.status, txt);
-        return local;
-      }
-
-      const cycleData = await cycleRes.json();
-      const symptomData = await symptomRes.json();
-
-      let cycleItems = [];
-      if (Array.isArray(cycleData?.items)) {
-        cycleItems = cycleData.items;
-      } else if (cycleData?.entries && typeof cycleData.entries === "object") {
-        cycleItems = Object.entries(cycleData.entries).map(([dateKey, entry]) => ({
-          dateKey,
-          ...entry,
-        }));
-      }
-
-      const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
-
-      const logs = mergeCloudLogs(cycleItems, symptomItems);
-
-      // Only overwrite local cache if cloud actually returned data.
-      // If cloud is empty but local has entries, keep local to avoid
-      // wiping logs that were saved before a sync had a chance to run.
-      if (Object.keys(logs).length > 0) {
-        writeJSON(LOGS_KEY, logs);
-        setCloudSyncedBanner();
-        _logsCache = logs;
-        _logsCacheMode = "account";
-        return logs;
-      }
-
+    if (!cycleRes.ok) {
+      const txt = await cycleRes.text().catch(() => "");
+      console.warn("Cycle cloud fetch failed:", cycleRes.status, txt);
       return local;
-    } catch (e) {
-      console.warn("Cloud fetch error:", e);
-      return local;
-    } finally {
-      _logsInFlight = null;
     }
-  })();
 
-  return _logsInFlight;
+    if (!symptomRes.ok) {
+      const txt = await symptomRes.text().catch(() => "");
+      console.warn("Symptom cloud fetch failed:", symptomRes.status, txt);
+      return local;
+    }
+
+    const cycleData = await cycleRes.json();
+    const symptomData = await symptomRes.json();
+
+    let cycleItems = [];
+    if (Array.isArray(cycleData?.items)) {
+      cycleItems = cycleData.items;
+    } else if (cycleData?.entries && typeof cycleData.entries === "object") {
+      cycleItems = Object.entries(cycleData.entries).map(([dateKey, entry]) => ({
+        dateKey,
+        ...entry,
+      }));
+    }
+
+    const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
+
+    const logs = mergeCloudLogs(cycleItems, symptomItems);
+
+    console.log("CLOUD cycleItems:", cycleItems);
+    console.log("MERGED logs:", logs);
+
+    // Only overwrite local cache if cloud actually returned data.
+    // If cloud is empty but local has entries, keep local to avoid
+    // wiping logs that were saved before a sync had a chance to run.
+    // If cloud returned something → use it
+    if (Object.keys(logs).length > 0) {
+      writeJSON(LOGS_KEY, logs);
+      _logsCache = logs;
+      return logs;
+    }
+
+    // If cloud empty BUT local exists → KEEP local
+    if (Object.keys(local).length > 0) {
+      return local;
+    }
+
+    // Only if BOTH empty → return empty
+    return {};
+  } catch (e) {
+    console.warn("Cloud fetch error:", e);
+    return local;
+  }
 }
 
 export async function deleteDailyLog(dateKey) {
@@ -551,30 +391,6 @@ export async function getAssistantSession() {
   return readJSON(ASSIST_KEY, null);
 }
 
-/**
- * getOrInitBloomieMemory()
- * Reads Bloomie memory from versioned local storage and migrates legacy keys.
- */
-export function getOrInitBloomieMemory() {
-  return loadBloomieMemoryLocal();
-}
-
-/**
- * updateBloomieLocalMemory(patch)
- * Merges patch into the versioned Bloomie memory cache and persists it.
- */
-export function updateBloomieLocalMemory(patch) {
-  return saveBloomieMemoryLocal(patch || {}, { replace: false });
-}
-
-export function loadLocalBloomieMemory() {
-  return loadBloomieMemoryLocal();
-}
-
-export function saveLocalBloomieMemory(update) {
-  saveBloomieMemoryLocal(update || {}, { replace: false });
-}
-
 // --------------------
 // Bloomie persistent memory
 // --------------------
@@ -582,44 +398,26 @@ export function saveLocalBloomieMemory(update) {
 // Load the last session snapshot. Tries Firestore first (account mode),
 // falls back to localStorage for anon/offline.
 export async function loadBloomieMemory() {
-  const local = loadBloomieMemoryLocal();
+  const local = readJSON(MEMORY_KEY, null);
   if (!isAccountMode()) return local;
   try {
     const headers = await authHeaders();
     if (!headers) return local;
     const res = await fetch(apiUrl("/api/bloomie-memory"), { headers });
-    if (!res.ok) {
-      bloomieDiagnostic("memory_load_failed", {
-        module: "db",
-        stage:  "loadBloomieMemory",
-        reason: `backend returned ${res.status}`,
-        fallbackTarget: "local_memory",
-      });
-      return local;
-    }
+    if (!res.ok) return local;
     const data = await res.json();
-    if (data && typeof data === "object") {
-      return saveBloomieMemoryLocal(data, { replace: true });
-    }
-    return local;
-  } catch (err) {
-    bloomieDiagnostic("memory_load_failed", {
-      module: "db",
-      stage:  "loadBloomieMemory",
-      reason: err?.message ?? "network error",
-      fallbackTarget: "local_memory",
-    });
+    if (data) writeJSON(MEMORY_KEY, data);
+    return data;
+  } catch {
     return local;
   }
 }
 
 // Save a compact memory snapshot. Always writes to localStorage,
 // and syncs to Firestore in account mode.
-// Uses merge semantics for localStorage so a partial update from
-// persistMemory() does not overwrite fields it did not touch.
 export async function saveBloomieMemory(memoryData) {
   if (!memoryData) return;
-  saveBloomieMemoryLocal(memoryData, { replace: false });
+  writeJSON(MEMORY_KEY, memoryData);
   if (!isAccountMode()) return;
   try {
     const headers = await authHeaders();
@@ -629,50 +427,15 @@ export async function saveBloomieMemory(memoryData) {
       headers,
       body: JSON.stringify(memoryData),
     });
-  } catch (err) {
-    bloomieDiagnostic("cache_write_failed", {
-      module: "db",
-      stage:  "saveBloomieMemory",
-      reason: err?.message ?? "network error",
-    });
-  }
-}
-
-// Load the authenticated user's profile (nickname) from the backend.
-// Returns { nickname: string | null }. Never throws.
-export async function loadUserProfile() {
-  try {
-    const headers = await authHeaders();
-    if (!headers) return { nickname: null };
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 3000)
-    );
-    const request = fetch(apiUrl("/api/user/profile"), { headers });
-    const res = await Promise.race([request, timeout]);
-    if (!res.ok) {
-      bloomieDiagnostic("profile_sync_failed", {
-        module: "db",
-        stage:  "loadUserProfile",
-        reason: `backend returned ${res.status}`,
-      });
-      return { nickname: null };
-    }
-    const data = await res.json();
-    return { nickname: data?.nickname ?? null };
-  } catch (err) {
-    bloomieDiagnostic("profile_sync_failed", {
-      module: "db",
-      stage:  "loadUserProfile",
-      reason: err?.message ?? "network error or timeout",
-    });
-    return { nickname: null };
+  } catch (e) {
+    console.warn("[Bloomie] memory cloud save failed:", e);
   }
 }
 
 export async function deleteAllLocalData() {
   localStorage.removeItem(LOGS_KEY);
   localStorage.removeItem(ASSIST_KEY);
-  clearBloomieMemoryLocal();
+  localStorage.removeItem(MEMORY_KEY);
 }
 
 export async function clearAllLogs() {

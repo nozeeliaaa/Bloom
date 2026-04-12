@@ -37,16 +37,13 @@
       gap: 1rem;
     }
     @media (min-width: 700px) {
-      .details-grid { grid-template-columns: 1fr 1fr; align-items: start; }
+      .details-grid { grid-template-columns: 1fr 1fr; align-items: stretch; }
     }
     .details-card {
       display: flex; flex-direction: column;
     }
-    .details-card .row-actions {
-      margin-top: 1rem;
-      padding-top: 0;
-      justify-content: flex-start;
-    }
+    .details-card .form-grid { flex: 1; }
+    .details-card .row-actions { margin-top: auto; padding-top: 1rem; }
     [hidden] { display: none !important; }
     .form-grid { display: grid; gap: 0.5rem; }
     .section-label {
@@ -166,10 +163,6 @@
             Typical period duration (days)
             <input class="form-input" id="period-duration" type="number" placeholder="e.g., 5" min="1" max="14" />
           </label>
-          <label class="form-label">
-            Sleep score (1-10)
-            <input class="form-input" id="sleep-score" type="number" placeholder="e.g., 7" min="1" max="10" step="1" />
-          </label>
           <div>
             <div class="weight-label-row">
               <label class="form-label" for="weight">Weight</label>
@@ -246,7 +239,6 @@
     const yobEl            = document.getElementById("yob");
     const avgCycleEl       = document.getElementById("avg-cycle");
     const periodDurEl      = document.getElementById("period-duration");
-    const sleepScoreEl     = document.getElementById("sleep-score");
     const lmpFieldEl       = document.getElementById("lmp-field");
     const lmpDateEl        = document.getElementById("lmp-date");
     const yobLockedNote    = document.getElementById("yob-locked-note");
@@ -339,8 +331,17 @@
     }
 
     function loadProfile() {
-      try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
-      catch { return {}; }
+      try {
+        const data = JSON.parse(localStorage.getItem(LS_PROFILE)) || {};
+        return {
+          ...(data.profile || {}),
+          ...(data.healthProfile || {}),
+          biometricProfile: data.biometricProfile || {},
+          phaseProfile: data.phaseProfile || {}
+        };
+      } catch {
+        return {};
+      }
     }
 
     function selectAvatar(emoji) {
@@ -367,11 +368,12 @@
 
     function fillFields() {
       const p = loadProfile();
+
       nicknameEl.value  = p.nickname       || "";
       yobEl.value       = p.yob            || "";
       avgCycleEl.value  = p.avgCycleLength || "";
       periodDurEl.value = p.periodDuration || "";
-      sleepScoreEl.value = p.sleepScore ?? "";
+
       const lmp = localStorage.getItem(LS_LMP);
       if (lmp) lmpDateEl.value = lmp;
 
@@ -390,7 +392,6 @@
           heightInEl.value = ins;
         }
       }
-
       if (p.yob || localStorage.getItem(LS_YOB_LOCKED)) {
         localStorage.setItem(LS_YOB_LOCKED, "true");
         lockYobUI(p.yob || "");
@@ -408,7 +409,6 @@
       const wasLocked = !!localStorage.getItem(LS_YOB_LOCKED);
       const avgCycle  = avgCycleEl.value.trim();
       const periodDur = periodDurEl.value.trim();
-      const sleepScore = sleepScoreEl.value.trim();
       const lmp       = lmpDateEl.value;
       const weightRaw = parseFloat(weightEl.value);
 
@@ -416,14 +416,6 @@
         const n = Number(yob);
         if (!Number.isFinite(n) || n < 1900 || n > 2100) {
           showStatus("Year of Birth must be between 1900 and 2100.");
-          return;
-        }
-      }
-
-      if (sleepScore) {
-        const n = Number(sleepScore);
-        if (!Number.isFinite(n) || n < 1 || n > 10) {
-          showStatus("Sleep score must be between 1 and 10.");
           return;
         }
       }
@@ -446,17 +438,35 @@
       localStorage.setItem(LS_AVATAR, selectedAvatar);
 
       // Save all profile fields to localStorage
-      const profile = {
-        ...loadProfile(),
-        nickname,
-        yob: yob ? Number(yob) : "",
-        avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
-        periodDuration: periodDur ? Number(periodDur) : null,
-        sleepScore: sleepScore ? Number(sleepScore) : null,
-        weightKg,
-        heightCm,
+      const existing = (() => {
+        try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
+        catch { return {}; }
+      })();
+
+      const localProfile = {
+        ...existing,
+        profile: {
+          ...(existing.profile || {}),
+          nickname,
+          yob: yob ? Number(yob) : ""
+        },
+        healthProfile: {
+          ...(existing.healthProfile || {}),
+        },
+        biometricProfile: {
+          ...(existing.biometricProfile || {}),
+        },
+        phaseProfile: {
+          ...(existing.phaseProfile || {}),
+        }
       };
-      localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+
+      if (avgCycle !== "") localProfile.healthProfile.avgCycleLength = Number(avgCycle);
+      if (periodDur !== "") localProfile.healthProfile.periodDuration = Number(periodDur);
+      if (!isNaN(weightRaw)) localProfile.healthProfile.weightKg = weightKg;
+      if (heightCm !== null) localProfile.healthProfile.heightCm = heightCm;
+
+      localStorage.setItem(LS_PROFILE, JSON.stringify(localProfile));
 
       if (yob && !wasLocked) {
         localStorage.setItem(LS_YOB_LOCKED, "true");
@@ -470,35 +480,49 @@
       }
 
       // Persist everything to backend if signed in
+      let backendSaved = false;
+
       if (getUser()) {
         try {
           const token = await getIdToken();
           const apiBase = window.BLOOM_API_BASE ?? '';
           const payload = {
             nickname,
-            avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
-            periodDuration: periodDur ? Number(periodDur) : null,
-            sleepScore: sleepScore ? Number(sleepScore) : null,
-            weightKg:  weightKg  ?? null,
-            heightCm:  heightCm  ?? null,
-            avatar:    selectedAvatar,
+            avatar: selectedAvatar,
           };
+
           if (yob) payload.yearOfBirth = Number(yob);
+
+          if (avgCycle !== "") payload.avgCycleLength = Number(avgCycle);
+          if (periodDur !== "") payload.periodDuration = Number(periodDur);
+          if (!isNaN(weightRaw)) payload.weightKg = weightKg;
+          if (heightCm !== null) payload.heightCm = heightCm;
+
           const r = await fetch(`${apiBase}/api/user/profile`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
             body: JSON.stringify(payload),
           });
+
           if (!r.ok) {
             const err = await r.json().catch(() => ({}));
             console.error("[Bloom] profile save failed:", r.status, err);
-          } else {
-            console.log("[Bloom] profile saved to backend ✓");
+            showStatus(`Profile save failed (${r.status})`);
+            return;
           }
-        } catch (e) { console.error("[Bloom] profile save error:", e); }
-      }
+          backendSaved = true;
+          console.log("[Bloom] profile saved to backend ✓");
+          } catch (e) {
+            console.error("[Bloom] profile save error:", e);
+            showStatus("Profile save failed");
+            return;
+          }
+        }
 
-      showStatus("Profile saved ✓");
+        showStatus(backendSaved || !getUser() ? "Profile saved ✓" : "Saved locally only");
     });
 
     // Delete account
@@ -550,32 +574,6 @@
     fillFields();
     toggleLmpField();
 
-    // Background sync on page load
-    (async () => {
-      if (!getUser()) return;
-      try {
-        const token = await getIdToken();
-        if (!token) return;
-        const p = loadProfile();
-        const avatar = localStorage.getItem(LS_AVATAR);
-        const payload = {};
-        if (p.nickname)       payload.nickname       = p.nickname;
-        if (p.yob)            payload.yearOfBirth    = Number(p.yob);
-        if (p.avgCycleLength) payload.avgCycleLength = Number(p.avgCycleLength);
-        if (p.periodDuration) payload.periodDuration = Number(p.periodDuration);
-        if (p.sleepScore)     payload.sleepScore     = Number(p.sleepScore);
-        if (p.weightKg)       payload.weightKg       = Number(p.weightKg);
-        if (p.heightCm)       payload.heightCm       = Number(p.heightCm);
-        if (avatar && avatar !== "👤") payload.avatar = avatar;
-        if (Object.keys(payload).length === 0) return;
-        const apiBase = window.BLOOM_API_BASE ?? '';
-        await fetch(`${apiBase}/api/user/profile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-          body: JSON.stringify(payload),
-        });
-      } catch (_) {}
-    })();
   </script>
 </body>
 </html>
