@@ -161,10 +161,10 @@ describe("return shape contract", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Null safety — invalid / missing userId
+// Null safety - invalid / missing userId
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("null safety — invalid userId", () => {
+describe("null safety - invalid userId", () => {
   it("returns empty context for empty string uid", async () => {
     const ctx = await buildSafeBloomieContext("");
     expect(ctx).toEqual(buildEmptyContext());
@@ -187,7 +187,7 @@ describe("null safety — invalid userId", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Profile — nickname + accountMode
+// Profile - nickname + accountMode
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("user profile", () => {
@@ -217,7 +217,7 @@ describe("user profile", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Sanitization — no HTML, no scripts
+// Sanitization - no HTML, no scripts
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("input sanitization", () => {
@@ -272,7 +272,7 @@ describe("input sanitization", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Cycle data — LMP, average cycle length, predictions, phase
+// Cycle data - LMP, average cycle length, predictions, phase
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("cycle data", () => {
@@ -340,8 +340,8 @@ describe("cycle data", () => {
   it("ignores implausible cycle gaps (< 18 or > 45 days)", async () => {
     mockCycleQueryGet.mockResolvedValue(snap([
       { dateKey: "2025-05-01", periodDay: 1 },
-      { dateKey: "2025-04-30", periodDay: 1 }, // 1-day gap — implausible
-      { dateKey: "2025-04-01", periodDay: 1 }, // 29-day gap from 2025-04-30 — wait, test the real logic
+      { dateKey: "2025-04-30", periodDay: 1 }, // 1-day gap - implausible
+      { dateKey: "2025-04-01", periodDay: 1 }, // 29-day gap from 2025-04-30 - wait, test the real logic
     ]));
 
     // Gap from 2025-04-30 to 2025-05-01 is 1 day (< 18 → ignored)
@@ -399,7 +399,7 @@ describe("recent symptoms", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Bloomie memory — recentActivity only, NOT cycle/profile data
+// Bloomie memory - recentActivity only, NOT cycle/profile data
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("bloomie memory", () => {
@@ -435,7 +435,7 @@ describe("bloomie memory", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Graceful degradation — one source fails, others still populate
+// Graceful degradation - one source fails, others still populate
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("graceful degradation", () => {
@@ -476,7 +476,7 @@ describe("graceful degradation", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Route — GET /api/bloomie-context authentication
+// Route - GET /api/bloomie-context authentication
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("GET /api/bloomie-context route", () => {

@@ -1,6 +1,12 @@
 import { auth, db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 
+function normalizeBiometricLevel(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized || null;
+}
+
 export async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
 
@@ -12,7 +18,6 @@ export async function requireAuth(req, res, next) {
 
   try {
     const decoded = await auth.verifyIdToken(token);
-
     const userRef = db.collection("users").doc(decoded.uid);
     const userDoc = await userRef.get();
 
@@ -35,15 +40,12 @@ export async function requireAuth(req, res, next) {
           periodDuration: null,
           weightKg: null,
           heightCm: null,
+          lmpDate: null,
         },
         biometricProfile: {
+          activityLevel: null,
           sleepScore: null,
           stressLevel: null,
-          activityLevel: null,
-        },
-        phaseProfile: {
-          lastPeriodStart: null,
-          phaseEstimation: null,
         },
         game: {
           xp: 0,
@@ -65,6 +67,7 @@ export async function requireAuth(req, res, next) {
 
       return next();
     }
+
     if (!decoded.email_verified) {
       return res.status(403).json({
         error: "Email not verified",
@@ -73,36 +76,31 @@ export async function requireAuth(req, res, next) {
     }
 
     const data = userDoc.data() || {};
-
-    // Only check adminUsers collection if Firestore already shows role: "admin"
-    // Avoids extra read on every request for regular users
-    const isAdminUser = data.role === "admin"
-      ? (await db.collection("adminUsers").doc(decoded.uid).get()).exists
-      : false;
-
+    const isAdminUser =
+      data.role === "admin"
+        ? (await db.collection("adminUsers").doc(decoded.uid).get()).exists
+        : false;
     const profile = data.profile || {};
     const healthProfile = data.healthProfile || {};
     const biometricProfile = data.biometricProfile || {};
 
     if (!data.email && decoded.email) {
       await userRef.set(
-      {
-        email: decoded.email,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+        {
+          email: decoded.email,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
 
-    data.email = decoded.email;
-  }
+      data.email = decoded.email;
+    }
 
     const needsBackfill =
       !data.role ||
       !data.profile ||
       !data.healthProfile ||
-      !data.biometricProfile ||
       !data.game ||
-      !data.phaseProfile ||
       profile.nickname === undefined ||
       profile.avatar === undefined ||
       profile.yearOfBirth === undefined ||
@@ -114,18 +112,26 @@ export async function requireAuth(req, res, next) {
       profile.role !== undefined ||
       profile.avgCycleLength !== undefined ||
       profile.periodDuration !== undefined ||
+      profile.sleepScore !== undefined ||
+      profile.activityLevel !== undefined ||
+      profile.stressLevel !== undefined ||
       profile.weightKg !== undefined ||
       profile.heightCm !== undefined ||
-      profile.sleepScore !== undefined ||
+      profile.lmpDate !== undefined ||
+      profile.lmp !== undefined ||
       healthProfile.sleepScore !== undefined ||
+      healthProfile.lmpDate === undefined ||
+      healthProfile.lmp !== undefined ||
+      !data.biometricProfile ||
+      biometricProfile.activityLevel === undefined ||
+      biometricProfile.sleepScore === undefined ||
+      biometricProfile.stressLevel === undefined ||
       profile.goal === "track_cycle";
 
     if (needsBackfill) {
       const backfill = {
         role: data.role || "user",
         email: data.email || decoded.email || null,
-        lastPeriodStart: admin.firestore.FieldValue.delete(),
-        phaseEstimation: admin.firestore.FieldValue.delete(),
         profile: {
           nickname: profile.nickname ?? null,
           avatar: profile.avatar ?? "👤",
@@ -140,6 +146,16 @@ export async function requireAuth(req, res, next) {
           consentSensitive: profile.consentSensitive ?? false,
           remindersEnabled: profile.remindersEnabled ?? false,
           reminderTime: profile.reminderTime ?? "09:00",
+          role: admin.firestore.FieldValue.delete(),
+          avgCycleLength: admin.firestore.FieldValue.delete(),
+          periodDuration: admin.firestore.FieldValue.delete(),
+          sleepScore: admin.firestore.FieldValue.delete(),
+          activityLevel: admin.firestore.FieldValue.delete(),
+          stressLevel: admin.firestore.FieldValue.delete(),
+          weightKg: admin.firestore.FieldValue.delete(),
+          heightCm: admin.firestore.FieldValue.delete(),
+          lmpDate: admin.firestore.FieldValue.delete(),
+          lmp: admin.firestore.FieldValue.delete(),
         },
         healthProfile: {
           avgCycleLength:
@@ -150,33 +166,24 @@ export async function requireAuth(req, res, next) {
             healthProfile.weightKg ?? profile.weightKg ?? null,
           heightCm:
             healthProfile.heightCm ?? profile.heightCm ?? null,
+          lmpDate:
+            healthProfile.lmpDate ?? healthProfile.lmp ?? profile.lmpDate ?? profile.lmp ?? null,
+          lmp: admin.firestore.FieldValue.delete(),
+          sleepScore: admin.firestore.FieldValue.delete(),
         },
         biometricProfile: {
+          activityLevel:
+            normalizeBiometricLevel(biometricProfile.activityLevel ?? profile.activityLevel),
           sleepScore:
-            biometricProfile.sleepScore ??
-            healthProfile.sleepScore ??
-            profile.sleepScore ??
-            null,
-          stressLevel: biometricProfile.stressLevel ?? null,
-          activityLevel: biometricProfile.activityLevel ?? null,
+            biometricProfile.sleepScore ?? healthProfile.sleepScore ?? profile.sleepScore ?? null,
+          stressLevel:
+            normalizeBiometricLevel(biometricProfile.stressLevel ?? profile.stressLevel),
         },
-        phaseProfile: {
-          lastPeriodStart:
-            data.phaseProfile?.lastPeriodStart ??
-            data.lastPeriodStart ??
-            null,
-
-          phaseEstimation:
-            data.phaseProfile?.phaseEstimation ??
-            data.phaseEstimation ??
-            null,
-      },
         game: {
           xp: data.game?.xp ?? 0,
           level: data.game?.level ?? 1,
           sessionsPlayed: data.game?.sessionsPlayed ?? 0,
         },
-        "healthProfile.sleepScore": admin.firestore.FieldValue.delete(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
@@ -187,7 +194,6 @@ export async function requireAuth(req, res, next) {
       data.profile = backfill.profile;
       data.healthProfile = backfill.healthProfile;
       data.biometricProfile = backfill.biometricProfile;
-      data.phaseProfile = backfill.phaseProfile;
       data.game = backfill.game;
     }
 
@@ -212,7 +218,7 @@ export async function requireAuth(req, res, next) {
       uid: decoded.uid,
       email: decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role: isAdminUser ? "admin" : (data.role || "user"),
+      role: isAdminUser ? "admin" : (decoded.role || data.role || "user"),
       ageBand,
       yob: safeProfile.yearOfBirth || null,
     };

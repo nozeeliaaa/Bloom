@@ -82,8 +82,8 @@ export function buildNodeHelpers(env) {
   // Reads ctx.moodMentions (recorded in assistant.js on every mood entity hit)
   // and returns one of three signals:
   //   { type: "none" }
-  //   { type: "persistent", count }   — same mood 2–3 turns in a row
-  //   { type: "escalated",  count }   — tone has worsened across mentions
+  //   { type: "persistent", count }   - same mood 2–3 turns in a row
+  //   { type: "escalated",  count }   - tone has worsened across mentions
   //
   // Returns null when: urgency is active, fewer than 2 mentions exist, or the
   // continuity was already surfaced this session (adviceGiven guard).
@@ -96,7 +96,7 @@ export function buildNodeHelpers(env) {
     const mentions = ctx.moodMentions ?? [];
     if (mentions.length < 2) return null;
 
-    // Use last 3 mentions only — older history decays
+    // Use last 3 mentions only - older history decays
     const recent = mentions.slice(-3);
 
     // Escalation: tone has moved toward a more distressed/serious value
@@ -114,22 +114,22 @@ export function buildNodeHelpers(env) {
     const signal = getMoodContinuitySignal();
     if (!signal) return null;
 
-    // Mark as surfaced — only show once per session
+    // Mark as surfaced - only show once per session
     ctx.adviceGiven.add("mood_continuity_surfaced");
 
     if (signal.type === "escalated") {
       return pick([
-        "It sounds like this has been getting heavier as we've been talking — I want to make sure I'm giving you what you actually need right now 🩷",
-        "I'm noticing this feels like it's intensifying — that's worth paying attention to, not pushing through 🩷",
-        "The more you share, the clearer it is that this isn't a small thing — I hear you 🩷",
+        "It sounds like this has been getting heavier as we've been talking - I want to make sure I'm giving you what you actually need right now 🩷",
+        "I'm noticing this feels like it's intensifying - that's worth paying attention to, not pushing through 🩷",
+        "The more you share, the clearer it is that this isn't a small thing - I hear you 🩷",
       ]);
     }
 
     // persistent
     return pick([
-      "It sounds like this hasn't really eased up since you first mentioned it — and that matters 🩷",
+      "It sounds like this hasn't really eased up since you first mentioned it - and that matters 🩷",
       "You're still feeling this, and the fact that it keeps coming back tells me it deserves more than just sitting with it 🩷",
-      "I've been noticing this has come up more than once — that kind of persistence is worth taking seriously 🩷",
+      "I've been noticing this has come up more than once - that kind of persistence is worth taking seriously 🩷",
     ]);
   }
 
@@ -155,8 +155,8 @@ export function buildNodeHelpers(env) {
       ? labels[0]
       : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
     return pick([
-      `It's been a few days — last time you mentioned **${list}**. How are you feeling now?`,
-      `We last talked about **${list}** — is that still going on, or is something new coming up? 🩷`,
+      `It's been a few days - last time you mentioned **${list}**. How are you feeling now?`,
+      `We last talked about **${list}** - is that still going on, or is something new coming up? 🩷`,
     ]);
   }
 
@@ -180,8 +180,8 @@ export function buildNodeHelpers(env) {
     const label = INTENT_LABELS[bloomieMemory?.lastIntent];
     if (!label) return null;
     return pick([
-      `Last time you were looking into **${label}** — feel free to pick up where we left off, or start fresh 🩷`,
-      `It looks like **${label}** was on your mind last time — still relevant, or is something new coming up? 🩷`,
+      `Last time you were looking into **${label}** - feel free to pick up where we left off, or start fresh 🩷`,
+      `It looks like **${label}** was on your mind last time - still relevant, or is something new coming up? 🩷`,
     ]);
   }
 
@@ -215,24 +215,24 @@ export function buildNodeHelpers(env) {
 
     if (signal.topic === "late") {
       return pick([
-        "You've mentioned delayed or missed timing more than once recently — that pattern over time gives useful context 🩷",
-        "I can see late-period timing has come up repeatedly — that trend matters more than a single cycle 🩷",
+        "You've mentioned delayed or missed timing more than once recently - that pattern over time gives useful context 🩷",
+        "I can see late-period timing has come up repeatedly - that trend matters more than a single cycle 🩷",
       ]);
     }
     if (signal.topic === "pelvic") {
       return pick([
-        "You've mentioned cramps/pelvic discomfort a few times recently — that repeated pattern is important context 🩷",
+        "You've mentioned cramps/pelvic discomfort a few times recently - that repeated pattern is important context 🩷",
         "I'm noticing pelvic pain has come up across multiple turns, which helps us focus the conversation 🩷",
       ]);
     }
     if (signal.topic === "spot") {
       return pick([
         "Spotting has come up more than once recently, so pattern-tracking is especially useful here 🩷",
-        "I can see spotting has been recurring — those clusters over time usually tell us more than one day alone 🩷",
+        "I can see spotting has been recurring - those clusters over time usually tell us more than one day alone 🩷",
       ]);
     }
     return pick([
-      "You've mentioned heavier bleeding more than once recently — that recurring pattern is worth paying attention to 🩷",
+      "You've mentioned heavier bleeding more than once recently - that recurring pattern is worth paying attention to 🩷",
       "I can see heavier flow has come up repeatedly, which gives more context than one isolated cycle 🩷",
     ]);
   }
@@ -278,7 +278,7 @@ export function buildNodeHelpers(env) {
       return {
         kind: "overdue_spot",
         strong: true,
-        line: `Your period still looks late by estimate, and you've also had spotting signals recently — that combination is worth a closer look 🩷`,
+        line: `Your period still looks late by estimate, and you've also had spotting signals recently - that combination is worth a closer look 🩷`,
         followUp: "If it's still not here, tell me whether you're noticing spotting, cramps, or pregnancy concerns most right now.",
       };
     }
@@ -286,7 +286,7 @@ export function buildNodeHelpers(env) {
       return {
         kind: "overdue_general",
         strong: true,
-        line: `Based on your logged dates, your period may be a little late${Math.abs(daysLeft) > 1 ? ` — around ${Math.abs(daysLeft)} days overdue by estimate` : ""} 🩷`,
+        line: `Based on your logged dates, your period may be a little late${Math.abs(daysLeft) > 1 ? ` - around ${Math.abs(daysLeft)} days overdue by estimate` : ""} 🩷`,
         followUp: "If it still hasn't come yet or something feels off, I'm here. What's going on?",
       };
     }
@@ -356,7 +356,7 @@ export function buildNodeHelpers(env) {
       const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
       return r([
         introLine,
-        `Looks like pregnancy tracking mode is on${weeksAlong > 0 ? ` — you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along by date estimate` : ""} 🩷`,
+        `Looks like pregnancy tracking mode is on${weeksAlong > 0 ? ` - you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along by date estimate` : ""} 🩷`,
         "I can help with symptoms, test timing, due dates, or anything else on your mind. What's going on?",
       ]);
     }
@@ -389,7 +389,7 @@ export function buildNodeHelpers(env) {
         const contextLine = combined?.kind?.startsWith("overdue")
           ? combined.line
           : pick([
-              `Based on your logged dates, your period may be a little late${Math.abs(daysLeft) > 1 ? ` — around ${Math.abs(daysLeft)} days overdue by estimate` : ""} 🩷`,
+              `Based on your logged dates, your period may be a little late${Math.abs(daysLeft) > 1 ? ` - around ${Math.abs(daysLeft)} days overdue by estimate` : ""} 🩷`,
               "Looks like your period might be a bit later than expected 🩷",
               "From your recent logs, your period may not have arrived yet 🩷",
             ]);
@@ -405,7 +405,7 @@ export function buildNodeHelpers(env) {
           : pick([
               `Looks like your period might be coming up in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
               `Based on your logged dates, your period is due in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
-              `Your period window is getting close — around ${daysLeft} day${daysLeft === 1 ? "" : "s"} away 🌸`,
+              `Your period window is getting close - around ${daysLeft} day${daysLeft === 1 ? "" : "s"} away 🌸`,
             ]);
         return r([
           introLine,
@@ -415,7 +415,7 @@ export function buildNodeHelpers(env) {
         ]);
       }
 
-      // No urgency signal — use phase awareness for returning users
+      // No urgency signal - use phase awareness for returning users
       const phaseInfo = getCurrentPhase();
       if (isReturning && phaseInfo) {
         const phaseLine = pick([

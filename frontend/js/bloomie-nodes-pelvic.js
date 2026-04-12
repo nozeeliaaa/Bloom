@@ -56,7 +56,7 @@ export function createPelvicNodes(env, helpers) {
       onEnter() {
         const dizzyKnown = ctx.entityHistory?.some(e => e.symptoms?.dizziness);
         if (dizzyKnown) {
-          say(pick(["You mentioned dizziness — that's important to flag 🩷", "I've got the dizziness you mentioned noted 🩷"]));
+          say(pick(["You mentioned dizziness - that's important to flag 🩷", "I've got the dizziness you mentioned noted 🩷"]));
           const tid = setTimeout(() => transition("PELVIC_URGENT"), 1300);
           ctx.timers.add(tid);
         } else {
@@ -160,7 +160,7 @@ export function createPelvicNodes(env, helpers) {
         const lateCtx = getLateCrampsContext();
         return [
           lateCtx.pregnancySignalRecent
-            ? "Thanks — and I still want to keep pregnancy possibility in mind 🩷"
+            ? "Thanks - and I still want to keep pregnancy possibility in mind 🩷"
             : "One more useful check 🩷",
           "Any chance of pregnancy this cycle?",
         ];

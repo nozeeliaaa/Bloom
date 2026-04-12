@@ -330,14 +330,14 @@ export const SYMPTOM_CATEGORIES = symptoms.reduce((acc, symptom) => {
   return acc;
 }, {});
 
-/** Emoji icon for each symptom label — no external dependency */
+/** Emoji icon for each symptom label - no external dependency */
 export const SYMPTOM_ICONS = {
   // Bleeding
   "Vaginal bleeding":           "🩸",
   "Spotting":                   "🩷",
   "Heavy flow":                 "🔴",
   "Large clots":                "🩸",
-  // Blood Colour — coloured circles to match the actual shade
+  // Blood Colour - coloured circles to match the actual shade
   "Bright red blood":           "🔴",
   "Dark red blood":             "🟥",
   "Light red blood":            "🩷",

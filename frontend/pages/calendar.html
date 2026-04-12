@@ -227,6 +227,39 @@
     .clear-logs-btn { flex-shrink: 0; margin-top: 0.25rem; }
     .severity-panel { display: none; }
     .severity-hint { font-weight: 400; color: var(--color-text-muted); font-size: 0.82rem; }
+
+    /* Daily biometrics */
+    .biometric-grid {
+      display: grid;
+      gap: 0.65rem;
+    }
+    .biometric-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .biometric-label {
+      font-size: 0.86rem;
+      color: var(--color-text);
+      font-weight: 700;
+    }
+    .biometric-value {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      font-weight: 700;
+      min-width: 80px;
+      text-align: right;
+    }
+    .biometric-slider {
+      width: 100%;
+      accent-color: var(--color-primary);
+    }
+    .biometric-note {
+      margin: 0.25rem 0 0;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
   </style>
     <link rel="stylesheet" href="/css/main.css" />
   </head>
@@ -302,6 +335,34 @@
         <div class="form-group">
           <label class="form-label">Flow</label>
           <div class="chip-group" id="flow-chips"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Daily biometrics</label>
+          <div class="biometric-grid">
+            <div>
+              <div class="biometric-row">
+                <span class="biometric-label">Sleep score</span>
+                <span class="biometric-value" id="sleep-score-value">Not set</span>
+              </div>
+              <input class="biometric-slider" type="range" id="sleep-score" min="1" max="10" step="1" value="7" />
+            </div>
+            <div>
+              <div class="biometric-row">
+                <span class="biometric-label">Stress level</span>
+                <span class="biometric-value" id="stress-level-value">Not set</span>
+              </div>
+              <input class="biometric-slider" type="range" id="stress-level" min="1" max="4" step="1" value="2" />
+            </div>
+            <div>
+              <div class="biometric-row">
+                <span class="biometric-label">Activity level</span>
+                <span class="biometric-value" id="activity-level-value">Not set</span>
+              </div>
+              <input class="biometric-slider" type="range" id="activity-level" min="1" max="4" step="1" value="2" />
+            </div>
+          </div>
+          <p class="biometric-note">Quick daily check-in to support phase estimation.</p>
         </div>
 
         <div class="form-group">

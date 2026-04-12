@@ -10,7 +10,7 @@
  *   • integration: generateSymptomSignals includes forecast step
  *                  generateIntegratedSignals suppresses forecast on bad cycle context
  *
- * All tests are fully deterministic — no network calls, no randomness.
+ * All tests are fully deterministic - no network calls, no randomness.
  *
  * Run: cd frontend && npx vitest run js/__tests__/bloom-symptom-forecast.test.js
  */
@@ -77,7 +77,7 @@ function buildRepeatingHistory(codes, { cycleLength = 28, numCycles = 3, cycleDa
   return history;
 }
 
-// ─── 1. reconstructCycleStarts (internal — tested via groupSymptomsByCycleWindow) ─
+// ─── 1. reconstructCycleStarts (internal - tested via groupSymptomsByCycleWindow) ─
 
 describe("groupSymptomsByCycleWindow", () => {
   it("maps a history entry to the correct cycle index and dayOfCycle", () => {
@@ -94,7 +94,7 @@ describe("groupSymptomsByCycleWindow", () => {
 
   it("assigns entries outside all windows to nothing", () => {
     const cycleStarts = [{ start: daysAgo(10), length: 28 }];
-    // Entry from 50 days ago — beyond the one cycle window
+    // Entry from 50 days ago - beyond the one cycle window
     const h = [entry(toKey(daysAgo(50)), "BLOATING")];
     const byCode = groupSymptomsByCycleWindow(h, cycleStarts);
     expect(byCode.size).toBe(0);
@@ -121,8 +121,8 @@ describe("groupSymptomsByCycleWindow", () => {
     // Entry from 15 days ago: inside cycle 1 (33–5=28 days span, 15 > 5 so not cycle 0)
     // Cycle 0 window: [daysAgo(5), daysAgo(5)+28d) = [daysAgo(5), daysAgo(-23))
     // 15 days ago < 5 days ago? No. daysAgo(15) < daysAgo(5)? daysAgo(15) is earlier (smaller date).
-    // Cycle 0: [daysAgo(5), daysAgo(-23)) — entry at daysAgo(15) is BEFORE daysAgo(5) so NOT in cycle 0
-    // Cycle 1: [daysAgo(33), daysAgo(5)) — entry at daysAgo(15) IS between daysAgo(33) and daysAgo(5)
+    // Cycle 0: [daysAgo(5), daysAgo(-23)) - entry at daysAgo(15) is BEFORE daysAgo(5) so NOT in cycle 0
+    // Cycle 1: [daysAgo(33), daysAgo(5)) - entry at daysAgo(15) IS between daysAgo(33) and daysAgo(5)
     const h = [entry(toKey(daysAgo(15)), "CRAMPS")];
     const byCode = groupSymptomsByCycleWindow(h, cycleStarts);
     expect(byCode.has("CRAMPS")).toBe(true);
@@ -138,7 +138,7 @@ describe("groupSymptomsByCycleWindow", () => {
 describe("countCyclesSupportingDayWindow", () => {
   it("counts distinct past cycles within window, excluding cycle 0", () => {
     const occurrences = [
-      { cycleIndex: 0, dayOfCycle: 22 }, // current cycle — must not count
+      { cycleIndex: 0, dayOfCycle: 22 }, // current cycle - must not count
       { cycleIndex: 1, dayOfCycle: 22 },
       { cycleIndex: 2, dayOfCycle: 20 }, // within ±3 of 22
       { cycleIndex: 3, dayOfCycle: 25 }, // within ±3 of 22
@@ -164,7 +164,7 @@ describe("countCyclesSupportingDayWindow", () => {
 describe("countCyclesSupportingPhase", () => {
   it("counts distinct past cycles in the target phase", () => {
     const occurrences = [
-      { cycleIndex: 0, phase: "luteal" }, // current — excluded
+      { cycleIndex: 0, phase: "luteal" }, // current - excluded
       { cycleIndex: 1, phase: "luteal" },
       { cycleIndex: 2, phase: "luteal" },
       { cycleIndex: 3, phase: "follicular" }, // wrong phase
@@ -303,9 +303,9 @@ describe("getSymptomForecastCandidates", () => {
   });
 });
 
-// ─── 7. detectSymptomForecastSignal — suppression rules ──────────────────────
+// ─── 7. detectSymptomForecastSignal - suppression rules ──────────────────────
 
-describe("detectSymptomForecastSignal — suppression", () => {
+describe("detectSymptomForecastSignal - suppression", () => {
   const base = {
     cycleCount:     3,
     phase:          "luteal",
@@ -359,7 +359,7 @@ describe("detectSymptomForecastSignal — suppression", () => {
   });
 
   it("returns show:false when no candidate qualifies (too few supporting cycles)", () => {
-    // Only 1 past cycle has the symptom — threshold is 2
+    // Only 1 past cycle has the symptom - threshold is 2
     const history = [
       entry(toKey(daysAgo(28 + 22 - 1)), "BLOATING"), // 1 past cycle
     ];
@@ -374,7 +374,7 @@ describe("detectSymptomForecastSignal — suppression", () => {
       symptomHistory: history,
       loggedSymptoms: [{ code: "BLOATING", severity: 2 }],
     });
-    // BLOATING is already logged today — should be excluded from forecast
+    // BLOATING is already logged today - should be excluded from forecast
     if (sig.show) {
       expect(sig.debug.forecastSymptoms).not.toContain("BLOATING");
     } else {
@@ -384,9 +384,9 @@ describe("detectSymptomForecastSignal — suppression", () => {
   });
 });
 
-// ─── 8. detectSymptomForecastSignal — positive cases ─────────────────────────
+// ─── 8. detectSymptomForecastSignal - positive cases ─────────────────────────
 
-describe("detectSymptomForecastSignal — positive signal", () => {
+describe("detectSymptomForecastSignal - positive signal", () => {
   it("shows forecast when pattern is strong enough", () => {
     // User on day 22, luteal phase. BLOATING + FATIGUE appear on day 22 in 3 past cycles.
     const cycleLength = 28;
@@ -510,9 +510,9 @@ describe("detectSymptomForecastSignal — positive signal", () => {
   });
 });
 
-// ─── 9. generateSymptomSignals — forecast wired in ───────────────────────────
+// ─── 9. generateSymptomSignals - forecast wired in ───────────────────────────
 
-describe("generateSymptomSignals — forecast step wired in", () => {
+describe("generateSymptomSignals - forecast step wired in", () => {
   it("includes SYMPTOM_FORECAST in output when pattern qualifies", () => {
     const cycleLength = 28;
     const dayOfCycleToday = 22;
@@ -566,9 +566,9 @@ describe("generateSymptomSignals — forecast step wired in", () => {
   });
 });
 
-// ─── 10. generateIntegratedSignals — cross-engine suppression ────────────────
+// ─── 10. generateIntegratedSignals - cross-engine suppression ────────────────
 
-describe("generateIntegratedSignals — forecast suppressed by cycle signals", () => {
+describe("generateIntegratedSignals - forecast suppressed by cycle signals", () => {
   /**
    * To trigger MISSED_PERIOD from the cycle engine, we pass a lastPeriodStart
    * that is significantly overdue relative to the expected window.
@@ -601,6 +601,6 @@ describe("generateIntegratedSignals — forecast suppressed by cycle signals", (
       expect(forecast).toBeUndefined();
       expect(result.crossValidatedNotes.some(n => n.includes("forecast suppressed"))).toBe(true);
     }
-    // If MISSED_PERIOD didn't fire, test passes vacuously — cycle engine logic varies by date
+    // If MISSED_PERIOD didn't fire, test passes vacuously - cycle engine logic varies by date
   });
 });

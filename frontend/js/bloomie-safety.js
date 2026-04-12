@@ -3,15 +3,15 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Input / output safety layer for the Bloomie chat engine.
  *
- * This module is rule-based and deterministic — it contains no AI calls,
+ * This module is rule-based and deterministic - it contains no AI calls,
  * no LLM interaction, and no creative response generation.
  *
  * Responsibilities
  * ────────────────
- * 1. sanitizeInput(text)          — clean raw user text before it enters routing
- * 2. classifyInputSafety(text)    — detect and block unsafe request categories
- * 3. sanitizeBotLine(text)        — verify bot response lines are safe to render
- * 4. isHtmlPayloadAuthorized(meta) — enforce the meta.html bypass whitelist
+ * 1. sanitizeInput(text)          - clean raw user text before it enters routing
+ * 2. classifyInputSafety(text)    - detect and block unsafe request categories
+ * 3. sanitizeBotLine(text)        - verify bot response lines are safe to render
+ * 4. isHtmlPayloadAuthorized(meta) - enforce the meta.html bypass whitelist
  *
  * Integration points in assistant.js
  * ────────────────────────────────────
@@ -49,7 +49,7 @@ const HTML_AUTH_TOKEN = Symbol("bloomie_html_authorized");
  * sanitizeInput(rawText) → string
  *
  * Cleans raw user text so it is safe to pass through the routing pipeline.
- * Never throws — always returns a string.
+ * Never throws - always returns a string.
  *
  * What it does:
  *  - Coerces to string
@@ -59,21 +59,21 @@ const HTML_AUTH_TOKEN = Symbol("bloomie_html_authorized");
  *  - Caps length at MAX_INPUT_LENGTH
  *
  * What it does NOT do:
- *  - It does not normalize Patois or fix spelling — that stays in the existing
+ *  - It does not normalize Patois or fix spelling - that stays in the existing
  *    pipeline (normalizePatois → fuzzyCorrect → expandShorthand).
  *  - It does not translate or interpret the text.
  */
 export function sanitizeInput(rawText) {
   let text = String(rawText ?? "");
 
-  // Remove null bytes — can cause downstream regex anomalies
+  // Remove null bytes - can cause downstream regex anomalies
   text = text.replace(/\0/g, "");
 
   // Remove ASCII control characters (0x00–0x1F, 0x7F) except tab and newline
   // which may be legitimately pasted from notes/apps.
   text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 
-  // Strip HTML/XML tags — prevents any markup from reaching entity extraction
+  // Strip HTML/XML tags - prevents any markup from reaching entity extraction
   // or being reflected into log strings.  The existing escapeHtml() at render
   // time is a separate, complementary defence.
   text = text.replace(/<[^>]*>/g, "");
@@ -81,7 +81,7 @@ export function sanitizeInput(rawText) {
   // Collapse runs of whitespace (but preserve single newlines for readability)
   text = text.replace(/[^\S\n]+/g, " ").trim();
 
-  // Hard length cap — protects regex performance in downstream matchers
+  // Hard length cap - protects regex performance in downstream matchers
   if (text.length > MAX_INPUT_LENGTH) {
     text = text.slice(0, MAX_INPUT_LENGTH);
   }
@@ -118,7 +118,7 @@ const PROMPT_INJECTION_PATTERNS = [
 
 /**
  * Patterns that claim a definitive medical diagnosis.
- * Bloomie is explicitly non-diagnostic — these must be blocked.
+ * Bloomie is explicitly non-diagnostic - these must be blocked.
  */
 const DIAGNOSIS_CLAIM_PATTERNS = [
   /i\s+(definitely|certainly|obviously|clearly)\s+have\s+\w/i,
@@ -151,7 +151,7 @@ const UNSAFE_INSTRUCTION_PATTERNS = [
  * Runs after sanitizeInput(). Returns { blocked: false } when safe.
  * When blocked, returns a safe, non-alarming response string for Bloomie to say.
  *
- * This function is pure — it has no side effects.
+ * This function is pure - it has no side effects.
  */
 export function classifyInputSafety(text) {
   const lower = text.toLowerCase();
@@ -162,7 +162,7 @@ export function classifyInputSafety(text) {
       return {
         blocked:  true,
         category: "prompt_injection",
-        response: "I'm here to help with period and cycle questions — I'm not able to take instructions that change how I work 🩷 What's going on with your health?",
+        response: "I'm here to help with period and cycle questions - I'm not able to take instructions that change how I work 🩷 What's going on with your health?",
       };
     }
   }
@@ -173,7 +173,7 @@ export function classifyInputSafety(text) {
       return {
         blocked:  true,
         category: "diagnosis_claim",
-        response: "I'm not able to diagnose conditions — that's something only a doctor can do 🩷 What I can do is help you understand your symptoms and figure out if you need to see someone. What's been going on?",
+        response: "I'm not able to diagnose conditions - that's something only a doctor can do 🩷 What I can do is help you understand your symptoms and figure out if you need to see someone. What's been going on?",
       };
     }
   }
@@ -191,7 +191,7 @@ export function classifyInputSafety(text) {
 
   // ── 4. Oversized input (after sanitization, so the cap is already applied) ─
   // If the remaining text is still suspiciously long after truncation, it may
-  // indicate the user pasted a wall of text — guide them gently.
+  // indicate the user pasted a wall of text - guide them gently.
   if (text.length === MAX_INPUT_LENGTH) {
     return {
       blocked:  true,
@@ -209,7 +209,7 @@ export function classifyInputSafety(text) {
 
 /**
  * Phrases that would imply a definitive medical diagnosis or certainty.
- * Bloomie's node templates should never contain these — but this acts as a
+ * Bloomie's node templates should never contain these - but this acts as a
  * last-resort backstop in case a future template edit introduces one.
  */
 const DIAGNOSTIC_LEAK_PATTERNS = [
@@ -227,7 +227,7 @@ const DIAGNOSTIC_LEAK_PATTERNS = [
  * - If the line contains a diagnostic claim, replaces it with a safe fallback.
  * - Strips any HTML tags that have no business in a plain-text bot bubble
  *   (protects against accidental raw HTML in a template string).
- * - Never throws — always returns a string.
+ * - Never throws - always returns a string.
  *
  * Note: this is a safety net, not a template validator. Node templates in
  * bloomie-nodes.js are the source of truth; this catches regressions.
@@ -244,8 +244,8 @@ export function sanitizeBotLine(text) {
   // Check for diagnostic leaks and substitute a safe fallback line.
   for (const pattern of DIAGNOSTIC_LEAK_PATTERNS) {
     if (pattern.test(safe)) {
-      console.warn("[bloomie-safety] Diagnostic phrase detected in bot line — substituting fallback.", safe);
-      return "I want to make sure I'm giving you accurate information — this is something worth discussing with a doctor or nurse 🩷";
+      console.warn("[bloomie-safety] Diagnostic phrase detected in bot line - substituting fallback.", safe);
+      return "I want to make sure I'm giving you accurate information - this is something worth discussing with a doctor or nurse 🩷";
     }
   }
 

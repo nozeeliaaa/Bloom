@@ -45,7 +45,7 @@ const REGISTERED_NODE_IDS = getRegisteredNodeIds();
 
 // ─── extractEntities ──────────────────────────────────────────────────────────
 
-describe("extractEntities — symptoms", () => {
+describe("extractEntities - symptoms", () => {
   it("detects late period", () => {
     const e = extractEntities("my period is late");
     expect(e.symptoms.late).toBe(true);
@@ -154,7 +154,7 @@ describe("extractEntities — symptoms", () => {
   });
 });
 
-describe("extractEntities — severity", () => {
+describe("extractEntities - severity", () => {
   it("extracts severe", () => {
     const e = extractEntities("the pain is very bad and unbearable");
     expect(e.severity).toBe("severe");
@@ -171,7 +171,7 @@ describe("extractEntities — severity", () => {
   });
 });
 
-describe("extractEntities — timing", () => {
+describe("extractEntities - timing", () => {
   it("extracts before_period", () => {
     const e = extractEntities("i feel anxious a few days before my period");
     expect(e.timing).toBe("before_period");
@@ -188,7 +188,7 @@ describe("extractEntities — timing", () => {
   });
 });
 
-describe("extractEntities — pregnancy", () => {
+describe("extractEntities - pregnancy", () => {
   it("detects pregnancy chance from unprotected sex", () => {
     const e = extractEntities("i had unprotected sex and my period is late");
     expect(e.pregnancy.chance).toBe(true);
@@ -218,7 +218,7 @@ describe("extractEntities — pregnancy", () => {
   });
 });
 
-describe("extractEntities — urgency", () => {
+describe("extractEntities - urgency", () => {
   it("flags fainting", () => {
     // urgency regex matches \bfaint\b (not "fainted") and \bpassed out\b
     const e = extractEntities("i passed out from the bleeding");
@@ -226,7 +226,7 @@ describe("extractEntities — urgency", () => {
   });
 
   it("flags soaking through clothing", () => {
-    // urgency regex matches "bleed.*pants" — needs present-tense "bleed"
+    // urgency regex matches "bleed.*pants" - needs present-tense "bleed"
     const e = extractEntities("i bleed through my pants");
     expect(e.urgent).toBe(true);
   });
@@ -242,9 +242,9 @@ describe("extractEntities — urgency", () => {
   });
 });
 
-// ─── inferRoute — SAFETY CRITICAL ────────────────────────────────────────────
+// ─── inferRoute - SAFETY CRITICAL ────────────────────────────────────────────
 
-describe("inferRoute — urgent routes (highest priority)", () => {
+describe("inferRoute - urgent routes (highest priority)", () => {
   it("urgency flag → HEAVY_URGENT", () => {
     const e = extractEntities("i nearly fainted and i'm soaking through pads");
     const route = inferRoute(e);
@@ -274,7 +274,7 @@ describe("inferRoute — urgent routes (highest priority)", () => {
   });
 });
 
-describe("inferRoute — late period routes", () => {
+describe("inferRoute - late period routes", () => {
   it("late + pregnancy chance + no test → PREGNANCY_ENTRY", () => {
     const e = extractEntities("my period is late and i had unprotected sex");
     const route = inferRoute(e);
@@ -308,9 +308,9 @@ describe("inferRoute — late period routes", () => {
   });
 });
 
-describe("inferRoute — heavy bleeding routes", () => {
+describe("inferRoute - heavy bleeding routes", () => {
   it("heavy + 7 days → HEAVY_ROUTE_B and node exists", () => {
-    // symptom regex uses \bheavy\b — "heavily" doesn't match; use "heavy bleeding"
+    // symptom regex uses \bheavy\b - "heavily" doesn't match; use "heavy bleeding"
     const e = extractEntities("i have heavy bleeding for a week");
     const route = inferRoute(e);
     expect(route.next).toBe("HEAVY_ROUTE_B");
@@ -334,7 +334,7 @@ describe("inferRoute — heavy bleeding routes", () => {
   });
 });
 
-describe("inferRoute — spotting routes", () => {
+describe("inferRoute - spotting routes", () => {
   it("spotting + mid cycle → SPOT_MIDCYCLE_NOTE", () => {
     const e = extractEntities("light spotting in the middle of my cycle");
     const route = inferRoute(e);
@@ -355,7 +355,7 @@ describe("inferRoute — spotting routes", () => {
   });
 });
 
-describe("inferRoute — pelvic pain routes", () => {
+describe("inferRoute - pelvic pain routes", () => {
   it("pelvic + after sex → PELVIC_SEX_INTRO", () => {
     // "pain after sex" alone doesn't set pelvic=true; need "cramps" or "pelvic"
     const e = extractEntities("i have cramps after sex");
@@ -371,7 +371,7 @@ describe("inferRoute — pelvic pain routes", () => {
   });
 });
 
-describe("inferRoute — mood routes", () => {
+describe("inferRoute - mood routes", () => {
   it("mood + before period → MOOD_SEVERITY", () => {
     const e = extractEntities("i feel very anxious and tired a few days before my period");
     const route = inferRoute(e);
@@ -380,7 +380,7 @@ describe("inferRoute — mood routes", () => {
   });
 });
 
-describe("inferRoute — discharge route", () => {
+describe("inferRoute - discharge route", () => {
   it("discharge alone (no spotting/pelvic) → ELSE_DISCHARGE", () => {
     const e = extractEntities("i have unusual discharge with a smell");
     const route = inferRoute(e);
@@ -389,7 +389,7 @@ describe("inferRoute — discharge route", () => {
   });
 });
 
-describe("inferRoute — nausea + late", () => {
+describe("inferRoute - nausea + late", () => {
   it("nausea + late → LATE_TEST_Q", () => {
     const e = extractEntities("i feel nauseous and my period is late");
     const route = inferRoute(e);
@@ -398,7 +398,7 @@ describe("inferRoute — nausea + late", () => {
   });
 });
 
-describe("inferRoute — no match", () => {
+describe("inferRoute - no match", () => {
   it("returns null for unrecognized input", () => {
     const e = extractEntities("i like flowers");
     const route = inferRoute(e);
@@ -408,7 +408,7 @@ describe("inferRoute — no match", () => {
 
 // ─── implicit_late extraction ─────────────────────────────────────────────────
 
-describe("extractEntities — implicit_late", () => {
+describe("extractEntities - implicit_late", () => {
   it("detects 'it hasn't come'", () => {
     expect(extractEntities("it hasn't come").symptoms.implicit_late).toBe(true);
   });
@@ -437,7 +437,7 @@ describe("extractEntities — implicit_late", () => {
 
 // ─── implicit_late routing (effectiveLate guard) ──────────────────────────────
 
-describe("inferRoute — implicit late (no other symptoms)", () => {
+describe("inferRoute - implicit late (no other symptoms)", () => {
   it("'it hasn't come' + 3 days → LATE_NO_GUIDANCE", () => {
     const e = extractEntities("it hasn't come, it's been 3 days");
     const route = inferRoute(e);
@@ -471,7 +471,7 @@ describe("inferRoute — implicit late (no other symptoms)", () => {
   });
 });
 
-describe("clarification helpers — ambiguity and missing context", () => {
+describe("clarification helpers - ambiguity and missing context", () => {
   it("asks targeted reproductive-health clarification for vague down-there wording", () => {
     const text = "down there feel off";
     const entities = extractEntities(text);

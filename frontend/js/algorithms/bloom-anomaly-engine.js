@@ -2,7 +2,7 @@
  * bloom-anomaly-engine.js
  *
  * Statistical anomaly detection for menstrual cycle timing.
- * Educational / wellness support only — not diagnostic.
+ * Educational / wellness support only - not diagnostic.
  *
  * --------------------------------------------------------------------
  * RESEARCH BASIS FOR THE THRESHOLDS IN THIS FILE

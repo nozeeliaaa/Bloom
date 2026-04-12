@@ -243,7 +243,7 @@ function buildFutureCyclesBackend(lastPeriodStart, predictedLength, periodDurati
 /** Convert cyclePhaseEngine confidence string → object shape calendar.js expects */
 function buildConfidenceObj(confidenceStr, cycleCount) {
   const map = {
-    high:   { level: 'High',   windowDays: 0, message: 'Your cycle is quite regular. This estimate is fairly reliable.' },
+    high:   { level: 'High',   windowDays: 0, message: '' },
     medium: { level: 'Medium', windowDays: 2, message: 'Your cycle varies slightly. Showing an estimated window.' },
     low:    { level: 'Low',    windowDays: 5, message: cycleCount === 0
                 ? 'Not enough history yet. Showing a wider estimate window.'

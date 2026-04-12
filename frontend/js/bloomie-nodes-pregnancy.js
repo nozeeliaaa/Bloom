@@ -32,7 +32,7 @@ export function createPregnancyNodes(env, helpers) {
       say: [pick([
         "Okay 🩷 Let me help you figure out the right time to test. What best describes your situation?",
         "Sure 🩷 Let's figure out the right time for you to test. What best describes your situation?",
-        "Got it 🩷 I can help with test timing — what best describes your situation?",
+        "Got it 🩷 I can help with test timing - what best describes your situation?",
       ])],
       choices: [
         { id: "know_date",   label: "I know my expected period date",    next: "TEST_EXPECTED_DATE", primary: true },
@@ -63,7 +63,7 @@ export function createPregnancyNodes(env, helpers) {
       },
     },
     TEST_SHOW_PLAN: {
-      // MEMORY AUDIT: ctx.captureData — all nodes checked, no gaps found.
+      // MEMORY AUDIT: ctx.captureData - all nodes checked, no gaps found.
       //   say() correctly reads ctx.captureData.expectedPeriodDate and ctx.captureData.sexDate
       //   before computing the test plan. No re-asking needed here.
       say(ctx) {
@@ -243,7 +243,7 @@ export function createPregnancyNodes(env, helpers) {
           "If pregnancy prevention is the immediate concern, emergency contraception works best as soon as possible and can still help up to 5 days after sex.",
           "Type the date of the unprotected sex like: 2026-02-08 (YYYY-MM-DD).",
         ];
-        if (ctx.isMinor) lines.unshift("This is a safe space — I won't share anything you tell me 🩷");
+        if (ctx.isMinor) lines.unshift("This is a safe space - I won't share anything you tell me 🩷");
         return lines;
       },
       autoNext(ctx) {

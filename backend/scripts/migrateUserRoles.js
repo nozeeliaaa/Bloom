@@ -3,6 +3,12 @@ import { db } from "../src/firebaseAdmin.js";
 
 const { FieldValue } = admin.firestore;
 
+function normalizeBiometricLevel(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized || null;
+}
+
 async function migrateUsers() {
   console.log("Starting full user migration...");
   const snap = await db.collection("users").get();
@@ -12,6 +18,7 @@ async function migrateUsers() {
     const data = doc.data() || {};
     const profile = data.profile || {};
     const healthProfile = data.healthProfile || {};
+    const biometricProfile = data.biometricProfile || {};
 
     const cleanProfile = {
       nickname: profile.nickname ?? null,
@@ -33,6 +40,17 @@ async function migrateUsers() {
       periodDuration: healthProfile.periodDuration ?? profile.periodDuration ?? null,
       weightKg: healthProfile.weightKg ?? profile.weightKg ?? null,
       heightCm: healthProfile.heightCm ?? profile.heightCm ?? null,
+      lmpDate: healthProfile.lmpDate ?? healthProfile.lmp ?? profile.lmpDate ?? profile.lmp ?? null,
+    };
+
+    const cleanBiometricProfile = {
+      activityLevel: normalizeBiometricLevel(
+        biometricProfile.activityLevel ?? profile.activityLevel
+      ),
+      sleepScore: biometricProfile.sleepScore ?? healthProfile.sleepScore ?? profile.sleepScore ?? null,
+      stressLevel: normalizeBiometricLevel(
+        biometricProfile.stressLevel ?? profile.stressLevel
+      ),
     };
 
     await doc.ref.set({
@@ -43,10 +61,20 @@ async function migrateUsers() {
         role: FieldValue.delete(),
         avgCycleLength: FieldValue.delete(),
         periodDuration: FieldValue.delete(),
+        sleepScore: FieldValue.delete(),
+        activityLevel: FieldValue.delete(),
+        stressLevel: FieldValue.delete(),
         weightKg: FieldValue.delete(),
         heightCm: FieldValue.delete(),
+        lmpDate: FieldValue.delete(),
+        lmp: FieldValue.delete(),
       },
-      healthProfile: cleanHealthProfile,
+      healthProfile: {
+        ...cleanHealthProfile,
+        lmp: FieldValue.delete(),
+        sleepScore: FieldValue.delete(),
+      },
+      biometricProfile: cleanBiometricProfile,
       updatedAt: FieldValue.serverTimestamp(),
       createdAt: data.createdAt ?? FieldValue.serverTimestamp(),
     }, { merge: true });

@@ -5,12 +5,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bloom</title>
+    <!-- Redirect in <head> before body paints - prevents flash of fallback card -->
+    <script>
+      (function() {
+        var p = window.location.pathname;
+        var isRoot = p === "/" || p === "/index.html" || p.endsWith("/index.html");
+        var alreadyHome = /\/pages\/home\.html\/?$/.test(p);
+        if (isRoot && !alreadyHome) {
+          window.location.replace(new URL("pages/home.html", window.location.href).href);
+        }
+      })();
+    </script>
     <style>
       body {
         margin: 0;
         font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
         background: #fff7fb;
         color: #3b2a33;
+        display: none;
       }
       .root-redirect-wrap {
         min-height: 100vh;
@@ -90,23 +102,16 @@
         if (homeLink) homeLink.href = homeUrl.href;
 
         function showFallback(text) {
+          document.body.style.display = "";
           if (msg) msg.textContent = text || "You can try again, or open the home page directly.";
           if (fallback) fallback.hidden = false;
         }
 
-        async function goHome() {
+        function goHome() {
           try {
-            const ctrl = new AbortController();
-            const timeout = setTimeout(() => ctrl.abort(), 1800);
-            const res = await fetch(homeUrl.href, { method: "GET", cache: "no-store", signal: ctrl.signal });
-            clearTimeout(timeout);
-            if (!res.ok) {
-              showFallback("Home is not reachable right now. Please try again in a moment.");
-              return;
-            }
             window.location.replace(homeUrl.href);
           } catch (_) {
-            showFallback("We could not reach home right now. Check your connection and try again.");
+            showFallback("We could not open Bloom. Try clicking Open Home.");
           }
         }
 

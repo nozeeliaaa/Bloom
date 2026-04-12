@@ -152,8 +152,8 @@ export function createPeriodNodes(env, helpers) {
     HEAVY_C_SOAK: {
       say: [pick([
         "Okay, are you soaking through a pad or tampon about every hour?",
-        "Got it — are you soaking through a pad or tampon about every hour?",
-        "Let's check — are you going through a pad or tampon every hour or so?",
+        "Got it - are you soaking through a pad or tampon about every hour?",
+        "Let's check - are you going through a pad or tampon every hour or so?",
       ])],
       choices: [
         { id: "yes", label: "Yes, soaking about every hour", next: "HEAVY_C_SOAK_YES", primary: true },
@@ -335,7 +335,7 @@ export function createPeriodNodes(env, helpers) {
     /* ---------------- LATE OR MISSED PERIOD ---------------- */
     LATE_INTRO: {
       autoNext(ctx) {
-        // MEMORY AUDIT FIX: was re-asking "more than 7 days late?" — now checks
+        // MEMORY AUDIT FIX: was re-asking "more than 7 days late?" - now checks
         // ctx.entityHistory for duration already extracted from the user's message.
         const lastEnt = ctx.entityHistory?.at?.(-1) ?? ctx.entityHistory?.[ctx.entityHistory.length - 1];
         const dur = lastEnt?.duration;
@@ -368,7 +368,7 @@ export function createPeriodNodes(env, helpers) {
     },
     LATE_NO_GUIDANCE: {
       autoNext(ctx) {
-        // MEMORY AUDIT FIX: was re-asking pregnancy chance — now checks
+        // MEMORY AUDIT FIX: was re-asking pregnancy chance - now checks
         // ctx.entityHistory for test/chance already extracted from the user's message.
         const lastEnt = ctx.entityHistory?.at?.(-1) ?? ctx.entityHistory?.[ctx.entityHistory.length - 1];
         const preg = lastEnt?.pregnancy;
@@ -416,7 +416,7 @@ export function createPeriodNodes(env, helpers) {
     },
     LATE_YES_PREG: {
       autoNext(ctx) {
-        // MEMORY AUDIT FIX: was re-asking pregnancy chance — now checks
+        // MEMORY AUDIT FIX: was re-asking pregnancy chance - now checks
         // ctx.entityHistory for test/chance already extracted from the user's message.
         const lastEnt = ctx.entityHistory?.at?.(-1) ?? ctx.entityHistory?.[ctx.entityHistory.length - 1];
         const preg = lastEnt?.pregnancy;
@@ -462,7 +462,7 @@ export function createPeriodNodes(env, helpers) {
     PREGNANCY_ENTRY: {
       say(ctx) {
         const lines = ["Got you 🩷 What feels closest to your situation right now?"];
-        if (ctx.isMinor) lines.unshift("It's okay to be here — you can share as much or as little as you're comfortable with 🩷");
+        if (ctx.isMinor) lines.unshift("It's okay to be here - you can share as much or as little as you're comfortable with 🩷");
         return lines;
       },
       question: "Pregnancy concern type",
@@ -539,7 +539,7 @@ export function createPeriodNodes(env, helpers) {
     // ────────────────────────────────────────────────────────────────────────
     LATE_TEST_Q: {
       autoNext(ctx) {
-        // MEMORY AUDIT FIX: was re-asking "have you taken a pregnancy test?" — now
+        // MEMORY AUDIT FIX: was re-asking "have you taken a pregnancy test?" - now
         // checks ctx.entityHistory for testedYet/result already extracted from the message.
         const lastEnt = ctx.entityHistory?.at?.(-1) ?? ctx.entityHistory?.[ctx.entityHistory.length - 1];
         const preg = lastEnt?.pregnancy;
@@ -644,7 +644,7 @@ export function createPeriodNodes(env, helpers) {
             pick(["Okay 🩷", "Got it 🩷", "Sure 🩷"]),
             pick([
               "I've noted you mentioned pelvic pain or cramps 🩷 Are you also noticing any of these?",
-              "I remember you mentioned cramping — keeping that in mind 🩷 Anything else going on?",
+              "I remember you mentioned cramping - keeping that in mind 🩷 Anything else going on?",
             ]),
           ];
         }

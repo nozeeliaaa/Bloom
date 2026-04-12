@@ -23,7 +23,7 @@ describe("buildFutureCapabilityLine", () => {
     expect(line.length).toBeGreaterThan(0);
   });
 
-  it("returns null when urgentFlag is true — never surfaces during urgent flows", () => {
+  it("returns null when urgentFlag is true - never surfaces during urgent flows", () => {
     expect(buildFutureCapabilityLine("general",        { urgentFlag: true })).toBeNull();
     expect(buildFutureCapabilityLine("improvement",    { urgentFlag: true })).toBeNull();
     expect(buildFutureCapabilityLine("personalization",{ urgentFlag: true })).toBeNull();
@@ -59,7 +59,7 @@ describe("buildFutureCapabilityLine", () => {
     }
   });
 
-  it("is deterministic — same context always returns the same line", () => {
+  it("is deterministic - same context always returns the same line", () => {
     expect(buildFutureCapabilityLine("improvement")).toBe(buildFutureCapabilityLine("improvement"));
     expect(buildFutureCapabilityLine("personalization")).toBe(buildFutureCapabilityLine("personalization"));
   });
@@ -118,7 +118,7 @@ describe("detectFutureCapabilityContext", () => {
 // Integration: resolveEducationalQuery attaches futureCapabilityLine correctly
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("resolveEducationalQuery — futureCapabilityLine field", () => {
+describe("resolveEducationalQuery - futureCapabilityLine field", () => {
   let resolveEducationalQuery;
 
   // Dynamically import to avoid hoisting issues with named exports

@@ -6,7 +6,7 @@
  * getTrustedSources(topic) → { intro: string, sources: ExternalSource[] } | null
  *
  * Rules:
- *  • Whitelist only — no dynamic API calls, no runtime fetches.
+ *  • Whitelist only - no dynamic API calls, no runtime fetches.
  *  • Max 2 sources returned per topic.
  *  • Returns null when the topic is unrecognised.
  *  • Nothing is written to Bloomie memory.
@@ -14,10 +14,10 @@
  *    matches the user's question.
  *
  * Each ExternalSource:
- *   title       — display name of the resource
- *   url         — canonical, stable URL (whitelisted)
- *   sourceName  — name of the organisation/publisher
- *   description — one-sentence description of what the page covers
+ *   title       - display name of the resource
+ *   url         - canonical, stable URL (whitelisted)
+ *   sourceName  - name of the organisation/publisher
+ *   description - one-sentence description of what the page covers
  *
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -140,7 +140,7 @@ export const TRUSTED_SOURCE_REGISTRY = {
   },
 
   pms: {
-    intro: "These pages explain PMS and PMDD — what causes them and what can help.",
+    intro: "These pages explain PMS and PMDD - what causes them and what can help.",
     sources: [
       {
         title:       "Premenstrual Syndrome (PMS)",
@@ -291,7 +291,7 @@ export const TRUSTED_SOURCE_REGISTRY = {
 /**
  * getTrustedSources(topic) → { intro: string, sources: ExternalSource[] } | null
  *
- * @param {string} topic — canonical topic token (e.g. "pcos", "menstruation")
+ * @param {string} topic - canonical topic token (e.g. "pcos", "menstruation")
  *
  * @returns {{
  *   intro:   string,

@@ -45,9 +45,9 @@ export function createCoreNodes(env, helpers) {
           ctx.adviceGiven.add("cycle_logging_gap"); // prevent duplicate cycle gap note
           ctx.loggingGapPending = false;
           const gapNote = pick([
-            "One small thing before we start 🩷 Bloom works best when symptoms are logged regularly — even a quick entry every few days helps me spot patterns for you.",
+            "One small thing before we start 🩷 Bloom works best when symptoms are logged regularly - even a quick entry every few days helps me spot patterns for you.",
             "Just a little heads-up 🩷 It looks like it's been a while since your last symptom log. Regular logging helps me give more reliable cycle context.",
-            "Hey, quick note 🩷 Logging regularly — even a few times a week — really helps me personalise what I share with you.",
+            "Hey, quick note 🩷 Logging regularly - even a few times a week - really helps me personalise what I share with you.",
           ]);
           return [...INTRO, gapNote];
         }
@@ -169,7 +169,7 @@ export function createCoreNodes(env, helpers) {
     // Presents topic buttons instead of a generic OOS reply.
     // ── Session summary node ───────────────────────────────────────────────────
     CONVERSATION_SUMMARY: {
-      // MEMORY AUDIT: ctx.adviceGiven — all nodes checked, no gaps found.
+      // MEMORY AUDIT: ctx.adviceGiven - all nodes checked, no gaps found.
       //   say() correctly reads ctx.adviceGiven and ctx.conversationProfile.concernsUnresolved
       //   to build the session recap. No re-asking needed here.
       say(ctx) {
@@ -216,7 +216,7 @@ export function createCoreNodes(env, helpers) {
     MEDIUM_CONFIRM: {
       say() {
         const note = ctx.routeConfidence?.confidenceNote ||
-          "Just to make sure I understand — does that sound right?";
+          "Just to make sure I understand - does that sound right?";
         return [note];
       },
       choices: [
@@ -235,7 +235,7 @@ export function createCoreNodes(env, helpers) {
           ];
         }
         return [
-          "I'm having a hard time pinpointing the right area — that's on me 💗",
+          "I'm having a hard time pinpointing the right area - that's on me 💗",
           "Quick split: is this more about pain/physical symptoms, or more that your cycle timing feels off?",
         ];
       },
@@ -265,8 +265,8 @@ export function createCoreNodes(env, helpers) {
         if (ctx.narrowingVague) {
           ctx.narrowingVague = false;
           const options = [
-            "It sounds like something might be off — I want to make sure I help with the right thing 💗 Which of these feels closest to what you're experiencing?",
-            "I hear you — let's figure this out together 💗 Which area feels closest to what's going on?",
+            "It sounds like something might be off - I want to make sure I help with the right thing 💗 Which of these feels closest to what you're experiencing?",
+            "I hear you - let's figure this out together 💗 Which area feels closest to what's going on?",
             withNickname("Something feeling off is worth looking at") + " 💗 Which of these is closest to what you're dealing with?",
           ];
           const msg = pickAvoiding(options, ctx.lastNarrowingPrompt);
@@ -294,7 +294,7 @@ export function createCoreNodes(env, helpers) {
         const options = [
           "I want to make sure I help you with the right thing 💗 Which area is closest to what you're dealing with?",
           withNickname("Let me point you in the right direction") + " 💗 Which of these is closest to what's going on?",
-          "Happy to help — which area fits best?",
+          "Happy to help - which area fits best?",
         ];
         const msg = pickAvoiding(options, ctx.lastNarrowingPrompt);
         ctx.lastNarrowingPrompt = msg;
@@ -410,16 +410,16 @@ export function createCoreNodes(env, helpers) {
     // WHAT THIS NODE IS FOR
     // Reached only when detectReportedCondition() identifies the user as
     // reporting an EXISTING confirmed diagnosis (confidence ≥ 0.80). This is
-    // NOT for suspected conditions or diagnosis-seeking requests — those go to
+    // NOT for suspected conditions or diagnosis-seeking requests - those go to
     // DIAGNOSIS_REDIRECT via the diagnosis_request OOS path.
     //
     // RESPONSE STYLE (req 11)
-    //   ✓ Warm and natural — acknowledge the person, not the condition label
-    //   ✓ Supportive — validate that sharing was the right thing to do
-    //   ✓ Non-diagnostic — never confirm, deny, reinterpret, or verify
-    //   ✓ Never robotic — no clinical phrasing, no bullet lists
-    //   ✓ Never dismissive — do not minimise the condition or redirect quickly
-    //   ✓ Brief — one acknowledgement line + one bridge question is enough
+    //   ✓ Warm and natural - acknowledge the person, not the condition label
+    //   ✓ Supportive - validate that sharing was the right thing to do
+    //   ✓ Non-diagnostic - never confirm, deny, reinterpret, or verify
+    //   ✓ Never robotic - no clinical phrasing, no bullet lists
+    //   ✓ Never dismissive - do not minimise the condition or redirect quickly
+    //   ✓ Brief - one acknowledgement line + one bridge question is enough
     //
     // MEMORY POLICY (req 10)
     //   ✓ conditionKey stored in ctx.reportedConditions (session + memory)
@@ -437,12 +437,12 @@ export function createCoreNodes(env, helpers) {
         const ack = name
           ? pick([
               `Thanks for sharing that 🩷 Since you've already been diagnosed with ${name}, I can keep that in mind while we talk through your cycle or symptoms.`,
-              `I'm glad you told me 🩷 I'll keep your ${name} diagnosis in mind as we go — I can help you track patterns, understand cycle-related changes, or just talk through what's been going on.`,
+              `I'm glad you told me 🩷 I'll keep your ${name} diagnosis in mind as we go - I can help you track patterns, understand cycle-related changes, or just talk through what's been going on.`,
               `Got it 🩷 Since you have ${name}, that's helpful context. I can't offer treatment advice, but I can help you understand what you're experiencing and what questions to bring to your provider.`,
             ])
           : pick([
               "Thanks for sharing that 🩷 I'll keep that context in mind while we talk through your symptoms.",
-              "That's really helpful to know 🩷 I can keep that in mind as we go — I'm here to help you track patterns and understand what you're experiencing.",
+              "That's really helpful to know 🩷 I can keep that in mind as we go - I'm here to help you track patterns and understand what you're experiencing.",
             ]);
 
         // If other conditions are already recorded this session, lightly
@@ -474,15 +474,15 @@ export function createCoreNodes(env, helpers) {
     // WHAT THIS NODE IS FOR
     // Reached when the user asks how to manage, treat, or live with a condition
     // they have ALREADY reported (ctx.reportedConditions non-empty). Requires
-    // an existing reported diagnosis — never fires for users who haven't stated
+    // an existing reported diagnosis - never fires for users who haven't stated
     // one. Falls through to normal routing if no conditions are on record.
     //
     // RESPONSE STYLE (req 11)
-    //   ✓ Warm opener — acknowledge the question as valid, not clinical
-    //   ✓ Structured — one educational paragraph per condition, then a close
-    //   ✓ Non-diagnostic — state patterns generally; never instruct
-    //   ✓ Never prescriptive — no medication names, doses, or treatment plans
-    //   ✓ Never certain — use "often discussed", "may help", "varies by person"
+    //   ✓ Warm opener - acknowledge the question as valid, not clinical
+    //   ✓ Structured - one educational paragraph per condition, then a close
+    //   ✓ Non-diagnostic - state patterns generally; never instruct
+    //   ✓ Never prescriptive - no medication names, doses, or treatment plans
+    //   ✓ Never certain - use "often discussed", "may help", "varies by person"
     //   ✓ Always close with a provider-referral nudge
     //
     // SAFETY BOUNDARY (req 6)
@@ -494,7 +494,7 @@ export function createCoreNodes(env, helpers) {
     //   ✓ Always direct specific treatment decisions back to the provider
     //
     // MEMORY POLICY (req 10)
-    //   No additional memory written here — condition key already in
+    //   No additional memory written here - condition key already in
     //   ctx.reportedConditions from REPORTED_CONDITION_ACK. No clinical
     //   detail stored.
     CONDITION_MANAGEMENT_INFO: {
@@ -512,14 +512,14 @@ export function createCoreNodes(env, helpers) {
             ])
           : "That's a really valid question 🩷";
 
-        // Condition-specific educational context — factual, not prescriptive
+        // Condition-specific educational context - factual, not prescriptive
         const CONDITION_EDUCATION = {
           pcos: [
-            "For PCOS, general lifestyle factors like regular movement, balanced blood sugar, and stress management are often discussed — but what works varies a lot from person to person.",
+            "For PCOS, general lifestyle factors like regular movement, balanced blood sugar, and stress management are often discussed - but what works varies a lot from person to person.",
             "Some people with PCOS find tracking their cycle patterns helpful for spotting changes and having more informed conversations with their provider.",
           ],
           endometriosis: [
-            "For endometriosis, management is very individual — pain relief strategies, hormonal options, and surgical choices all depend on the person's specific situation.",
+            "For endometriosis, management is very individual - pain relief strategies, hormonal options, and surgical choices all depend on the person's specific situation.",
             "Tracking your pain levels, cycle timing, and what makes symptoms better or worse is often really useful information to bring to your provider.",
           ],
           fibroids: [
@@ -527,7 +527,7 @@ export function createCoreNodes(env, helpers) {
             "Keeping track of your bleeding patterns and any pressure or pain symptoms can give your provider a clearer picture.",
           ],
           adenomyosis: [
-            "Adenomyosis management typically focuses on symptom relief and is tailored to each person's situation — there's no one-size-fits-all approach.",
+            "Adenomyosis management typically focuses on symptom relief and is tailored to each person's situation - there's no one-size-fits-all approach.",
             "Tracking your pain and bleeding patterns is really useful for building a picture of what's happening for you.",
           ],
           ovarian_cysts: [
@@ -535,7 +535,7 @@ export function createCoreNodes(env, helpers) {
             "Your provider is best placed to advise on what follow-up is right for your situation.",
           ],
           pmdd: [
-            "PMDD is often managed with a combination of lifestyle strategies, therapy, and sometimes medical support — but the right approach varies by person.",
+            "PMDD is often managed with a combination of lifestyle strategies, therapy, and sometimes medical support - but the right approach varies by person.",
             "Cycle tracking can be particularly useful with PMDD, since documenting symptom timing helps confirm the pattern and informs treatment decisions.",
           ],
           perimenopause: [
@@ -547,7 +547,7 @@ export function createCoreNodes(env, helpers) {
             "Tracking which symptoms are most disruptive to you is a good starting point for those conversations.",
           ],
           amenorrhea: [
-            "Amenorrhea has several potential causes and the approach to management depends on what's behind it — your provider is the right person to guide that.",
+            "Amenorrhea has several potential causes and the approach to management depends on what's behind it - your provider is the right person to guide that.",
             "If you haven't already had a full evaluation, that's usually the recommended first step.",
           ],
           anemia: [
@@ -555,7 +555,7 @@ export function createCoreNodes(env, helpers) {
             "Your provider can advise on the right supplementation approach for your specific levels.",
           ],
           thyroid: [
-            "Thyroid condition management typically involves medication or monitoring under a doctor's guidance — the approach depends on your specific thyroid function results.",
+            "Thyroid condition management typically involves medication or monitoring under a doctor's guidance - the approach depends on your specific thyroid function results.",
             "Cycle changes related to thyroid conditions often improve when the thyroid levels are well-managed.",
           ],
         };
@@ -568,7 +568,7 @@ export function createCoreNodes(env, helpers) {
         const close = pick([
           "I can help you think through your current symptoms or questions to bring to your provider 🩷 What would be most useful?",
           "I'm not able to advise on specific treatments, but I can help you talk through what you're experiencing 🩷 What's going on for you right now?",
-          "I can help you track patterns or talk through what's happening — what would be most helpful? 🩷",
+          "I can help you track patterns or talk through what's happening - what would be most helpful? 🩷",
         ]);
 
         return [opener, ...education, close];
@@ -586,16 +586,16 @@ export function createCoreNodes(env, helpers) {
     // WHAT THIS NODE IS FOR
     // Reached when the user describes current symptoms AND names a condition
     // they have already reported in the same message. Keeps the condition as
-    // passive context — never attributes causation or says "that is your X".
+    // passive context - never attributes causation or says "that is your X".
     // After the opener + focus question, the user continues into normal
     // symptom routing (PERIOD_TRIAGE, PELVIC_INTRO, etc.).
     //
     // RESPONSE STYLE (req 11)
-    //   ✓ Warm — lead with "I'll keep that in mind" framing, not clinical
-    //   ✓ Non-diagnostic — never say "that's because of your [condition]"
-    //   ✓ Non-attributing — always include uncertainty: "I can't say for sure"
-    //   ✓ Supportive — frame the follow-up as "let's look at this together"
-    //   ✓ Focused — ask about timing, severity, and change from normal
+    //   ✓ Warm - lead with "I'll keep that in mind" framing, not clinical
+    //   ✓ Non-diagnostic - never say "that's because of your [condition]"
+    //   ✓ Non-attributing - always include uncertainty: "I can't say for sure"
+    //   ✓ Supportive - frame the follow-up as "let's look at this together"
+    //   ✓ Focused - ask about timing, severity, and change from normal
     //
     // LANGUAGE RULES (req 7)
     //   ✗ NEVER: "that is because of your PCOS"
@@ -607,7 +607,7 @@ export function createCoreNodes(env, helpers) {
     //   ✓ OK: "I'll hold your [condition] as background context"
     //
     // MEMORY POLICY (req 10)
-    //   No additional memory written here — condition key already stored.
+    //   No additional memory written here - condition key already stored.
     //   Symptom details from this node flow into normal persistMemory() via
     //   the downstream symptom-routing nodes, not here directly.
     CONDITION_SYMPTOM_CONTEXT: {
@@ -632,9 +632,9 @@ export function createCoreNodes(env, helpers) {
             ]);
 
         const focus = pick([
-          "Can you tell me more about what's going on — when did it start, how bad is it, and is it different from what you'd normally expect?",
+          "Can you tell me more about what's going on - when did it start, how bad is it, and is it different from what you'd normally expect?",
           "What are you noticing right now? It helps to know the timing, how severe it feels, and whether this seems different from your usual pattern.",
-          "Walk me through what's happening — the timing, severity, and whether anything about it feels different from what you're used to would all be useful.",
+          "Walk me through what's happening - the timing, severity, and whether anything about it feels different from what you're used to would all be useful.",
         ]);
 
         return [opener, focus];
@@ -669,17 +669,17 @@ export function createCoreNodes(env, helpers) {
 
         // One focused symptom follow-up per condition
         const followUp = {
-          pcos:           "The most common signs are irregular periods, acne, hair thinning, and difficulty losing weight — do any of those feel familiar?",
-          endometriosis:  "The most common signs are very painful periods, pelvic pain outside your period, and pain during sex — does any of that match what you're going through?",
-          fibroids:       "Fibroids often cause heavy bleeding, pelvic pressure or fullness, and longer periods — is that close to what you're noticing?",
-          adenomyosis:    "Adenomyosis often causes heavy, painful periods and a feeling of pelvic pressure or bloating — does that sound like what you're dealing with?",
-          cyst:           "Ovarian cysts can cause pelvic pain or pressure, sometimes with bloating or irregular cycles — what symptoms have you been noticing most?",
-          thyroid:        "Thyroid issues can cause irregular periods, fatigue, hair changes, and weight shifts — which of those feel most relevant to you?",
+          pcos:           "The most common signs are irregular periods, acne, hair thinning, and difficulty losing weight - do any of those feel familiar?",
+          endometriosis:  "The most common signs are very painful periods, pelvic pain outside your period, and pain during sex - does any of that match what you're going through?",
+          fibroids:       "Fibroids often cause heavy bleeding, pelvic pressure or fullness, and longer periods - is that close to what you're noticing?",
+          adenomyosis:    "Adenomyosis often causes heavy, painful periods and a feeling of pelvic pressure or bloating - does that sound like what you're dealing with?",
+          cyst:           "Ovarian cysts can cause pelvic pain or pressure, sometimes with bloating or irregular cycles - what symptoms have you been noticing most?",
+          thyroid:        "Thyroid issues can cause irregular periods, fatigue, hair changes, and weight shifts - which of those feel most relevant to you?",
         }[cond] || "Which of these best describes what you've been experiencing?";
 
         return [
           opener,
-          "These concerns are valid — conditions like this are real and often under-diagnosed.",
+          "These concerns are valid - conditions like this are real and often under-diagnosed.",
           "I can't give a diagnosis (that takes a clinical exam and tests), but I can help you map your symptoms so you know exactly what to tell a provider.",
           followUp,
         ];
@@ -926,21 +926,21 @@ export function createCoreNodes(env, helpers) {
       say: [
         pick([
           "Hi, I'm Bloomie 🩷 Your personal reproductive health companion.",
-          "Hey, great question 🩷 I'm Bloomie — your cycle and reproductive health companion.",
+          "Hey, great question 🩷 I'm Bloomie - your cycle and reproductive health companion.",
           "Glad you asked 🩷 I'm Bloomie, Bloom's health chat assistant.",
         ]),
         pick([
-          "Bloom is a menstrual health platform designed to help you understand your cycle, track symptoms, and get clear, supportive information — no judgment, no jargon.",
-          "Bloom is a women's health app that helps you track your period, understand your cycle, and navigate reproductive health questions — all in one place.",
-          "Bloom is a reproductive health app built around your cycle. Whether you're tracking periods, dealing with symptoms, or just trying to understand your body better — I'm here for it.",
+          "Bloom is a menstrual health platform designed to help you understand your cycle, track symptoms, and get clear, supportive information - no judgment, no jargon.",
+          "Bloom is a women's health app that helps you track your period, understand your cycle, and navigate reproductive health questions - all in one place.",
+          "Bloom is a reproductive health app built around your cycle. Whether you're tracking periods, dealing with symptoms, or just trying to understand your body better - I'm here for it.",
         ]),
         pick([
-          "Here's what I can help with 🩷\n\n• **Period concerns** — late, heavy, irregular, or painful periods\n• **Spotting** — between periods or unexpected bleeding\n• **Mood, energy & sleep** — cycle-linked changes\n• **Pelvic pain & cramps** — what they might mean\n• **Discharge** — what's normal, what's not\n• **Hormones & skin** — acne, weight shifts, cycle patterns\n• **Pregnancy & TTC** — test timing, ovulation, trying to conceive\n• **App help** — how to log, track, and navigate Bloom",
+          "Here's what I can help with 🩷\n\n• **Period concerns** - late, heavy, irregular, or painful periods\n• **Spotting** - between periods or unexpected bleeding\n• **Mood, energy & sleep** - cycle-linked changes\n• **Pelvic pain & cramps** - what they might mean\n• **Discharge** - what's normal, what's not\n• **Hormones & skin** - acne, weight shifts, cycle patterns\n• **Pregnancy & TTC** - test timing, ovulation, trying to conceive\n• **App help** - how to log, track, and navigate Bloom",
           "I can help with quite a lot 🩷\n\n• Late, heavy, or irregular periods\n• Spotting and unexpected bleeding\n• Cramps, pelvic pain, and discomfort\n• Mood swings, low energy, and sleep changes\n• Discharge and hormonal skin changes\n• Pregnancy questions and TTC support\n• How to use the Bloom app",
         ]),
         pick([
-          "I'm not a doctor and can't diagnose anything — but I can help you understand what's going on and what questions to bring to a provider 🩷 What's on your mind?",
-          "I'm not a replacement for medical care, but I can help you understand your body and know when to seek support 🩷 So — what's going on for you?",
+          "I'm not a doctor and can't diagnose anything - but I can help you understand what's going on and what questions to bring to a provider 🩷 What's on your mind?",
+          "I'm not a replacement for medical care, but I can help you understand your body and know when to seek support 🩷 So - what's going on for you?",
           "Think of me as a knowledgeable, supportive friend who knows a lot about cycles and reproductive health 🩷 What would you like help with today?",
         ]),
       ],
@@ -1030,7 +1030,7 @@ export function createCoreNodes(env, helpers) {
     },
 
     // ── Resolution check ────────────────────────────────────────────────────
-    // Gate node — evaluates guards then redirects to RESOLUTION_ASK or exits.
+    // Gate node - evaluates guards then redirects to RESOLUTION_ASK or exits.
     //
     // State transitions:
     //   RESOLUTION_CHECK (gate) ──┬── urgency active       → CLOSE
@@ -1067,7 +1067,7 @@ export function createCoreNodes(env, helpers) {
 
     // Topic → content card mapping shared by RESOLUTION_YES and RESOLUTION_NO.
     // Defined once here; referenced by closure in both onEnter/say functions.
-    // (Not a NODES key — just a local constant in this scope.)
+    // (Not a NODES key - just a local constant in this scope.)
 
     RESOLUTION_YES: {
       onEnter() {
@@ -1130,9 +1130,9 @@ export function createCoreNodes(env, helpers) {
       },
       say: [
         pick([
-          "I'm sorry I didn't fully address that 🩷 Let's try again — what's still unclear?",
+          "I'm sorry I didn't fully address that 🩷 Let's try again - what's still unclear?",
           "That's okay, let's take another look 🩷 What part didn't land for you?",
-          "I hear you — let me try to help better 🩷 What else is going on?",
+          "I hear you - let me try to help better 🩷 What else is going on?",
         ]),
       ],
       choices: [
@@ -1142,7 +1142,7 @@ export function createCoreNodes(env, helpers) {
     },
 
     // ── End-chat confirmation flow ──────────────────────────────────────────
-    // Reached when the user types a goodbye phrase. Never closes immediately —
+    // Reached when the user types a goodbye phrase. Never closes immediately -
     // shows a confirmation prompt and lets the user cancel back to their
     // previous state, or confirm to reset and restart from START.
     END_CHAT_CONFIRM: {

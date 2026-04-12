@@ -44,7 +44,7 @@ vi.mock("../bloomie-logger.js", async (importOriginal) => {
 
 // normalizePatois / detectUserTone iterate PHRASE_MAP, a large const array
 // literal that Vite's transform renders non-iterable in the test environment
-// (pre-existing bug — bloomie-patois.test.js shows 57/100 failures for the
+// (pre-existing bug - bloomie-patois.test.js shows 57/100 failures for the
 // same reason). The multi-turn tests use plain English inputs, so bypassing
 // Patois normalisation has no effect on the state-machine behaviours under
 // test. All other exports (fuzzyCorrect, detectPatois, …) come from the
@@ -128,9 +128,9 @@ afterEach(() => {
 
 // ── 1. Cumulative risk: heavy bleeding + dizziness ────────────────────────────
 
-describe("multi-turn: cumulative risk flags — heavy + dizziness", () => {
+describe("multi-turn: cumulative risk flags - heavy + dizziness", () => {
   it("escalates to HEAVY_URGENT when heavy bleeding is followed by dizziness", () => {
-    // Turn 1: heavy bleeding message — registers the heavy_bleeding flag.
+    // Turn 1: heavy bleeding message - registers the heavy_bleeding flag.
     // Note: without a severity qualifier, detectMissingContext intercepts the
     // message and asks for clarification, so state stays at START. The cumulative
     // flag IS set before that early return, and the context is stashed as
@@ -138,7 +138,7 @@ describe("multi-turn: cumulative risk flags — heavy + dizziness", () => {
     sendMessage("my period is really heavy right now");
     expect(chat.getState().cumulativeRiskFlags.has("heavy_bleeding")).toBe(true);
 
-    // Turn 2: user now reports dizziness — combination triggers cumulative escalation.
+    // Turn 2: user now reports dizziness - combination triggers cumulative escalation.
     sendMessage("i also feel dizzy and lightheaded");
     const state = chat.getState();
     expect(state.cumulativeRiskFlags.has("heavy_bleeding")).toBe(true);
@@ -150,9 +150,9 @@ describe("multi-turn: cumulative risk flags — heavy + dizziness", () => {
 
 // ── 2. Cumulative risk: late period + one-sided pain ─────────────────────────
 
-describe("multi-turn: cumulative risk flags — late + one-sided pain", () => {
+describe("multi-turn: cumulative risk flags - late + one-sided pain", () => {
   it("escalates to HEAVY_URGENT when late period is followed by one-sided pain", () => {
-    // Turn 1: late period — sets late_period flag, routes to late flow.
+    // Turn 1: late period - sets late_period flag, routes to late flow.
     sendMessage("my period is late");
     expect(chat.getState().cumulativeRiskFlags.has("late_period")).toBe(true);
 
@@ -160,7 +160,7 @@ describe("multi-turn: cumulative risk flags — late + one-sided pain", () => {
     // NOTE: "i have one sided pain" matches extractUrgency's `one.sided.*pain`
     // pattern and routes via the safety re-check BEFORE the cumulative flags
     // block runs, so one_sided_pain is never added to cumulativeRiskFlags.
-    // Use "pain on one side" instead — "one side" matches the cumulative flag
+    // Use "pain on one side" instead - "one side" matches the cumulative flag
     // regex (/one.sided|one side/) but not the urgency regex (one.sided.*pain).
     sendMessage("i have pain on one side of my lower abdomen");
     const state = chat.getState();
@@ -174,13 +174,13 @@ describe("multi-turn: cumulative risk flags — late + one-sided pain", () => {
 
 describe("multi-turn: topic interrupt clears entity history", () => {
   it("resets entityHistory when topic switches from late period to cramps", () => {
-    // Turn 1: late period — builds entity history with late symptoms.
+    // Turn 1: late period - builds entity history with late symptoms.
     sendMessage("my period is late");
     expect(chat.getState().entityHistory.length).toBeGreaterThan(0);
     const firstEntry = chat.getState().entityHistory[chat.getState().entityHistory.length - 1];
     expect(firstEntry.symptoms.late).toBe(true);
 
-    // Turn 2: user switches to pelvic/cramp topic — triggers topic interrupt.
+    // Turn 2: user switches to pelvic/cramp topic - triggers topic interrupt.
     // The old late-period entityHistory should be wiped; only pelvic remains.
     sendMessage("actually i have really bad cramps in my lower abdomen");
     const state = chat.getState();
@@ -222,7 +222,7 @@ describe("multi-turn: accumulated extraction window", () => {
   });
 });
 
-// ── 4. Overload triage — 3+ topics in one message ────────────────────────────
+// ── 4. Overload triage - 3+ topics in one message ────────────────────────────
 
 describe("multi-turn: overload detection", () => {
   it("shows overload triage text and renders overload_* quick-reply buttons", () => {
@@ -242,7 +242,7 @@ describe("multi-turn: overload detection", () => {
   });
 });
 
-// ── 5. Loop detection — adaptive repeat handling ─────────────────────────────
+// ── 5. Loop detection - adaptive repeat handling ─────────────────────────────
 //
 // Repeat semantics (after spec item 8):
 //   Send #1 (_exactCount=0): normal routing
@@ -251,11 +251,11 @@ describe("multi-turn: overload detection", () => {
 //   Send #4 (_exactCount≥3, "third repeat"):  ELSE_NOT_SURE_ROUTE
 //   Any non-repeat message: isRetryAttempt reset to false
 
-describe("multi-turn: loop detection — exact repeat", () => {
+describe("multi-turn: loop detection - exact repeat", () => {
   it("second repeat (3rd send) sets isRetryAttempt and does NOT route to ELSE_NOT_SURE_ROUTE", () => {
     sendMessage("help me");
     sendMessage("help me");
-    // Third identical send — second repeat: empathetic variant queued, routing continues.
+    // Third identical send - second repeat: empathetic variant queued, routing continues.
     // Note: the empathetic say() timers are cleared by the subsequent transition(), so
     // the text is not reliably verifiable in the chatbox. Only state flags are asserted.
     sendMessage("help me");
@@ -269,8 +269,8 @@ describe("multi-turn: loop detection — exact repeat", () => {
   it("third repeat (4th send) routes to ELSE_NOT_SURE_ROUTE", () => {
     sendMessage("help me");
     sendMessage("help me");
-    sendMessage("help me");   // second repeat — continues routing, isRetryAttempt = true
-    sendMessage("help me");   // third repeat  — ELSE_NOT_SURE_ROUTE
+    sendMessage("help me");   // second repeat - continues routing, isRetryAttempt = true
+    sendMessage("help me");   // third repeat  - ELSE_NOT_SURE_ROUTE
 
     const state = chat.getState();
     expect(state.state).toBe("ELSE_NOT_SURE_ROUTE");
@@ -287,13 +287,13 @@ describe("multi-turn: loop detection — exact repeat", () => {
 
     expect(chat.getState().isRetryAttempt).toBe(true);
 
-    // Different message — _exactCount drops to 0 → else branch resets flag.
+    // Different message - _exactCount drops to 0 → else branch resets flag.
     sendMessage("my period is late");
     expect(chat.getState().isRetryAttempt).toBe(false);
   });
 });
 
-// ── 6. IDK loop — "not sure" variants 3 times ────────────────────────────────
+// ── 6. IDK loop - "not sure" variants 3 times ────────────────────────────────
 
 describe("multi-turn: IDK loop", () => {
   it("routes to ELSE_NOT_SURE_ROUTE after 3 idk-variant messages", () => {
@@ -309,7 +309,7 @@ describe("multi-turn: IDK loop", () => {
   });
 });
 
-// ── 7. Conversational repair — OOS streak at sufficient session depth ─────────
+// ── 7. Conversational repair - OOS streak at sufficient session depth ─────────
 
 describe("multi-turn: conversational repair → NARROWING", () => {
   it("transitions to NARROWING after 2 consecutive OOS at session depth ≥ 3", () => {
@@ -317,20 +317,20 @@ describe("multi-turn: conversational repair → NARROWING", () => {
     // Using a health message as Turn 1 would deposit symptoms into entityHistory
     // that then bleed into Turn 2 via mergeEntities(), causing OOS messages to
     // inherit the health context and route via buildGuidanceResponse instead of
-    // routeUserText — so oosStreakCount would never increment.
+    // routeUserText - so oosStreakCount would never increment.
     //
     // With pure OOS messages: depth++ and streak++ each turn via the keyword-
     // router path. Condition: streak >= 2 && depth >= 3 fires on Turn 3.
 
-    // Turn 1: OOS — depth = 1, streak = 1.
+    // Turn 1: OOS - depth = 1, streak = 1.
     sendMessage("what is the weather like today");
     expect(chat.getState().oosStreakCount).toBe(1);
 
-    // Turn 2: OOS — depth = 2, streak = 2 (depth still < 3, no NARROWING yet).
+    // Turn 2: OOS - depth = 2, streak = 2 (depth still < 3, no NARROWING yet).
     sendMessage("tell me a joke please");
     expect(chat.getState().oosStreakCount).toBe(2);
 
-    // Turn 3: OOS — depth = 3, streak = 3 → conversational repair fires.
+    // Turn 3: OOS - depth = 3, streak = 3 → conversational repair fires.
     sendMessage("who won the election");
     const state = chat.getState();
     expect(state.state).toBe("NARROWING");
@@ -354,7 +354,7 @@ describe("multi-turn: MEDIUM confidence pending route", () => {
     score: 4,
     primaryIntent: "late",
     competingIntents: ["pelvic"],
-    confidenceNote: "Just to make sure — is your concern mainly about a late period?",
+    confidenceNote: "Just to make sure - is your concern mainly about a late period?",
   };
 
   it("shows MEDIUM_CONFIRM choices and routes to pending destination on yes", () => {
@@ -671,7 +671,7 @@ describe("multi-turn: unresolved concerns before CLOSE", () => {
 
 describe("multi-turn: OOS follow-up resolution", () => {
   it("resolves a food OOS follow-up to MOOD_SAFETY_CHECK when user confirms pre-period", () => {
-    // Turn 1: food/craving OOS — sets lastOOS = "food".
+    // Turn 1: food/craving OOS - sets lastOOS = "food".
     sendMessage("i really want to eat junk food all day today");
     expect(chat.getState().lastOOS).toBe("food");
 
@@ -742,7 +742,7 @@ describe("multi-turn: stale button guard", () => {
     startPeriodBtn.click();
     vi.advanceTimersByTime(10_000);
 
-    // State must remain at START — stale click had no effect.
+    // State must remain at START - stale click had no effect.
     expect(chat.getState().state).toBe("START");
   });
 });

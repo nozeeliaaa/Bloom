@@ -5,7 +5,7 @@
  *
  * getDefaultBloomieMemory() → BloomieMemory
  *   Returns the full memory schema with safe defaults.
- *   Every field is present — no undefined values.
+ *   Every field is present - no undefined values.
  *
  * mergeMemory(existing, updates) → BloomieMemory
  *   Safely merges an updates patch into an existing memory object.
@@ -28,7 +28,7 @@ const LIMITS = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Whitelists (mirrors bloomieMemory.js — kept local so this module is self-contained)
+// Whitelists (mirrors bloomieMemory.js - kept local so this module is self-contained)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const VALID_SYMPTOM_KEYS = new Set([
@@ -66,7 +66,7 @@ const VALID_OOS_CATEGORIES = new Set([
  * Returns the full memory schema initialised to safe defaults.
  *
  * Guarantees:
- *   • Every key is present — no field is ever undefined.
+ *   • Every key is present - no field is ever undefined.
  *   • Arrays default to [].
  *   • Booleans default to false.
  *   • Numbers default to 0.
@@ -130,14 +130,14 @@ export function getDefaultBloomieMemory() {
  *   • Always starts from getDefaultBloomieMemory() so every field is present.
  *   • Existing values are preserved when the corresponding update field is
  *     absent, null, or fails validation.
- *   • Each field is individually validated and coerced — no raw spread.
+ *   • Each field is individually validated and coerced - no raw spread.
  *   • Enforces length limits (arrays capped, strings truncated).
- *   • Raw user text is never written — string fields are length-capped only.
+ *   • Raw user text is never written - string fields are length-capped only.
  *
- * @param {Partial<BloomieMemory>} existing — current persisted memory (may be partial)
- * @param {Partial<BloomieMemory>} updates  — incoming patch (may be partial)
+ * @param {Partial<BloomieMemory>} existing - current persisted memory (may be partial)
+ * @param {Partial<BloomieMemory>} updates  - incoming patch (may be partial)
  *
- * @returns {BloomieMemory} — fully-shaped merged result
+ * @returns {BloomieMemory} - fully-shaped merged result
  */
 export function mergeMemory(existing = {}, updates = {}) {
   // Start from the canonical default so every key is guaranteed present.
@@ -145,7 +145,7 @@ export function mergeMemory(existing = {}, updates = {}) {
   const current = typeof existing === "object" && existing !== null ? existing : {};
   const patch   = typeof updates  === "object" && updates  !== null ? updates  : {};
 
-  // Helper — pick the first defined, non-null value from a priority list.
+  // Helper - pick the first defined, non-null value from a priority list.
   const first = (...vals) => vals.find(v => v !== undefined && v !== null) ?? null;
 
   // ── lastSessionDate ────────────────────────────────────────────────────────

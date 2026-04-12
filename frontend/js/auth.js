@@ -97,8 +97,9 @@ async function syncUserRole(user) {
     const ref = doc(db, "users", user.uid);
     const snap = await getDoc(ref);
 
-    // Schema: role lives at users/{uid}.profile.role (nested object, not a top-level field)
-    const role = snap.exists() ? snap.data()?.profile?.role : null;
+    // Backend schema: role is top-level users/{uid}.role
+    // Keep nested fallback for older docs.
+    const role = snap.exists() ? (snap.data()?.role ?? snap.data()?.profile?.role) : null;
 
     localStorage.setItem(ROLE_KEY, role || "user");
     localStorage.setItem(IS_ADMIN_KEY, role === "admin" ? "1" : "0");

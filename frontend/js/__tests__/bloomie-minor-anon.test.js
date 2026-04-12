@@ -12,7 +12,7 @@
  *   4. Anonymous greeting appears when isAnon is true and isMinor is false
  *   5. When both flags are true, minor greeting takes priority
  *
- * Second-pass — minorSafeFooter():
+ * Second-pass - minorSafeFooter():
  *   6. footer nudge is recorded in adviceGiven after first health guidance
  *   7. footer nudge appears at most once per session
  *   8. footer nudge does not fire during urgent escalation
@@ -170,7 +170,7 @@ describe("minorSafeFooter", () => {
 describe("anonNudge", () => {
   it("does not fire at session depth 1", () => {
     // anonNudge call site requires sessionDepth >= 2.
-    // After one message, depth = 1 — nudge must not fire even if guidance is built.
+    // After one message, depth = 1 - nudge must not fire even if guidance is built.
     const chat = mountChat({ isAnon: true });
     sendMessage("my period is late");  // depth becomes 1; late_period guidance is non-null
     expect(chat.getState().adviceGiven.has("anon_account_nudge")).toBe(false);

@@ -14,6 +14,31 @@ function isValidDateKey(dateKey) {
 function toBool(val) {
   return val === true || val === "true";
 }
+
+const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
+
+function normalizeBiometricLevel(value) {
+  if (value === undefined || value === null || value === "") return null;
+
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return BIOMETRIC_LEVELS[value - 1] ?? null;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+  return BIOMETRIC_LEVELS.includes(normalized) ? normalized : null;
+}
+
+function normalizeSleepScore(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10) return null;
+  return parsed;
+}
+
 async function ensureCycleLogsParent(uid) {
   const parentRef = db.collection("cycleLogs").doc(uid);
   const snap = await parentRef.get();
@@ -35,6 +60,7 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
     }
 
+    // ---- Validate body ----
     const validation = validateCycleLog(req.body);
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
@@ -59,6 +85,9 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       dateKey,
       periodDay,
       flowLevel: req.body.flowLevel ?? null,
+      sleepScore: normalizeSleepScore(req.body.sleepScore),
+      stressLevel: normalizeBiometricLevel(req.body.stressLevel),
+      activityLevel: normalizeBiometricLevel(req.body.activityLevel),
       hadSex: toBool(req.body.hadSex),
       contraceptionUsed: toBool(req.body.contraceptionUsed),
       notes:
@@ -120,14 +149,15 @@ router.get("/", requireAuth, async (req, res) => {
     }
 
     let q = db
-      .collection("cycleLogs")
-      .doc(uid)
-      .collection("entries")
-      .orderBy("dateKey", "desc");
+    .collection("cycleLogs")
+    .doc(uid)
+    .collection("entries")
+    .orderBy("dateKey", "desc");
 
     if (start) q = q.where("dateKey", ">=", start);
     if (end) q = q.where("dateKey", "<=", end);
 
+    // Only apply a cap when filtering by range - not on full history fetch
     if (start || end) q = q.limit(3650);
 
     const snap = await q.get();
@@ -152,6 +182,7 @@ router.delete("/", requireAuth, async (req, res) => {
 
     if (snap.empty) return res.json({ ok: true, deleted: 0 });
 
+    // Firestore batch max 500 ops - chunk if needed
     const BATCH_SIZE = 500;
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += BATCH_SIZE) {
@@ -199,5 +230,6 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to delete cycle log" });
   }
 });
+
 
 export default router;

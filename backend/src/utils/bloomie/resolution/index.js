@@ -1,18 +1,18 @@
 /**
  * src/utils/bloomie/resolution/index.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Resolution module — handles session close / wrap-up logic for Bloomie.
+ * Resolution module - handles session close / wrap-up logic for Bloomie.
  *
  * Responsible for:
  *  • Detecting close intent ("thanks", "bye", "that's all")
  *  • Determining resolution status (resolved / unresolved / skipped)
  *  • Building session-end memory patches
  *
- * Placeholder — implementation to follow.
+ * Placeholder - implementation to follow.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-// No-op stubs — replace with real implementations as needed.
+// No-op stubs - replace with real implementations as needed.
 
 /**
  * detectCloseIntent(inputText) → boolean

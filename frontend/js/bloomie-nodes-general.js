@@ -144,7 +144,7 @@ export function createGeneralNodes(env, helpers) {
         const nauseaKnown = ctx.entityHistory?.some(e => e.symptoms?.nausea);
         const heavyKnown  = ctx.entityHistory?.some(e => e.symptoms?.heavy);
         const acks = [
-          ...(nauseaKnown ? [pick(["I've noted you mentioned nausea 🩷", "Got that you've had nausea — keeping that in mind 🩷"])] : []),
+          ...(nauseaKnown ? [pick(["I've noted you mentioned nausea 🩷", "Got that you've had nausea - keeping that in mind 🩷"])] : []),
           ...(heavyKnown  ? [pick(["I've noted you mentioned heavy bleeding 🩷", "I remember you mentioned heavy bleeding, I've got that noted 🩷"])] : []),
         ];
         const prompt = (nauseaKnown || heavyKnown)
@@ -738,7 +738,7 @@ export function createGeneralNodes(env, helpers) {
     },
 
     // Quick 2-option confirm so we never give due-date math to someone
-    // who was just curious — shown once per session.
+    // who was just curious - shown once per session.
     EDD_CONFIRM: {
       onEnter() {
         if (userMode.isPregnancy) transition("CYCLE_EDD_ANSWER");
@@ -755,7 +755,7 @@ export function createGeneralNodes(env, helpers) {
       ],
     },
 
-    // EDD in explore / planning mode — helpful, no false confirmation
+    // EDD in explore / planning mode - helpful, no false confirmation
     EDD_EXPLORE: {
       say() {
         const lmp = effectiveLmp();
@@ -810,7 +810,7 @@ export function createGeneralNodes(env, helpers) {
           ].filter(Boolean);
         }
 
-        // ── NOT in pregnancy mode — never assume pregnancy ─────────────────
+        // ── NOT in pregnancy mode - never assume pregnancy ─────────────────
         if (!userMode.isPregnancy) {
           const provisionalEdd = cd.lmp ? addDays(cd.lmp, 280) : null;
           if (!hasLmpData()) {

@@ -146,6 +146,81 @@ function renderCustomSymptomAdvancedInsights(logsByDate, today = new Date()) {
   `;
 }
 
+// Pulled from bloomie-recovery advanced-insights path:
+// derive period-level metadata for bloom-cycle-engine.generateAdvancedInsights().
+function buildPeriodInsightInputs(logsByDate) {
+  const FLOW_SCORES = {
+    spotting: 1,
+    very_light: 1,
+    light: 2,
+    medium: 3,
+    heavy: 4,
+    very_heavy: 5,
+  };
+
+  const bleedingDays = Object.entries(logsByDate || {})
+    .filter(([, log]) => {
+      const flowKey = String(log?.flow || "").toLowerCase();
+      return (FLOW_SCORES[flowKey] || 0) > 0;
+    })
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  const clusters = [];
+  let current = null;
+  for (const [dateKey, log] of bleedingDays) {
+    if (!current || diffDays(current.end, dateKey) > 3) {
+      current = { start: dateKey, end: dateKey, days: [{ dateKey, log }] };
+      clusters.push(current);
+      continue;
+    }
+    current.end = dateKey;
+    current.days.push({ dateKey, log });
+  }
+
+  const periodEntries = [];
+  const unscheduledBleedingDates = [];
+
+  for (const cluster of clusters) {
+    const durationDays = diffDays(cluster.start, cluster.end) + 1;
+    const flowScores = cluster.days.map(({ log }) => {
+      const flowKey = String(log?.flow || "").toLowerCase();
+      return FLOW_SCORES[flowKey] ?? 0;
+    });
+    const maxFlowScore = flowScores.length ? Math.max(...flowScores) : 0;
+    const maxFlowLevel = cluster.days
+      .map(({ log }) => log?.flow)
+      .find((flow) => {
+        const flowKey = String(flow || "").toLowerCase();
+        return (FLOW_SCORES[flowKey] ?? 0) === maxFlowScore;
+      }) ?? null;
+    const nonSpottingDays = cluster.days.filter(({ log }) => {
+      const flowKey = String(log?.flow || "").toLowerCase();
+      return (FLOW_SCORES[flowKey] ?? 0) >= 2;
+    }).length;
+    const hadLargeClots = cluster.days.some(({ log }) => {
+      const labels = Array.isArray(log?.symptoms) ? log.symptoms : [];
+      const normalizedLabels = labels.map((s) => String(s).trim().toLowerCase());
+      if (normalizedLabels.includes("large clots")) return true;
+      if (labels.map((s) => String(s).trim().toUpperCase()).includes("LARGE_CLOTS")) return true;
+      const mappedCodes = Object.values(log?.symptomCodes || {}).map((c) => String(c).trim().toUpperCase());
+      return mappedCodes.includes("LARGE_CLOTS");
+    });
+
+    if (durationDays >= 2 || nonSpottingDays >= 1) {
+      periodEntries.push({
+        durationDays,
+        flowLevel: maxFlowLevel,
+        flowScore: maxFlowScore,
+        hadLargeClots,
+      });
+    } else {
+      unscheduledBleedingDates.push(cluster.start);
+    }
+  }
+
+  return { periodEntries, unscheduledBleedingDates };
+}
+
 /**
  * Data preparation only - identifies period cluster starts from logs.
  * Used to derive cycleLengths and lastPeriodStart for passing to the approved engines.
@@ -183,10 +258,12 @@ function show(el, on) {
 }
 
 function applyGoalClasses(goal) {
-  const isSymptomGoal = goal === "no_period" || goal === "track_symptoms";
+  const isNoPeriodGoal = goal === "no_period";
+  const isTrackSymptomsGoal = goal === "track_symptoms";
   document.body.classList.toggle("goal-ttc", goal === "ttc");
   document.body.classList.toggle("goal-pregnancy", goal === "pregnancy");
-  document.body.classList.toggle("goal-no-period", isSymptomGoal);
+  document.body.classList.toggle("goal-no-period", isNoPeriodGoal);
+  document.body.classList.toggle("goal-track-symptoms", isTrackSymptomsGoal);
   document.body.classList.toggle("goal-perimenopause", goal === "perimenopause");
 }
 
@@ -253,6 +330,93 @@ function getGoalTip(goal, phase) {
   return g[phase] ?? g.default ?? null;
 }
 
+const PHASE_FEEDBACK_STORAGE_KEY = "bloom_phase_feedback_by_date_v1";
+const PHASE_CSS_MAP = {
+  menstrual: "menstrual",
+  follicular: "follicular",
+  ovulation: "ovulation",
+  ovulatory: "ovulation",
+  luteal: "luteal",
+  late_luteal: "luteal",
+  unknown: "unknown",
+};
+const PHASE_LABELS = {
+  menstrual: "Menstrual",
+  follicular: "Follicular",
+  ovulation: "Ovulatory",
+  ovulatory: "Ovulatory",
+  luteal: "Luteal",
+  late_luteal: "Late Luteal",
+  unknown: "Calculating",
+};
+const PHASE_FEEDBACK_CORRECTIONS = {
+  bleeding: { phase: "menstrual", label: "Menstrual" },
+  ovulation_signs: { phase: "ovulation", label: "Ovulatory" },
+  pms_pre_period: { phase: "luteal", label: "Luteal" },
+  not_sure: { phase: null, label: null },
+};
+
+function normalizeConfidenceLevel(level) {
+  const normalized = String(level || "low").trim().toLowerCase();
+  if (normalized === "high" || normalized === "medium" || normalized === "low") return normalized;
+  return "low";
+}
+
+function readPhaseFeedbackStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PHASE_FEEDBACK_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writePhaseFeedbackStore(store) {
+  try {
+    localStorage.setItem(PHASE_FEEDBACK_STORAGE_KEY, JSON.stringify(store || {}));
+  } catch (_) {}
+}
+
+function getTodayPhaseFeedback() {
+  const todayKey = toDateKey(new Date());
+  const store = readPhaseFeedbackStore();
+  return store[todayKey] || null;
+}
+
+function setTodayPhaseFeedback(feedback) {
+  const todayKey = toDateKey(new Date());
+  const store = readPhaseFeedbackStore();
+  if (!feedback) {
+    delete store[todayKey];
+  } else {
+    store[todayKey] = {
+      ...feedback,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  writePhaseFeedbackStore(store);
+}
+
+
+function getDisplayPhaseFromCycle(cycle, feedback = null) {
+  const rawPhase = cycle?.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
+  const inferredKey = cycle?.phaseLabel === "Late Luteal" ? "late_luteal" : rawPhase;
+  const correctedKey =
+    feedback?.response === "no" && feedback?.updatedPhase ? feedback.updatedPhase : inferredKey;
+  const correctedLabel =
+    feedback?.response === "no" && feedback?.updatedPhaseLabel
+      ? feedback.updatedPhaseLabel
+      : (PHASE_LABELS[correctedKey] ?? cycle?.phaseLabel ?? "Calculating");
+  const cssKey = PHASE_CSS_MAP[correctedKey] ?? "unknown";
+
+  return {
+    key: correctedKey,
+    label: correctedLabel,
+    cssKey,
+    rawPhase,
+  };
+}
+
 function setTodayInsights(phaseKey, goal, phaseLabel, loggedSymptoms = []) {
   const box = document.getElementById("insights");
   if (!box) return;
@@ -282,47 +446,104 @@ function setTodayInsights(phaseKey, goal, phaseLabel, loggedSymptoms = []) {
 
 // ─── Phase card with colour badge ────────────────────────────────────────────
 
-function renderPhaseCard(cycle) {
+function renderPhaseCard(cycle, onFeedbackChange = null) {
   const el = document.getElementById("cycle-phase");
   if (!el) return;
 
-  const rawPhase = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
-  // Resolve late_luteal from phaseLabel if available
-  const isLateLuteal = cycle.phaseLabel === "Late Luteal";
-  const key = isLateLuteal ? "late_luteal" : rawPhase;
-  // Map internal phase keys → CSS class names (both must use the same class names)
-  const CSS_MAP = { menstrual:"menstrual", follicular:"follicular", ovulation:"ovulation",
-    ovulatory:"ovulation", luteal:"luteal", late_luteal:"luteal" };
-  const cssKey = CSS_MAP[key] ?? "unknown";
-  const PHASE_LABELS = { menstrual:"Menstrual", follicular:"Follicular", ovulatory:"Ovulatory",
-    ovulation:"Ovulatory", luteal:"Luteal", late_luteal:"Late Luteal", unknown:"Calculating" };
-  const label = PHASE_LABELS[key] ?? cycle.phaseLabel ?? "Unknown";
+  const feedback = getTodayPhaseFeedback();
+  const phase = getDisplayPhaseFromCycle(cycle, feedback);
+  const confidenceLevel = normalizeConfidenceLevel(cycle?.confidence);
+  const confidenceLabel = `${confidenceLevel.charAt(0).toUpperCase()}${confidenceLevel.slice(1)} confidence`;
+
+  // Show correction sub-buttons only while awaiting a correction pick (No tapped, no correction yet)
+  const pendingNo = feedback?.response === "no" && !feedback?.correction;
 
   el.style.display = "flex";
   el.style.flexDirection = "column";
   el.style.justifyContent = "space-between";
 
-
-  if (rawPhase !== "unknown") {
+  if (phase.rawPhase !== "unknown") {
     el.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:0.75rem 0;gap:0.35rem;">
-        <span class="phase-badge phase-${cssKey}">
-          <span class="phase-dot"></span>${label} Phase
+      <div class="phase-estimate-wrap">
+        <span class="phase-badge phase-${phase.cssKey}">
+          <span class="phase-dot"></span>${phase.label} Phase
         </span>
+        <div class="phase-meta-row">
+          <span class="phase-confidence-dot phase-confidence-dot--${confidenceLevel}"></span>
+          <span class="phase-confidence-text">${confidenceLabel}</span>
+          <span class="phase-feedback-divider">·</span>
+          <span class="phase-feedback-label">Accurate?</span>
+          <button type="button" class="phase-thumb-btn" data-phase-feedback="yes" title="Yes">👍</button>
+          <button type="button" class="phase-thumb-btn" data-phase-feedback="no" title="No">👎</button>
+        </div>
+        ${pendingNo ? `
+          <div class="phase-correction-wrap">
+            <span class="phase-feedback-label">What feels closer?</span>
+            <div class="phase-feedback-row">
+              <button type="button" class="phase-feedback-btn" data-phase-correction="bleeding">I'm bleeding</button>
+              <button type="button" class="phase-feedback-btn" data-phase-correction="ovulation_signs">Ovulation signs</button>
+              <button type="button" class="phase-feedback-btn" data-phase-correction="pms_pre_period">PMS / pre-period</button>
+              <button type="button" class="phase-feedback-btn" data-phase-correction="not_sure">Not sure</button>
+            </div>
+          </div>` : ""}
+        <p class="phase-feedback-note" id="phase-feedback-flash" style="display:none;"></p>
       </div>
     `;
   } else {
     el.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:0.75rem 0;gap:0.35rem;">
+      <div style="display:flex;flex-direction:column;align-items:flex-start;justify-content:center;flex:1;padding:0.75rem 0;gap:0.45rem;">
         <span class="phase-badge phase-unknown">Calculating Phase</span>
-        <p class="card-estimate-note" style="text-align:center;margin:0;">Log a period day to see your current phase.</p>
+        <p class="phase-reason" style="margin:0;">Keep logging to get a phase estimate.</p>
       </div>
     `;
+    return;
   }
+
+  function flashNote(text) {
+    const note = el.querySelector("#phase-feedback-flash");
+    if (!note) return;
+    note.textContent = text;
+    note.style.display = "block";
+    setTimeout(() => { note.style.display = "none"; }, 2000);
+  }
+
+  el.querySelectorAll("[data-phase-feedback]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const response = btn.dataset.phaseFeedback;
+      if (!response) return;
+      const existing = getTodayPhaseFeedback() || {};
+      const next = {
+        ...existing,
+        response,
+        correction: response === "no" ? (existing.correction || null) : null,
+        updatedPhase: response === "no" ? (existing.updatedPhase || null) : null,
+        updatedPhaseLabel: response === "no" ? (existing.updatedPhaseLabel || null) : null,
+      };
+      setTodayPhaseFeedback(next);
+      if (typeof onFeedbackChange === "function") onFeedbackChange(next);
+      if (response === "no") {
+        // Reveal correction sub-buttons
+        renderPhaseCard(cycle, onFeedbackChange);
+      } else {
+        flashNote(response === "yes" ? "Got it ✓" : "Noted.");
+      }
+    });
+  });
+
+  el.querySelectorAll("[data-phase-correction]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const correction = btn.dataset.phaseCorrection;
+      if (!correction) return;
+      const mapped = PHASE_FEEDBACK_CORRECTIONS[correction] || PHASE_FEEDBACK_CORRECTIONS.not_sure;
+      const next = { response: "no", correction, updatedPhase: mapped.phase, updatedPhaseLabel: mapped.label };
+      setTodayPhaseFeedback(next);
+      if (typeof onFeedbackChange === "function") onFeedbackChange(next);
+      // Collapse sub-buttons then flash
+      renderPhaseCard(cycle, onFeedbackChange);
+      setTimeout(() => flashNote("Recorded — thanks for the correction."), 0);
+    });
+  });
 }
-
-// ─── Goal tool card ───────────────────────────────────────────────────────────
-
 function renderGoalToolCard(goal, cycle) {
   const el = document.getElementById("goal-tool");
   if (!el) return;
@@ -604,7 +825,7 @@ function renderFactsSlideshow(goal) {
 
 // ─── Pregnancy section ────────────────────────────────────────────────────────
 
-// Twemoji SVG images via jsDelivr CDN — renders consistently on all platforms
+// Twemoji SVG images via jsDelivr CDN - renders consistently on all platforms
 const _TW = (cp) => `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${cp}.svg`;
 const _SVG = (svg) => `data:image/svg+xml;utf8,${encodeURIComponent(svg.trim())}`;
 const PAPAYA_SVG = _SVG(`
@@ -728,7 +949,7 @@ const PREGNANCY_SYMPTOM_MAP = {
   HEADACHE:             { label: "Headaches", note: "Common in pregnancy due to hormonal changes and increased blood volume. Stay hydrated and rest. Persistent or severe headaches should be checked." },
   JOINT_PAIN:           { label: "Joint pain", note: "Relaxin hormone loosens joints in preparation for birth, which can cause aching. Gentle movement and warm compresses help." },
   BREAST_TENDERNESS:    { label: "Breast tenderness", note: "Increased blood flow and hormones cause breast changes throughout pregnancy. A well-fitted, supportive bra makes a difference." },
-  OVULATION_PAIN:       { label: "Pelvic twinges", note: "Round ligament pain — sharp twinges in the lower abdomen — is common as the uterus grows. Changing positions slowly can help." },
+  OVULATION_PAIN:       { label: "Pelvic twinges", note: "Round ligament pain - sharp twinges in the lower abdomen - is common as the uterus grows. Changing positions slowly can help." },
   // Digestive
   BLOATING:             { label: "Bloating", note: "Progesterone slows digestion, causing gas and bloating. Smaller meals and gentle movement can help." },
   GASSY:                { label: "Gas", note: "Increased gas is common throughout pregnancy. Eating slowly, avoiding carbonated drinks, and light walks after meals can ease it." },
@@ -745,10 +966,10 @@ const PREGNANCY_SYMPTOM_MAP = {
   FLUID_RETENTION:      { label: "Swelling", note: "Mild swelling in legs and feet is common later in pregnancy. Sudden or severe swelling in the face or hands should be reported to your provider." },
   FREQUENT_URINATION:   { label: "Frequent urination", note: "Normal as the uterus grows and presses on the bladder. Reduce fluids in the evening if it disrupts sleep, but stay hydrated during the day." },
   WEIGHT_CHANGE:        { label: "Weight changes", note: "Steady weight gain is expected during pregnancy. Your provider will monitor this at each visit to ensure it's on track for you." },
-  NASAL_CONGESTION:     { label: "Nasal congestion", note: "Pregnancy rhinitis — a stuffy nose caused by increased blood flow — is common. A humidifier and saline spray can help." },
+  NASAL_CONGESTION:     { label: "Nasal congestion", note: "Pregnancy rhinitis - a stuffy nose caused by increased blood flow - is common. A humidifier and saline spray can help." },
   SMELL_SENSITIVITY:    { label: "Smell sensitivity", note: "Heightened sense of smell is very common in the first trimester and often linked to nausea. Avoiding strong scents where possible can help." },
   // Skin & Hair
-  ACNE:                 { label: "Acne", note: "Hormonal changes can trigger breakouts. Gentle cleansers are best — avoid strong actives like retinoids during pregnancy." },
+  ACNE:                 { label: "Acne", note: "Hormonal changes can trigger breakouts. Gentle cleansers are best - avoid strong actives like retinoids during pregnancy." },
   DRY_SKIN:             { label: "Dry skin", note: "Skin stretching and hormonal shifts can cause dryness and itching. Fragrance-free moisturisers help, and staying hydrated matters too." },
   HAIR_THINNING:        { label: "Hair changes", note: "Some people experience hair thinning during pregnancy while others notice thicker hair. Postpartum hair shedding is also very common." },
   // Temperature
@@ -762,21 +983,21 @@ const PREGNANCY_SYMPTOM_MAP = {
   MOOD_SWINGS:          { label: "Mood swings", note: "Hormonal fluctuations cause rapid emotional shifts throughout pregnancy. Connection, rest, and talking to someone you trust all help." },
   IRRITABILITY:         { label: "Irritability", note: "Feeling irritable is very common in pregnancy, driven by hormonal changes, discomfort, and disrupted sleep. Rest and boundaries matter." },
   ANXIETY:              { label: "Anxiety", note: "Worry about pregnancy and birth is common. Talking to someone you trust, prenatal yoga, or speaking with your midwife can all support your wellbeing." },
-  DEPRESSION:           { label: "Low mood", note: "Prenatal depression affects many people and is treatable. Please speak with your provider or midwife — you do not have to manage this alone." },
+  DEPRESSION:           { label: "Low mood", note: "Prenatal depression affects many people and is treatable. Please speak with your provider or midwife - you do not have to manage this alone." },
   CRYING_SPELLS:        { label: "Crying spells", note: "Emotional sensitivity and tearfulness are very common in pregnancy. Hormonal changes are usually responsible, but if it feels overwhelming, speak to your provider." },
   STRESSED:             { label: "Stress", note: "Some stress is normal, but chronic stress can affect sleep and wellbeing. Breathing exercises, support from loved ones, and rest all help." },
   // Sleep
-  INSOMNIA:             { label: "Sleep difficulty", note: "Common in all trimesters for different reasons — nausea, back pain, or anxiety. A body pillow, cool room, and wind-down routine can support better sleep." },
+  INSOMNIA:             { label: "Sleep difficulty", note: "Common in all trimesters for different reasons - nausea, back pain, or anxiety. A body pillow, cool room, and wind-down routine can support better sleep." },
   // Appetite
   CRAVING_SWEET:        { label: "Sweet cravings", note: "Food cravings are very common in pregnancy. Satisfying them in moderation while maintaining balanced nutrition is a reasonable approach." },
   CRAVING_SALTY:        { label: "Salty cravings", note: "Salt cravings can occur as blood volume increases. Balance them with nutritious whole foods and adequate hydration." },
   CRAVING_GREASY:       { label: "Greasy food cravings", note: "Cravings for comfort foods are normal. Listen to your body while keeping a varied, nutritious diet overall." },
-  CRAVING_SPICY:        { label: "Spicy food cravings", note: "Spicy food cravings are common — just be mindful of heartburn, which spicy foods can worsen during pregnancy." },
+  CRAVING_SPICY:        { label: "Spicy food cravings", note: "Spicy food cravings are common - just be mindful of heartburn, which spicy foods can worsen during pregnancy." },
   APPETITE_INCREASE:    { label: "Increased appetite", note: "Increased hunger, especially in the second trimester, is normal as your baby grows rapidly. Focus on nutrient-dense foods." },
   APPETITE_DECREASE:    { label: "Decreased appetite", note: "Reduced appetite is common in the first trimester due to nausea. Eat small amounts often and focus on what you can tolerate." },
   // Reproductive
   VAGINAL_DRYNESS:      { label: "Vaginal dryness", note: "Can occur due to hormonal shifts. A water-based lubricant is safe to use during pregnancy if needed." },
-  PAIN_DURING_SEX:      { label: "Discomfort during sex", note: "Common as the body changes. Many positions become uncomfortable — communication with your partner and trying different positions can help." },
+  PAIN_DURING_SEX:      { label: "Discomfort during sex", note: "Common as the body changes. Many positions become uncomfortable - communication with your partner and trying different positions can help." },
   CERVICAL_MUCUS_CHANGE:{ label: "Cervical mucus changes", note: "Increased discharge throughout pregnancy is normal as the body maintains the mucus plug. Report any sudden gush of fluid to your provider." },
 };
 
@@ -912,7 +1133,8 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   if (!card || !body) return;
 
   const on = goal === "no_period" || goal === "track_symptoms" || goal === "perimenopause";
-  document.body.classList.toggle("goal-no-period", goal === "no_period" || goal === "track_symptoms");
+  document.body.classList.toggle("goal-no-period", goal === "no_period");
+  document.body.classList.toggle("goal-track-symptoms", goal === "track_symptoms");
   document.body.classList.toggle("goal-perimenopause", goal === "perimenopause");
   show(card, on);
   if (!on) return;
@@ -983,7 +1205,7 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   }
 
   if (!algoSymptomEngine) {
-    body.innerHTML = `<p class="text-muted">Symptom engine loading — please refresh.</p>`;
+    body.innerHTML = `<p class="text-muted">Symptom engine loading - please refresh.</p>`;
     return;
   }
 
@@ -1473,11 +1695,438 @@ function signalLabel(code) {
   }[code] || code.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase());
 }
 
+function friendlySymptomNameFromCode(code) {
+  return String(code || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function buildPersonalizedSymptomSignals({ symptomHistory = [], today = new Date() } = {}) {
+  if (!Array.isArray(symptomHistory) || symptomHistory.length < 1) return [];
+
+  const todayKey = toDateKey(today);
+  const recent30Start = addDaysStr(todayKey, -29);
+  const prev30Start = addDaysStr(todayKey, -59);
+  const prev30End = addDaysStr(todayKey, -30);
+
+  const byCode = new Map();
+  const recentSymptomDays = new Set();
+
+  for (const day of symptomHistory) {
+    const dateKey = day?.dateKey;
+    if (!dateKey || !Array.isArray(day?.items)) continue;
+    const isRecent30 = dateKey >= recent30Start && dateKey <= todayKey;
+    const isPrev30 = dateKey >= prev30Start && dateKey <= prev30End;
+    if (isRecent30) recentSymptomDays.add(dateKey);
+
+    for (const item of day.items) {
+      const code = String(item?.code || "").trim().toUpperCase();
+      if (!code) continue;
+      const sev = Number(item?.severity ?? 3);
+      const stat = byCode.get(code) || {
+        code,
+        recent30: 0,
+        prev30: 0,
+        recentSevSum: 0,
+        recentSevCount: 0,
+      };
+
+      if (isRecent30) {
+        stat.recent30 += 1;
+        stat.recentSevSum += Number.isFinite(sev) ? sev : 3;
+        stat.recentSevCount += 1;
+      } else if (isPrev30) {
+        stat.prev30 += 1;
+      }
+
+      byCode.set(code, stat);
+    }
+  }
+
+  const ranked = [...byCode.values()]
+    .filter((s) => s.recent30 > 0)
+    .sort((a, b) => b.recent30 - a.recent30 || b.recentSevSum - a.recentSevSum);
+
+  if (!ranked.length) return [];
+
+  const signals = [];
+  const top = ranked[0];
+  const topLabel = friendlySymptomNameFromCode(top.code);
+  const topAvgSeverity = top.recentSevCount ? top.recentSevSum / top.recentSevCount : 0;
+
+  if (top.prev30 > 0 && top.recent30 >= top.prev30 + 2) {
+    // Trending up - lead with the change
+    signals.push({
+      code: `PERSONAL_SYMPTOM_TREND_${top.code}`,
+      title: `${topLabel} is coming up more often`,
+      level: "medium",
+      show: true,
+      message: `${topLabel} has appeared ${top.recent30} time${top.recent30 !== 1 ? "s" : ""} this past month, up from ${top.prev30} the month before. This kind of uptick can sometimes reflect a hormonal shift - worth keeping an eye on.`,
+    });
+  } else if (top.recent30 >= 2) {
+    const freqWord = top.recent30 >= 6 ? "frequently" : top.recent30 >= 4 ? "several times" : "a few times";
+    const sevNote = topAvgSeverity >= 4 ? " at higher intensity" : topAvgSeverity >= 3 ? " at a moderate level" : "";
+    signals.push({
+      code: `PERSONAL_SYMPTOM_RECURRING_${top.code}`,
+      title: `${topLabel} is a pattern for you`,
+      level: top.recent30 >= 4 ? "medium" : "low",
+      show: true,
+      message: `You've logged ${topLabel.toLowerCase()} ${freqWord} this month${sevNote}. Recurring symptoms like this are useful to track - they can reveal how your cycle or hormones affect how you feel day to day.`,
+    });
+  }
+
+  const uniqueRecent = ranked.filter((s) => s.recent30 > 0).length;
+  if (uniqueRecent >= 3 && recentSymptomDays.size >= 4) {
+    const topThree = ranked.slice(0, 3).map(s => friendlySymptomNameFromCode(s.code).toLowerCase()).join(", ");
+    signals.push({
+      code: "PERSONAL_SYMPTOM_MIX_PATTERN",
+      title: "You have a consistent symptom cluster",
+      level: "low",
+      show: true,
+      message: `Your most frequent symptoms lately - ${topThree} - are showing up together across multiple days. Symptom clusters like this often follow the rhythm of your cycle phases.`,
+    });
+  }
+
+  if (!signals.length && top.recent30 >= 1) {
+    signals.push({
+      code: `PERSONAL_SYMPTOM_RECENT_${top.code}`,
+      title: `${topLabel} noted in your recent logs`,
+      level: "low",
+      show: true,
+      message: `You've logged ${topLabel.toLowerCase()} recently. Log it a few more times with severity ratings and Bloom will be able to spot whether it's part of a pattern for you.`,
+    });
+  }
+
+  return signals;
+}
+
+
+function toPrettyList(items = [], max = 3) {
+  return items.filter(Boolean).slice(0, max).join(", ");
+}
+
+function formatPhaseLabelForInsight(phase) {
+  const key = String(phase || "").toLowerCase();
+  if (!key) return "current";
+  if (key === "late_luteal") return "late luteal";
+  return key.replace(/_/g, " ");
+}
+
+function collectSignalSymptomLabels(debug = {}) {
+  const keys = [
+    "matchedSymptoms",
+    "supportingSymptoms",
+    "matched",
+    "unexpected",
+    "intenseSymptoms",
+    "persistingSymptoms",
+    "newSymptoms",
+    "trendingSymptoms",
+    "forecastSymptoms",
+  ];
+
+  const labels = [];
+  for (const key of keys) {
+    const arr = Array.isArray(debug?.[key]) ? debug[key] : [];
+    for (const item of arr) {
+      const label = friendlySymptomNameFromCode(String(item));
+      if (label) labels.push(label);
+    }
+  }
+  return [...new Set(labels)];
+}
+
+function extractPrimarySymptomCode(signal = {}) {
+  const signalCode = String(signal?.code || "").trim().toUpperCase();
+  const personalPrefixes = [
+    "PERSONAL_SYMPTOM_RECURRING_",
+    "PERSONAL_SYMPTOM_TREND_",
+    "PERSONAL_SYMPTOM_RECENT_",
+  ];
+
+  for (const prefix of personalPrefixes) {
+    if (signalCode.startsWith(prefix)) {
+      return signalCode.slice(prefix.length);
+    }
+  }
+
+  const debug = signal?.debug || {};
+  const keys = [
+    "matchedSymptoms",
+    "supportingSymptoms",
+    "matched",
+    "unexpected",
+    "intenseSymptoms",
+    "persistingSymptoms",
+    "newSymptoms",
+    "trendingSymptoms",
+    "forecastSymptoms",
+  ];
+
+  for (const key of keys) {
+    const arr = Array.isArray(debug?.[key]) ? debug[key] : [];
+    if (!arr.length) continue;
+    const first = String(arr[0] || "").trim().toUpperCase();
+    if (first) return first;
+  }
+
+  return "";
+}
+
+function buildPhaseSymptomReason(symptomCode, phase) {
+  const code = String(symptomCode || "").trim().toUpperCase();
+  if (!code) return "";
+
+  const phaseKey = String(phase || "").toLowerCase() === "late_luteal"
+    ? "luteal"
+    : String(phase || "").toLowerCase();
+  const symptom = friendlySymptomNameFromCode(code).toLowerCase();
+
+  const perSymptom = {
+    IRRITABILITY: {
+      luteal: "Irritability often rises in the luteal phase when progesterone shifts and estrogen drops before a period.",
+      menstrual: "During menstruation, lower hormone levels plus discomfort can make irritability feel stronger.",
+      any: "Mood symptoms like irritability are commonly linked to hormone shifts across the cycle.",
+    },
+    MOOD_SWINGS: {
+      luteal: "Mood swings are common in the luteal phase as pre-period hormone levels change quickly.",
+      menstrual: "Lower estrogen during menstruation can contribute to mood swings for some people.",
+      any: "Mood swings can happen when estrogen and progesterone fluctuate across phases.",
+    },
+    ANXIETY: {
+      luteal: "Anxiety can feel stronger in the luteal phase as hormone levels change before bleeding starts.",
+      any: "Anxiety symptoms can track with cycle-related hormone fluctuations.",
+    },
+    CRAMPS: {
+      menstrual: "Cramps during menstruation are commonly linked to prostaglandins, which trigger uterine contractions.",
+      any: "Pelvic cramping symptoms are often tied to cycle-phase hormone and uterine activity shifts.",
+    },
+    PELVIC_PAIN: {
+      menstrual: "Pelvic pain in the menstrual phase is often related to uterine contractions and inflammation signals.",
+      ovulation: "Mid-cycle pelvic pain can happen around ovulation when the ovary releases an egg.",
+      any: "Pelvic pain can vary by phase and is often linked to ovulation or menstrual changes.",
+    },
+    BREAST_TENDERNESS: {
+      luteal: "Breast tenderness is common in the luteal phase because progesterone changes can increase tissue sensitivity.",
+      any: "Breast tenderness often follows hormone shifts, especially in the second half of the cycle.",
+    },
+    BLOATING: {
+      luteal: "Bloating is common in the luteal phase when progesterone can slow digestion and increase fluid retention.",
+      menstrual: "Bloating around menstruation is often related to inflammatory signaling and fluid shifts.",
+      any: "Bloating can increase with hormone-driven digestion and fluid changes across the cycle.",
+    },
+    NAUSEA: {
+      menstrual: "Nausea around a period can happen when prostaglandin activity is higher during bleeding.",
+      luteal: "Some people notice nausea in the luteal phase during pre-period hormone changes.",
+      any: "Nausea can be cycle-related when hormone and inflammation signals shift.",
+    },
+    HEARTBURN: {
+      luteal: "Heartburn may feel worse in the luteal phase because progesterone can relax the esophageal sphincter and slow digestion.",
+      any: "Digestive symptoms like heartburn can be amplified by hormone-related gut motility changes.",
+    },
+    HEADACHE: {
+      luteal: "Headaches often increase near the end of the luteal phase as estrogen drops before a period.",
+      menstrual: "Period headaches are commonly linked to lower estrogen and inflammatory signaling.",
+      any: "Cycle-related headaches are often associated with estrogen fluctuations.",
+    },
+    FATIGUE: {
+      luteal: "Fatigue can increase in the luteal phase as progesterone rises and sleep quality shifts.",
+      menstrual: "Fatigue during menstruation can be linked to bleeding, inflammation, and lower energy reserves.",
+      any: "Energy changes across the cycle are common and often hormone-related.",
+    },
+    INSOMNIA: {
+      luteal: "Sleep can become lighter in the luteal phase because progesterone and body-temperature changes affect sleep quality.",
+      any: "Sleep changes are common around hormone transitions in the cycle.",
+    },
+    DISCHARGE_EGGWHITE: {
+      ovulation: "Egg-white discharge is typical near ovulation as estrogen rises and cervical mucus becomes more fertile-type.",
+      any: "This discharge pattern is usually linked to estrogen-driven ovulation timing.",
+    },
+    CERVICAL_MUCUS_CHANGE: {
+      ovulation: "Cervical mucus often changes around ovulation due to rising estrogen.",
+      follicular: "Mucus texture can shift through the follicular phase as estrogen rises toward ovulation.",
+      any: "Cervical mucus changes are strongly tied to normal cycle-phase hormone shifts.",
+    },
+    INCREASED_LIBIDO: {
+      ovulation: "Increased libido is common near ovulation, when estrogen and testosterone are relatively higher.",
+      any: "Libido can shift naturally across phases as hormones change.",
+    },
+    DECREASED_LIBIDO: {
+      luteal: "Lower libido is common in the luteal phase when PMS-type symptoms and progesterone shifts are present.",
+      any: "Lower libido can happen during phases with stronger hormonal or symptom load.",
+    },
+    ACNE: {
+      luteal: "Acne often flares in the luteal phase as pre-period hormone changes affect oil production.",
+      any: "Cycle-related acne is commonly linked to hormonal shifts in the second half of the cycle.",
+    },
+  };
+
+  const hit = perSymptom[code];
+  if (hit) {
+    return hit[phaseKey] || hit.any || "";
+  }
+
+  const moodCodes = new Set(["DEPRESSION", "CRYING_SPELLS", "STRESSED", "BRAIN_FOG", "POOR_CONCENTRATION"]);
+  if (moodCodes.has(code)) {
+    if (phaseKey === "luteal") return `Symptoms like ${symptom} can increase in the luteal phase due to pre-period hormone shifts.`;
+    return `Symptoms like ${symptom} can track with hormone changes across cycle phases.`;
+  }
+
+  const gutCodes = new Set(["CONSTIPATION", "DIARRHEA", "APPETITE_INCREASE", "APPETITE_DECREASE", "CRAVING_SWEET", "CRAVING_SALTY", "CRAVING_GREASY", "CRAVING_SPICY"]);
+  if (gutCodes.has(code)) {
+    if (phaseKey === "luteal") return `In the luteal phase, progesterone and appetite-related hormone shifts can drive ${symptom}.`;
+    return `Digestive and appetite symptoms like ${symptom} often vary with cycle-phase hormone changes.`;
+  }
+
+  if (phaseKey === "menstrual") {
+    return `During the menstrual phase, hormone and prostaglandin changes can contribute to symptoms like ${symptom}.`;
+  }
+  if (phaseKey === "ovulation") {
+    return `Around ovulation, rapid hormone shifts can contribute to symptoms like ${symptom}.`;
+  }
+  if (phaseKey === "luteal") {
+    return `In the luteal phase, pre-period hormone changes can contribute to symptoms like ${symptom}.`;
+  }
+  if (phaseKey === "follicular") {
+    return `In the follicular phase, rising estrogen can influence symptoms like ${symptom}.`;
+  }
+
+  return "";
+}
+
+function buildPossibleReason(signal, cycle = {}) {
+  const code = String(signal?.code || "").toUpperCase();
+  const debug = signal?.debug || {};
+  const symptomLabels = collectSignalSymptomLabels(debug);
+  const symptomList = toPrettyList(symptomLabels, 4);
+  const phaseLabel = formatPhaseLabelForInsight(cycle?.phase);
+  const primarySymptomCode = extractPrimarySymptomCode(signal);
+  const phaseSymptomReason = buildPhaseSymptomReason(primarySymptomCode, cycle?.phase);
+
+  if (code === "LATE_PERIOD") {
+    return "Your expected period window passed without a new logged period start.";
+  }
+  if (code === "MISSED_PERIOD") {
+    return "Your logs still do not show a period start after the expected window.";
+  }
+  if (code === "EXTENDED_ABSENCE") {
+    return "There has been a longer gap since your last logged period than your pattern usually shows.";
+  }
+  if (code === "IRREGULAR_CYCLE") {
+    return "Recent cycle lengths in your history are varying more than usual, which can shift timing.";
+  }
+  if (code === "LOW_PREDICTION_CONFIDENCE") {
+    return "Recent cycle data is limited or variable, so timing-based predictions are less precise right now.";
+  }
+  if (code === "LOGGING_GAP") {
+    return "Recent logging is sparse, so Bloom has less data to map your pattern.";
+  }
+  if (code === "LENGTHENING_CYCLE_TREND") {
+    return "Your latest cycles are trending longer than your earlier recent cycles.";
+  }
+  if (code === "SHORTENING_CYCLE_TREND") {
+    return "Your latest cycles are trending shorter than your earlier recent cycles.";
+  }
+  if (code === "SUDDEN_CYCLE_SHIFT") {
+    return "Your most recent cycle timing changed noticeably from your earlier baseline.";
+  }
+  if (code.startsWith("PERSONAL_SYMPTOM_RECURRING_")) {
+    if (phaseSymptomReason) return phaseSymptomReason;
+    return "This symptom has repeated multiple times in your recent history.";
+  }
+  if (code.startsWith("PERSONAL_SYMPTOM_TREND_")) {
+    if (phaseSymptomReason) return phaseSymptomReason;
+    return "This symptom is showing up more often recently than in your previous month of logs.";
+  }
+  if (code === "PERSONAL_SYMPTOM_MIX_PATTERN") {
+    return "You logged several symptom types across multiple recent days, which suggests a personal recurring mix.";
+  }
+  if (code.startsWith("PERSONAL_SYMPTOM_RECENT_")) {
+    if (phaseSymptomReason) return phaseSymptomReason;
+    return "This symptom appears in your recent logs and may become clearer as you keep tracking.";
+  }
+
+  if (phaseSymptomReason && signal?._source === "symptom") {
+    return phaseSymptomReason;
+  }
+
+  if (symptomList) {
+    if (code === "PHASE_UNEXPECTED_SYMPTOMS") {
+      return `Recent logs include ${symptomList}, which is less typical for the ${phaseLabel} phase.`;
+    }
+    if (code === "SYMPTOM_FORECAST") {
+      return "Bloom found similar symptom timing in your earlier cycles around this phase.";
+    }
+    return `This insight is based on recent logs including ${symptomList}.`;
+  }
+
+  if (signal?._source === "symptom") {
+    return `Bloom compared your recent symptom logs with your ${phaseLabel} phase context.`;
+  }
+
+  return "";
+}
+
+function buildLateNoticeBanner(signal) {
+  if (!signal) return "";
+  const code = String(signal.code || "").toUpperCase();
+  const debug = signal.debug || {};
+  const isIrregular = Boolean(debug.irregular);
+
+  let title = "Health notice - Period may be late";
+  let body = "Bloom noticed your period has not started yet based on your logged cycle timing.";
+
+  if (code === "MISSED_PERIOD") {
+    title = "Health notice - Period appears overdue";
+    body = "Bloom noticed your expected period still has not started based on your logged cycle dates.";
+  } else if (code === "EXTENDED_ABSENCE") {
+    title = "Health notice - Longer gap since last period";
+    body = "Bloom noticed a longer-than-usual gap since your last logged period start.";
+  }
+
+  const variabilityLine = isIrregular
+    ? "Your recent cycle lengths have also been more variable, which can shift exact timing."
+    : "";
+
+  return `
+    <div style="background:#fff8e7;border:1px solid #f5c842;border-left:3px solid #f59e0b;border-radius:12px;padding:0.85rem 1rem;margin-bottom:0.85rem;">
+      <div style="font-size:0.95rem;font-weight:800;color:#91610a;margin-bottom:0.35rem;">${title}</div>
+      <div style="font-size:0.9rem;line-height:1.55;color:#5d4a1f;">
+        ${body} ${variabilityLine} Keep tracking, and if this feels unusual for your body, consider taking a pregnancy test at the right time and checking in with a healthcare professional.
+      </div>
+    </div>
+  `;
+}
+
+function humanizeCrossEngineNote(note) {
+  const raw = String(note || "").trim();
+  if (!raw) return "";
+
+  const lower = raw.toLowerCase();
+  if (lower.includes("low_cycle_prediction_confidence")) {
+    return "Forecast-style symptom predictions are paused right now because cycle confidence is still low. More consistent logs will unlock better forecasting.";
+  }
+  if (lower.includes("missed_period_detected")) {
+    return "Bloom paused forecast-style symptom predictions because your period looks delayed, which makes timing-based forecasts less reliable right now.";
+  }
+  if (lower.includes("extended_absence_detected")) {
+    return "Forecast-style symptom predictions are paused because there has been a longer gap since your last logged period, so cycle timing is less certain.";
+  }
+  if (lower.includes("sudden_cycle_shift_detected")) {
+    return "Forecast-style symptom predictions are paused because your recent cycle timing appears to have shifted, and Bloom is recalibrating.";
+  }
+
+  return raw.replace(/[_-]+/g, " ");
+}
+
 function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodStart, lastLogDate, logsByDate, mlPredictedCycleLength }) {
   if (!advancedEl) return;
   const customInsightsHtml = renderCustomSymptomAdvancedInsights(logsByDate, new Date());
 
   const signals = [];
+  const symptomHistoryForInsights = buildEngineSymptomHistory(logsByDate);
 
   const today          = new Date();
   const lastPeriodDate = lastPeriodStart ? new Date(lastPeriodStart + "T00:00:00") : null;
@@ -1498,6 +2147,26 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
         cycleLengths,
       });
       signals.push(...(cycleSignals || []).map((s) => ({ ...s, _source: "cycle" })));
+
+      // Pulled from bloomie-recovery: include advanced cycle-pattern signals
+      // (menorrhagia/oligomenorrhea/etc.) so advanced insights are not limited
+      // to only timing-window signals.
+      if (typeof algoCycleEngine.generateAdvancedInsights === "function") {
+        const { periodEntries, unscheduledBleedingDates } = buildPeriodInsightInputs(logsByDate);
+        const advCycleResult = algoCycleEngine.generateAdvancedInsights({
+          cycleLengths,
+          lastPeriodStart: lastPeriodDate,
+          today,
+          periodEntries,
+          unscheduledBleedingDates,
+        });
+        const advCycleSignals = Array.isArray(advCycleResult?.signals) ? advCycleResult.signals : [];
+        const cycleCodes = new Set((cycleSignals || []).map((s) => s?.code));
+        const filtered = advCycleSignals.filter(
+          (s) => !(s?.code === "AMENORRHEA_PATTERN" && cycleCodes.has("EXTENDED_ABSENCE"))
+        );
+        signals.push(...filtered.map((s) => ({ ...s, _source: "cycle" })));
+      }
     } catch (e) {
       console.warn("[dashboard] cycle engine error:", e.message);
     }
@@ -1519,9 +2188,8 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
   // Symptom engine
   if (algoSymptomEngine && logsByDate) {
     try {
-      const symptomHistory = buildEngineSymptomHistory(logsByDate);
-      const latestWithSymptoms = symptomHistory.length
-        ? symptomHistory[symptomHistory.length - 1]
+      const latestWithSymptoms = symptomHistoryForInsights.length
+        ? symptomHistoryForInsights[symptomHistoryForInsights.length - 1]
         : null;
       const loggedSymptoms = latestWithSymptoms?.items || [];
       const ENGINE_PHASE_MAP = { late_luteal: "luteal", ovulatory: "ovulation" };
@@ -1532,8 +2200,8 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
         phase:           enginePhase,
         dayOfCycle:      cycle.dayInCycle,
         cycleLengths,
-        cycleCount:      Math.max((cycle.cycleStarts || []).length, symptomHistory.length > 0 ? 2 : 0),
-        symptomHistory,
+        cycleCount:      Math.max((cycle.cycleStarts || []).length, symptomHistoryForInsights.length > 0 ? 2 : 0),
+        symptomHistory: symptomHistoryForInsights,
         lastPeriodStart: lastPeriodDate,
         today,
       });
@@ -1543,9 +2211,47 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
         const advancedSymptom = algoSymptomEngine.generateAdvancedSymptomInsights({
           loggedSymptoms,
           phase: enginePhase,
-          symptomHistory,
+          symptomHistory: symptomHistoryForInsights,
         });
         signals.push(...(advancedSymptom?.signals || []).map((s) => ({ ...s, _source: "symptom" })));
+      }
+
+      // Personalization fallback: ensure advanced insights can still surface
+      // user-specific symptom trends even when strict rule-based signals are sparse.
+      const personalized = buildPersonalizedSymptomSignals({ symptomHistory: symptomHistoryForInsights, today });
+      signals.push(...personalized.map((s) => ({ ...s, _source: "symptom" })));
+
+      // Cross-engine integration from bloom-symptom-engine:
+      // adds notes when cycle and symptom engines agree on a pattern.
+      if (typeof algoSymptomEngine.generateIntegratedSignals === "function") {
+        const integrated = algoSymptomEngine.generateIntegratedSignals({
+          expectedNextPeriodWindow: nextWindow,
+          today,
+          lastPeriodStart: lastPeriodDate,
+          lastLogDate: lastLogDateObj,
+          cycleLengths,
+          loggedSymptoms,
+          phase: enginePhase,
+          dayOfCycle: cycle.dayInCycle,
+          cycleCount: Math.max((cycle.cycleStarts || []).length, symptomHistoryForInsights.length > 0 ? 2 : 0),
+          symptomHistory: symptomHistoryForInsights,
+        });
+
+        const crossNotes = Array.isArray(integrated?.crossValidatedNotes)
+          ? integrated.crossValidatedNotes
+          : [];
+        crossNotes.slice(0, 2).forEach((note, idx) => {
+          const pretty = humanizeCrossEngineNote(note);
+          if (!pretty) return;
+          signals.push({
+            code: `CROSS_ENGINE_NOTE_${idx}`,
+            level: "low",
+            show: true,
+            title: "Combined pattern insight",
+            message: pretty,
+            _source: "symptom",
+          });
+        });
       }
     } catch (e) {
       console.warn("[dashboard] symptom engine error:", e.message);
@@ -1553,55 +2259,97 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
   }
 
   // ── Basic avg-cycle outlier flags (all goals) ──
-  if (cycle.avgCycleLength && cycle.avgCycleLength < 21 && !signals.some(s => s.code === "SHORT_CYCLE")) {
-    signals.push({ code: "SHORT_CYCLE", level: "medium", show: true, message: "Your average cycle is shorter than 21 days. This may be worth discussing with a healthcare provider.", _source: "cycle" });
+  if (
+    cycle.avgCycleLength &&
+    cycle.avgCycleLength < 21 &&
+    !signals.some((s) => s.code === "SHORT_CYCLE" || s.code === "POLYMENORRHEA_PATTERN")
+  ) {
+    signals.push({
+      code: "SHORT_CYCLE",
+      level: "medium",
+      show: true,
+      message: "Your average cycle is shorter than 21 days. This may be worth discussing with a healthcare provider.",
+      _source: "cycle",
+    });
   }
-  if (cycle.avgCycleLength && cycle.avgCycleLength > 35 && !signals.some(s => s.code === "LONG_CYCLE")) {
-    signals.push({ code: "LONG_CYCLE", level: "medium", show: true, message: "Your average cycle is longer than 35 days. This can be worth monitoring with a provider.", _source: "cycle" });
+  if (
+    cycle.avgCycleLength &&
+    cycle.avgCycleLength > 35 &&
+    !signals.some((s) => s.code === "LONG_CYCLE" || s.code === "OLIGOMENORRHEA_PATTERN")
+  ) {
+    signals.push({
+      code: "LONG_CYCLE",
+      level: "medium",
+      show: true,
+      message: "Your average cycle is longer than 35 days. This can be worth monitoring with a provider.",
+      _source: "cycle",
+    });
   }
 
   if (!signals.length) {
-    advancedEl.innerHTML = `${customInsightsHtml || `<div class="insight-item">No unusual patterns detected. Keep logging for more detailed insights.</div>`}`;
+    advancedEl.innerHTML = customInsightsHtml || `<div class="adv-insight-empty">Keep logging daily - patterns will surface here as your data builds up.</div>`;
     return;
   }
 
-  // Sort: symptom-engine first, then by severity, and dedupe by code.
+  // Sort: high severity first, then symptom > cycle > anomaly, then dedupe.
   const srcPri = { symptom: 3, cycle: 2, anomaly: 1 };
-  const seen = new Set();
   const pri = { high: 3, medium: 2, low: 1 };
+  const seen = new Set();
+
+  // Filter out low-value meta signals that aren't actionable for the user
+  const SKIP_CODES = new Set(["LOW_PREDICTION_CONFIDENCE", "LOGGING_GAP"]);
+
   const deduped = signals
-    .filter((s) => s?.show !== false)
+    .filter((s) => s?.show !== false && !SKIP_CODES.has(String(s?.code || "").toUpperCase()))
     .filter(s => { if (seen.has(s.code)) return false; seen.add(s.code); return true; })
     .sort((a, b) => {
-      const bySrc = (srcPri[b._source] || 0) - (srcPri[a._source] || 0);
-      if (bySrc !== 0) return bySrc;
       const byLevel = (pri[b.level] || 0) - (pri[a.level] || 0);
       if (byLevel !== 0) return byLevel;
-      return String(a.code || "").localeCompare(String(b.code || ""));
+      return (srcPri[b._source] || 0) - (srcPri[a._source] || 0);
     })
-    .slice(0, 6);
+    .slice(0, 5);
 
-  const structuredHtml = deduped.map(s => {
-    const label = signalLabel(s.code);
-    const guidance = s.guidance ? ` ${s.guidance}` : "";
+  const lateNoticeSignal =
+    deduped.find((s) => s.code === "EXTENDED_ABSENCE") ||
+    deduped.find((s) => s.code === "MISSED_PERIOD") ||
+    deduped.find((s) => s.code === "LATE_PERIOD") ||
+    null;
+  const lateNoticeHtml = buildLateNoticeBanner(lateNoticeSignal);
+  const listSignals = lateNoticeSignal
+    ? deduped.filter((s) => s.code !== lateNoticeSignal.code)
+    : deduped;
+
+  const structuredHtml = listSignals.map((s, idx) => {
+    const codeStr = String(s.code || "");
+    const isCrossEngine = codeStr.startsWith("CROSS_ENGINE_NOTE_");
+    const reason = isCrossEngine ? "" : buildPossibleReason(s, cycle);
+    const guidance = s.guidance && !isCrossEngine ? String(s.guidance) : "";
+
+    // Build one flowing paragraph: message + reason woven together
+    let body = s.message || "";
+    if (reason && !body.toLowerCase().includes(reason.toLowerCase().slice(0, 20))) {
+      body += ` ${reason}`;
+    }
+    if (guidance) {
+      body += ` ${guidance}`;
+    }
+
     if (s.level === "high") {
       return `
-        <div style="
-          background: #fff8e7;
-          border: 1px solid #f5c842;
-          border-left: 3px solid #f59e0b;
-          border-radius: 10px;
-          padding: 0.75rem 1rem;
-          margin-bottom: 0.75rem;
-        ">
-          <div style="font-weight:800;font-size:0.88rem;color:#92600a;margin-bottom:0.3rem;">⚠️ ${label}</div>
-          <div style="font-size:0.88rem;color:#555;line-height:1.55;">${s.message}${guidance} Consider speaking to a healthcare provider.</div>
+        <div class="adv-insight-item adv-insight-item--alert" ${idx > 0 ? 'style="margin-top:0.65rem;"' : ''}>
+          <div class="adv-insight-title">⚠️ ${s.title || signalLabel(s.code)}</div>
+          <div class="adv-insight-body">${body}</div>
         </div>`;
     }
-    return `<div class="insight-item"><strong>${label}:</strong> ${s.message}${guidance}</div>`;
+
+    return `
+      <div class="adv-insight-item" ${idx > 0 ? 'style="border-top:1px solid var(--color-border);padding-top:0.75rem;margin-top:0.75rem;"' : ''}>
+        <div class="adv-insight-title">${s.title || signalLabel(s.code)}</div>
+        <div class="adv-insight-body">${body}</div>
+      </div>`;
   }).join("");
 
-  advancedEl.innerHTML = structuredHtml + customInsightsHtml;
+  advancedEl.innerHTML = lateNoticeHtml + structuredHtml + (customInsightsHtml || "");
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -1683,10 +2431,12 @@ async function loadDashboard() {
       cycle.phaseLabel     = state.phaseLabel      ?? null;
       cycle.source         = state.source          ?? "backend";
       // confidence may be an object {level,message} (local) or a string (old path)
-      const confLevel = typeof state.confidence === "object"
-        ? state.confidence?.level?.toLowerCase()
-        : state.confidence;
-      cycle.confidence     = confLevel             ?? cycle.confidence;
+      const confidenceObj = typeof state.confidence === "object"
+        ? state.confidence
+        : { level: state.confidence, message: "" };
+      const confLevel = confidenceObj?.level?.toLowerCase();
+      cycle.confidence = confLevel ?? cycle.confidence;
+      cycle.confidenceMessage = String(confidenceObj?.message || "").trim();
       cycle.dayInCycle     = state.dayInCycle      ?? cycle.dayInCycle;
       cycle.avgCycleLength = state.avgCycleLength  ?? cycle.avgCycleLength;
       predictedCycleLength = state.predictedCycleLength ?? null;
@@ -1731,12 +2481,22 @@ async function loadDashboard() {
     }
   }
 
-  renderPhaseCard(cycle);
+  const applyPhaseFeedbackToInsights = () => {
+    const fb = getTodayPhaseFeedback();
+    const phaseForInsight = fb?.response === "no" && fb?.updatedPhase
+      ? fb.updatedPhase
+      : (cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown");
+    const phaseLabelForInsight = fb?.response === "no" && fb?.updatedPhaseLabel
+      ? fb.updatedPhaseLabel
+      : cycle.phaseLabel;
+    const todaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
+    setTodayInsights(phaseForInsight, goal, phaseLabelForInsight, todaySymptoms);
+  };
+
+  renderPhaseCard(cycle, applyPhaseFeedbackToInsights);
   renderGoalToolCard(goal, cycle);
 
-  const phaseKey = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
-  const todaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
-  setTodayInsights(phaseKey, goal, cycle.phaseLabel, todaySymptoms);
+  applyPhaseFeedbackToInsights();
 
   // Anon mode: hide advanced features quickly (without waiting for deferred work)
   if (isAnonMode()) {
@@ -1840,3 +2600,4 @@ ensureLogsPromise().then(async logs => {
 
   triggerNotifications(cycle, logs);
 });
+

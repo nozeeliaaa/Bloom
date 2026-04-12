@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/__tests__/**/*.test.js"],
-    // ESM-native — no transform needed for plain .js files
+    // ESM-native - no transform needed for plain .js files
   },
 });

@@ -182,11 +182,11 @@ export function extractEntities(text) {
 
 // ── 1a. Symptoms ──────────────────────────────────────────────────────────────
 // Covers all 60 catalog keys. Backward-compatible: original 8 keys preserved.
-// New keys added below — all map to at least one symptomCatalog code via
+// New keys added below - all map to at least one symptomCatalog code via
 // SYMPTOM_TO_CATALOG_KEYS (exported at bottom of file).
 function extractSymptoms(t) {
   return {
-    // ── ORIGINAL 8 (kept exactly — inferRoute depends on these names) ────────
+    // ── ORIGINAL 8 (kept exactly - inferRoute depends on these names) ────────
     late:           /\b(late|missed|no period|still no period|period.*not come|period.*nuh come|period.*hasn't|period.*didn't|period skipped|period skip|period is missing|period.*supposed to come|haven't seen.*my period|haven't had.*period|period hasn't arrived|period hasn't come)\b/.test(t),
     // Implicit late: pronoun-based references without naming "period" directly.
     // Only treated as late in inferRoute when no other symptom entities are present.
@@ -514,7 +514,7 @@ export function inferRoute(entities) {
 
   // ── IMPLICIT LATE GUARD ─────────────────────────────────────────────────────
   // Treat implicit pronoun signals ("it hasn't come", "still waiting", etc.) as
-  // late ONLY when no other symptom entities are present — this is the
+  // late ONLY when no other symptom entities are present - this is the
   // period-tracking context guard for inferRoute which has no ctx access.
   const noOtherSymptoms = !sym.heavy && !sym.spotting && !sym.pelvic &&
                           !sym.discharge && !sym.nausea && !sym.dizziness && !sym.mood;
@@ -597,7 +597,7 @@ export function inferRoute(entities) {
     return { next: "MOOD_SEVERITY", payload: { inferred: true, reason: "mood+before_period" } };
   }
 
-  // Late + pelvic pain combo (could be ectopic risk — go to late intro with urgency note)
+  // Late + pelvic pain combo (could be ectopic risk - go to late intro with urgency note)
   // Note: effectiveLate is false here when sym.late is false (implicit_late requires !pelvic)
   if (sym.late && sym.pelvic && severity === "severe") {
     return { next: "HEAVY_URGENT", payload: { inferred: true, reason: "late+severe_pelvic (ectopic risk)" } };
@@ -647,7 +647,7 @@ export function inferRoute(entities) {
   // ── IMPLICIT LATE fallback ─────────────────────────────────────────────────
   // Only fires for pronoun-based late signals ("it hasn't come", "still waiting",
   // "nothing yet") when no explicit late keyword is present. Explicit sym.late
-  // ("my period is late") intentionally falls through to null — the chat engine
+  // ("my period is late") intentionally falls through to null - the chat engine
   // handles those via guidance-only (stays at START), which existing tests rely on.
   if (sym.implicit_late && !sym.late && noOtherSymptoms) {
     return { next: "LATE_INTRO", payload: { inferred: true, reason: "implicit_late_only" } };
@@ -741,7 +741,7 @@ export function detectAmbiguousInput(text, entities) {
     return "Is the dizziness happening alongside any bleeding, or more on its own?";
   }
 
-  // "feeling sick" / "feel sick" alone — must match text directly (nausea regex misses this phrase)
+  // "feeling sick" / "feel sick" alone - must match text directly (nausea regex misses this phrase)
   if (
     /\b(feeling sick|feel sick|feel unwell|feeling unwell)\b/.test(t) &&
     words.length <= 6 &&
@@ -759,7 +759,7 @@ export function detectAmbiguousInput(text, entities) {
     !sym.heavy && !sym.late && !sym.dizziness &&
     words.length <= 5
   ) {
-    return "Where is the pain — is it more in your lower belly, pelvic area, or somewhere else? And on a scale of 1 to 5, how intense is it?";
+    return "Where is the pain - is it more in your lower belly, pelvic area, or somewhere else? And on a scale of 1 to 5, how intense is it?";
   }
 
   // "heavy bleeding" without severity context (and not already urgent)
@@ -769,10 +769,10 @@ export function detectAmbiguousInput(text, entities) {
     !entities?.urgent &&
     words.length <= 8
   ) {
-    return "When you say heavy — are you soaking through a pad or tampon in about an hour or less, or is it heavier than usual but manageable?";
+    return "When you say heavy - are you soaking through a pad or tampon in about an hour or less, or is it heavier than usual but manageable?";
   }
 
-  // "is this normal?" — seeking reassurance without specific context
+  // "is this normal?" - seeking reassurance without specific context
   if (
     /\b(is this normal|is that normal|dat normal|is it normal)\b/.test(t) &&
     !sym.heavy && !sym.late && !sym.pelvic && !sym.dizziness
@@ -794,7 +794,7 @@ export function detectContradiction(text, _entities) {
     /\b(heavy|soaking)\b/.test(t) &&
     /\b(just spotting|just a spot|likkle|light spotting|only spotting)\b/.test(t)
   ) {
-    return "You mentioned both heavy bleeding and spotting — could you describe what you're seeing? Are you soaking through protection, or is it more of a light stain?";
+    return "You mentioned both heavy bleeding and spotting - could you describe what you're seeing? Are you soaking through protection, or is it more of a light stain?";
   }
 
   // "late" / "missed period" + "my period started"
@@ -802,12 +802,12 @@ export function detectContradiction(text, _entities) {
     /\b(late|missed period|period.*late|my period is late)\b/.test(t) &&
     /\b(my period started|period started|period came|period come|period begin|period began|it started yesterday|started yesterday|started today)\b/.test(t)
   ) {
-    return "It sounds like you might be saying your period started but was also late — is that right? When did bleeding begin?";
+    return "It sounds like you might be saying your period started but was also late - is that right? When did bleeding begin?";
   }
 
   // "negative" test + "positive" test in same message
   if (/\bnegative\b/.test(t) && /\bpositive\b/.test(t) && /\btest(s|ed|ing)?\b/.test(t)) {
-    return "I want to make sure I understood — did you get a negative result, a positive result, or both on different tests?";
+    return "I want to make sure I understood - did you get a negative result, a positive result, or both on different tests?";
   }
 
   // "no pain" / "not in pain" + pain descriptor
@@ -815,7 +815,7 @@ export function detectContradiction(text, _entities) {
     /\b(no pain|not in pain|don(?:'|')?t have pain|dont have pain|pain free|no cramps)\b/.test(t) &&
     /\b(severe|really bad|unbearable|bad pain|so much pain|cramps badly)\b/.test(t)
   ) {
-    return "You mentioned no pain but also described pain — could you clarify? Is it mild, or is it actually quite uncomfortable?";
+    return "You mentioned no pain but also described pain - could you clarify? Is it mild, or is it actually quite uncomfortable?";
   }
 
   // "not sexually active" / "haven't had sex" + "had sex" / "unprotected"
@@ -823,10 +823,10 @@ export function detectContradiction(text, _entities) {
     /\b(not sexually active|haven(?:'|')?t had sex|havent had sex|not having sex|i don(?:'|')?t have sex|i dont have sex)\b/.test(t) &&
     /\b(had sex|we had sex|unprotected|slept with|breed)\b/.test(t)
   ) {
-    return "I want to make sure I understand your situation so I can give you the right guidance — is there any chance of pregnancy this cycle?";
+    return "I want to make sure I understand your situation so I can give you the right guidance - is there any chance of pregnancy this cycle?";
   }
 
-  // "fine" / "okay" + urgency-adjacent severity signal — minimising serious symptoms
+  // "fine" / "okay" + urgency-adjacent severity signal - minimising serious symptoms
   if (
     /\b(i(?:'|')?m fine|im fine|i(?:'|')?m okay|im okay|i(?:'|')?m alright|im alright|feel fine|feel okay|i(?:'|')?m good|im good)\b/.test(t) &&
     /\b(severe|really bad|unbearable|can(?:'|')?t stand|faint|passing out|bleed.*bad|bleed.*nuff)\b/.test(t)
@@ -835,7 +835,7 @@ export function detectContradiction(text, _entities) {
       /\bfaint|\bpass out/.test(t) ? "fainting" :
       /\bbleed/.test(t) ? "bleeding" :
       /\bpain/.test(t) ? "pain" : "the symptom you mentioned";
-    return `I want to make sure — you mentioned ${symptomWord} but also said you're okay. Is the ${symptomWord} manageable or actually quite uncomfortable?`;
+    return `I want to make sure - you mentioned ${symptomWord} but also said you're okay. Is the ${symptomWord} manageable or actually quite uncomfortable?`;
   }
 
   // Multiple conflicting timing words for the same event
@@ -844,7 +844,7 @@ export function detectContradiction(text, _entities) {
     /\blast week\b/.test(t) &&
     /\blast month\b/.test(t)
   ) {
-    return "I want to get the timing right — when did this start? Yesterday, last week, or longer ago?";
+    return "I want to get the timing right - when did this start? Yesterday, last week, or longer ago?";
   }
 
   // "no cramps" / "cramp free" + severe cramping description
@@ -852,7 +852,7 @@ export function detectContradiction(text, _entities) {
     /\b(no cramps|cramp free|no period pain)\b/.test(t) &&
     /\b(severe cramps|bad cramps|cramps are bad|cramps so bad|cramps killing|cramping badly)\b/.test(t)
   ) {
-    return "You mentioned no cramps but also described severe cramping — could you clarify? Are the cramps manageable or actually quite bad?";
+    return "You mentioned no cramps but also described severe cramping - could you clarify? Are the cramps manageable or actually quite bad?";
   }
 
   return null;
@@ -878,7 +878,7 @@ export function detectMissingContext(entities, text) {
   // Pain signal but no location and no pelvic/belly entity
   const hasPain = /\b(pain|hurt|hurts|hurting|ache|aches|sore)\b/.test(t);
   if (hasPain && !sym.pelvic && !sym.headache && !sym.joint_pain && !entities?.severity) {
-    return "Where does the pain feel like it's coming from — more in your belly, lower pelvic area, or somewhere else?";
+    return "Where does the pain feel like it's coming from - more in your belly, lower pelvic area, or somewhere else?";
   }
 
   // Bleeding but no severity/amount (and not already urgent)

@@ -3,6 +3,7 @@
 const VALID_GOALS = ["period", "track_symptoms", "ttc", "perimenopause", "pregnancy"];
 const VALID_MODES = ["account", "guest"];
 const VALID_ROLES = ["user", "teen", "guardian", "admin"];
+const VALID_BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
 
 /**
  * Validates the body of a POST /profile request.
@@ -10,6 +11,12 @@ const VALID_ROLES = ["user", "teen", "guardian", "admin"];
  */
 export function validateUserProfile(body, existingProfile = null) {
   const currentYear = new Date().getFullYear();
+  const incomingBiometric =
+    body?.biometricProfile && typeof body.biometricProfile === "object"
+      ? body.biometricProfile
+      : {};
+  const readBiometricField = (field) =>
+    body?.[field] !== undefined ? body[field] : incomingBiometric?.[field];
 
   // --- yearOfBirth ---
   if (body.yearOfBirth !== undefined && body.yearOfBirth !== null) {
@@ -62,10 +69,35 @@ export function validateUserProfile(body, existingProfile = null) {
   }
 
   // --- sleepScore ---
-  if (body.sleepScore !== undefined && body.sleepScore !== null) {
-    const val = Number(body.sleepScore);
+  const sleepScore = readBiometricField("sleepScore");
+  if (sleepScore !== undefined && sleepScore !== null && sleepScore !== "") {
+    const val = Number(sleepScore);
     if (!Number.isFinite(val) || val < 1 || val > 10) {
       return { valid: false, error: "sleepScore must be a number between 1 and 10" };
+    }
+  }
+
+  // --- activityLevel ---
+  const activityLevel = readBiometricField("activityLevel");
+  if (activityLevel !== undefined && activityLevel !== null && activityLevel !== "") {
+    if (typeof activityLevel !== "string") {
+      return { valid: false, error: "activityLevel must be a string" };
+    }
+    const normalized = activityLevel.trim().toLowerCase();
+    if (!VALID_BIOMETRIC_LEVELS.includes(normalized)) {
+      return { valid: false, error: `activityLevel must be one of: ${VALID_BIOMETRIC_LEVELS.join(", ")}` };
+    }
+  }
+
+  // --- stressLevel ---
+  const stressLevel = readBiometricField("stressLevel");
+  if (stressLevel !== undefined && stressLevel !== null && stressLevel !== "") {
+    if (typeof stressLevel !== "string") {
+      return { valid: false, error: "stressLevel must be a string" };
+    }
+    const normalized = stressLevel.trim().toLowerCase();
+    if (!VALID_BIOMETRIC_LEVELS.includes(normalized)) {
+      return { valid: false, error: `stressLevel must be one of: ${VALID_BIOMETRIC_LEVELS.join(", ")}` };
     }
   }
 
@@ -82,6 +114,22 @@ export function validateUserProfile(body, existingProfile = null) {
     const val = Number(body.heightCm);
     if (!Number.isFinite(val) || val <= 0 || val > 300) {
       return { valid: false, error: "heightCm must be a positive number" };
+    }
+  }
+
+  // --- lmpDate ---
+  if (body.lmpDate !== undefined && body.lmpDate !== null) {
+    if (typeof body.lmpDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.lmpDate)) {
+      return { valid: false, error: "lmpDate must be in YYYY-MM-DD format" };
+    }
+    const parsed = new Date(`${body.lmpDate}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      return { valid: false, error: "lmpDate must be a valid date" };
+    }
+    const today = new Date();
+    const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    if (parsed.getTime() > todayUtc) {
+      return { valid: false, error: "lmpDate cannot be in the future" };
     }
   }
 
