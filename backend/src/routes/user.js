@@ -61,8 +61,6 @@ router.post("/profile", requireAuth, async (req, res) => {
       yearOfBirth: finalYearOfBirth,
       ageBand: finalYearOfBirth ? computeAgeBand(finalYearOfBirth) : null,
       consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
-      remindersEnabled: req.body.remindersEnabled ?? existingProfile?.remindersEnabled ?? false,
-      reminderTime: req.body.reminderTime ?? existingProfile?.reminderTime ?? "09:00",
     };
 
     const healthProfile = {
@@ -105,7 +103,6 @@ router.post("/profile", requireAuth, async (req, res) => {
       healthProfile,
       biometricProfile,
       phaseProfile,   
-      "healthProfile.sleepScore": admin.firestore.FieldValue.delete(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
