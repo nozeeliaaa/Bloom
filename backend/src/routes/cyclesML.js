@@ -476,17 +476,34 @@ async function computeFullEstimation(uid) {
   const clusters = getPeriodClustersBackend(cycleLogs);
 
   if (!clusters.length) {
-    return {
-      ready: false, phase: 'unknown', phaseLabel: 'Unknown',
-      dayInCycle: null, avgCycleLength: null, predictedCycleLength: null,
-      confidence: { level: 'Low', windowDays: 5, message: 'Log your first period to see predictions.' },
-      nextPeriodDate: null, ovulationDate: null, fertileStart: null, fertileEnd: null,
-      cyclesLogged: 0, predictedPeriodDays: [], futureOvulationDates: [],
-      allFertileDays: [], futureCycles: [],
+  return {
+    state: {
+      ready: false,
+      phase: 'unknown',
+      phaseLabel: 'Unknown',
+      dayInCycle: null,
+      avgCycleLength: null,
+      predictedCycleLength: null,
+      confidence: {
+        level: 'Low',
+        windowDays: 5,
+        message: 'Log your first period to see predictions.',
+      },
+      nextPeriodDate: null,
+      ovulationDate: null,
+      fertileStart: null,
+      fertileEnd: null,
+      cyclesLogged: 0,
+      predictedPeriodDays: [],
+      futureOvulationDates: [],
+      allFertileDays: [],
+      futureCycles: [],
       phaseEstimation: null,
       disclaimer: 'This is an educational estimate, not a medical prediction.',
-    };
-  }
+    },
+    lastStart: null,
+  };
+}
 
   const clusterStarts = clusters.map(c => c.start);
   const lastCluster   = clusters[clusters.length - 1];
