@@ -226,7 +226,8 @@
     let searchQuery = '';
 
     async function init() {
-      const sensitiveEnabled = localStorage.getItem('bloom_sensitive_enabled') === 'true';
+      const prefs = JSON.parse(localStorage.getItem('bloom_preferences') || '{}');
+      const sensitiveEnabled = !prefs.hideSensitive;
 
       // Show spinner while loading
       document.getElementById('pamphlet-grid').innerHTML = '<div class="spinner"></div>';

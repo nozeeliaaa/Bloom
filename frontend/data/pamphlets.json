@@ -47,7 +47,7 @@
     "content": "<h2>What is Perimenopause?</h2><p>Perimenopause is the transitional period before menopause. It can begin in your 40s (sometimes earlier) and last several years. During this time, your body gradually produces less estrogen.</p><h2>What is Menopause?</h2><p>Menopause is confirmed when you've gone 12 consecutive months without a period. The average age is 51, but it can happen earlier or later.</p><h2>Common Perimenopause Symptoms</h2><ul><li>Irregular periods (shorter, longer, heavier, lighter)</li><li>Hot flashes and night sweats</li><li>Sleep disturbances</li><li>Mood changes and irritability</li><li>Vaginal dryness</li><li>Changes in libido</li><li>Brain fog or difficulty concentrating</li><li>Joint pain or stiffness</li></ul><h2>Finding Comfort</h2><ul><li>Stay cool: dress in layers, use fans, keep cold water nearby</li><li>Stay active: regular exercise can help with mood and sleep</li><li>Eat well: focus on calcium, vitamin D, and balanced nutrition</li><li>Sleep hygiene: maintain a consistent sleep schedule</li><li>Talk about it: share your experience with trusted people</li></ul><h2>When to Seek Support</h2><p>If symptoms significantly affect your quality of life, speak with a healthcare provider about management options. You don't have to simply endure severe symptoms.</p>",
     "readTime": "5 min",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "when-to-seek-help",
@@ -87,7 +87,7 @@
     "readTime": "6 min",
     "pdf": "/assets/The three stages of menopause.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "menopause-in-ja",
@@ -97,7 +97,7 @@
     "readTime": "4 min",
     "pdf": "/assets/Menopause In JA.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "period-blood-colour",
@@ -177,7 +177,7 @@
     "readTime": "5 min",
     "pdf": "/assets/TRYING TO GET PREGNANT.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "pregnancy-tests",
@@ -207,7 +207,7 @@
     "readTime": "4 min",
     "pdf": "/assets/MOOD CHANGES DURING PERIMENOPAUSE.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "pms-what-it-is",
@@ -347,7 +347,7 @@
     "readTime": "5 min",
     "pdf": "/assets/PCOS AND FERTILITY.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "pcos-teens",
@@ -447,7 +447,7 @@
     "readTime": "4 min",
     "pdf": "/assets/first trimester changes.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "second-trimester-changes",
@@ -457,7 +457,7 @@
     "readTime": "4 min",
     "pdf": "/assets/second trimester changes.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "third-trimester-changes",
@@ -467,7 +467,7 @@
     "readTime": "4 min",
     "pdf": "/assets/third trimester changes.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "common-symptoms",
@@ -477,7 +477,7 @@
     "readTime": "3 min",
     "pdf": "/assets/common symptoms.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "prenatal-care-basics",
@@ -487,7 +487,7 @@
     "readTime": "4 min",
     "pdf": "/assets/prenatal care basics.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "nutrition-pregnancy",
@@ -497,7 +497,7 @@
     "readTime": "5 min",
     "pdf": "/assets/nutrition pregnancy.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "safe-vs-unsafe-symptoms",
@@ -507,7 +507,7 @@
     "readTime": "4 min",
     "pdf": "/assets/safe vs unsafe symptoms.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "ovulation-fertile-window",
@@ -517,7 +517,7 @@
     "readTime": "4 min",
     "pdf": "/assets/ovulation fertile window.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "how-conception-works",
@@ -527,7 +527,7 @@
     "readTime": "4 min",
     "pdf": "/assets/how conception works.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "when-to-take-a-preg-test",
@@ -547,7 +547,7 @@
     "readTime": "5 min",
     "pdf": "/assets/factors that affect fertility.pdf",
     "status": "published",
-    "sensitive": false
+    "sensitive": true
   },
   {
     "id": "hormonal-birth-control",
