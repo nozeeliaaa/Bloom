@@ -226,7 +226,8 @@
     let searchQuery = '';
 
     async function init() {
-      const sensitiveEnabled = localStorage.getItem('bloom_sensitive_enabled') === 'true';
+      const prefs = JSON.parse(localStorage.getItem('bloom_preferences') || '{}');
+      const sensitiveEnabled = !prefs.hideSensitive;
 
       // Show spinner while loading
       document.getElementById('pamphlet-grid').innerHTML = '<div class="spinner"></div>';
@@ -234,14 +235,22 @@
       try {
         const res = await fetch(`/catalog/pamphlets?sensitive=${sensitiveEnabled}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
         const json = await res.json();
-        pamphlets = json.pamphlets ?? [];
+
+        pamphlets = (json.pamphlets ?? [])
+          .filter(p => p.status === "published")
+          .filter(p => sensitiveEnabled || !p.sensitive);
+
       } catch (_) {
-        // Fallback to static file if backend is unavailable
         try {
           const res = await fetch('/data/pamphlets.json');
           const all = await res.json();
-          pamphlets = sensitiveEnabled ? all : all.filter(p => !p.sensitive);
+
+          pamphlets = all
+            .filter(p => p.status === "published")
+            .filter(p => sensitiveEnabled || !p.sensitive);
+
         } catch (_2) {
           document.getElementById('pamphlet-grid').innerHTML =
             '<p class="text-muted no-results">Could not load pamphlets. Please try again later.</p>';
