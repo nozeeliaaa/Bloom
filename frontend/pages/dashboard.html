@@ -604,13 +604,13 @@
     body.goal-pregnancy .dash-mid { display: none; }
     body.goal-pregnancy .dash-top { display: none; }
 
-    /* Hide today/advanced/history for symptom goals - replaced by symptom insight card */
+    /* Hide today/advanced/history only for strict symptom-only goals */
     body.goal-no-period #today-insight-card,
     body.goal-no-period #advanced-insight-card,
-    body.goal-perimenopause #today-insight-card,
-    body.goal-perimenopause #advanced-insight-card { display: none; }
+    body.goal-track-symptoms #today-insight-card,
+    body.goal-track-symptoms #advanced-insight-card { display: none; }
     body.goal-no-period .dash-mid,
-    body.goal-perimenopause .dash-mid { display: none; }
+    body.goal-track-symptoms .dash-mid { display: none; }
 
     /* Pregnancy insights card grid */
     .pregnancy-insights-grid {

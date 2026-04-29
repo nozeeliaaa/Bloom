@@ -35,16 +35,6 @@ async function hasSensitiveConsent(uid) {
   return !!consent.scope?.sensitiveModules;
 }
 
-async function ensureSymptomLogsParent(uid) {
-  const parentRef = db.collection("symptomLogs").doc(uid);
-  const snap = await parentRef.get();
-  if (!snap.exists) {
-    await parentRef.set({ uid, createdAt: new Date(), updatedAt: new Date() });
-  } else {
-    await parentRef.set({ updatedAt: new Date() }, { merge: true });
-  }
-}
-
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
 // Each doc holds an items[] array - multiple symptoms per day
 

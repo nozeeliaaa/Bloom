@@ -549,7 +549,16 @@ function renderGoalToolCard(goal, cycle) {
   if (!el) return;
   const todayKey = toDateKey(new Date());
 
-  if (goal === "no_period" || goal === "track_symptoms" || goal === "perimenopause") {
+  if (goal === "perimenopause") {
+    el.innerHTML = `
+      <div class="stat-number">Perimenopause Mode</div>
+      <p class="text-muted">Track cycle shifts and symptoms over time.</p>
+      <a class="btn btn-outline" href="/pages/calendar.html" style="margin-top:0.5rem;display:inline-block;">Log today</a>
+    `;
+    return;
+  }
+
+  if (goal === "no_period" || goal === "track_symptoms") {
     el.innerHTML = `
       <div class="stat-number">Symptom Mode</div>
       <p class="text-muted">Log symptoms freely.</p>
