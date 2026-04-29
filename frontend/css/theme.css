@@ -32,8 +32,8 @@
   --phase-follicular-bg: #EEF5FF;
   --phase-ovulation:    #1A8080;
   --phase-ovulation-bg: #E6F4F4;
-  --phase-luteal:       #E8A838;
-  --phase-luteal-bg:    #FFF8EC;
+  --phase-luteal:       #9C86D8;
+  --phase-luteal-bg:    #F2ECFF;
   --phase-unknown:      #8B6B7D;
   --phase-unknown-bg:   #F5EFF3;
 
@@ -84,8 +84,8 @@
   --phase-follicular-bg: #142030;
   --phase-ovulation:    #2BBDBD;
   --phase-ovulation-bg: #0D2828;
-  --phase-luteal:       #F0B848;
-  --phase-luteal-bg:    #271E08;
+  --phase-luteal:       #D4B8FF;
+  --phase-luteal-bg:    #302345;
   --phase-unknown:      #9A8896;
   --phase-unknown-bg:   #201C22;
 

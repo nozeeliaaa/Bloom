@@ -3,6 +3,7 @@
  */
 import { isAccountMode, isAnonMode } from "./mode.js";
 import { getUser } from "./auth.js";
+import { startSessionTimeoutGuard } from "./session-timeout.js";
 import symptoms from '../data/symptoms.json';
 import { initTheme } from "./theme-manager.js";
 
@@ -35,6 +36,8 @@ export function icon(name, size = 18) {
 
 /* ===== NAVIGATION ===== */
 export function renderNav(activePage = "") {
+  startSessionTimeoutGuard();
+
   const nav = document.createElement("nav");
   nav.className = "navbar";
   nav.setAttribute("role", "navigation");

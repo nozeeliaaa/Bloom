@@ -2432,6 +2432,24 @@ async function loadDashboard() {
     _cycleStatePromise = Promise.resolve(null);
   }
 
+  // First paint: show the top cards immediately with baseline values so the
+  // dashboard feels responsive while cycle-state is still resolving.
+  const earlyGoalBadge = document.getElementById("goal-badge");
+  const earlyGoalDescEl = document.getElementById("goal-desc");
+  if (earlyGoalBadge) earlyGoalBadge.textContent = goalLabel(goal);
+  if (earlyGoalDescEl) earlyGoalDescEl.textContent = goalDesc(goal);
+
+  const earlySnapshotEl = document.getElementById("cycle-snapshot");
+  if (earlySnapshotEl && !cycle.dayInCycle) {
+    earlySnapshotEl.innerHTML = `
+      <div class="stat-number">-</div>
+      <p class="text-muted">Loading your cycle snapshot...</p>
+    `;
+  }
+
+  renderPhaseCard(cycle, () => {});
+  renderGoalToolCard(goal, cycle);
+
   if (lastPeriodStart) {
     const state = await _cycleStatePromise;
     if (loadEpoch !== _dashboardLoadEpoch) return;
@@ -2598,8 +2616,9 @@ ensureLogsPromise().then(async logs => {
   const cycle = buildCycleBase(logs);
 
   if (!isAnonMode() && (cycle.cycleStarts || []).length >= 1) {
-    // Reuse the in-flight or resolved promise from loadDashboard if available
-    const state = await (_cycleStatePromise ?? fetchCycleState(logs)).catch(() => null);
+    // Reuse only the in-flight/resolved promise from loadDashboard.
+    // Avoid triggering a second startup fetch that can race and timeout.
+    const state = await (_cycleStatePromise ?? Promise.resolve(null)).catch(() => null);
     if (state) {
       if (state.nextPeriodDate) cycle.nextPeriodDate = state.nextPeriodDate;
       if (state.fertileStart)   cycle.fertileStart   = state.fertileStart;

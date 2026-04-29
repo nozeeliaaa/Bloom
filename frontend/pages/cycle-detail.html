@@ -56,7 +56,7 @@
     .detail-dot.dot-fertile    { background: #7EC8C8; }
     .detail-dot.dot-ovulation  { background: #1A8080; }
     .detail-dot.dot-follicular { background: #A8C8E8; }
-    .detail-dot.dot-luteal     { background: #E8B86D; }
+    .detail-dot.dot-luteal     { background: var(--phase-luteal); }
 
     .detail-legend {
       display: flex;
@@ -383,6 +383,7 @@
           <span class="detail-legend-item"><span class="detail-dot dot-period" style="display:inline-block"></span>Period</span>
           <span class="detail-legend-item"><span class="detail-dot dot-fertile" style="display:inline-block"></span>Fertile</span>
           <span class="detail-legend-item"><span class="detail-dot dot-ovulation" style="display:inline-block"></span>Ovulation</span>
+          <span class="detail-legend-item"><span class="detail-dot dot-follicular" style="display:inline-block"></span>Follicular</span>
           <span class="detail-legend-item"><span class="detail-dot dot-luteal" style="display:inline-block"></span>Luteal</span>
         </div>
         ${cycleLenCard}

@@ -163,11 +163,11 @@
   margin-bottom: 0.5rem;
 }
 /* Phase badge colours = must match the calendar legend exactly:
-   Period=pink  Follicular=blue  Ovulation=teal  Luteal=amber       */
+   Period=pink  Follicular=blue  Ovulation=teal  Luteal=purple      */
 .phase-menstrual  { background: #fce7f3; color: #be185d; }   /* pink  */
 .phase-follicular { background: #eff6ff; color: #3b82f6; }   /* blue  */
 .phase-ovulation  { background: #E6F4F4; color: #1A8080; }   /* teal  */
-.phase-luteal     { background: #fffbeb; color: #d97706; }   /* amber */
+.phase-luteal     { background: var(--phase-luteal-bg); color: var(--phase-luteal); }   /* purple */
 .phase-unknown    { background: #F4EEF0; color: var(--color-text-muted); }
 
 /* ── Phase pills (calendar below-grid phase row) ───────────────────────────── */
@@ -195,7 +195,7 @@
 .phase-pill--active.phase-menstrual  { background: #fce7f3; color: #be185d; border-color: #be185d; }
 .phase-pill--active.phase-follicular { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
 .phase-pill--active.phase-ovulation  { background: #E6F4F4; color: #1A8080; border-color: #1A8080; }
-.phase-pill--active.phase-luteal     { background: #fffbeb; color: #d97706; border-color: #d97706; }
+.phase-pill--active.phase-luteal     { background: var(--phase-luteal-bg); color: var(--phase-luteal); border-color: var(--phase-luteal); }
 
 .phase-dot {
   display: inline-block;

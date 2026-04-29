@@ -259,7 +259,7 @@
     .cal-day.fertile { background: #b2dfdb; color: #00796b; }
     .cal-day.ov { background: #80cbc4; color: #004d40; font-weight: 800; }
     .cal-day.today { outline: 2px solid #D4749A; outline-offset: -2px; }
-    .cal-day.luteal { background: #ede7f6; color: #7b1fa2; }
+    .cal-day.luteal { background: var(--phase-luteal-bg); color: var(--phase-luteal); }
 
     .cal-legend { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
     .cal-legend-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--color-text-muted); }
@@ -267,7 +267,7 @@
     .cal-legend-dot.period  { background: #D4749A; }
     .cal-legend-dot.fertile { background: #b2dfdb; }
     .cal-legend-dot.ov      { background: #80cbc4; }
-    .cal-legend-dot.luteal  { background: #ede7f6; }
+    .cal-legend-dot.luteal  { background: var(--phase-luteal); }
 
     /* Chat mockup */
     .chat-msgs { display: flex; flex-direction: column; gap: 0.55rem; }

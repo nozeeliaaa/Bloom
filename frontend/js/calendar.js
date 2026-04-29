@@ -656,18 +656,43 @@ function renderCalendar() {
   const ovulationSet = new Set();
 
   if (allowFertilityMarkers) {
-    if (cycleData?.allFertileDays?.length) {
-      cycleData.allFertileDays.forEach((dk) => fertileSet.add(dk));
-    } else if (cycleData?.fertileStart && cycleData?.fertileEnd) {
-      let d = new Date(cycleData.fertileStart + "T00:00:00");
-      const end = new Date(cycleData.fertileEnd + "T00:00:00");
-      while (d <= end) { fertileSet.add(toDateKey(d)); d.setDate(d.getDate() + 1); }
+    // Show exactly ONE fertile window on the calendar:
+    // prefer the resolved top-level window from cycle-state; if missing, fall
+    // back to the nearest future cycle window.
+    let chosenFertileStart = cycleData?.fertileStart ?? null;
+    let chosenFertileEnd = cycleData?.fertileEnd ?? null;
+    let chosenOvulation = cycleData?.ovulationDate ?? null;
+
+    if ((!chosenFertileStart || !chosenFertileEnd || !chosenOvulation) && predResult?.futureCycles?.length) {
+      const todayMs = new Date(todayKey + "T00:00:00").getTime();
+      const nearestFutureCycle = predResult.futureCycles.find((c) => {
+        const endMs = c?.fertileWindow?.end?.getTime?.();
+        return Number.isFinite(endMs) && endMs >= todayMs;
+      });
+
+      if (nearestFutureCycle) {
+        if ((!chosenFertileStart || !chosenFertileEnd) &&
+            nearestFutureCycle.fertileWindow?.start &&
+            nearestFutureCycle.fertileWindow?.end) {
+          chosenFertileStart = toDateKey(nearestFutureCycle.fertileWindow.start);
+          chosenFertileEnd = toDateKey(nearestFutureCycle.fertileWindow.end);
+        }
+        if (!chosenOvulation && nearestFutureCycle.ovulationDay) {
+          chosenOvulation = toDateKey(nearestFutureCycle.ovulationDay);
+        }
+      }
     }
 
-    if (cycleData?.futureOvulationDates?.length) {
-      cycleData.futureOvulationDates.forEach((dk) => ovulationSet.add(dk));
-    } else if (cycleData?.ovulationDate) {
-      ovulationSet.add(cycleData.ovulationDate);
+    if (chosenFertileStart && chosenFertileEnd) {
+      let d = new Date(chosenFertileStart + "T00:00:00");
+      const end = new Date(chosenFertileEnd + "T00:00:00");
+      while (d <= end) {
+        fertileSet.add(toDateKey(d));
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    if (chosenOvulation) {
+      ovulationSet.add(chosenOvulation);
     }
   }
 

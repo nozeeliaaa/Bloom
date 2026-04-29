@@ -254,7 +254,8 @@ export function initBloomieChat({
 
   function isSoundEnabled() {
     const p = loadChatPrefs();
-    return p.soundEnabled !== false;
+    // Opt-in only: chat cue is silent unless explicitly enabled in prefs.
+    return p.soundEnabled === true;
   }
 
   function isVoicePlaybackEnabled() {
