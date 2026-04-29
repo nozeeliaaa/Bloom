@@ -165,5 +165,15 @@ export function validateUserProfile(body, existingProfile = null) {
     }
   }
 
+  // --- nickname ---
+  if (body.nickname !== undefined && body.nickname !== null) {
+    if (typeof body.nickname !== "string") {
+      return { valid: false, error: "nickname must be a string" };
+    }
+    if (body.nickname.trim().length > 40) {
+      return { valid: false, error: "nickname must be 40 characters or fewer" };
+    }
+  }
+
   return { valid: true };
 }

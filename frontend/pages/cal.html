@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biometric Calendar - Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+    .calendar-wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .calendar-cell {
+      min-height: 44px;
+      font-size: 0.9rem;
+    }
+    @media (min-width: 640px) {
+      .calendar-cell {
+        min-height: 56px;
+        font-size: 1rem;
+      }
+    }
+    .flow-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      position: absolute;
+      bottom: 3px;
+    }
+    .flow-spotting { background: #F0C6D4; }
+    .flow-light { background: #E8A0BF; }
+    .flow-medium { background: #D4749A; }
+    .flow-heavy { background: #B85C82; }
+    .key-heading {
+      margin-top: 0;
+    }
+    .delete-log-btn {
+      margin-right: auto;
+      display: none;
+    }
+
+    /* ── Page header row ── */
+    .page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .page-header-row > div { flex: 1; min-width: 0; }
+
+    /* ── Symptom search ── */
+    .symptom-search-wrap {
+      margin-bottom: 0.5rem;
+    }
+    .symptom-search-wrap input {
+      width: 100%;
+      padding: 0.45rem 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      background: var(--color-bg);
+      color: var(--color-text);
+      box-sizing: border-box;
+    }
+    .symptom-search-wrap input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    /* ── Symptom categories ── */
+    .symptom-categories-scroll {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .symptom-cat { margin-bottom: 0.6rem; }
+    .symptom-cat:last-child { margin-bottom: 0; }
+    .symptom-cat-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    /* ── Per-symptom severity ── */
+    .severity-panel { margin-top: 0; }
+    .severity-panel-list { margin-top: 0.25rem; }
+    .severity-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .severity-row:last-child { border-bottom: none; }
+    .severity-symptom-name {
+      font-size: 0.88rem;
+      color: var(--color-text);
+      flex: 1;
+      min-width: 0;
+    }
+    .severity-btns { display: flex; gap: 0.25rem; flex-shrink: 0; }
+    .severity-btn {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg);
+      color: var(--color-text-muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+    .severity-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .severity-btn.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+    }
+
+    /* ── Prediction panel ── */
+    .pred-section { margin-top: 1rem; }
+    .pred-section-label { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); }
+    .pred-section-h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+    .pred-row-space { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; }
+    .pred-msg { margin: 0 0 0.25rem; font-size: 0.9rem; color: var(--color-text-muted); }
+    .pred-cycles-note { margin: 0; font-size: 0.85rem; color: var(--color-text-muted); }
+
+    /* Confidence badge */
+    .conf-badge { font-size: 0.78rem; font-weight: 800; padding: 0.2em 0.65em; border-radius: 99px; }
+    .conf-high   { background: #d4f7e7; color: #1a7a4a; }
+    .conf-medium { background: #fff0d4; color: #9a6200; }
+    .conf-low    { background: var(--phase-menstrual-bg, #fff0f3); color: var(--phase-menstrual, #e05c7a); }
+
+    /* Phase pills row */
+    .phase-pills-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+    .phase-pill { font-size: 0.82rem; font-weight: 700; padding: 0.25em 0.75em; border-radius: 99px; background: var(--color-bg-subtle, #f5f0f3); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+    .phase-pill--active { color: #fff; border-color: transparent; }
+    .phase-pill--active.phase-menstrual  { background: var(--phase-menstrual,  #e05c7a); }
+    .phase-pill--active.phase-follicular { background: var(--phase-follicular, #5b9bd5); }
+    .phase-pill--active.phase-ovulation  { background: var(--phase-ovulation,  #5ba865); }
+    .phase-pill--active.phase-luteal     { background: var(--phase-luteal,     #e8a838); }
+
+    /* Cycle cards */
+    .pred-cycle-card { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 0.6rem; }
+    .pred-cycle-card:last-child { margin-bottom: 0; }
+    .pred-cycle-title { font-weight: 800; font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--color-primary); }
+    .pred-window { font-size: 0.78rem; font-weight: 600; color: var(--color-text-muted); }
+    .pred-cycle-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; padding: 0.2rem 0; color: var(--color-text); }
+    .pred-cycle-row:not(:last-child) { border-bottom: 1px solid var(--color-border); }
+
+    /* Comparison rows */
+    .pred-comparison-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; padding: 0.3rem 0; border-bottom: 1px solid var(--color-border); }
+    .pred-comparison-row:last-of-type { border-bottom: none; }
+    .pred-disclaimer { margin: 0.75rem 0 0; font-size: 0.8rem; color: var(--color-text-muted); font-style: italic; line-height: 1.5; }
+    .clear-logs-btn { flex-shrink: 0; margin-top: 0.25rem; }
+    .severity-panel { display: none; }
+    .severity-hint { font-weight: 400; color: var(--color-text-muted); font-size: 0.82rem; }
+  </style>
+    <link rel="stylesheet" href="/css/main.css" />
+  </head>
+<body>
+  <main>
+    <div id="banner-area"></div>
+
+    <div class="page-header">
+      <div class="page-header-row">
+        <div>
+          <h1>Biometric Calendar</h1>
+          <p>Tap a day to log your flow, symptoms, and notes</p>
+        </div>
+        <button class="btn btn-outline btn-sm clear-logs-btn" id="clear-all-logs-btn">Clear All Logs</button>
+      </div>
+    </div>
+
+    <div class="calendar-wrapper">
+      <div class="calendar-nav">
+        <button id="prev-month" aria-label="Previous month">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Prev
+        </button>
+        <h3 id="month-label"></h3>
+        <button id="next-month" aria-label="Next month">
+          Next
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Calendar">
+        <div role="row">
+          <div class="calendar-header-cell" role="columnheader">Sun</div>
+          <div class="calendar-header-cell" role="columnheader">Mon</div>
+          <div class="calendar-header-cell" role="columnheader">Tue</div>
+          <div class="calendar-header-cell" role="columnheader">Wed</div>
+          <div class="calendar-header-cell" role="columnheader">Thu</div>
+          <div class="calendar-header-cell" role="columnheader">Fri</div>
+          <div class="calendar-header-cell" role="columnheader">Sat</div>
+        </div>
+      </div>
+
+      <section class="card">
+        <h3 class="key-heading">Key</h3>
+        <div class="key-grid">
+          <div class="key-item"><span class="key-swatch swatch-period"></span> Period (logged)</div>
+          <div class="key-item"><span class="key-swatch swatch-predicted"></span> Period (predicted)</div>
+          <div class="key-item"><span class="key-swatch swatch-fertile"></span> Fertile window</div>
+          <div class="key-item"><span class="key-swatch swatch-ovulation"></span> Ovulation</div>
+        </div>
+      </section>
+
+      <div id="prediction-panel"></div>
+    </div>
+  </main>
+
+  <!-- Log Modal -->
+  <div class="modal-overlay" id="log-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal" tabindex="-1">
+      <div class="modal-header">
+        <h3 id="modal-title">Log Entry</h3>
+        <button class="modal-close" aria-label="Close" id="modal-close-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <form id="log-form">
+        <div id="future-date-notice" class="future-date-notice" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Future date- flow cannot be logged ahead of time. You can still add notes.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Flow</label>
+          <div class="chip-group" id="flow-chips"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Symptoms</label>
+          <div class="symptom-search-wrap">
+            <input type="text" id="symptom-search" placeholder="Search symptoms..." autocomplete="off" />
+          </div>
+          <div class="symptom-categories-scroll">
+            <div id="symptom-categories"></div>
+          </div>
+        </div>
+
+        <div class="form-group severity-panel" id="severity-panel">
+          <label class="form-label">Severity per symptom <span class="severity-hint">(1 = mild, 5 = severe)</span></label>
+          <div class="severity-panel-list" id="symptom-severity-list"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="notes">Notes</label>
+          <textarea class="form-textarea" id="notes" placeholder="Any additional notes..." rows="3"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline delete-log-btn" id="delete-log-btn">Delete</button>
+          <button type="button" class="btn btn-outline" id="cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Log</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="/js/cal.js"></script>
+</body>
+</html>

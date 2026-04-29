@@ -15,13 +15,15 @@ import { fileURLToPath } from 'url';
 import { requireConsent } from "../middleware/requireConsent.js";
 import { requireAuth } from "../middleware/auth.js";
 import { computeCyclePhaseML } from "../../ml/inference/cyclePhaseEngine.js";
+import { phaseFusionEngine } from "../../ml/inference/phase_fusion_engine.js";
 import { db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-const CYCLE_SCRIPT = path.join(__dirname, '../public/ml/inference/cycle_predict.py');
+const CYCLE_SCRIPT = path.join(__dirname, '../../ml/inference/cycle_predict.py');
+const BIOMETRIC_PHASE_SCRIPT = path.join(__dirname, '../../ml/inference/biometric_phase.py');
 
 const router = express.Router();
 
@@ -47,10 +49,36 @@ function runPython(scriptPath, args) {
     });
 }
 
+function runPythonJson(scriptPath, payload) {
+    return new Promise((resolve, reject) => {
+        const python = spawn('python3', [scriptPath]);
+        let output = '';
+        let errorOutput = '';
+
+        python.stdout.on('data', (data) => { output += data.toString(); });
+        python.stderr.on('data', (data) => { errorOutput += data.toString(); });
+        python.on('error', reject);
+        python.on('close', (code) => {
+            if (code !== 0) return reject(new Error(`Python failed: ${errorOutput || output}`));
+            try {
+                const result = JSON.parse(output.trim());
+                if (result.error) return reject(new Error(result.error));
+                resolve(result);
+            } catch (e) {
+                reject(new Error(`Failed to parse Python output: ${output}`));
+            }
+        });
+
+        python.stdin.write(JSON.stringify(payload ?? {}));
+        python.stdin.end();
+    });
+}
+
 // ── In-memory cache for /state (avoids repeated Python spawns) ──────────────
 // Keyed by uid. Cache entry expires after 4 hours or when the last period date changes.
 const _stateCache = new Map();
 const _STATE_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+const _biometricStateCache = new Map();
 
 function _getCachedState(uid, lastPeriodDay) {
   const entry = _stateCache.get(uid);
@@ -62,6 +90,18 @@ function _getCachedState(uid, lastPeriodDay) {
 
 function _setCachedState(uid, lastPeriodDay, state) {
   _stateCache.set(uid, { lastPeriodDay, state, ts: Date.now() });
+}
+
+function _getBiometricCachedState(uid, lastPeriodDay) {
+  const entry = _biometricStateCache.get(uid);
+  if (!entry) return null;
+  if (entry.lastPeriodDay !== lastPeriodDay) return null;
+  if (Date.now() - entry.ts > _STATE_CACHE_TTL) return null;
+  return entry.state;
+}
+
+function _setBiometricCachedState(uid, lastPeriodDay, state) {
+  _biometricStateCache.set(uid, { lastPeriodDay, state, ts: Date.now() });
 }
 
 // ── Fallback: rule-based weighted average ────────────────────
@@ -285,6 +325,107 @@ function buildCalendarOverlays(futureCycles, clusterStarts) {
   return { predictedPeriodDays, futureOvulationDates, allFertileDays, nextPeriodDate };
 }
 
+function clampSeverity(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  return Math.max(0, Math.min(5, Math.round(num)));
+}
+
+function diffDateKeys(a, b) {
+  return Math.round(
+    (new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000
+  );
+}
+
+function findRecentSymptomLog(logs) {
+  const entries = Object.entries(logs || {})
+    .sort(([a], [b]) => a.localeCompare(b))
+    .reverse();
+
+  return entries.find(([, log]) =>
+    Array.isArray(log?.symptoms) && log.symptoms.length
+  ) ?? null;
+}
+
+function maxSeverity(log, symptomLabels) {
+  if (!log || !Array.isArray(log.symptoms) || !log.symptoms.length) return 0;
+
+  const symptomSet = new Set(log.symptoms);
+  let max = 0;
+  for (const label of symptomLabels) {
+    if (!symptomSet.has(label)) continue;
+    max = Math.max(max, clampSeverity(log.symptomSeverity?.[label] ?? 3));
+  }
+  return max;
+}
+
+function normalizeBiometricPhase(phaseName) {
+  switch (String(phaseName || '').toLowerCase()) {
+    case 'menstrual':
+      return { phase: 'menstrual', phaseLabel: 'Menstrual' };
+    case 'follicular':
+      return { phase: 'follicular', phaseLabel: 'Follicular' };
+    case 'ovulation':
+    case 'ovulatory':
+      return { phase: 'ovulatory', phaseLabel: 'Ovulatory' };
+    case 'luteal':
+      return { phase: 'luteal', phaseLabel: 'Luteal' };
+    default:
+      return { phase: 'unknown', phaseLabel: 'Unknown' };
+  }
+}
+
+function deriveBiometricInput(logs, phaseData, lastStart) {
+  const todayKey = todayDateKey();
+  const recentSymptomEntry = findRecentSymptomLog(logs);
+  const sourceDate = recentSymptomEntry?.[0] ?? todayKey;
+  const sourceLog = recentSymptomEntry?.[1] ?? logs[todayKey] ?? {};
+
+  const dayInStudy = Number.isFinite(phaseData?.dayInCycle)
+    ? phaseData.dayInCycle
+    : (lastStart ? Math.max(1, diffDateKeys(lastStart, todayKey) + 1) : 1);
+
+  const foodCravings = Math.max(
+    maxSeverity(sourceLog, ['Sweet cravings', 'Salty cravings', 'Greasy food cravings', 'Spicy food cravings']),
+    maxSeverity(sourceLog, ['Increased appetite'])
+  );
+
+  return {
+    sourceDate,
+    userInput: {
+      day_in_study: dayInStudy,
+      headaches: maxSeverity(sourceLog, ['Headache']),
+      cramps: Math.max(
+        maxSeverity(sourceLog, ['Cramps']),
+        maxSeverity(sourceLog, ['Pelvic pain', 'Ovulation pain'])
+      ),
+      sorebreasts: maxSeverity(sourceLog, ['Breast tenderness']),
+      fatigue: maxSeverity(sourceLog, ['Fatigue']),
+      sleepissue: Math.max(
+        maxSeverity(sourceLog, ['Insomnia']),
+        maxSeverity(sourceLog, ['Poor concentration', 'Brain fog'])
+      ),
+      moodswing: Math.max(
+        maxSeverity(sourceLog, ['Mood swings', 'Irritability']),
+        maxSeverity(sourceLog, ['Low mood', 'Crying spells'])
+      ),
+      stress: Math.max(
+        maxSeverity(sourceLog, ['Stressed']),
+        maxSeverity(sourceLog, ['Anxiety'])
+      ),
+      foodcravings: foodCravings,
+      indigestion: Math.max(
+        maxSeverity(sourceLog, ['Heartburn']),
+        maxSeverity(sourceLog, ['Gassy', 'Nausea'])
+      ),
+      bloating: Math.max(
+        maxSeverity(sourceLog, ['Bloating']),
+        maxSeverity(sourceLog, ['Fluid retention'])
+      ),
+    },
+  };
+}
+
 // ── Route: POST /api/cycles/state ────────────────────────────
 // Single source of truth: ML prediction + phase + calendar overlays.
 // Persists result to users/{uid}/cycleState/current in Firestore.
@@ -442,6 +583,163 @@ router.post('/state', requireAuth, requireConsent, async (req, res) => {
     return res.json({ ok: true, state });
   } catch (err) {
     console.error('[cyclesML/state] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/biometric-state', requireAuth, requireConsent, async (req, res) => {
+  try {
+    const { logs = {} } = req.body;
+    const uid = req.user?.uid;
+
+    if (!logs || typeof logs !== 'object') {
+      return res.status(400).json({ error: 'logs must be an object keyed by YYYY-MM-DD' });
+    }
+
+    console.log(`[cyclesML/biometric-state] uid=${uid} log_days=${Object.keys(logs).length}`);
+
+    const clusters = getPeriodClustersBackend(logs);
+    const lastPeriodDay = clusters.length ? clusters[clusters.length - 1].end : "none";
+    const cached = _getBiometricCachedState(uid, lastPeriodDay);
+    if (cached) {
+      console.log(`[cyclesML/biometric-state] cache hit uid=${uid}`);
+      return res.json({ ok: true, state: cached });
+    }
+
+    if (!clusters.length) {
+      const emptyState = {
+        ready: false, phase: 'unknown', phaseLabel: 'Unknown',
+        dayInCycle: null, avgCycleLength: null, predictedCycleLength: null,
+        confidence: { level: 'Low', windowDays: 5, message: 'Log your first period to see predictions.' },
+        nextPeriodDate: null, ovulationDate: null, fertileStart: null, fertileEnd: null,
+        cyclesLogged: 0, predictedPeriodDays: [], futureOvulationDates: [],
+        allFertileDays: [], futureCycles: [],
+        disclaimer: 'This is an educational estimate, not a medical prediction.',
+      };
+      return res.json({ ok: true, state: emptyState });
+    }
+
+    const clusterStarts = clusters.map(c => c.start);
+    const lastCluster = clusters[clusters.length - 1];
+    const lastStart = lastCluster.start;
+    const lastEnd = lastCluster.end;
+
+    const cycleLengths = [];
+    for (let i = 1; i < clusterStarts.length; i++) {
+      cycleLengths.push(Math.round(
+        (new Date(clusterStarts[i] + 'T00:00:00') - new Date(clusterStarts[i - 1] + 'T00:00:00')) / 86400000
+      ));
+    }
+    const avgLen = cycleLengths.length
+      ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+      : 28;
+
+    let predictedCycleLength = avgLen;
+    let predMethod = 'avg';
+
+    if (cycleLengths.length >= 3) {
+      try {
+        const cycleVariability = calculateStdDev(cycleLengths);
+        const mlResult = await runPython(CYCLE_SCRIPT, [
+          cycleLengths[cycleLengths.length - 1], avgLen, 14,
+          cycleVariability, clusterStarts.length, 28, 22, 0, 0,
+        ]);
+        predictedCycleLength = mlResult.predictedCycleLength ?? avgLen;
+        predMethod = 'ml';
+      } catch (mlErr) {
+        console.warn('[cyclesML/biometric-state] ML failed, fallback:', mlErr.message);
+        predictedCycleLength = weightedAverageFallback(cycleLengths).predicted_cycle_length;
+        predMethod = 'weighted-avg';
+      }
+    } else if (cycleLengths.length > 0) {
+      predictedCycleLength = weightedAverageFallback(cycleLengths).predicted_cycle_length;
+      predMethod = 'weighted-avg';
+    }
+
+    const phaseData = computeCyclePhaseML(logs, predictedCycleLength);
+    const biometricInput = deriveBiometricInput(logs, phaseData, lastStart);
+
+    let fusedPhase = normalizeBiometricPhase(null);
+    let biometricsMeta = {
+      source: 'biometric-fusion',
+      inputDate: biometricInput.sourceDate,
+      confidence: null,
+      scores: null,
+    };
+
+    try {
+      const modelOutput = await runPythonJson(BIOMETRIC_PHASE_SCRIPT, biometricInput.userInput);
+      const fusionOutput = phaseFusionEngine({
+        modelOutput,
+        userInput: biometricInput.userInput,
+      });
+
+      fusedPhase = normalizeBiometricPhase(fusionOutput.finalPhase);
+      biometricsMeta = {
+        source: 'biometric-fusion',
+        inputDate: biometricInput.sourceDate,
+        confidence: fusionOutput.confidence,
+        scores: fusionOutput.scores,
+        modelConfidence: modelOutput.confidence ?? null,
+        modelPhase: modelOutput.predicted_phase ?? null,
+      };
+    } catch (biometricErr) {
+      console.warn('[cyclesML/biometric-state] biometric phase failed:', biometricErr.message);
+      biometricsMeta = {
+        source: 'biometric-unavailable',
+        inputDate: biometricInput.sourceDate,
+        error: biometricErr.message,
+      };
+    }
+
+    const periodDuration = Math.max(1,
+      Math.round((new Date(lastEnd + 'T00:00:00') - new Date(lastStart + 'T00:00:00')) / 86400000) + 1
+    );
+    const confidence = buildConfidenceObj(phaseData.confidence, cycleLengths.length);
+    const futureCycles = buildFutureCyclesBackend(lastStart, predictedCycleLength, periodDuration, 3, confidence.windowDays);
+    const overlays = buildCalendarOverlays(futureCycles, clusterStarts);
+
+    const state = {
+      ready: true,
+      phase: fusedPhase.phase,
+      phaseLabel: fusedPhase.phaseLabel,
+      dayInCycle: phaseData.dayInCycle,
+      avgCycleLength: phaseData.avgCycleLength ?? avgLen,
+      predictedCycleLength,
+      confidence,
+      nextPeriodDate: overlays.nextPeriodDate ?? phaseData.nextPeriodDate,
+      ovulationDate: phaseData.ovulationDate,
+      fertileStart: phaseData.fertileStart,
+      fertileEnd: phaseData.fertileEnd,
+      cyclesLogged: clusterStarts.length,
+      predictedPeriodDays: overlays.predictedPeriodDays,
+      futureOvulationDates: overlays.futureOvulationDates,
+      allFertileDays: overlays.allFertileDays,
+      futureCycles,
+      disclaimer: 'This is an educational estimate, not a medical prediction. Consult a healthcare provider for medical advice.',
+      predictionMethod: predMethod,
+      phaseSource: biometricsMeta.source,
+      biometricInputDate: biometricsMeta.inputDate,
+      biometricConfidence: biometricsMeta.confidence ?? null,
+      biometricScores: biometricsMeta.scores ?? null,
+    };
+
+    _setBiometricCachedState(uid, lastPeriodDay, state);
+
+    if (uid && db) {
+      db.collection('users').doc(uid)
+        .collection('cycleState').doc('biometricCurrent')
+        .set({ ...state, updatedAt: admin.firestore.FieldValue.serverTimestamp() })
+        .catch(err => console.warn('[cyclesML/biometric-state] Firestore persist failed:', err.message));
+    }
+
+    console.log(
+      `[cyclesML/biometric-state] phase=${state.phase} day=${state.dayInCycle} phaseSource=${state.phaseSource} method=${predMethod}`
+    );
+
+    return res.json({ ok: true, state });
+  } catch (err) {
+    console.error('[cyclesML/biometric-state] error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

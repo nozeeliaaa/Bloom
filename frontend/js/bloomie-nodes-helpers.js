@@ -11,7 +11,6 @@ export function buildNodeHelpers(env) {
     buildCyclePersonalisationLine, hasLmpData, cd, userMode, withNickname,
     pickAvoiding, wasNodeRecentlySeen, insightFor, buildSymptomPatternLine,
     buildSymptomInsightLine, buildCycleSignalLine, getNickname,
-    pregnancyAlgorithm,
   } = env;
 
   // ── computeTestPlan ──────────────────────────────────────────────────────
@@ -20,7 +19,6 @@ export function buildNodeHelpers(env) {
     const sex = sexDate ? new Date(sexDate) : null;
     const validExp = exp && !Number.isNaN(exp.getTime());
     const validSex = sex && !Number.isNaN(sex.getTime());
-    const canUsePregAlgo = typeof pregnancyAlgorithm?.whenToTest === "function";
 
     const daysSinceSex = validSex ? Math.floor((today - sex) / 86400000) : null;
     const isTooEarly = validSex ? daysSinceSex < 10 : false;
@@ -32,22 +30,8 @@ export function buildNodeHelpers(env) {
     let _fromPeriod = null;
     let _fromSex = null;
 
-    if (validExp) {
-      if (canUsePregAlgo) {
-        const byPeriod = pregnancyAlgorithm.whenToTest(validSex ? sex : today, exp);
-        _fromPeriod = byPeriod?.primaryTestDate ? new Date(byPeriod.primaryTestDate) : addDays(exp, 1);
-      } else {
-        _fromPeriod = addDays(exp, 1);
-      }
-    }
-    if (validSex) {
-      if (canUsePregAlgo) {
-        const bySex = pregnancyAlgorithm.whenToTest(sex, null);
-        _fromSex = bySex?.primaryTestDate ? new Date(bySex.primaryTestDate) : addDays(sex, 21);
-      } else {
-        _fromSex = addDays(sex, 21);
-      }
-    }
+    if (validExp) _fromPeriod = addDays(exp, 1);
+    if (validSex) _fromSex = addDays(sex, 21);
 
     if (validExp && validSex) {
       bothDatesAvailable = true;
@@ -82,8 +66,8 @@ export function buildNodeHelpers(env) {
   // Reads ctx.moodMentions (recorded in assistant.js on every mood entity hit)
   // and returns one of three signals:
   //   { type: "none" }
-  //   { type: "persistent", count }   - same mood 2–3 turns in a row
-  //   { type: "escalated",  count }   - tone has worsened across mentions
+  //   { type: "persistent", count }   — same mood 2–3 turns in a row
+  //   { type: "escalated",  count }   — tone has worsened across mentions
   //
   // Returns null when: urgency is active, fewer than 2 mentions exist, or the
   // continuity was already surfaced this session (adviceGiven guard).
@@ -96,7 +80,7 @@ export function buildNodeHelpers(env) {
     const mentions = ctx.moodMentions ?? [];
     if (mentions.length < 2) return null;
 
-    // Use last 3 mentions only - older history decays
+    // Use last 3 mentions only — older history decays
     const recent = mentions.slice(-3);
 
     // Escalation: tone has moved toward a more distressed/serious value
@@ -114,22 +98,22 @@ export function buildNodeHelpers(env) {
     const signal = getMoodContinuitySignal();
     if (!signal) return null;
 
-    // Mark as surfaced - only show once per session
+    // Mark as surfaced — only show once per session
     ctx.adviceGiven.add("mood_continuity_surfaced");
 
     if (signal.type === "escalated") {
       return pick([
-        "It sounds like this has been getting heavier as we've been talking - I want to make sure I'm giving you what you actually need right now 🩷",
-        "I'm noticing this feels like it's intensifying - that's worth paying attention to, not pushing through 🩷",
-        "The more you share, the clearer it is that this isn't a small thing - I hear you 🩷",
+        "It sounds like this has been getting heavier as we've been talking — I want to make sure I'm giving you what you actually need right now 🩷",
+        "I'm noticing this feels like it's intensifying — that's worth paying attention to, not pushing through 🩷",
+        "The more you share, the clearer it is that this isn't a small thing — I hear you 🩷",
       ]);
     }
 
     // persistent
     return pick([
-      "It sounds like this hasn't really eased up since you first mentioned it - and that matters 🩷",
+      "It sounds like this hasn't really eased up since you first mentioned it — and that matters 🩷",
       "You're still feeling this, and the fact that it keeps coming back tells me it deserves more than just sitting with it 🩷",
-      "I've been noticing this has come up more than once - that kind of persistence is worth taking seriously 🩷",
+      "I've been noticing this has come up more than once — that kind of persistence is worth taking seriously 🩷",
     ]);
   }
 
@@ -155,19 +139,14 @@ export function buildNodeHelpers(env) {
       ? labels[0]
       : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
     return pick([
-      `It's been a few days - last time you mentioned **${list}**. How are you feeling now?`,
-      `We last talked about **${list}** - is that still going on, or is something new coming up? 🩷`,
+      `It's been a few days — last time you mentioned **${list}**. How are you feeling now?`,
+      `We last talked about **${list}** — is that still going on, or is something new coming up? 🩷`,
     ]);
   }
 
   // Build a fallback line from the last known intent when no symptom recall is available.
   function buildIntentFallbackLine() {
     if (ctx.isAnon) return null;
-    // Guard against speculative recall: only surface intent fallback when
-    // memory originated from explicit symptom extraction.
-    if (bloomieMemory?.lastSymptomsSource && bloomieMemory.lastSymptomsSource !== "explicit_entity") {
-      return null;
-    }
     const INTENT_LABELS = {
       LATE_INTRO:           "a late or missed period",
       HEAVY_INTRO:          "heavy bleeding",
@@ -180,163 +159,26 @@ export function buildNodeHelpers(env) {
     const label = INTENT_LABELS[bloomieMemory?.lastIntent];
     if (!label) return null;
     return pick([
-      `Last time you were looking into **${label}** - feel free to pick up where we left off, or start fresh 🩷`,
-      `It looks like **${label}** was on your mind last time - still relevant, or is something new coming up? 🩷`,
+      `Last time you were looking into **${label}** — feel free to pick up where we left off, or start fresh 🩷`,
+      `It looks like **${label}** was on your mind last time — still relevant, or is something new coming up? 🩷`,
     ]);
-  }
-
-  function getRecentSymptomContinuitySignal() {
-    if (ctx.urgency) return null;
-    const recent = Array.isArray(ctx.entityHistory) ? ctx.entityHistory.slice(-5) : [];
-    if (recent.length < 2) return null;
-
-    const counts = { late: 0, pelvic: 0, spot: 0, heavy: 0 };
-    for (const e of recent) {
-      const s = e?.symptoms || {};
-      if (s.late || s.implicit_late) counts.late++;
-      if (s.pelvic || s.ovulation_pain) counts.pelvic++;
-      if (s.spotting) counts.spot++;
-      if (s.heavy || s.large_clots) counts.heavy++;
-    }
-
-    const priority = ["late", "pelvic", "spot", "heavy"];
-    const topic = priority.find(t => counts[t] >= 2);
-    if (!topic) return null;
-
-    const guardKey = `continuity_${topic}_surfaced`;
-    if (ctx.adviceGiven.has(guardKey)) return null;
-    return { topic, count: counts[topic], guardKey };
-  }
-
-  function buildNonMoodContinuityLine({ consume = true } = {}) {
-    const signal = getRecentSymptomContinuitySignal();
-    if (!signal) return null;
-    if (consume) ctx.adviceGiven.add(signal.guardKey);
-
-    if (signal.topic === "late") {
-      return pick([
-        "You've mentioned delayed or missed timing more than once recently - that pattern over time gives useful context 🩷",
-        "I can see late-period timing has come up repeatedly - that trend matters more than a single cycle 🩷",
-      ]);
-    }
-    if (signal.topic === "pelvic") {
-      return pick([
-        "You've mentioned cramps/pelvic discomfort a few times recently - that repeated pattern is important context 🩷",
-        "I'm noticing pelvic pain has come up across multiple turns, which helps us focus the conversation 🩷",
-      ]);
-    }
-    if (signal.topic === "spot") {
-      return pick([
-        "Spotting has come up more than once recently, so pattern-tracking is especially useful here 🩷",
-        "I can see spotting has been recurring - those clusters over time usually tell us more than one day alone 🩷",
-      ]);
-    }
-    return pick([
-      "You've mentioned heavier bleeding more than once recently - that recurring pattern is worth paying attention to 🩷",
-      "I can see heavier flow has come up repeatedly, which gives more context than one isolated cycle 🩷",
-    ]);
-  }
-
-  function buildUnresolvedConcernLine() {
-    if (ctx.isAnon) return null;
-    const unresolved = ctx.conversationProfile?.concernsUnresolved?.[0] ?? null;
-    if (!unresolved) return null;
-    const labels = {
-      late: "late or missed period",
-      pelvic: "pelvic pain or cramps",
-      spot: "spotting",
-      heavy: "heavy bleeding",
-      mood: "mood or energy changes",
-      pregnancy: "pregnancy concerns",
-      discharge: "discharge changes",
-    };
-    const label = labels[unresolved] || unresolved;
-    return pick([
-      `We can pick back up on **${label}** if that's still on your mind 🩷`,
-      `If you want, we can continue where we left off on **${label}** 🩷`,
-    ]);
-  }
-
-  // Picks one strongest intro context line so opening feels intentional rather
-  // than stacking disconnected memory snippets.
-  function buildCombinedIntroContext() {
-    if (ctx.isAnon) return null;
-    const daysLeft = daysUntilNextPeriod();
-    const overdue = typeof daysLeft === "number" && daysLeft < -1;
-    const dueSoon = typeof daysLeft === "number" && daysLeft >= 0 && daysLeft <= 5;
-    const continuity = getRecentSymptomContinuitySignal();
-
-    if (overdue && continuity?.topic === "pelvic") {
-      return {
-        kind: "overdue_pelvic",
-        strong: true,
-        line: `Since your period still looks late (about ${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? "" : "s"} by estimate), and cramps have come up recently, let's check this in context 🩷`,
-        followUp: "If it still hasn't come, are you noticing cramps, spotting, or pregnancy concerns too?",
-      };
-    }
-    if (overdue && continuity?.topic === "spot") {
-      return {
-        kind: "overdue_spot",
-        strong: true,
-        line: `Your period still looks late by estimate, and you've also had spotting signals recently - that combination is worth a closer look 🩷`,
-        followUp: "If it's still not here, tell me whether you're noticing spotting, cramps, or pregnancy concerns most right now.",
-      };
-    }
-    if (overdue) {
-      return {
-        kind: "overdue_general",
-        strong: true,
-        line: `Based on your logged dates, your period may be a little late${Math.abs(daysLeft) > 1 ? ` - around ${Math.abs(daysLeft)} days overdue by estimate` : ""} 🩷`,
-        followUp: "If it still hasn't come yet or something feels off, I'm here. What's going on?",
-      };
-    }
-    if (dueSoon) {
-      return {
-        kind: "due_soon",
-        strong: false,
-        line: `Looks like your period window is coming up in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
-        followUp: "If you're already feeling symptoms, I can help you sort them.",
-      };
-    }
-    if (continuity) {
-      return {
-        kind: "continuity",
-        strong: false,
-        line: buildNonMoodContinuityLine({ consume: false }),
-      };
-    }
-    const unresolvedLine = buildUnresolvedConcernLine();
-    if (unresolvedLine) {
-      return { kind: "unresolved", strong: false, line: unresolvedLine };
-    }
-    return null;
   }
 
   function buildIntro() {
     const name        = getNickname();                                    // Firestore nickname or null
     const isReturning = !ctx.isAnon && !!bloomieMemory?.lastSessionDate;  // has at least one prior session
-    const combined    = buildCombinedIntroContext();
-    // If a strong context line is available (e.g. overdue+signals), avoid
-    // layering memory callbacks that can feel abrupt or stale.
-    const recall      = combined?.strong ? null : buildRecallLine();                                 // topic/recentness gated in assistant helper
-    const continuity  = !recall && !combined ? buildNonMoodContinuityLine({ consume: false }) : null;
-    const bgRecall    = !recall && !continuity && !combined?.strong ? buildBackgroundRecallLine() : null;     // stale recall (>24h <7d), or null
-    const intentLine  = !recall && !continuity && !bgRecall && !combined ? buildIntentFallbackLine() : null; // last-resort intent hint
-    const appendLine  = combined?.line ?? recall ?? continuity ?? bgRecall ?? intentLine;
-    const r = (lines) => {
-      if (!appendLine) return lines;
-      // Avoid echoing the same intro context twice (e.g. overdue line selected
-      // as both the main contextLine and appendLine).
-      if (lines.some((l) => typeof l === "string" && l === appendLine)) return lines;
-      return [...lines, appendLine];
-    };
+    const recall      = buildRecallLine();                                 // topic/recentness gated in assistant helper
+    const bgRecall    = !recall ? buildBackgroundRecallLine() : null;     // stale recall (>24h <7d), or null
+    const intentLine  = !recall && !bgRecall ? buildIntentFallbackLine() : null; // last-resort intent hint
+    const appendLine  = recall ?? bgRecall ?? intentLine;
+    const r = (lines) => appendLine ? [...lines, appendLine] : lines;
     const introLine = `${greet()} I'm Bloomie, Bloom's health assistant 🌸`;
 
     // ── Minor ─────────────────────────────────────────────────────────────
     if (ctx.isMinor) {
       return r([
         introLine,
-        "I'm here to help you understand what's going on with your body 🩷",
+        "I'm here to help you understand what's going on with your body 🩷 Everything you share with me stays between us.",
         "I can help with period questions, cramps, mood changes, and more. What's on your mind?",
       ]);
     }
@@ -345,8 +187,7 @@ export function buildNodeHelpers(env) {
     if (ctx.isAnon) {
       return r([
         introLine,
-        "Quick note: you're in anonymous mode, so this chat is not saved to your account and PDF export is unavailable in this mode 🩷",
-        "I can still help with reproductive health questions in this session.",
+        "You're not signed in, so I won't be able to see your cycle history — but I can still help 🩷",
         "What's going on today?",
       ]);
     }
@@ -356,7 +197,7 @@ export function buildNodeHelpers(env) {
       const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
       return r([
         introLine,
-        `Looks like pregnancy tracking mode is on${weeksAlong > 0 ? ` - you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along by date estimate` : ""} 🩷`,
+        `Looks like pregnancy tracking mode is on${weeksAlong > 0 ? ` — you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along by date estimate` : ""} 🩷`,
         "I can help with symptoms, test timing, due dates, or anything else on your mind. What's going on?",
       ]);
     }
@@ -384,38 +225,28 @@ export function buildNodeHelpers(env) {
       const daysLeft = daysUntilNextPeriod();
       const dueSoon  = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
       const overdue  = daysLeft !== null && daysLeft < -1;
+      const enoughCycleHistory = Number(cd?.cycleCount ?? 0) >= 2;
 
       if (overdue) {
-        const contextLine = combined?.kind?.startsWith("overdue")
-          ? combined.line
-          : pick([
-              `Based on your logged dates, your period may be a little late${Math.abs(daysLeft) > 1 ? ` - around ${Math.abs(daysLeft)} days overdue by estimate` : ""} 🩷`,
-              "Looks like your period might be a bit later than expected 🩷",
-              "From your recent logs, your period may not have arrived yet 🩷",
-            ]);
-        const followUp = combined?.kind?.startsWith("overdue")
-          ? (combined.followUp || "If it hasn't come yet or something feels off, I'm here. What's going on?")
-          : "If it hasn't come yet or something feels off, I'm here. What's going on?";
-        return r([introLine, contextLine, followUp]);
+        const lateDays = Math.abs(daysLeft);
+        const contextLine = pick([
+          `Based on your logged dates, your period may be a little late${enoughCycleHistory && lateDays > 1 ? ` — around ${lateDays} days overdue by estimate` : ""} 🩷`,
+          `Looks like your period might be a bit later than expected 🩷`,
+          `From your recent logs, your period may not have arrived yet 🩷`,
+        ]);
+        return r([introLine, contextLine, "If it hasn't come yet or something feels off, I'm here. What's going on?"]);
       }
 
       if (dueSoon) {
-        const contextLine = combined?.kind === "due_soon"
-          ? combined.line
-          : pick([
-              `Looks like your period might be coming up in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
-              `Based on your logged dates, your period is due in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
-              `Your period window is getting close - around ${daysLeft} day${daysLeft === 1 ? "" : "s"} away 🌸`,
-            ]);
-        return r([
-          introLine,
-          contextLine,
-          combined?.followUp || "If you're already feeling symptoms, I can help. What's going on?",
-          "If you want, you can ask: \"Remind me in 2 days to check my symptoms.\"",
+        const contextLine = pick([
+          `Looks like your period might be coming up in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
+          `Based on your logged dates, your period is due in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
+          `Your period window is getting close — around ${daysLeft} day${daysLeft === 1 ? "" : "s"} away 🌸`,
         ]);
+        return r([introLine, contextLine, "If you're already feeling symptoms, I can help. What's going on?"]);
       }
 
-      // No urgency signal - use phase awareness for returning users
+      // No urgency signal — use phase awareness for returning users
       const phaseInfo = getCurrentPhase();
       if (isReturning && phaseInfo) {
         const phaseLine = pick([
@@ -428,7 +259,7 @@ export function buildNodeHelpers(env) {
       if (isReturning) {
         return r([
           introLine,
-          combined?.followUp || "What can I help you with today?",
+          "What can I help you with today?",
         ]);
       }
 
@@ -476,10 +307,6 @@ export function buildNodeHelpers(env) {
     computeTestPlan,
     getMoodContinuitySignal,
     buildMoodContinuityLine,
-    getRecentSymptomContinuitySignal,
-    buildNonMoodContinuityLine,
-    buildUnresolvedConcernLine,
-    buildCombinedIntroContext,
     buildBackgroundRecallLine,
     buildIntentFallbackLine,
     buildIntro,
