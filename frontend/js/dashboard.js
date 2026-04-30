@@ -31,9 +31,9 @@ import { triggerNotifications } from "./notifications.js";
 import { getTodaysPhaseInsights } from "./phase-education.js";
 import { fetchCycleState } from "./cycle-state.js";
 import {
+  buildCustomSymptomInsights,
   collectCustomSymptomRecurrence,
   customSymptomLooksUrgent,
-  summarizeCustomSymptoms,
 } from "./custom-symptoms.js";
 // Algorithm modules loaded lazily inside loadDashboard() = no top-level await
 let algoPregnancy    = null;
@@ -165,7 +165,7 @@ function buildCustomSymptomInsight(logsByDate, days = 30) {
 }
 
 function renderCustomSymptomAdvancedInsights(logsByDate, today = new Date()) {
-  const insights = summarizeCustomSymptoms(logsByDate, { days: 30, maxItems: 2, fromDate: today });
+  const insights = buildCustomSymptomInsights(logsByDate, { days: 30, maxItems: 2, fromDate: today });
   if (!insights.length) return "";
 
   return `
@@ -173,9 +173,12 @@ function renderCustomSymptomAdvancedInsights(logsByDate, today = new Date()) {
       <div style="font-size:0.74rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:0.55rem;">
         Custom Symptoms From Your History
       </div>
+      <p class="text-muted" style="font-size:0.82rem;line-height:1.45;margin:0 0 0.6rem;">
+        These are saved as custom symptom notes, separate from structured symptom predictions.
+      </p>
       ${insights.map((item) => `
         <div class="insight-item" style="background:rgba(212,116,154,0.05);border:1px solid rgba(212,116,154,0.14);border-radius:12px;padding:0.7rem 0.85rem;margin-bottom:0.55rem;">
-          <strong>${item.kind === "recurring" ? "Custom symptom pattern" : "Custom symptom saved"}:</strong> ${item.message}${item.guidance ? ` ${item.guidance}` : ""}
+          <strong>${item.kind === "recurring" ? "Custom symptom from your logs" : "Saved to your symptom history"}:</strong> ${item.message}${item.guidance ? ` ${item.guidance}` : ""}
         </div>
       `).join("")}
     </div>
@@ -223,13 +226,36 @@ function buildPeriodInsightInputs(logsByDate) {
     const hadLargeClots = cluster.days.some(({ log }) =>
       (log?.symptoms || []).some((symptom) => symptomLabelToCode(symptom) === "LARGE_CLOTS")
     );
+    const heavyDayCount = cluster.days.filter(({ log }) => (FLOW_SCORES[log?.flow] ?? 0) >= 4).length;
+    const clotDayCount = cluster.days.filter(({ log }) =>
+      (log?.symptoms || []).some((symptom) => symptomLabelToCode(symptom) === "LARGE_CLOTS")
+    ).length;
+    const painItems = cluster.days.flatMap(({ log }) =>
+      buildEngineLoggedSymptoms(log).filter((item) =>
+        ["CRAMPS", "PELVIC_PAIN", "OVULATION_PAIN"].includes(item.code)
+      )
+    );
+    const painDayCount = cluster.days.filter(({ log }) =>
+      buildEngineLoggedSymptoms(log).some((item) =>
+        ["CRAMPS", "PELVIC_PAIN", "OVULATION_PAIN"].includes(item.code)
+      )
+    ).length;
+    const maxPainSeverity = painItems.length
+      ? Math.max(...painItems.map((item) => Number(item.severity) || 0))
+      : 0;
 
     if (durationDays >= 2 || nonSpottingDays >= 1) {
       periodEntries.push({
+        startDate: cluster.start,
+        endDate: cluster.end,
         durationDays,
         flowLevel: maxFlowLevel,
         flowScore: maxFlowScore,
+        heavyDayCount,
+        clotDayCount,
         hadLargeClots,
+        painDayCount,
+        maxPainSeverity,
       });
     } else {
       unscheduledBleedingDates.push(cluster.start);
@@ -237,6 +263,81 @@ function buildPeriodInsightInputs(logsByDate) {
   }
 
   return { periodEntries, unscheduledBleedingDates };
+}
+
+function averageRounded(values) {
+  const nums = (values || []).filter((v) => Number.isFinite(v));
+  if (!nums.length) return null;
+  return Math.round(nums.reduce((sum, value) => sum + value, 0) / nums.length);
+}
+
+function buildMenstrualPatternEvidence({
+  logsByDate = {},
+  cycleLengths = [],
+  lastPeriodStart = null,
+  today = new Date(),
+} = {}) {
+  const { periodEntries, unscheduledBleedingDates } = buildPeriodInsightInputs(logsByDate);
+  const recentCycles = Array.isArray(cycleLengths) ? cycleLengths.slice(-6) : [];
+  const longCycles = recentCycles.filter((days) => days > 35);
+  const shortCycles = recentCycles.filter((days) => days < 21);
+  const avgCycleLength = averageRounded(recentCycles);
+  const todayKey = toDateKey(today);
+  const daysSinceLastPeriod = lastPeriodStart ? diffDays(lastPeriodStart, todayKey) : null;
+
+  const heavyPeriods = periodEntries.filter((entry) =>
+    (entry.flowScore ?? 0) >= 4 || (entry.heavyDayCount ?? 0) > 0
+  );
+  const clottingHeavyPeriods = periodEntries.filter((entry) =>
+    entry.hadLargeClots && ((entry.flowScore ?? 0) >= 4 || (entry.heavyDayCount ?? 0) > 0)
+  );
+  const prolongedPeriods = periodEntries.filter((entry) => (entry.durationDays ?? 0) > 7);
+  const painfulPeriods = periodEntries.filter((entry) =>
+    (entry.painDayCount ?? 0) > 0 || (entry.maxPainSeverity ?? 0) >= 3
+  );
+  const lightPeriods = periodEntries.filter((entry) =>
+    (entry.durationDays != null && entry.durationDays < 2) ||
+    ["spotting", "very_light", "light"].includes(entry.flowLevel) ||
+    (entry.flowScore != null && entry.flowScore <= 2)
+  );
+  const heavyDays = periodEntries.reduce((sum, entry) => sum + (entry.heavyDayCount || 0), 0);
+  const clotDays = periodEntries.reduce((sum, entry) => sum + (entry.clotDayCount || 0), 0);
+  const painDays = periodEntries.reduce((sum, entry) => sum + (entry.painDayCount || 0), 0);
+  const lightDurations = lightPeriods
+    .map((entry) => entry.durationDays)
+    .filter((days) => Number.isFinite(days));
+
+  return {
+    periodEntries,
+    unscheduledBleedingDates,
+    cycle: {
+      recentCycles,
+      avgCycleLength,
+      longCount: longCycles.length,
+      shortCount: shortCycles.length,
+      daysSinceLastPeriod,
+    },
+    bleeding: {
+      heavyPeriodCount: heavyPeriods.length,
+      heavyDays,
+      clottingHeavyPeriodCount: clottingHeavyPeriods.length,
+      clotDays,
+      prolongedPeriodCount: prolongedPeriods.length,
+      longestDuration: prolongedPeriods.length
+        ? Math.max(...prolongedPeriods.map((entry) => entry.durationDays || 0))
+        : null,
+      lightPeriodCount: lightPeriods.length,
+      avgLightDuration: averageRounded(lightDurations),
+      offTimingCount: unscheduledBleedingDates.length,
+    },
+    pain: {
+      painfulPeriodCount: painfulPeriods.length,
+      painDays,
+      maxSeverity: painfulPeriods.length
+        ? Math.max(...painfulPeriods.map((entry) => entry.maxPainSeverity || 0))
+        : 0,
+    },
+  };
 }
 
 /**
@@ -1576,17 +1677,123 @@ function chooseVariant(options, seed = 0) {
   return options[idx];
 }
 
-function makeInsightCard({ level = "low", heading, body, guidance = "" }) {
-  return { level, heading, body, guidance };
+function makeInsightCard({ level = "low", heading, body, guidance = "", priority = 50 }) {
+  return { level, heading, body, guidance, priority };
 }
 
 function joinInsightParts(parts, maxParts = 2) {
   return (parts || []).filter(Boolean).slice(0, maxParts).join(" ");
 }
 
+function makeConcise(message, maxSentences = 2) {
+  return String(message || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/(?<=[.!?])\s+/)
+    .filter(Boolean)
+    .slice(0, maxSentences)
+    .join(" ");
+}
+
+function splitSentences(message) {
+  return String(message || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/(?<=[.!?])\s+/)
+    .filter(Boolean);
+}
+
 function getSignal(codes, list) {
   const codeSet = new Set(Array.isArray(codes) ? codes : [codes]);
   return (list || []).find((s) => codeSet.has(s.code)) || null;
+}
+
+function hasInsightHeading(cards, headings) {
+  const set = new Set(Array.isArray(headings) ? headings : [headings]);
+  return cards.some((card) => set.has(card.heading));
+}
+
+const LEARNING_INSIGHT_HEADINGS = [
+  "Your cycle pattern is still taking shape",
+  "Right now, your cycle pattern is still early",
+  "Your logging is still getting started",
+  "Your logging rhythm is still getting established",
+  "Your consistent logging is helping",
+  "Your insights are still getting sharper",
+  "Your timing estimates are still getting sharper",
+  "Your timing estimates are still learning your pattern",
+];
+
+function findInsightCard(cards, headings) {
+  const set = new Set(Array.isArray(headings) ? headings : [headings]);
+  return cards.find((card) => set.has(card.heading)) || null;
+}
+
+function getLearningInsightCard(cards) {
+  return findInsightCard(cards, LEARNING_INSIGHT_HEADINGS);
+}
+
+function appendInsightSentence(card, sentence, maxSentences = 2) {
+  if (!card || !sentence) return;
+  const baseSentences = splitSentences(card.body);
+  const base = baseSentences.length >= maxSentences
+    ? baseSentences.slice(0, Math.max(maxSentences - 1, 1)).join(" ")
+    : card.body || "";
+  card.body = makeConcise(`${base} ${sentence}`, maxSentences);
+}
+
+function buildCycleTimingPatternBody({ kind, cycleEvidence, fallback = "" }) {
+  const avg = cycleEvidence?.avgCycleLength;
+  const recentCount = cycleEvidence?.recentCycles?.length || 0;
+  const recentPhrase = recentCount
+    ? `the last ${pluralize(recentCount, "completed cycle")}`
+    : "your recent completed cycles";
+  if (kind === "long" && cycleEvidence?.longCount >= 2 && avg) {
+    return `Your recent history looks more spread out than steady right now. ${recentPhrase} average around ${avg} days, and ${pluralize(cycleEvidence.longCount, "cycle")} ran past 35 days.`;
+  }
+  if (kind === "short" && cycleEvidence?.shortCount >= 2 && avg) {
+    return `Your recent history shows cycles coming closer together than usual. ${recentPhrase} average around ${avg} days, and ${pluralize(cycleEvidence.shortCount, "cycle")} came in under 21 days.`;
+  }
+  return fallback;
+}
+
+function shouldExplainCycleTimingRange({ cycleEvidence = {}, timingSignals = {}, anomalySignals = [] } = {}) {
+  const hasVariableAnomaly = Boolean(getSignal(["HIGH_CYCLE_VARIABILITY", "RESIDUAL_DRIFT", "DEVIATION_CLUSTER"], anomalySignals));
+  return Boolean(
+    (cycleEvidence.avgCycleLength && cycleEvidence.avgCycleLength > 35) ||
+    cycleEvidence.longCount >= 2 ||
+    timingSignals.irregular ||
+    timingSignals.lowConfidence?.show ||
+    timingSignals.trend ||
+    hasVariableAnomaly
+  );
+}
+
+function buildCycleTimingFallbackBody({ kind, avg = null, timingSignals = {} } = {}) {
+  if (kind === "long") {
+    if (avg && avg > 35) {
+      return `Your cycle timing has been running later than usual, with a recent average around ${avg} days. A period has not been logged inside the expected window, so this looks more like a stretched-out timing pattern than a simple on-time cycle.`;
+    }
+    return "A period has not been logged inside the expected window. Your recent timing also looks less steady, so this is being treated as a timing pattern to watch rather than a single missed date.";
+  }
+
+  if (kind === "short") {
+    if (avg && avg < 21) {
+      return `Your cycles have been coming closer together than usual, with a recent average around ${avg} days. That shorter spacing can make the next expected window arrive sooner than your earlier pattern.`;
+    }
+    return "Your recent cycle spacing looks closer together than usual. Keeping period starts up to date will help show whether this is repeating or just a short-term shift.";
+  }
+
+  if (timingSignals.trend?.code === "LENGTHENING_CYCLE_TREND") {
+    return "Your recent cycle lengths have been stretching later compared with your earlier pattern. That shift makes the next expected window more flexible right now.";
+  }
+  if (timingSignals.trend?.code === "SHORTENING_CYCLE_TREND") {
+    return "Your recent cycle lengths have been getting shorter compared with your earlier pattern. That shift can pull the expected window earlier than usual.";
+  }
+  if (timingSignals.trend?.code === "SUDDEN_CYCLE_SHIFT") {
+    return "Your recent cycle timing has shifted away from your earlier pattern. The next estimate is being treated more cautiously while the new pattern becomes clearer.";
+  }
+  return "Your recent cycle timing has been less steady than usual. A few more period starts will help show whether this is a short-term shift or a new pattern.";
 }
 
 function composeAdvancedInsights({
@@ -1600,6 +1807,7 @@ function composeAdvancedInsights({
   cycleLengths = [],
   symptomHistory = [],
   logsByDate = {},
+  patternEvidence = {},
   today = new Date(),
 }) {
   const cards = [];
@@ -1624,23 +1832,34 @@ function composeAdvancedInsights({
     ...symptomSignals,
     ...advancedSymptomSignals,
   ];
+  const cycleEvidence = patternEvidence.cycle || {};
+  const bleedingEvidence = patternEvidence.bleeding || {};
+  const painEvidence = patternEvidence.pain || {};
 
   const urgency = [...allSignals]
     .filter((s) => s?.level === "high" && ["SEEK_URGENT_CARE", "URGENT_SYMPTOM_COMBINATION", "EXTENDED_ABSENCE", "MENOMETRORRHAGIA_PATTERN", "HEAVY_CLOTTING_PATTERN"].includes(s.code))
     .sort((a, b) => (pri[b.level] || 0) - (pri[a.level] || 0))[0];
   if (urgency) {
     const urgencyHeading = urgency.code === "EXTENDED_ABSENCE"
-      ? "There has been a prolonged gap since your last logged period"
+      ? "Your cycle timing has been running much later than usual"
       : urgency.code === "MENOMETRORRHAGIA_PATTERN"
       ? "Your bleeding pattern looks heavier and less predictable lately"
       : urgency.code === "HEAVY_CLOTTING_PATTERN"
       ? "Heavier bleeding with clotting has repeated in your logs"
       : "Something in your recent symptom log needs attention";
+    const urgencyBody = urgency.code === "EXTENDED_ABSENCE" && cycleEvidence.daysSinceLastPeriod
+      ? `Your last logged period was about ${pluralize(cycleEvidence.daysSinceLastPeriod, "day")} ago${cycleEvidence.avgCycleLength ? `, while your recent cycles have averaged around ${cycleEvidence.avgCycleLength} days` : ""}. This gap is longer than your usual pattern, so timing is best read as a cautious range rather than a single expected date.`
+      : urgency.code === "MENOMETRORRHAGIA_PATTERN"
+      ? `Your logs show both heavier bleeding and bleeding outside expected period timing. This has repeated enough to surface as one combined pattern.`
+      : urgency.code === "HEAVY_CLOTTING_PATTERN"
+      ? `Your logs show heavier bleeding with clotting across ${pluralize(bleedingEvidence.clottingHeavyPeriodCount || urgency.debug?.clottingCycleCount || 2, "recent period")}.`
+      : urgency.message;
     cards.push(makeInsightCard({
       level: "high",
       heading: urgencyHeading,
-      body: urgency.message,
+      body: makeConcise(urgencyBody),
       guidance: urgency.guidance || "If this feels severe, sudden, or worrying, consider seeking medical advice.",
+      priority: 10,
     }));
   }
 
@@ -1677,6 +1896,7 @@ function composeAdvancedInsights({
         "Right now, your cycle pattern is still early",
       ], totalCycleCount),
       body,
+      priority: 60,
     }));
   }
 
@@ -1687,37 +1907,44 @@ function composeAdvancedInsights({
 
     if (timingSignals.oligo || timingSignals.late) {
       heading = chooseVariant([
-        "Your recent cycles have been running longer than usual",
-        avg ? `Your recent average cycle length is around ${avg} days` : "Your cycle timing has been stretching out more than usual",
         "Your cycle timing has been running later than usual",
+        "Your recent pattern looks more spread out than steady",
+        "Your period timing has been landing later than your usual pattern",
       ], avg || totalCycleCount);
-      body = joinInsightParts([
-        timingSignals.late ? timingSignals.late.message : null,
-        timingSignals.oligo ? timingSignals.oligo.message : null,
-      ]);
+      body = buildCycleTimingPatternBody({
+        kind: "long",
+        cycleEvidence,
+        fallback: buildCycleTimingFallbackBody({ kind: "long", avg, timingSignals }),
+      });
     } else if (timingSignals.poly) {
       heading = chooseVariant([
         "Your cycles have been coming closer together than usual",
-        avg ? `Your recent average cycle length is around ${avg} days` : "Your recent cycles have been coming closer together",
+        "Your recent cycle timing looks closer together than usual",
       ], avg || totalCycleCount);
-      body = joinInsightParts([
-        timingSignals.poly.message,
-        timingSignals.irregular ? "The spacing has also been less steady than usual." : null,
-      ]);
+      body = buildCycleTimingPatternBody({
+        kind: "short",
+        cycleEvidence,
+        fallback: buildCycleTimingFallbackBody({ kind: "short", avg, timingSignals }),
+      });
     } else if (timingSignals.irregular || timingSignals.trend) {
       heading = chooseVariant([
         "Your cycle timing has been less steady lately",
         "Your recent cycles are not staying on one steady rhythm",
         "Your recent cycles are not staying on one consistent rhythm",
       ], totalCycleCount);
-      body = joinInsightParts([
-        timingSignals.irregular?.message,
-        timingSignals.trend?.message,
-      ]);
+      body = buildCycleTimingFallbackBody({ kind: "irregular", avg, timingSignals });
     }
 
     if (heading && body) {
-      cards.push(makeInsightCard({ level: "medium", heading, body }));
+      const timingCard = makeInsightCard({ level: "medium", heading, body, priority: 30 });
+      if (shouldExplainCycleTimingRange({ cycleEvidence, timingSignals, anomalySignals })) {
+        appendInsightSentence(
+          timingCard,
+          "Because your cycle timing has been more variable, timing is shown as a range rather than a single date to better match your pattern.",
+          3
+        );
+      }
+      cards.push(timingCard);
     }
   }
 
@@ -1730,55 +1957,99 @@ function composeAdvancedInsights({
     discharge: getSignal("LEUKORRHEA_PATTERN", advancedSymptomSignals),
   };
 
-  if (!bleedingSignals.combo && (bleedingSignals.heavy || bleedingSignals.offPhase || bleedingSignals.light || bleedingSignals.pain || bleedingSignals.discharge)) {
-    if (bleedingSignals.heavy && bleedingSignals.pain) {
+  const hasBleedingCard = cards.some((card) => /bleeding|flow|clot/i.test(card.heading || ""));
+  const hasHeavyEvidence = bleedingEvidence.heavyPeriodCount >= 2 || bleedingEvidence.heavyDays >= 2;
+  const hasClottingHeavyEvidence = bleedingEvidence.clottingHeavyPeriodCount >= 2 || bleedingEvidence.clotDays >= 2;
+  const hasProlongedEvidence = bleedingEvidence.prolongedPeriodCount >= 1;
+  const hasOffTimingEvidence = bleedingEvidence.offTimingCount >= 2;
+  const hasLightEvidence = bleedingEvidence.lightPeriodCount >= 2;
+  const hasHeavyIrregularEvidence = hasHeavyEvidence && (
+    hasOffTimingEvidence ||
+    timingSignals.irregular ||
+    getSignal("HIGH_CYCLE_VARIABILITY", anomalySignals)
+  );
+  const hasPainEvidence = painEvidence.painfulPeriodCount >= 2 || painEvidence.painDays >= 2;
+
+  if (!hasBleedingCard && (bleedingSignals.combo || hasHeavyIrregularEvidence)) {
+    cards.push(makeInsightCard({
+      level: "high",
+      heading: "Your logs show heavier bleeding and off-timing bleeding together",
+      body: hasOffTimingEvidence
+        ? `Heavier flow has appeared across ${pluralize(bleedingEvidence.heavyPeriodCount || 2, "recent period")}, and spotting or bleeding outside expected timing has appeared ${pluralize(bleedingEvidence.offTimingCount || 2, "time")}.`
+        : `Heavier flow has appeared across ${pluralize(bleedingEvidence.heavyPeriodCount || 2, "recent period")}, while your cycle timing has also been less steady lately.`,
+      guidance: "If this is unusual for you or keeps happening, it may be worth mentioning to a healthcare provider.",
+      priority: 20,
+    }));
+  } else if (!hasBleedingCard && (bleedingSignals.heavy || bleedingSignals.offPhase || bleedingSignals.light || bleedingSignals.pain || bleedingSignals.discharge || hasHeavyEvidence || hasClottingHeavyEvidence || hasProlongedEvidence || hasOffTimingEvidence || hasLightEvidence || hasPainEvidence)) {
+    if ((bleedingSignals.heavy || hasHeavyEvidence || hasClottingHeavyEvidence) && (bleedingSignals.pain || hasPainEvidence)) {
       cards.push(makeInsightCard({
-        level: bleedingSignals.heavy.level === "high" || bleedingSignals.pain.level === "high" ? "high" : "medium",
+        level: bleedingSignals.heavy?.level === "high" || bleedingSignals.pain?.level === "high" ? "high" : "medium",
         heading: chooseVariant([
           "Your period logs are showing a stronger pattern lately",
           "Your logs show repeating pain and bleeding around your period",
         ], totalSymptomDays),
-        body: joinInsightParts([bleedingSignals.heavy.message, bleedingSignals.pain.message]),
+        body: `Heavier flow has appeared across ${pluralize(bleedingEvidence.heavyPeriodCount || 2, "recent period")}, and pain symptoms have appeared on ${pluralize(painEvidence.painDays || painEvidence.painfulPeriodCount || 2, "period day")}.`,
+        guidance: "Keep logging flow, pain level, and timing so this pattern stays clear.",
+        priority: 20,
       }));
-    } else if (bleedingSignals.heavy) {
+    } else if (bleedingSignals.heavy || hasHeavyEvidence || hasClottingHeavyEvidence || hasProlongedEvidence) {
+      const heading = hasClottingHeavyEvidence || bleedingSignals.heavy?.code === "HEAVY_CLOTTING_PATTERN"
+        ? "Your logs show heavier bleeding with clotting more than once"
+        : hasProlongedEvidence
+        ? "Your logs show a longer bleeding stretch"
+        : chooseVariant([
+            "Your logs show heavier bleeding across multiple period days or cycles",
+            "Heavier flow has come up more than once in your recent period history",
+            "Your recent period logs show a stronger bleeding pattern",
+          ], totalCycleCount);
+      const body = hasClottingHeavyEvidence
+        ? `Heavier flow and clotting have appeared together across ${pluralize(bleedingEvidence.clottingHeavyPeriodCount || 2, "recent period")}.`
+        : hasProlongedEvidence
+        ? `One recent bleeding stretch lasted about ${pluralize(bleedingEvidence.longestDuration || 8, "day")}, which is longer than typical period-log timing.`
+        : `Heavier flow has appeared across ${pluralize(bleedingEvidence.heavyPeriodCount || 2, "recent period")} and ${pluralize(bleedingEvidence.heavyDays || 2, "logged day")}.`;
       cards.push(makeInsightCard({
-        level: bleedingSignals.heavy.level,
-        heading: chooseVariant([
-          "Your logs show heavier bleeding across multiple period days or cycles",
-          "Heavier flow has come up more than once in your recent period history",
-          "Your recent period logs show a stronger bleeding pattern",
-        ], totalCycleCount),
-        body: bleedingSignals.heavy.message,
+        level: bleedingSignals.heavy?.level || (hasClottingHeavyEvidence || hasProlongedEvidence ? "high" : "medium"),
+        heading,
+        body,
+        guidance: "This is not a diagnosis, but it is useful to keep tracking and mention if it feels unusual for you.",
+        priority: 20,
       }));
-    } else if (bleedingSignals.offPhase) {
+    } else if (bleedingSignals.offPhase || hasOffTimingEvidence) {
       cards.push(makeInsightCard({
-        level: bleedingSignals.offPhase.level,
+        level: bleedingSignals.offPhase?.level || "medium",
         heading: chooseVariant([
           "Spotting has appeared outside your expected bleeding days more than once",
           "Your logs show spotting or bleeding outside your expected period timing",
         ], totalCycleCount + 1),
-        body: bleedingSignals.offPhase.message,
+        body: `This has appeared ${pluralize(bleedingEvidence.offTimingCount || 2, "time")} in your recent logs, so it looks like a repeated timing pattern rather than a one-off note.`,
+        priority: 20,
       }));
-    } else if (bleedingSignals.light) {
+    } else if (bleedingSignals.light || hasLightEvidence) {
       cards.push(makeInsightCard({
-        level: bleedingSignals.light.level,
+        level: bleedingSignals.light?.level || "medium",
         heading: "Your recent period logs have been lighter than your earlier pattern",
-        body: bleedingSignals.light.message,
+        body: hasLightEvidence
+          ? `${pluralize(bleedingEvidence.lightPeriodCount, "recent period")} in your logs have been lighter or shorter than the rest of your period history${bleedingEvidence.avgLightDuration ? `, averaging about ${pluralize(bleedingEvidence.avgLightDuration, "day")}` : ""}.`
+          : bleedingSignals.light.message,
+        priority: 25,
       }));
-    } else if (bleedingSignals.pain) {
+    } else if (bleedingSignals.pain || hasPainEvidence) {
       cards.push(makeInsightCard({
-        level: bleedingSignals.pain.level,
+        level: bleedingSignals.pain?.level || (painEvidence.maxSeverity >= 4 ? "high" : "medium"),
         heading: chooseVariant([
           "Your logs show a repeating pain pattern around your period",
           "Cramping or pelvic discomfort has shown up repeatedly during menstrual days in your logs",
         ], totalSymptomDays),
-        body: bleedingSignals.pain.message,
+        body: `Pain symptoms have appeared across ${pluralize(painEvidence.painfulPeriodCount || 2, "period")} in your history${painEvidence.maxSeverity ? `, with severity reaching ${painEvidence.maxSeverity}/5` : ""}.`,
+        guidance: "If this affects your day-to-day or feels different from your usual pattern, it may be worth mentioning to a provider.",
+        priority: 20,
       }));
     } else if (bleedingSignals.discharge) {
       cards.push(makeInsightCard({
         level: bleedingSignals.discharge.level,
         heading: "Your logs show a recurring discharge pattern in this part of your cycle",
-        body: bleedingSignals.discharge.message,
+        body: makeConcise(bleedingSignals.discharge.message),
+        priority: 35,
       }));
     }
   }
@@ -1791,11 +2062,18 @@ function composeAdvancedInsights({
   };
   if (anomaly.unusual || anomaly.drift || anomaly.cluster || anomaly.variability) {
     const parts = [];
-    if (anomaly.unusual) parts.push(anomaly.unusual.message);
-    if (anomaly.drift) parts.push("Your cycle length has been shifting over recent cycles instead of staying steady.");
-    if (anomaly.cluster) parts.push("Several recent cycles have drifted away from your earlier pattern.");
+    const latestResidual = Number(anomalyStats?.latestResidual);
+    const variability = anomalyStats?.patternSummary?.variability;
+    const avgCycleLength = anomalyStats?.patternSummary?.avgCycleLength;
+    if (anomaly.unusual && Number.isFinite(latestResidual)) {
+      parts.push(`The latest completed cycle was about ${pluralize(Math.abs(Math.round(latestResidual)), "day")} ${latestResidual > 0 ? "longer" : "shorter"} than expected from your recent baseline.`);
+    } else if (anomaly.unusual) {
+      parts.push("The latest completed cycle looks more different from your recent baseline than usual.");
+    }
+    if (anomaly.drift) parts.push("Your cycle length has been shifting over recent cycles rather than staying steady.");
+    if (anomaly.cluster) parts.push("Several recent cycles have moved away from your earlier timing pattern.");
     if (anomaly.variability && anomalyStats?.patternSummary?.variability != null) {
-      parts.push(`Your recent cycle lengths are spread by about ${anomalyStats.patternSummary.variability} days.`);
+      parts.push(`Your recent cycle lengths are spread by about ${variability} days${avgCycleLength ? ` around an average of ${avgCycleLength} days` : ""}.`);
     }
     const heading = chooseVariant([
       "This cycle looks more different from your usual pattern",
@@ -1805,42 +2083,75 @@ function composeAdvancedInsights({
     cards.push(makeInsightCard({
       level: anomaly.unusual?.level || anomaly.drift?.level || anomaly.cluster?.level || anomaly.variability?.level || "medium",
       heading,
-      body: joinInsightParts(parts),
+      body: makeConcise(joinInsightParts(parts)),
+      guidance: "Keep logging the next few cycles to see whether this is a one-off shift or a new pattern.",
+      priority: 40,
     }));
   }
 
   const confidenceScore = timingSignals.lowConfidence?.debug?.confidenceScore;
-  const shouldShowLearningCard =
+  const hasStrongCycleCard = cards.some((card) => (card.priority ?? 99) <= 40);
+  let learningCard = getLearningInsightCard(cards);
+  const timingCard = cards.find((card) => (card.priority ?? 99) === 30) || null;
+
+  if (!hasStrongCycleCard && !learningCard && !timingSignals.absence && totalCycleStarts < 3) {
+    let heading = "Your cycle pattern is still taking shape";
+    let body = totalCycleStarts === 0
+      ? "Log a period start when you can to begin building your cycle timeline."
+      : `So far, you have ${pluralize(totalCycleStarts, "period start")} and ${pluralize(totalCycleCount, "completed cycle")} in your history.`;
+    if (cycleEvidence.avgCycleLength && totalCycleCount > 0) {
+      body += ` Early logs suggest your cycle timing is centering around ${cycleEvidence.avgCycleLength} days.`;
+    }
+    if (cycleEvidence.longCount > 0) {
+      body += " Early logs also suggest your timing may be more spread out than average.";
+    } else if (cycleEvidence.shortCount > 0) {
+      body += " Early logs also suggest your timing may be closer together than average.";
+    }
+    if (totalCycleStarts === 0 && totalLogDays === 0) {
+      heading = "Your logging is still getting started";
+    }
+
+    learningCard = makeInsightCard({ level: "low", heading, body: makeConcise(body), priority: 45 });
+    cards.push(learningCard);
+  }
+
+  const shouldShowLearningReadiness =
     timingSignals.lowConfidence?.show ||
-    totalCycleCount < 3 ||
+    typeof confidenceScore === "number" ||
     totalCycleStarts < 3 ||
+    totalCycleCount < 3 ||
     timingSignals.loggingGap?.show ||
     recentLogDays <= 3 ||
     totalLogDays === 0;
-  if (shouldShowLearningCard) {
-    let heading = "Your pattern is still taking shape";
-    let body = "A few more consistent logs will make your insights more precise.";
-    if (typeof confidenceScore === "number") {
-      body = confidenceScore < 40
-        ? "Right now, your pattern is still early or uneven. A few more consistent logs will make predictions more precise."
-        : "A few more consistent logs will make your predictions more precise.";
-    } else if (totalCycleCount > 0 && totalCycleCount < 3) {
-      body = `So far, there are ${pluralize(totalCycleCount, "completed cycle")} in your history. A few more consistent logs will make predictions more precise.`;
+  if (shouldShowLearningReadiness) {
+    let readinessSentence = "A few more consistent logs will make predictions more precise.";
+    if (typeof confidenceScore === "number" && confidenceScore < 40) {
+      readinessSentence = "That makes exact timing less certain right now, so predictions are intentionally cautious until a few more consistent logs come in.";
+    } else if (totalCycleStarts < 3) {
+      readinessSentence = "A few more period starts will help turn this early pattern into a steadier prediction.";
     } else if (totalLogDays === 0) {
-      body = "Start logging cycles or symptoms to make these insights more personal.";
+      readinessSentence = "Start with a few cycle or symptom entries, and your insights will become more personal.";
     } else if (timingSignals.loggingGap?.debug?.daysSinceLastLog) {
-      body = `There has been a gap of about ${pluralize(timingSignals.loggingGap.debug.daysSinceLastLog, "day")} since your last cycle-related entry. More consistent logging will make your insights more precise.`;
+      readinessSentence = `Your last cycle entry was about ${pluralize(timingSignals.loggingGap.debug.daysSinceLastLog, "day")} ago, so the next period estimate is best treated as a cautious guide rather than a fixed date.`;
+    } else if (recentLogDays <= 3 && totalLogDays < 8) {
+      readinessSentence = `You have ${pluralize(totalLogDays, "logged day")} so far; more consistent logging will make your insights more precise.`;
     } else if (recentLogDays >= 8 && !cards.some((card) => card.level === "medium" || card.level === "high")) {
-      heading = "Your consistent logging is helping";
-      body = `You've logged ${pluralize(recentLogDays, "day")} in the last month, which gives your insights a stronger base.`;
+      readinessSentence = `You've logged ${pluralize(recentLogDays, "day")} in the last month, which gives your insights a stronger base.`;
     }
 
-    const hasEarlyCycleCard = cards.some((card) =>
-      card.heading === "Your cycle pattern is still taking shape" ||
-      card.heading === "Right now, your cycle pattern is still early"
-    );
-    if (!hasEarlyCycleCard || heading === "Your consistent logging is helping") {
-      cards.push(makeInsightCard({ level: "low", heading, body }));
+    const shouldAttachToTiming = timingCard && (timingSignals.lowConfidence?.show || timingSignals.loggingGap?.show);
+
+    if (learningCard) {
+      appendInsightSentence(learningCard, readinessSentence);
+    } else if (shouldAttachToTiming && timingCard.body && splitSentences(timingCard.body).length < 3) {
+      appendInsightSentence(timingCard, readinessSentence, 3);
+    } else if (!hasInsightHeading(cards, ["Your consistent logging is helping", "Your insights are still getting sharper", "Your timing estimates are still getting sharper", "Your timing estimates are still learning your pattern"])) {
+      cards.push(makeInsightCard({
+        level: "low",
+        heading: recentLogDays >= 8 ? "Your consistent logging is helping" : "Your timing estimates are still learning your pattern",
+        body: makeConcise(readinessSentence),
+        priority: 52,
+      }));
     }
   }
 
@@ -1854,44 +2165,72 @@ function composeAdvancedInsights({
         "Based on your past logs, this part of your cycle may bring familiar symptoms",
       ], totalSymptomDays),
       body: joinInsightParts([forecast.message, forecast.guidance], 1),
+      priority: 50,
     }));
   } else {
     const forecastDebug = forecast?.debug || {};
     let heading = "";
     let body = "";
     if (symptomGap?.code === "SYMPTOM_LOGGING_GAP" && symptomGap.show) {
-      heading = "Symptom forecasting needs a bit more history";
-      body = "A few more symptom entries will help forecast what tends to show up around this part of your cycle.";
+      heading = "Your symptom pattern needs a little more history";
+      body = "Your cycle timing has some shape, but symptom patterns need their own trail of entries. A few more symptom logs will help show what tends to repeat around this part of your cycle.";
     } else if (forecastDebug.suppressedBecause === "insufficient_cycles" || forecastDebug.suppressedBecause === "insufficient_cycle_length_data") {
-      heading = "Symptom patterns are still early";
-      body = "A few more logged cycles will help turn symptom tracking into symptom forecasting.";
+      heading = "Your symptom pattern is still forming";
+      body = "There are not enough completed cycles yet to safely forecast symptoms from your history. Once symptoms are logged across a few cycles, this area can highlight what usually shows up next for you.";
     } else if (forecastDebug.suppressedBecause === "no_symptom_history") {
-      heading = "There is not enough symptom history yet";
-      body = "Log symptoms across a few cycles to spot patterns like cramps, bloating, mood changes, or fatigue.";
+      heading = "Your symptom insights start with a few entries";
+      body = "Your cycle logs can guide timing, but symptom insights need symptom entries to compare. Logging things like cramps, bloating, mood changes, or fatigue across a few cycles will make this section more personal.";
     } else if (forecastDebug.suppressedBecause === "no_qualifying_forecast_candidates" && totalSymptomDays > 0) {
-      heading = "Your symptom history is starting to take shape";
-      body = `So far, you have ${pluralize(totalSymptomDays, "symptom day")} in your history. A bit more logging will help show what tends to come next.`;
+      heading = "Your symptom pattern is starting to come through";
+      body = `You have ${pluralize(totalSymptomDays, "symptom day")} in your history so far, which is enough to start learning but not enough to forecast confidently. A few more entries will help separate one-off symptoms from repeating patterns.`;
+    } else if (totalSymptomDays > 0) {
+      heading = "Your symptom pattern is starting to come through";
+      body = `You have ${pluralize(totalSymptomDays, "symptom day")} in your history so far. A few more entries around different cycle days will help show what is repeating versus what may be a one-off.`;
+    } else if (totalSymptomDays === 0 && totalLogDays > 0) {
+      heading = "Your cycle logs are started; symptoms can add the next layer";
+      body = "Your cycle logs are already helping with timing. Adding symptoms alongside them will help connect where you are in your cycle with how you tend to feel.";
     }
-    const hasLearningCard = cards.some((card) =>
-      card.heading === "Your pattern is still taking shape" ||
-      card.heading === "Your consistent logging is helping"
-    );
-    if (heading && body && !hasLearningCard) {
-      cards.push(makeInsightCard({ level: "low", heading, body }));
+    if (heading && body) {
+      const existingLearningCard = getLearningInsightCard(cards);
+      const hasCycleCard = cards.some((card) => (card.priority ?? 99) <= 40);
+      if (existingLearningCard && !hasCycleCard) {
+        appendInsightSentence(existingLearningCard, body);
+      } else {
+        cards.push(makeInsightCard({ level: "low", heading, body: makeConcise(body), priority: 55 }));
+      }
     }
+  }
+
+  const shouldShowFutureCapability =
+    totalLogDays > 0 &&
+    (totalCycleCount < 3 || totalSymptomDays < 3) &&
+    !cards.some((card) => (card.priority ?? 99) <= 20);
+  if (shouldShowFutureCapability && !cards.some((card) => (card.priority ?? 99) >= 45 && (card.priority ?? 99) <= 60)) {
+    cards.push(makeInsightCard({
+      level: "low",
+      heading: "Your logging rhythm is still getting established",
+      body: recentLogDays > 0
+        ? `You have ${pluralize(recentLogDays, "logged day")} in the last month. A few more consistent entries will make cycle shifts, symptom repeats, and custom symptom patterns easier to surface.`
+        : "A few more consistent entries will make cycle shifts, symptom repeats, and custom symptom patterns easier to surface.",
+      priority: 58,
+    }));
   }
 
   const fallback = allSignals
     .filter((s) => s?.show)
     .sort((a, b) => (pri[b.level] || 0) - (pri[a.level] || 0))
     .slice(0, 2)
-    .map((s) => makeInsightCard({ level: s.level, heading: signalLabel(s.code), body: s.message, guidance: s.guidance || "" }));
+    .map((s) => makeInsightCard({ level: s.level, heading: signalLabel(s.code), body: s.message, guidance: s.guidance || "", priority: 70 }));
 
   const finalCards = cards.filter(Boolean);
   if (!finalCards.length) return fallback;
 
   return finalCards
-    .sort((a, b) => (pri[b.level] || 0) - (pri[a.level] || 0))
+    .sort((a, b) => {
+      const byPriority = (a.priority ?? 50) - (b.priority ?? 50);
+      if (byPriority !== 0) return byPriority;
+      return (pri[b.level] || 0) - (pri[a.level] || 0);
+    })
     .slice(0, 4);
 }
 
@@ -1909,6 +2248,12 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
   const today          = new Date();
   const lastPeriodDate = lastPeriodStart ? new Date(lastPeriodStart + "T00:00:00") : null;
   const lastLogDateObj = lastLogDate     ? new Date(lastLogDate     + "T00:00:00") : null;
+  const patternEvidence = buildMenstrualPatternEvidence({
+    logsByDate,
+    cycleLengths,
+    lastPeriodStart,
+    today,
+  });
   const nextWindow     = cycle.nextPeriodDate ? {
     start: new Date(cycle.nextPeriodDate + "T00:00:00"),
     end:   new Date(addDaysStr(cycle.nextPeriodDate, 5) + "T00:00:00"),
@@ -1926,13 +2271,12 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
       });
       cycleSignals.push(...cycleEngineSignals);
 
-      const { periodEntries, unscheduledBleedingDates } = buildPeriodInsightInputs(logsByDate);
       const advancedCycleEngineSignals = algoCycleEngine.generateAdvancedInsights({
         cycleLengths,
         lastPeriodStart: lastPeriodDate,
         today,
-        periodEntries,
-        unscheduledBleedingDates,
+        periodEntries: patternEvidence.periodEntries,
+        unscheduledBleedingDates: patternEvidence.unscheduledBleedingDates,
       }).signals || [];
 
       const cycleCodes = new Set(cycleEngineSignals.map((s) => s.code));
@@ -1997,14 +2341,14 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
     cycle.avgCycleLength < 21 &&
     !advancedCycleSignals.some(s => s.code === "SHORT_CYCLE" || s.code === "POLYMENORRHEA_PATTERN")
   ) {
-    advancedCycleSignals.push({ code: "SHORT_CYCLE", level: "medium", show: true, message: "Your recent average cycle length is shorter than 21 days, so Bloom is treating the timing as more frequent than usual." });
+    advancedCycleSignals.push({ code: "SHORT_CYCLE", level: "medium", show: true, message: "Your recent average cycle length is shorter than 21 days, so your timing is being treated as more frequent than usual." });
   }
   if (
     cycle.avgCycleLength &&
     cycle.avgCycleLength > 35 &&
     !advancedCycleSignals.some(s => s.code === "LONG_CYCLE" || s.code === "OLIGOMENORRHEA_PATTERN")
   ) {
-    advancedCycleSignals.push({ code: "LONG_CYCLE", level: "medium", show: true, message: "Your recent average cycle length is longer than 35 days, so Bloom is treating the timing as more spread out than usual." });
+    advancedCycleSignals.push({ code: "LONG_CYCLE", level: "medium", show: true, message: "Your recent average cycle length is longer than 35 days, so your timing is being treated as more spread out than usual." });
   }
 
   const composed = composeAdvancedInsights({
@@ -2018,11 +2362,12 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
     cycleLengths,
     symptomHistory: buildEngineSymptomHistory(logsByDate),
     logsByDate,
+    patternEvidence,
     today,
   });
 
   if (!composed.length) {
-    advancedEl.innerHTML = `${customInsightsHtml || `<div class="insight-item">Bloom is still learning your pattern. A few more cycle and symptom logs will make these insights more personal.</div>`}`;
+    advancedEl.innerHTML = `${customInsightsHtml || `<div class="insight-item">Your pattern is still taking shape. A few more cycle and symptom logs will make these insights more personal.</div>`}`;
     return;
   }
 

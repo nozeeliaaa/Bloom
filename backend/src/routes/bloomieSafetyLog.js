@@ -32,7 +32,8 @@ import { requireAuth }               from "../middleware/auth.js";
 
 const router = express.Router();
 
-const VALID_TYPES = new Set(["urgent_trigger", "oos_fallback", "escalation"]);
+const VALID_TYPES      = new Set(["urgent_trigger", "oos_fallback", "escalation"]);
+const VALID_RISK_LEVELS = new Set(["low", "moderate", "high"]);
 
 const VALID_SYMPTOM_KEYS = new Set([
   "late","heavy","spotting","pelvic","mood","discharge","nausea","dizziness",
@@ -54,7 +55,7 @@ router.post("/", requireAuth, async (req, res) => {
     const {
       type, input, route, reason,
       category, fromNode, urgencyFlag, symptoms,
-      containsHealthKeywords,
+      containsHealthKeywords, topic, riskLevel,
     } = req.body;
 
     // Validate type
@@ -77,6 +78,8 @@ router.post("/", requireAuth, async (req, res) => {
     if (typeof fromNode === "string") doc.fromNode = fromNode.slice(0, 80);
     if (urgencyFlag              !== undefined) doc.urgencyFlag              = !!urgencyFlag;
     if (containsHealthKeywords   !== undefined) doc.containsHealthKeywords   = !!containsHealthKeywords;
+    if (typeof topic    === "string") doc.topic    = topic.slice(0, 80);
+    if (typeof riskLevel === "string" && VALID_RISK_LEVELS.has(riskLevel)) doc.riskLevel = riskLevel;
 
     if (Array.isArray(symptoms)) {
       doc.symptoms = symptoms

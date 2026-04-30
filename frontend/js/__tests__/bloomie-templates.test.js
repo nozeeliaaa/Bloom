@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildGuidanceResponse, getStructuredSummary, getPhaseInsight, getToneOpener, hasMedicalSeriousness, CONCERN_PRIORITY } from "../bloomie-templates.js";
-import { extractUrgency } from "../bloomie-inference.js";
+import { extractEntities, extractUrgency } from "../bloomie-inference.js";
 import { createCtx } from "../bloomie-session.js";
 
 // Helper: build a minimal entities object
@@ -193,6 +193,134 @@ describe("buildGuidanceResponse - response structure", () => {
     expect(res.structured).toHaveProperty("meaning");
     expect(res.structured).toHaveProperty("nextSteps");
     expect(res.structured).toHaveProperty("urgentSigns");
+  });
+});
+
+// ─── discharge + blood colour explanation layer ─────────────────────────────
+
+describe("buildGuidanceResponse - discharge and blood colour scenarios", () => {
+  it("maps a clear rush/stringy slime story to normal discharge education", () => {
+    const e = extractEntities("felt a rush, panty soaked, clear string slime");
+    expect(e.domainSelections.discharge).toEqual(expect.arrayContaining([
+      "watery", "eggwhite", "increased_volume",
+    ]));
+
+    const res = buildGuidanceResponse(e, "DISCHARGE_EXPLANATION");
+    const text = res.lines.join(" ");
+
+    expect(res.scenario).toBe("discharge_clear_watery");
+    expect(text).toMatch(/catch you off guard/i);
+    expect(text).toMatch(/cervical mucus|ovulation|estrogen/i);
+    expect(text).toMatch(/body doing its thing/i);
+    expect(text).not.toMatch(/Possible situation:|What this means:/i);
+  });
+
+  it("routes green or foul-smelling discharge to a check-in message", () => {
+    const e = extractEntities("greenish discharge and it smells bad");
+    expect(e.domainSelections.discharge).toEqual(expect.arrayContaining([
+      "green", "foul_smell",
+    ]));
+
+    const res = buildGuidanceResponse(e, "DISCHARGE_CONCERN");
+    const text = res.lines.join(" ");
+
+    expect(res.scenario).toBe("discharge_concern");
+    expect(text).toMatch(/imbalance|infection/i);
+    expect(text).toMatch(/provider|checked/i);
+  });
+
+  it("handles thick clumpy discharge without diagnosing", () => {
+    const e = extractEntities("thick white chunks like cottage cheese and itching");
+    const res = buildGuidanceResponse(e, "DISCHARGE_EXPLANATION");
+    const text = res.lines.join(" ");
+
+    expect(e.domainSelections.discharge).toContain("thick_clumpy");
+    expect(res.scenario).toBe("discharge_thick_clumpy");
+    expect(text).toMatch(/yeast overgrowth/i);
+    expect(text).toMatch(/not a diagnosis/i);
+    expect(text).not.toMatch(/you have|diagnosed/i);
+  });
+
+  it("explains darker blood colour as slower/older blood", () => {
+    const e = extractEntities("my blood is wine color");
+    const res = buildGuidanceResponse(e, "BLOOD_COLOUR_EXPLANATION");
+    const text = res.lines.join(" ");
+
+    expect(e.domainSelections.blood_colour).toContain("dark_red");
+    expect(res.scenario).toBe("blood_colour_dark_old");
+    expect(text).toMatch(/taken longer to leave|flow is slower/i);
+  });
+
+  it("flags gray blood colour as worth checking", () => {
+    const e = extractEntities("grey blood with a strong smell");
+    const res = buildGuidanceResponse(e, "BLOOD_COLOUR_EXPLANATION");
+    const text = res.lines.join(" ");
+
+    expect(e.domainSelections.blood_colour).toContain("gray");
+    expect(res.scenario).toBe("blood_colour_concern");
+    expect(text).toMatch(/less common|worth checking|get this checked/i);
+  });
+
+  it("still explains blood colour when only symptom flags survive merging", () => {
+    const res = buildGuidanceResponse(entities({
+      symptoms: {
+        blood_colour_any: true,
+        blood_colour_dark: true,
+      },
+    }));
+
+    expect(res).not.toBeNull();
+    expect(res.scenario).toBe("blood_colour_dark_old");
+    expect(res.lines.join(" ")).toMatch(/taken longer to leave|flow is slower/i);
+  });
+
+  it("handles natural period-colour wording like 'my period always black'", () => {
+    const e = extractEntities("my period always black");
+    const res = buildGuidanceResponse(e);
+
+    expect(res).not.toBeNull();
+    expect(res.scenario).toBe("blood_colour_dark_old");
+    expect(res.lines.join(" ")).toMatch(/taken longer to leave|flow is slower/i);
+  });
+});
+
+describe("buildGuidanceResponse - catalog symptom fallback", () => {
+  it("can still respond to social symptoms like feeling antisocial", () => {
+    const e = extractEntities("i'm feeling antisocial and withdrawn");
+    const res = buildGuidanceResponse(e);
+    const text = res?.lines.join(" ") || "";
+
+    expect(e.catalogMatches.map((m) => m.key)).toEqual(
+      expect.arrayContaining(["WITHDRAWN"])
+    );
+    expect(res).not.toBeNull();
+    expect(res.scenario).toBe("catalog_symptom_support");
+    expect(text).toMatch(/social/i);
+    expect(text).toMatch(/real symptom worth noticing|worth noticing/i);
+  });
+
+  it("can talk through mixed catalog symptoms even without a special route", () => {
+    const e = extractEntities("my breasts sore and i feel bloated");
+    const res = buildGuidanceResponse(e);
+    const text = res?.lines.join(" ") || "";
+
+    expect(e.catalogMatches.map((m) => m.key)).toEqual(
+      expect.arrayContaining(["BREAST_TENDERNESS", "BLOATING"])
+    );
+    expect(res).not.toBeNull();
+    expect(text).toMatch(/breast tenderness|bloating/i);
+    expect(text).toMatch(/together than in isolation|worth noticing/i);
+  });
+
+  it("can talk through mind and energy symptoms from the catalog", () => {
+    const e = extractEntities("I'm having brain fog, low energy, and headache");
+    const res = buildGuidanceResponse(e);
+
+    expect(e.catalogMatches.map((m) => m.key)).toEqual(
+      expect.arrayContaining(["BRAIN_FOG", "LOW_ENERGY", "HEADACHE"])
+    );
+    expect(res).not.toBeNull();
+    expect(res.lines.join(" ")).toMatch(/brain fog|low energy|headache/i);
   });
 });
 

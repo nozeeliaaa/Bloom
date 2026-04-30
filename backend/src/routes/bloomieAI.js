@@ -44,8 +44,19 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { createRequire } from "module";
 import express   from "express";
 import rateLimit from "express-rate-limit";
+
+const _require      = createRequire(import.meta.url);
+const symptomCatalog = _require("../../data/symptoms.json");
+
+// All valid catalog keys — built once from the source of truth so the symptom
+// endpoint's allowlist never drifts from symptoms.json.
+const VALID_CATALOG_KEYS = new Set(symptomCatalog.map(s => s.key));
+
+// Compact key list embedded in the system prompt (no descriptions to save tokens).
+const CATALOG_KEY_LIST = symptomCatalog.map(s => s.key).join(", ");
 
 const router = express.Router();
 
@@ -378,6 +389,101 @@ router.post("/extract", aiLimiter, async (req, res) => {
   } catch (err) {
     const code = err.code ?? "ai_unavailable";
     console.error(`[bloomieAI/extract] ${code}:`, err.message);
+    return res.status(503).json({ error: code });
+  }
+});
+
+// ── POST /symptoms ────────────────────────────────────────────────────────────
+/**
+ * Catalog-grounded symptom inference proxy.
+ *
+ * Maps a free-text user message to one or more keys from symptoms.json using
+ * Haiku as a semantic matcher — handling phrasing that regex aliases miss.
+ *
+ * Body:    { input: string, phase?: string, recentSymptoms?: string[] }
+ * Returns: { primary, secondary, confidence, clarificationNeeded, reason }
+ *          { error: "ai_timeout"|"ai_parse_error"|"ai_unavailable"|... }
+ *
+ * Fields forwarded to Anthropic: input (≤500 chars), phase, recentSymptoms.
+ * No conversation history. No session data. No PII.
+ */
+router.post("/symptoms", aiLimiter, async (req, res) => {
+  const { input, phase, recentSymptoms } = req.body ?? {};
+
+  if (typeof input !== "string" || !input.trim()) {
+    return res.status(400).json({ error: "input is required" });
+  }
+  if (input.length > 500) {
+    return res.status(400).json({ error: "input too long" });
+  }
+
+  // Build optional context hints for the model.
+  const contextLines = [];
+  if (phase && typeof phase === "string") {
+    contextLines.push(`current_phase: ${phase.trim().slice(0, 40)}`);
+  }
+  if (Array.isArray(recentSymptoms) && recentSymptoms.length) {
+    const safe = recentSymptoms
+      .filter(k => typeof k === "string" && VALID_CATALOG_KEYS.has(k))
+      .slice(0, 10);
+    if (safe.length) contextLines.push(`recent_symptoms: ${safe.join(", ")}`);
+  }
+
+  const userContent = contextLines.length
+    ? `${contextLines.join("\n")}\nuser_utterance: ${input.trim()}`
+    : input.trim();
+
+  const systemPrompt = [
+    "You are a symptom interpretation engine for a women's menstrual health app.",
+    "Your ONLY job is to map the user's message to symptom keys from the catalog below.",
+    "Do NOT generate advice, explanations, or free-form responses.",
+    "Output ONLY compact JSON — no markdown, no surrounding text.",
+    'Schema: {"primary":"KEY_OR_null","secondary":["KEY1","KEY2"],"confidence":0.0,"clarificationNeeded":false,"reason":"short explanation"}',
+    "Rules:",
+    "- Only use keys from the catalog. Never invent new keys.",
+    "- Prefer meaning over exact word match.",
+    "- If the message describes a long-term baseline (e.g. 'I've always been like this'), set primary to null and clarificationNeeded to true.",
+    "- If the message is an improvement (e.g. 'I feel better'), do NOT match an active symptom.",
+    "- secondary: up to 2 additional keys only when strongly supported.",
+    "- confidence: 0.0–1.0. Set below 0.5 and clarificationNeeded=true when ambiguous.",
+    "- reason: 10 words max.",
+    `Symptom catalog keys: ${CATALOG_KEY_LIST}`,
+  ].join(" ");
+
+  try {
+    const parsed = await callAnthropic({
+      system:      systemPrompt,
+      userContent,
+      maxTokens:   150,
+      timeoutMs:   1400,
+    });
+
+    // Validate primary
+    const primary = parsed.primary === null || parsed.primary === "null"
+      ? null
+      : (typeof parsed.primary === "string" && VALID_CATALOG_KEYS.has(parsed.primary)
+          ? parsed.primary
+          : null);
+
+    // Validate secondary — drop any key not in catalog, cap at 2
+    const secondary = Array.isArray(parsed.secondary)
+      ? parsed.secondary
+          .filter(k => typeof k === "string" && VALID_CATALOG_KEYS.has(k) && k !== primary)
+          .slice(0, 2)
+      : [];
+
+    const confidence = typeof parsed.confidence === "number"
+      ? Math.min(1, Math.max(0, parsed.confidence))
+      : 0;
+
+    const clarificationNeeded = !!parsed.clarificationNeeded;
+    const reason = typeof parsed.reason === "string" ? parsed.reason.slice(0, 120) : "";
+
+    return res.json({ primary, secondary, confidence, clarificationNeeded, reason });
+
+  } catch (err) {
+    const code = err.code ?? "ai_unavailable";
+    console.error(`[bloomieAI/symptoms] ${code}:`, err.message);
     return res.status(503).json({ error: code });
   }
 });

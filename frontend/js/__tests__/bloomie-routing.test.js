@@ -14,6 +14,7 @@ import {
   computeRouteConfidence,
   INTENT_TO_NODE,
 } from "../bloomie-routing.js";
+import { normalizeBloomieText } from "../bloomie-normalize.js";
 
 function getRegisteredNodeIds() {
   const envBase = {
@@ -57,6 +58,11 @@ describe("normalizeText", () => {
     expect(normalizeText("  Heavy BLEEDING  ")).toBe("heavy bleeding");
   });
 
+  it("stays semantically pure for heavy bleeding phrasing", () => {
+    expect(normalizeText("Heavy BLEEDING")).toBe("heavy bleeding");
+    expect(normalizeText("my period late")).toBe("my period late");
+  });
+
   it("strips special chars except apostrophe", () => {
     expect(normalizeText("it's late!!")).toBe("it's late");
   });
@@ -64,6 +70,12 @@ describe("normalizeText", () => {
   it("handles null/undefined", () => {
     expect(normalizeText(null)).toBe("");
     expect(normalizeText(undefined)).toBe("");
+  });
+
+  it("matches the shared Bloomie normalizer in routing mode", () => {
+    expect(normalizeText("  Heavy BLEEDING!!  ")).toBe(
+      normalizeBloomieText("  Heavy BLEEDING!!  ", { stripSpecialChars: true })
+    );
   });
 });
 

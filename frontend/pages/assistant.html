@@ -172,6 +172,37 @@
       align-items: center;
     }
 
+    .chat-input-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: 0.45rem;
+      padding: 0 0.35rem;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
+
+    .chat-input-hint {
+      line-height: 1.35;
+    }
+
+    .chat-char-count {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      transition: color 0.15s ease, font-weight 0.15s ease;
+    }
+
+    .chat-char-count.is-near-limit {
+      color: #b85c82;
+      font-weight: 700;
+    }
+
+    .chat-char-count.is-at-limit {
+      color: #a63d63;
+      font-weight: 800;
+    }
+
     .chat-input {
       flex: 1;
       padding: 0.7rem 1rem;
@@ -515,11 +546,15 @@
               type="text"
               placeholder="Type your question…"
               autocomplete="off"
-              maxlength="240"
+              maxlength="300"
             />
             <button class="chat-mic-btn" id="chat-mic-btn" type="button" aria-label="Tap to speak" title="Tap to speak">🎙️</button>
             <button class="chat-send-btn chat-send-btn--text" type="submit" aria-label="Send message">Send</button>
           </form>
+          <div class="chat-input-meta" aria-live="polite">
+            <div class="chat-input-hint">You can type up to 300 characters.</div>
+            <div class="chat-char-count" id="chat-char-count">0 / 300</div>
+          </div>
           <div class="chat-mic-status" id="chat-mic-status" aria-live="polite">Tap to speak</div>
           <div class="chat-footer-links" aria-label="Legal links">
             <a href="/pages/privacy.html" target="_blank" rel="noopener">Privacy</a>

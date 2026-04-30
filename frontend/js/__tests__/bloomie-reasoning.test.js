@@ -132,4 +132,86 @@ describe("bloomie reasoning layer", () => {
     expect(decision.interpretation).toBe("possible_perimenopause_pattern");
     expect(decision.next).toBe("PERIMENOPAUSE_INTRO");
   });
+
+  // ── Fix 1: fever + discharge/pain ─────────────────────────────────────────
+
+  it("fever + unusual discharge -> fever_with_discharge_or_pain triage", () => {
+    const { decision } = runReasoning("i have a fever and some unusual discharge");
+    expect(decision.interpretation).toBe("fever_with_discharge_or_pain");
+    expect(decision.strategy).toBe("triage");
+    expect(decision.next).toBe("ELSE_DISCHARGE_ENTRY");
+  });
+
+  it("fever + pelvic pain -> fever_with_discharge_or_pain triage", () => {
+    const { decision } = runReasoning("running a fever and having pelvic pain");
+    expect(decision.interpretation).toBe("fever_with_discharge_or_pain");
+    expect(decision.strategy).toBe("triage");
+    expect(decision.next).toBe("ELSE_DISCHARGE_ENTRY");
+  });
+
+  it("fever alone (no discharge or pain) -> does not trigger fever rule", () => {
+    const { decision } = runReasoning("i have a fever");
+    expect(decision.interpretation).not.toBe("fever_with_discharge_or_pain");
+  });
+
+  // ── Fix 3: bleeding after sex ─────────────────────────────────────────────
+
+  it("bleeding after sex -> bleeding_after_sex clarify route to SPOT_INTRO", () => {
+    const { decision } = runReasoning("i was bleeding after sex");
+    expect(decision.interpretation).toBe("bleeding_after_sex");
+    expect(decision.strategy).toBe("clarify");
+    expect(decision.next).toBe("SPOT_INTRO");
+    expect(decision.payload?.postSex).toBe(true);
+  });
+
+  it("spotting after intercourse -> bleeding_after_sex", () => {
+    const { decision } = runReasoning("i had some spotting after intercourse");
+    expect(decision.interpretation).toBe("bleeding_after_sex");
+  });
+
+  // ── Fix 4: severe unmanaged pain ──────────────────────────────────────────
+
+  it("unbearable cramps -> severe_unmanaged_pain triage", () => {
+    const { decision } = runReasoning("unbearable cramps, the pain is not going away");
+    expect(decision.interpretation).toBe("severe_unmanaged_pain");
+    expect(decision.strategy).toBe("triage");
+    expect(decision.next).toBe("HEAVY_ROUTE_C");
+  });
+
+  it("ibuprofen didn't help with cramps -> severe_unmanaged_pain", () => {
+    const { decision } = runReasoning("ibuprofen didn't help, my cramps are really bad");
+    expect(decision.interpretation).toBe("severe_unmanaged_pain");
+  });
+
+  it("heavy bleeding + severe pain -> heavy_bleeding_red_flag wins over severe_unmanaged_pain", () => {
+    const { decision } = runReasoning("heavy bleeding and unbearable pain");
+    expect(decision.interpretation).toBe("heavy_bleeding_red_flag");
+  });
+
+  // ── Fix 5: perimenopause partial cluster ──────────────────────────────────
+
+  it("irregular cycles + hot flashes (no sleep/mood) -> possible_perimenopause_pattern", () => {
+    const { decision } = runReasoning("my periods are irregular and i keep getting hot flashes");
+    expect(decision.interpretation).toBe("possible_perimenopause_pattern");
+    expect(decision.next).toBe("PERIMENOPAUSE_INTRO");
+  });
+
+  it("irregular cycles + cant sleep (no vasomotor) -> possible_perimenopause_pattern", () => {
+    const { decision } = runReasoning("my cycle is irregular and i cant sleep properly");
+    expect(decision.interpretation).toBe("possible_perimenopause_pattern");
+    expect(decision.next).toBe("PERIMENOPAUSE_INTRO");
+  });
+
+  // ── Fix 6: foul discharge without itching ────────────────────────────────
+
+  it("foul-smelling discharge alone -> foul_discharge_alone route to ELSE_DISCHARGE_ENTRY", () => {
+    const { decision } = runReasoning("my discharge has a foul smell");
+    expect(decision.interpretation).toBe("foul_discharge_alone");
+    expect(decision.next).toBe("ELSE_DISCHARGE_ENTRY");
+  });
+
+  it("fishy discharge (no itching) -> foul_discharge_alone", () => {
+    const { decision } = runReasoning("i have fishy discharge");
+    expect(decision.interpretation).toBe("foul_discharge_alone");
+  });
 });

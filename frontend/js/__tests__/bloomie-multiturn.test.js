@@ -193,6 +193,62 @@ describe("multi-turn: topic interrupt clears entity history", () => {
   });
 });
 
+describe("multi-turn: latest input priority", () => {
+  it("abandons stale heavy-flow questioning when the newest turn is pain plus discharge", () => {
+    clickButton("period");
+    clickButton("heavy");
+    expect(chat.getState().state.startsWith("HEAVY_")).toBe(true);
+
+    sendMessage("actually it's cramps and yellow discharge");
+    const state = chat.getState();
+
+    expect(state.state).toBe("ELSE_DISCHARGE_ENTRY");
+    expect(state.state.startsWith("HEAVY_")).toBe(false);
+    expect(state.entityHistory.at(-1)?.symptoms?.pelvic).toBe(true);
+    expect(state.entityHistory.at(-1)?.symptoms?.discharge).toBe(true);
+    expect(state.entityHistory.at(-1)?.symptoms?.heavy).toBe(false);
+  });
+
+  it("keeps repair turns in-flow and asks a refined question instead of restarting", () => {
+    sendMessage("cramps and yellow discharge");
+    sendMessage("that's not what i meant");
+
+    const state = chat.getState();
+    expect(state.state).not.toBe("START_MENU");
+    expect(getChatBoxText()).toMatch(/main issue the cramps, the discharge, or both together/i);
+  });
+
+  it("does not re-ask the same clarification after the user dismisses it", () => {
+    sendMessage("my belly hurts");
+    expect(getChatBoxText()).toMatch(/stomach\/belly in general|cramps low in your pelvis/i);
+    expect(chat.getState().pendingClarification?.key).toBe("pain_location");
+
+    sendMessage("forget it");
+    const state = chat.getState();
+    expect(state.pendingClarification).toBeNull();
+    expect(state.declinedClarificationKeys.has("pain_location")).toBe(true);
+    expect(getChatBoxText()).not.toMatch(/belly, lower pelvic area, or somewhere else/i);
+  });
+
+  it("keeps clots and cramps on one bleeding-focused follow-up", () => {
+    sendMessage("clots and cramps");
+
+    const text = getChatBoxText();
+    expect(text).toMatch(/clots|cramps/i);
+    expect(text).toMatch(/soaking through a pad|heavier than usual/i);
+    expect(text).not.toMatch(/belly, lower pelvic area, or somewhere else/i);
+  });
+
+  it("keeps mixed digestive symptoms progressive instead of spawning multiple probes", () => {
+    sendMessage("bloating and nausea");
+
+    const state = chat.getState();
+    const text = getChatBoxText();
+    expect(state.pendingClarification).toBeNull();
+    expect(text).not.toMatch(/Where does the pain feel|Has the colour, smell, or texture changed/i);
+  });
+});
+
 // ── 3b. Accumulated extraction for low-context follow-ups ───────────────────
 
 describe("multi-turn: accumulated extraction window", () => {

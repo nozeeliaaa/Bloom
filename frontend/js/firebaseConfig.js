@@ -8,7 +8,9 @@
  * This file should be in .gitignore for security.
  */
 // Empty string = use Vite proxy (/api → http://127.0.0.1:4000). Avoids CORS entirely.
-window.BLOOM_API_BASE = "";
+if (typeof window !== "undefined" && window.BLOOM_API_BASE === undefined) {
+  window.BLOOM_API_BASE = "";
+}
 
 export const firebaseConfig = {
   apiKey:            "AIzaSyCoY7010ONRgfc9ic6orCefKgSFAbAaOtg",

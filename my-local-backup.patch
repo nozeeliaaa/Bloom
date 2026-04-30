@@ -1,0 +1,957 @@
+diff --git a/backend/src/routes/cyclesML.js b/backend/src/routes/cyclesML.js
+index e6dcc58..64fa62e 100644
+--- a/backend/src/routes/cyclesML.js
++++ b/backend/src/routes/cyclesML.js
+@@ -194,6 +194,12 @@ function todayDateKey() {
+   return `${y}-${m}-${dy}`;
+ }
+ 
++function daysBetweenDateKeys(a, b) {
++  return Math.round(
++    (new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000
++  );
++}
++
+ /** Same period-cluster logic as calendar.js getPeriodClusters */
+ function getPeriodClustersBackend(logs) {
+   const periodDays = Object.keys(logs)
+@@ -215,10 +221,10 @@ function getPeriodClustersBackend(logs) {
+ }
+ 
+ /** Build N future cycles (all dates as YYYY-MM-DD strings) */
+-function buildFutureCyclesBackend(lastPeriodStart, predictedLength, periodDuration, monthsAhead, windowDays) {
++function buildFutureCyclesBackend(lastPeriodStart, predictedLength, periodDuration, cyclesAhead, windowDays) {
+   const cycles = [];
+   let chainStart = lastPeriodStart;
+-  for (let i = 0; i < monthsAhead; i++) {
++  for (let i = 0; i < cyclesAhead; i++) {
+     const periodStart  = dateStrAddDays(chainStart, predictedLength);
+     const periodEnd    = dateStrAddDays(periodStart, periodDuration - 1);
+     const ovulationDay = dateStrAddDays(periodStart, -14);
+@@ -240,6 +246,43 @@ function buildFutureCyclesBackend(lastPeriodStart, predictedLength, periodDurati
+   return cycles;
+ }
+ 
++function computeFutureCycleCount(lastPeriodStart, predictedLength, minimumAhead = 3) {
++  const firstPredictedStart = dateStrAddDays(lastPeriodStart, predictedLength);
++  const daysPastFirst = Math.max(0, daysBetweenDateKeys(firstPredictedStart, todayDateKey()));
++  const cyclesToCatchUp = Math.floor(daysPastFirst / predictedLength);
++  return Math.max(minimumAhead, cyclesToCatchUp + minimumAhead);
++}
++
++function resolvePredictedPeriodState(lastPeriodStart, predictedLength, futureCycles) {
++  const today = todayDateKey();
++  const firstPredictedPeriodDate = dateStrAddDays(lastPeriodStart, predictedLength);
++  const rawDaysLate = Math.max(0, daysBetweenDateKeys(firstPredictedPeriodDate, today));
++  const missedPredictedCycles = rawDaysLate > predictedLength
++    ? Math.floor(rawDaysLate / predictedLength)
++    : 0;
++  const currentExpectedPeriodDate = rawDaysLate > 0
++    ? dateStrAddDays(firstPredictedPeriodDate, missedPredictedCycles * predictedLength)
++    : firstPredictedPeriodDate;
++  const nextUpcomingPeriodDate = (futureCycles || []).find((c) => c.periodStart && c.periodStart > today)?.periodStart ?? null;
++  const daysLate = currentExpectedPeriodDate < today
++    ? daysBetweenDateKeys(currentExpectedPeriodDate, today)
++    : 0;
++  const cycleTimingStatus = rawDaysLate > predictedLength ? 'cycle_disruption'
++    : rawDaysLate > 0 ? 'late'
++    : 'expected';
++
++  return {
++    firstPredictedPeriodDate,
++    currentExpectedPeriodDate,
++    nextUpcomingPeriodDate,
++    rawDaysLate,
++    daysLate,
++    missedPredictedCycles,
++    cycleTimingStatus,
++    isCycleTimingDisrupted: cycleTimingStatus === 'cycle_disruption',
++  };
++}
++
+ /** Convert cyclePhaseEngine confidence string → object shape calendar.js expects */
+ function buildConfidenceObj(confidenceStr, cycleCount) {
+   const map = {
+@@ -319,6 +362,8 @@ router.post('/state', requireAuth, requireConsent, async (req, res) => {
+         dayInCycle: null, avgCycleLength: null, predictedCycleLength: null,
+         confidence: { level: 'Low', windowDays: 5, message: 'Log your first period to see predictions.' },
+         nextPeriodDate: null, ovulationDate: null, fertileStart: null, fertileEnd: null,
++        firstPredictedPeriodDate: null, currentExpectedPeriodDate: null, nextUpcomingPeriodDate: null,
++        daysLate: 0, rawDaysLate: 0, missedPredictedCycles: 0, cycleTimingStatus: 'unknown', isCycleTimingDisrupted: false,
+         cyclesLogged: 0, predictedPeriodDays: [], futureOvulationDates: [],
+         allFertileDays: [], futureCycles: [],
+         disclaimer: 'This is an educational estimate, not a medical prediction.',
+@@ -376,10 +421,12 @@ router.post('/state', requireAuth, requireConsent, async (req, res) => {
+     const confidence = buildConfidenceObj(phaseData.confidence, cycleLengths.length);
+ 
+     // 5 ─ Future cycles (date strings)
+-    const futureCycles = buildFutureCyclesBackend(lastStart, predictedCycleLength, periodDuration, 3, confidence.windowDays);
++    const futureCycleCount = computeFutureCycleCount(lastStart, predictedCycleLength, 3);
++    const futureCycles = buildFutureCyclesBackend(lastStart, predictedCycleLength, periodDuration, futureCycleCount, confidence.windowDays);
+ 
+     // 6 ─ Calendar overlays
+     const overlays = buildCalendarOverlays(futureCycles, clusterStarts);
++    const predictedPeriodState = resolvePredictedPeriodState(lastStart, predictedCycleLength, futureCycles);
+ 
+     const state = {
+       ready:                true,
+@@ -389,7 +436,15 @@ router.post('/state', requireAuth, requireConsent, async (req, res) => {
+       avgCycleLength:       phaseData.avgCycleLength ?? avgLen,
+       predictedCycleLength,
+       confidence,
+-      nextPeriodDate:       overlays.nextPeriodDate ?? phaseData.nextPeriodDate,
++      nextPeriodDate:       predictedPeriodState.currentExpectedPeriodDate,
++      firstPredictedPeriodDate: predictedPeriodState.firstPredictedPeriodDate,
++      currentExpectedPeriodDate: predictedPeriodState.currentExpectedPeriodDate,
++      nextUpcomingPeriodDate: predictedPeriodState.nextUpcomingPeriodDate ?? overlays.nextPeriodDate ?? phaseData.nextPeriodDate,
++      daysLate:             predictedPeriodState.daysLate,
++      rawDaysLate:          predictedPeriodState.rawDaysLate,
++      missedPredictedCycles: predictedPeriodState.missedPredictedCycles,
++      cycleTimingStatus:    predictedPeriodState.cycleTimingStatus,
++      isCycleTimingDisrupted: predictedPeriodState.isCycleTimingDisrupted,
+       ovulationDate:        phaseData.ovulationDate,
+       fertileStart:         phaseData.fertileStart,
+       fertileEnd:           phaseData.fertileEnd,
+@@ -439,4 +494,4 @@ router.post('/phase', requireAuth, requireConsent, (req, res) => {
+   }
+ });
+ 
+-export default router;
+\ No newline at end of file
++export default router;
+diff --git a/frontend/js/__tests__/bloomie-inference.test.js b/frontend/js/__tests__/bloomie-inference.test.js
+index 1bb6a5a..5391e04 100644
+--- a/frontend/js/__tests__/bloomie-inference.test.js
++++ b/frontend/js/__tests__/bloomie-inference.test.js
+@@ -66,6 +66,11 @@ describe("extractEntities — symptoms", () => {
+     expect(e.symptoms.heavy).toBe(true);
+   });
+ 
++  it("detects heavy flow phrasing", () => {
++    const e = extractEntities("heavy flow affecting my day");
++    expect(e.symptoms.heavy).toBe(true);
++  });
++
+   it("detects spotting", () => {
+     const e = extractEntities("i noticed spotting today");
+     expect(e.symptoms.spotting).toBe(true);
+@@ -169,6 +174,11 @@ describe("extractEntities — severity", () => {
+     const e = extractEntities("pretty bad pain, affecting my day");
+     expect(e.severity).toBe("moderate");
+   });
++
++  it("extracts severe from 'bleed out bad' phrasing", () => {
++    const e = extractEntities("me bleed out bad");
++    expect(e.severity).toBe("severe");
++  });
+ });
+ 
+ describe("extractEntities — timing", () => {
+@@ -332,6 +342,18 @@ describe("inferRoute — heavy bleeding routes", () => {
+     expect(route.next).toBe("HEAVY_ROUTE_B");
+     expect(REGISTERED_NODE_IDS.has(route.next)).toBe(true);
+   });
++
++  it("heavy flow affecting day → HEAVY_ROUTE_B", () => {
++    const e = extractEntities("heavy flow affecting my day");
++    const route = inferRoute(e);
++    expect(route.next).toBe("HEAVY_ROUTE_B");
++  });
++
++  it("very bad heavy bleeding that is unbearable → HEAVY_ROUTE_C", () => {
++    const e = extractEntities("very bad heavy bleeding that is unbearable");
++    const route = inferRoute(e);
++    expect(route.next).toBe("HEAVY_ROUTE_C");
++  });
+ });
+ 
+ describe("inferRoute — spotting routes", () => {
+diff --git a/frontend/js/__tests__/bloomie-intent-tags.test.js b/frontend/js/__tests__/bloomie-intent-tags.test.js
+index d1c6e94..7e29d95 100644
+--- a/frontend/js/__tests__/bloomie-intent-tags.test.js
++++ b/frontend/js/__tests__/bloomie-intent-tags.test.js
+@@ -12,6 +12,8 @@ describe("repair / clarification classifier", () => {
+   it("classifies patois confusion variants", () => {
+     expect(classifyRepairClarification("mi nuh get it")?.label).toBe("clarification");
+     expect(classifyRepairClarification("seh that again")?.label).toBe("clarification");
++    expect(classifyRepairClarification("what dat mean")?.label).toBe("clarification");
++    expect(classifyRepairClarification("weh yuh mean")?.label).toBe("clarification");
+   });
+ 
+   it("classifies mismatch feedback as frustration", () => {
+diff --git a/frontend/js/__tests__/bloomie-oos-routing.test.js b/frontend/js/__tests__/bloomie-oos-routing.test.js
+index 77af97f..8043355 100644
+--- a/frontend/js/__tests__/bloomie-oos-routing.test.js
++++ b/frontend/js/__tests__/bloomie-oos-routing.test.js
+@@ -178,6 +178,24 @@ describe("bloomie OOS routing - true positives and warm fallback", () => {
+     expect(routed.payload?.oos).toBe("clarification_repair");
+   });
+ 
++  it("routes 'what dat mean' to clarification repair", () => {
++    const { routeUserText } = makeRouter();
++    const routed = routeUserText("what dat mean");
++    expect(routed.payload?.oos).toBe("clarification_repair");
++  });
++
++  it("routes 'weh yuh mean' to clarification repair", () => {
++    const { routeUserText } = makeRouter();
++    const routed = routeUserText("weh yuh mean");
++    expect(routed.payload?.oos).toBe("clarification_repair");
++  });
++
++  it("routes 'seh dat again' to clarification repair", () => {
++    const { routeUserText } = makeRouter();
++    const routed = routeUserText("seh dat again");
++    expect(routed.payload?.oos).toBe("clarification_repair");
++  });
++
+   it("routes 'look yah nuh' to clarification repair", () => {
+     const { routeUserText } = makeRouter();
+     const routed = routeUserText("look yah nuh");
+diff --git a/frontend/js/__tests__/bloomie-patois.test.js b/frontend/js/__tests__/bloomie-patois.test.js
+index 7053ca7..e978a7c 100644
+--- a/frontend/js/__tests__/bloomie-patois.test.js
++++ b/frontend/js/__tests__/bloomie-patois.test.js
+@@ -113,6 +113,11 @@ describe("normalizePatois - Patois normalisation still works", () => {
+     expect(result).toMatch(/period/);
+     expect(result).toMatch(/stomach|cramp/i);
+   });
++
++  it("does not append synthetic routing boosters to the normalized text", () => {
++    expect(normalizePatois("Heavy BLEEDING")).toBe("heavy bleeding");
++    expect(normalizePatois("my period late")).toBe("my period late");
++  });
+ });
+ 
+ // ─── detectPatois ─────────────────────────────────────────────────────────────
+diff --git a/frontend/js/__tests__/bloomie-response-layers.test.js b/frontend/js/__tests__/bloomie-response-layers.test.js
+index 3a61eed..6634dfb 100644
+--- a/frontend/js/__tests__/bloomie-response-layers.test.js
++++ b/frontend/js/__tests__/bloomie-response-layers.test.js
+@@ -5,6 +5,7 @@ import {
+   buildMiniReplay,
+   buildSoftContinuePrompt,
+   buildTinyWinLine,
++  composeResponseLayers,
+   detectReasoningSpiral,
+   detectTinyWin,
+   maybeBuildRealityCheckPrefix,
+@@ -164,3 +165,32 @@ describe("tiny wins and gentle warnings", () => {
+     expect(line).toMatch(/good idea to get medical care soon/i);
+   });
+ });
++
++describe("response orchestration", () => {
++  it("keeps a short layered response without stacking every helper", () => {
++    const composed = composeResponseLayers(
++      makeContext({
++        text: "is brown blood bad?",
++        normalizedText: "is brown blood bad?",
++        inferredReason: "spotting+mid_cycle",
++        sessionDepth: 2,
++        symptoms: { spotting: true },
++      }),
++      {
++        guidance: {
++          scenario: "spotting_info",
++          lines: ["Brown blood can happen when blood moves more slowly or is older."],
++        },
++        guidanceOpener: "I can help with that 🩷",
++        patternLine: "I'm noticing this has come up more than once 🩷",
++        alreadyShown: {
++          tinyWins: new Set(),
++          softContinue: false,
++        },
++      }
++    );
++
++    expect(composed.lines.length).toBeLessThanOrEqual(3);
++    expect(composed.lines.join(" ")).toMatch(/brown blood|worr/i);
++  });
++});
+diff --git a/frontend/js/__tests__/bloomie-routing.test.js b/frontend/js/__tests__/bloomie-routing.test.js
+index 144272f..7cb5483 100644
+--- a/frontend/js/__tests__/bloomie-routing.test.js
++++ b/frontend/js/__tests__/bloomie-routing.test.js
+@@ -57,6 +57,11 @@ describe("normalizeText", () => {
+     expect(normalizeText("  Heavy BLEEDING  ")).toBe("heavy bleeding");
+   });
+ 
++  it("stays semantically pure for heavy bleeding phrasing", () => {
++    expect(normalizeText("Heavy BLEEDING")).toBe("heavy bleeding");
++    expect(normalizeText("my period late")).toBe("my period late");
++  });
++
+   it("strips special chars except apostrophe", () => {
+     expect(normalizeText("it's late!!")).toBe("it's late");
+   });
+diff --git a/frontend/js/assistant.js b/frontend/js/assistant.js
+index e103958..bf048bb 100644
+--- a/frontend/js/assistant.js
++++ b/frontend/js/assistant.js
+@@ -20,17 +20,9 @@ import { buildSignalBoard, scoreInterpretationBoard, scoreInterpretations, selec
+ import { buildPolicyContext, evaluatePolicyDecision, sanitizeMinorEnglishLine } from "./bloomie-policy.js";
+ import { isBloomieDebugEnabled } from "./bloom-storage.js";
+ import {
+-  buildEmotionalFollowUp,
+   buildFollowUpQuestion,
+-  buildMiniReplay,
+-  buildSoftContinuePrompt,
+-  buildTinyWinLine,
+-  detectHiddenConcern,
+-  detectTinyWin,
+-  maybeBuildRealityCheckPrefix,
+-  shouldAddSoftContinue,
++  composeResponseLayers,
+   shouldAskFollowUp,
+-  shouldUseMiniReplay,
+   softenEscalationLine,
+ } from "./bloomie-response-layers.js";
+ 
+@@ -2503,50 +2495,27 @@ export function initBloomieChat({
+           ...layerContext,
+           responseScenario: guidance.scenario,
+         };
+-        const realityCheckPrefix = !EMERGENCY_NODES.has(inferred?.next)
+-          ? maybeBuildRealityCheckPrefix(responseLayerContext)
+-          : null;
+-        const tinyWinType = !EMERGENCY_NODES.has(inferred?.next) ? detectTinyWin(responseLayerContext) : null;
+-        const tinyWinLine = tinyWinType && !ctx.adviceGiven.has(`tiny_win_${tinyWinType}`)
+-          ? buildTinyWinLine(tinyWinType, normalizedText)
+-          : null;
+-        if (tinyWinLine) ctx.adviceGiven.add(`tiny_win_${tinyWinType}`);
+-
+-        const miniReplay = !EMERGENCY_NODES.has(inferred?.next) && !realityCheckPrefix && shouldUseMiniReplay(responseLayerContext)
+-          ? buildMiniReplay(responseLayerContext)
+-          : null;
+-        const patternLine = !EMERGENCY_NODES.has(inferred?.next) && !miniReplay
+-          ? getPatternCatcherLine(mergedEntities)
+-          : null;
+-        const hiddenConcernFollowUp = !EMERGENCY_NODES.has(inferred?.next)
+-          ? buildEmotionalFollowUp(responseLayerContext)
+-          : null;
+-        const shouldSoftContinue = !EMERGENCY_NODES.has(inferred?.next) && !hiddenConcernFollowUp
+-          ? shouldAddSoftContinue(
+-              {
+-                ...responseLayerContext,
+-                hiddenConcern: !!detectHiddenConcern(normalizedText, inferred?.payload?.reason || ctx.lastIntent, ctx.currentTone),
+-                followUpAsked: false,
+-              },
+-              guidance
+-            )
+-          : false;
+-        const softContinue = shouldSoftContinue && !ctx.adviceGiven.has("soft_continue_prompt")
+-          ? buildSoftContinuePrompt(responseLayerContext)
+-          : null;
+-        if (softContinue) ctx.adviceGiven.add("soft_continue_prompt");
+-
+-        const guidanceLeadIn = (realityCheckPrefix || miniReplay) ? "" : guidanceOpener;
+-        const prefixLines = [
+-          tinyWinLine,
+-          miniReplay,
+-          guidanceLeadIn,
+-          realityCheckPrefix,
+-          patternLine,
+-        ].filter(Boolean);
+-        const suffixLines = [hiddenConcernFollowUp, softContinue].filter(Boolean);
+-        const guidanceCore = [...guidance.lines, ...suffixLines];
+-        const guidanceLines = [...prefixLines, ...guidanceCore];
++        const composedResponse = composeResponseLayers(responseLayerContext, {
++          guidance,
++          guidanceOpener,
++          patternLine: !EMERGENCY_NODES.has(inferred?.next) ? getPatternCatcherLine(mergedEntities) : null,
++          emergency: EMERGENCY_NODES.has(inferred?.next),
++          alreadyShown: {
++            tinyWins: new Set(
++              [...ctx.adviceGiven]
++                .filter((key) => key.startsWith("tiny_win_"))
++                .map((key) => key.replace(/^tiny_win_/, ""))
++            ),
++            softContinue: ctx.adviceGiven.has("soft_continue_prompt"),
++          },
++        });
++        if (composedResponse.meta?.tinyWinType) {
++          ctx.adviceGiven.add(`tiny_win_${composedResponse.meta.tinyWinType}`);
++        }
++        if (composedResponse.meta?.usedSoftContinue) {
++          ctx.adviceGiven.add("soft_continue_prompt");
++        }
++        const guidanceLines = composedResponse.lines;
+         const delay = estimateSayTime(guidanceLines);
+         if (inferred) {
+           say(guidanceLines, { keepLocked: true });
+diff --git a/frontend/js/bloomie-inference.js b/frontend/js/bloomie-inference.js
+index 7dc8a44..0bba895 100644
+--- a/frontend/js/bloomie-inference.js
++++ b/frontend/js/bloomie-inference.js
+@@ -75,7 +75,7 @@ export const SYMPTOM_DOMAIN_OPTION_CATALOG = {
+   cycle: [
+     { code: "late_period", importance: "routing_critical", matchers: [/\bperiod.*late|missed period|period nuh come|period hasn't come\b/] },
+     { code: "spotting", importance: "routing_critical", matchers: [/\bspotting|spot\b.*\bblood\b/] },
+-    { code: "heavy_flow", importance: "routing_critical", matchers: [/\bheavy bleeding|soaking through|flooding\b/] },
++    { code: "heavy_flow", importance: "routing_critical", matchers: [/\bheavy bleeding|heavy flow|soaking through|flooding\b/] },
+     { code: "clots", importance: "routing_critical", matchers: [/\bclots?|passing clots?\b/] },
+     { code: "irregular_cycle", importance: "routing_critical", matchers: [/\birregular period|cycle.*irregular|unpredictable cycle\b/] },
+   ],
+@@ -198,7 +198,7 @@ function extractSymptoms(t) {
+       /\bnothing yet\b/.test(t) ||
+       /\b(i didn'?t|i did not|didn'?t)\s+(get it|get mine|see it)\b/.test(t)
+     ),
+-    heavy:          /\b(heavy|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through|so much blood|so much bleeding)\b/.test(t),
++    heavy:          /\b(heavy|heavy flow|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleed.*out.*bad|bleeding.*bad|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through|so much blood|so much bleeding)\b/.test(t),
+     spotting:       /\b(spot|spotting|pink|brown.*discharge|blood.*between|between.*period)\b/.test(t),
+     pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly|one.sided.*pain|one.side.*hurt|one side.*hurt|lower.*abdominal.*pain|side.*hurts|sharp.*pelvic|back.*hurting|my back hurting)\b/.test(t),
+     mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it|feel.*low|so low|feel low|feeling low|angry|anger|mad|vex|frustrated|frustration|annoyed|snappy|happy|happier|good mood|excited|calm|overwhelmed|don't feel like myself|dont feel like myself|not like myself)\b/.test(t),
+@@ -459,7 +459,7 @@ function extractDuration(t) {
+ 
+ // ── 1c. Severity ──────────────────────────────────────────────────────────────
+ function extractSeverity(t) {
+-  if (/\b(severe|very bad|really bad|unbearable|kill.*me|kill.*mi|murder.*mi|cannot.*function|can't.*function|10\/10|worst)\b/.test(t)) {
++  if (/\b(severe|very bad|really bad|unbearable|kill.*me|kill.*mi|murder.*mi|cannot.*function|can't.*function|10\/10|worst|bleed.*out.*bad|bleeding bad)\b/.test(t)) {
+     return "severe";
+   }
+   if (/\b(bad|moderate|pretty bad|affecting|interfering|hard to|difficult|bad bad)\b/.test(t)) {
+@@ -468,7 +468,7 @@ function extractSeverity(t) {
+   if (/\b(mild|little|likkle|not bad|manageable|okay|bearable|slight|a bit|a likkle)\b/.test(t)) {
+     return "mild";
+   }
+-  if (/\b(hurt bad|pain bad|bleed bad|bleed nuff|hurt nuff|cramp bad|cramp nuff)\b/.test(t)) {
++  if (/\b(hurt bad|pain bad|bleed bad|bleed nuff|hurt nuff|cramp bad|cramp nuff|me bleed bad)\b/.test(t)) {
+     return "severe";
+   }
+   return null;
+diff --git a/frontend/js/bloomie-intent.js b/frontend/js/bloomie-intent.js
+index cc07f9b..eebcea1 100644
+--- a/frontend/js/bloomie-intent.js
++++ b/frontend/js/bloomie-intent.js
+@@ -77,6 +77,33 @@ export const INTENT_TO_ROUTE = {
+   else:       "ELSE_INTRO",
+ };
+ 
++export const REPAIR_CLARIFICATION_PATTERNS = [
++  /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
++  /^\s*cho man\s*$/i,
++  /^\s*i am frustrated(?:\s+what)?\s*$/i,
++  /^\s*wait hold on\s*$/i,
++  /^\s*look yah(?:\s+nuh)?\s*$/i,
++  /^\s*seh wah\s*\??\s*$/i,
++  /^\s*(what|huh)\s*\??\s*$/i,
++  /\b(what are you saying|what you mean|what do you mean|what dat mean|what that mean|weh yuh mean|weh you mean|wah yuh mean|wah you mean|seh dat again|seh that again|seh it again|say that again|explain that|explain that again|explain simpler)\b/i,
++  /\b(mi|me)\s+(nuh|no|don'?t|do not)\s+(understand|get it)\b/i,
++  /\byou lost me\b/i,
++  /\bnot what i mean\b/i,
++];
++
++export const REPAIR_FRUSTRATION_PATTERNS = [
++  /\bnot what i asked\b/i,
++  /\bthis (isn't|is not|not) what i asked\b/i,
++  /\byou (don't|do not) understand\b/i,
++  /\b(kmt|cho man)\b/i,
++];
++
++export function matchesRepairClarification(normalizedText) {
++  const t = String(normalizedText || "").toLowerCase().trim();
++  if (!t) return false;
++  return REPAIR_CLARIFICATION_PATTERNS.some((rx) => rx.test(t));
++}
++
+ /**
+  * Deterministic repair / clarification classifier.
+  * Input must be canonical normalized text from assistant.js.
+@@ -86,29 +113,11 @@ export function classifyRepairClarification(normalizedText) {
+   const t = String(normalizedText || "").toLowerCase().trim();
+   if (!t) return null;
+ 
+-  const clarificationPatterns = [
+-    /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
+-    /^\s*cho man\s*$/i,
+-    /^\s*i am frustrated(?:\s+what)?\s*$/i,
+-    /^\s*wait hold on\s*$/i,
+-    /^\s*look yah(?:\s+nuh)?\s*$/i,
+-    /^\s*(what|huh)\s*\??\s*$/i,
+-    /\b(what are you saying|what you mean|what do you mean|seh that again|say that again|explain that|explain that again|explain simpler)\b/i,
+-    /\b(mi|me)\s+(nuh|no|don'?t|do not)\s+(understand|get it)\b/i,
+-    /\byou lost me\b/i,
+-    /\bnot what i mean\b/i,
+-  ];
+-  if (clarificationPatterns.some((rx) => rx.test(t))) {
++  if (matchesRepairClarification(t)) {
+     return { label: "clarification", confidence: 0.92 };
+   }
+ 
+-  const frustrationPatterns = [
+-    /\bnot what i asked\b/i,
+-    /\bthis (isn't|is not|not) what i asked\b/i,
+-    /\byou (don't|do not) understand\b/i,
+-    /\b(kmt|cho man)\b/i,
+-  ];
+-  if (frustrationPatterns.some((rx) => rx.test(t))) {
++  if (REPAIR_FRUSTRATION_PATTERNS.some((rx) => rx.test(t))) {
+     return { label: "frustration", confidence: 0.86 };
+   }
+ 
+diff --git a/frontend/js/bloomie-oos.js b/frontend/js/bloomie-oos.js
+index 2b3615f..b19a33f 100644
+--- a/frontend/js/bloomie-oos.js
++++ b/frontend/js/bloomie-oos.js
+@@ -1,4 +1,5 @@
+ import { pick, scoreSignals, resolveSignals, detectOutOfScope, normalizeText } from "./bloomie-routing.js";
++import { classifyRepairClarification } from "./bloomie-intent.js";
+ import { extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
+ import { getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
+ 
+@@ -967,8 +968,10 @@ export function createOOS(env) {
+   }
+ 
+   function routeRepairClarifier(t) {
+-    const repairCats = OOS.filter((cat) => cat.name === "clarification_repair" || cat.name === "confused_with_bloomie");
+-    const cat = findCategory(repairCats, t);
++    const repair = classifyRepairClarification(t);
++    if (!repair) return null;
++    const targetName = repair.label === "frustration" ? "confused_with_bloomie" : "clarification_repair";
++    const cat = OOS.find((entry) => entry.name === targetName);
+     if (!cat) return null;
+     return renderCategoryReply(cat, t);
+   }
+@@ -1062,7 +1065,7 @@ export function createOOS(env) {
+     const heavyRouteA = [
+       "soaking", "soaked", "flooding", "bleed through", "bleed nuff",
+       "pad full", "tampon full", "changing every hour",
+-      "bleed out", "bleeding out bad", "pad full up", "tampon full up",
++      "bleed out", "bleed out bad", "bleeding out bad", "pad full up", "tampon full up",
+       "blood everywhere", "nuff blood",
+     ];
+     const heavyRouteB = [
+diff --git a/frontend/js/bloomie-patois.js b/frontend/js/bloomie-patois.js
+index d387a9f..5b15524 100644
+--- a/frontend/js/bloomie-patois.js
++++ b/frontend/js/bloomie-patois.js
+@@ -1050,91 +1050,15 @@ export function fuzzyCorrect(input) {
+   return result;
+ }
+ 
+-// ─── 4. INTENT BOOSTERS ───────────────────────────────────────────────────────
+-// After normalization, append extra scoring keywords for patterns that are
+-// hard to capture with word-swaps alone.
+-
+-const INTENT_BOOSTERS = [
+-  {
+-    // NOTE: boost uses "late period" not "late missed period". "missed period"
+-    // in boosted text activates scoreSignals' pregnancy signal via
+-    // /unprotected|missed.*period/ → false PREGNANCY_ENTRY on pure-late inputs.
+-    patterns: [/period.*not.*come|period.*late|missed.*period|\bno\b.*period/i],
+-    boost: " late period",
+-  },
+-  {
+-    // NOTE: boost must NOT include "pain" — combined with "severe" it triggers
+-    // extractUrgency's severe.*pain pattern causing false escalation.
+-    patterns: [/cramp|pelvic pain|stomach pain|belly pain|lower abdom/i],
+-    boost: " cramp pelvic",
+-  },
+-  {
+-    patterns: [/spotting|light bleed|brown discharge|pink discharge/i],
+-    boost: " spotting light stain",
+-  },
+-  {
+-    // NOTE: "missed period" removed from boost — it activated sym.late prematurely,
+-    // causing the late+pregnancy combo rule to fire before spotting+pregnancy rules.
+-    patterns: [/pregnant|pregnancy|positive test|might be pregnant/i],
+-    boost: " pregnant pregnancy",
+-  },
+-  {
+-    patterns: [/heavy bleed|soaking through|bleed through|passing clots/i],
+-    boost: " heavy bleeding soaking",
+-  },
+-  {
+-    patterns: [/mood|irritable|anxious|sad|overwhelmed|low mood|cry/i],
+-    boost: " mood anxious sad irritable",
+-  },
+-  {
+-    // NOTE: boost must NOT include "faint" — it is in extractUrgency's regex and
+-    // causes false escalation when the user only mentions weakness (not fainting).
+-    // "dizziness" and "lightheaded" are NOT urgency keywords so they are safe.
+-    patterns: [/faint|dizzy|lightheaded|pass out/i],
+-    boost: " dizzy lightheaded",
+-  },
+-  {
+-    // Amenorrhea — periods missing for extended time
+-    patterns: [/amenorrhea|period.*months|months.*period|period.*stopped|period.*absent|not.*had.*period|missed.*more.*period|period.*gone/i],
+-    boost: " amenorrhea missing period months absent",
+-  },
+-  {
+-    // TTC — trying to conceive context
+-    patterns: [/trying to conceive|ttc|trying to get pregnant|want.*pregnant|fertile days|ovulation.*test/i],
+-    boost: " ttc trying to conceive ovulation fertile",
+-  },
+-  {
+-    // Postpartum context
+-    patterns: [/postpartum|gave birth|had.*baby|after.*baby|breastfeeding|period.*return/i],
+-    boost: " postpartum after birth breastfeeding",
+-  },
+-  {
+-    // Lifestyle change signals that delay periods
+-    patterns: [/stressed|stress|lost weight|gained weight|exercise.*intense|intensely|been sick|illness|travel|sleep.*poor|not sleeping/i],
+-    boost: " lifestyle change stress weight exercise",
+-  },
+-  {
+-    // Birth control context
+-    patterns: [/birth control|on the pill|started pill|stopped pill|iud|implant|coil|bc/i],
+-    boost: " birth control pill contraception",
+-  },
+-  {
+-    // Emotional distress / fear
+-    patterns: [/scared|afraid|worried|ashamed|embarrassed|frightened|fear|nervous.*about.*health/i],
+-    boost: " scared worried emotional distress",
+-  },
+-];
+-
+-// ─── 5. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
++// ─── 4. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
+ 
+ /**
+  * normalizePatois(rawText) → String
+  *
+- * Full 4-stage preprocessing pipeline:
++ * Full preprocessing pipeline:
+  *   Stage 1: Phrase-level exact matching
+  *   Stage 2: Word-level exact matching
+  *   Stage 3: Fuzzy matching (Levenshtein) for near-miss Patois tokens
+- *   Stage 4: Intent boosters
+  *
+  * @param  {string} rawText  - Raw text from the chat input
+  * @returns {string}          - Normalized English text
+@@ -1182,14 +1106,7 @@ export function normalizePatois(rawText) {
+   // canonical pipeline order (normalizePatois → fuzzyCorrect → extractEntities).
+   text = fuzzyCorrect(text) ?? text;
+ 
+-  // ── Stage 4: intent boosters ──────────────────────────────────────────────
+-  for (const booster of INTENT_BOOSTERS) {
+-    if (booster.patterns.some((rx) => rx.test(text))) {
+-      text += booster.boost;
+-    }
+-  }
+-
+-  return text;
++  return text.replace(/\s+/g, " ").trim();
+ }
+ 
+ /**
+diff --git a/frontend/js/bloomie-reasoning.js b/frontend/js/bloomie-reasoning.js
+index 71750ac..d8713bf 100644
+--- a/frontend/js/bloomie-reasoning.js
++++ b/frontend/js/bloomie-reasoning.js
+@@ -1,4 +1,5 @@
+ import { normalizeText } from "./bloomie-routing.js";
++import { matchesRepairClarification } from "./bloomie-intent.js";
+ 
+ function hasAnySymptoms(symptoms = {}) {
+   return Object.values(symptoms).some(Boolean);
+@@ -13,13 +14,7 @@ function hasLateContext({ entities, overdueDays, lastIntent, state }) {
+ }
+ 
+ function isClarificationInput(t) {
+-  return [
+-    /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
+-    /^\s*(what|huh)\s*\??\s*$/i,
+-    /\b(what do you mean|say that again|explain that again|explain simpler)\b/i,
+-    /\b(me|mi)\s+nuh\s+(understand|get it)\b/i,
+-    /\b(wah dat mean|wah yuh mean)\b/i,
+-  ].some((rx) => rx.test(t));
++  return matchesRepairClarification(t);
+ }
+ 
+ // Reviewed allowlist for interpretation scoring.
+diff --git a/frontend/js/bloomie-response-layers.js b/frontend/js/bloomie-response-layers.js
+index 637fc55..77906d7 100644
+--- a/frontend/js/bloomie-response-layers.js
++++ b/frontend/js/bloomie-response-layers.js
+@@ -335,6 +335,73 @@ export function buildSoftContinuePrompt(context = {}) {
+   return chooseVariant(variants[concern] || variants.general, `${concern}|${context.sessionDepth || 0}`);
+ }
+ 
++function lineFeelsOpenEnded(line) {
++  const text = normalizeWhitespace(line).toLowerCase();
++  if (!text) return false;
++  return /\?$/.test(text) || /\b(if you want|tell me|let me know|would you like|do you want)\b/.test(text);
++}
++
++export function composeResponseLayers(context = {}, options = {}) {
++  const guidance = options.guidance || {};
++  const baseLines = Array.isArray(guidance.lines) ? guidance.lines.filter(Boolean) : [];
++  const emergency = !!options.emergency;
++  const guidanceOpener = options.guidanceOpener || "";
++  const patternLine = options.patternLine || null;
++  const alreadyShown = options.alreadyShown || {};
++
++  if (emergency) {
++    return {
++      lines: [...(guidanceOpener ? [guidanceOpener] : []), ...baseLines],
++      meta: {
++        tinyWinType: null,
++        usedSoftContinue: false,
++      },
++    };
++  }
++
++  const realityCheckPrefix = maybeBuildRealityCheckPrefix(context);
++  const tinyWinType = !realityCheckPrefix ? detectTinyWin(context) : null;
++  const tinyWinAlreadyShown = tinyWinType ? alreadyShown.tinyWins?.has?.(tinyWinType) : false;
++  const tinyWinLine = tinyWinType && !tinyWinAlreadyShown
++    ? buildTinyWinLine(tinyWinType, context.normalizedText || context.text || "")
++    : null;
++  const miniReplay = !realityCheckPrefix && shouldUseMiniReplay(context)
++    ? buildMiniReplay(context)
++    : null;
++  const hiddenConcernFollowUp = buildEmotionalFollowUp(context);
++  const effectiveTinyWinLine =
++    hiddenConcernFollowUp && tinyWinType === "body_awareness"
++      ? null
++      : tinyWinLine;
++  const shouldSoftContinueNow = !hiddenConcernFollowUp && shouldAddSoftContinue(
++    {
++      ...context,
++      hiddenConcern: !!detectHiddenConcern(
++        context.normalizedText || context.text,
++        context.inferredReason || context.lastIntent,
++        context.tone
++      ),
++      followUpAsked: false,
++    },
++    guidance
++  );
++  const softContinue = shouldSoftContinueNow && !alreadyShown.softContinue
++    ? buildSoftContinuePrompt(context)
++    : null;
++
++  const leadLine = realityCheckPrefix || miniReplay || guidanceOpener || null;
++  const supportLead = effectiveTinyWinLine || (!leadLine ? patternLine : null);
++  const suffixLine = hiddenConcernFollowUp || (!baseLines.some(lineFeelsOpenEnded) ? softContinue : null);
++
++  return {
++    lines: [supportLead, leadLine, ...baseLines, suffixLine].filter(Boolean),
++    meta: {
++      tinyWinType,
++      usedSoftContinue: !!(suffixLine && suffixLine === softContinue),
++    },
++  };
++}
++
+ export function softenEscalationLine(line) {
+   let text = String(line || "");
+   if (!text) return text;
+diff --git a/frontend/js/bloomie-tone.js b/frontend/js/bloomie-tone.js
+index 185ff0e..cf5598c 100644
+--- a/frontend/js/bloomie-tone.js
++++ b/frontend/js/bloomie-tone.js
+@@ -36,11 +36,19 @@
+  * ─────────────────────────────────────────────────────────────────────────────
+  */
+ 
+-import { normalizePatois } from "./bloomie-patois.js";
++import { normalizePatois, fuzzyCorrect, collapseRepeatedLetters, expandShorthand } from "./bloomie-patois.js";
+ import { bloomieDiagnostic } from "./bloomie-logger.js";
+ 
++function normalizeToneInput(text) {
++  const patoisNorm = normalizePatois(text);
++  const fuzzyNorm = fuzzyCorrect(patoisNorm) ?? patoisNorm;
++  const collapsed = collapseRepeatedLetters(fuzzyNorm);
++  const expanded = expandShorthand(collapsed);
++  return String(expanded || "").toLowerCase().trim();
++}
++
+ // ── Known vocabulary ──────────────────────────────────────────────────────────
+-// After normalizePatois() all Patois is mapped to English.  Any remaining token
++// After the same frontend-safe normalization used by routing, any remaining token
+ // longer than 2 chars that is NOT in this set is flagged as hasUnknownTokens,
+ // driving confidence to "low" so the AI layer can interpret it instead.
+ const KNOWN_VOCAB = new Set([
+@@ -98,7 +106,6 @@ const KNOWN_VOCAB = new Set([
+   "during","while","twice","once","usually","sometimes","often","always","never",
+   "within","until","already","yet","soon","eventually","recently","probably",
+ 
+-  // Words appended by INTENT_BOOSTERS in normalizePatois (always safe, internal)
+   "stain","soaking","irritable","lightheaded","amenorrhea","missing","absent",
+   "ttc","conceive","fertile","postpartum","breastfeeding","lifestyle","change",
+   "weight","exercise","birth","control","pill","contraception","distress",
+@@ -181,8 +188,7 @@ export function detectToneWithConfidence(text) {
+     return { tone: "neutral", confidence: "low", signals: {}, hasUnknownTokens: false };
+   }
+ 
+-  const normalized = normalizePatois(text);
+-  const t = normalized.toLowerCase();
++  const t = normalizeToneInput(text);
+ 
+   // Unknown-token check: after normalization, flag tokens > 2 chars not in KNOWN_VOCAB.
+   // Strip apostrophes first so contractions ("don't" → "dont") match the vocab.
+@@ -263,8 +269,20 @@ export async function classifyEmotionAI(rawInput, ruleResult) {
+     }
+ 
+     const parsed = await resp.json();
+-
+-    if (typeof parsed.confirms !== "boolean" || typeof parsed.tone !== "string") {
++    const payload =
++      parsed && typeof parsed.confirms === "boolean" && typeof parsed.tone === "string"
++        ? parsed
++        : (() => {
++            const raw = parsed?.content?.[0]?.text;
++            if (typeof raw !== "string") return null;
++            try {
++              return JSON.parse(raw);
++            } catch {
++              return null;
++            }
++          })();
++
++    if (typeof payload?.confirms !== "boolean" || typeof payload?.tone !== "string") {
+       bloomieDiagnostic("ai_invalid_response", {
+         module:         "bloomie-tone",
+         stage:          "classifyEmotionAI",
+@@ -275,10 +293,10 @@ export async function classifyEmotionAI(rawInput, ruleResult) {
+     }
+ 
+     return {
+-      confirms:  Boolean(parsed.confirms),
+-      tone:      String(parsed.tone),
+-      intensity: String(parsed.intensity ?? "medium"),
+-      subtext:   String(parsed.subtext   ?? "none"),
++      confirms:  Boolean(payload.confirms),
++      tone:      String(payload.tone),
++      intensity: String(payload.intensity ?? "medium"),
++      subtext:   String(payload.subtext   ?? "none"),
+     };
+   } catch (err) {
+     clearTimeout(timeoutId);
+diff --git a/frontend/js/calendar.js b/frontend/js/calendar.js
+index a90786f..4dd0929 100644
+--- a/frontend/js/calendar.js
++++ b/frontend/js/calendar.js
+@@ -173,11 +173,17 @@ async function recomputeCycleData() {
+     phaseLabel:           state.phaseLabel,
+     dayInCycle:           state.dayInCycle,
+     avgCycleLength:       state.avgCycleLength,
++    predictedCycleLength: state.predictedCycleLength ?? null,
+     predictedPeriodDays:  state.predictedPeriodDays  ?? [],
+     futureOvulationDates: state.futureOvulationDates ?? [],
+     allFertileDays:       state.allFertileDays        ?? [],
+     ovulationDate:        state.ovulationDate,
+     nextPeriodDate:       state.nextPeriodDate,
++    currentExpectedPeriodDate: state.currentExpectedPeriodDate ?? state.nextPeriodDate ?? null,
++    nextUpcomingPeriodDate: state.nextUpcomingPeriodDate ?? null,
++    cycleTimingStatus:    state.cycleTimingStatus ?? null,
++    isCycleTimingDisrupted: !!state.isCycleTimingDisrupted,
++    missedPredictedCycles: Number(state.missedPredictedCycles || 0),
+     fertileStart:         state.fertileStart,
+     fertileEnd:           state.fertileEnd,
+   };
+@@ -925,6 +931,13 @@ function renderPredictionPanel() {
+ 
+     <section class="card pred-section">
+       <h3 class="pred-section-h3">Upcoming predicted cycles</h3>
++<<<<<<< ours
++=======
++      ${cycleData?.isCycleTimingDisrupted ? `
++        <p class="pred-cycles-note">Your last expected start has been missed by more than one full predicted cycle, so the current cycle timing is being treated as disrupted rather than just simply late.</p>
++      ` : ""}
++      <p class="pred-cycles-note">Late timing is measured from the predicted start date, not the full shaded range.</p>
++>>>>>>> theirs
+       ${cycleCards || `<p style="color:var(--color-text-muted);font-size:0.9rem;">Log your current period to update predictions.</p>`}
+     </section>`;
+ }
+diff --git a/frontend/js/cycle-state.js b/frontend/js/cycle-state.js
+index cd8ae0c..1a3272a 100644
+--- a/frontend/js/cycle-state.js
++++ b/frontend/js/cycle-state.js
+@@ -36,11 +36,21 @@ function _resolveFutureCycles(state, todayKey) {
+   const fc = Array.isArray(state.futureCycles) ? state.futureCycles : [];
+   let newState = { ...state };
+ 
++  const explicitCurrentExpected = toStr(state.currentExpectedPeriodDate);
++  const explicitUpcoming = toStr(state.nextUpcomingPeriodDate);
++  if (explicitCurrentExpected) {
++    newState.currentExpectedPeriodDate = explicitCurrentExpected;
++    newState.nextPeriodDate = explicitCurrentExpected;
++  }
++  if (explicitUpcoming) {
++    newState.nextUpcomingPeriodDate = explicitUpcoming;
++  }
++
+   // ── 1. Next period date ────────────────────────────────────────────────────
+-  // Always use the SOONEST upcoming period from futureCycles (> today).
+-  // The engine computes this correctly via buildCalendarOverlays, but if it's
+-  // missing or stale we fill it in here.
+-  if (!newState.nextPeriodDate || newState.nextPeriodDate <= todayKey) {
++  // Preserve an explicit currentExpectedPeriodDate from the backend, even when
++  // it is already in the past, because that is what lateness is measured from.
++  // Only fill from futureCycles when the backend did not provide one.
++  if (!newState.nextPeriodDate && !explicitCurrentExpected) {
+     const nearestPeriodCycle = fc.find(c => {
+       const ps = toStr(c.periodStart);
+       return ps && ps > todayKey;
+@@ -49,6 +59,15 @@ function _resolveFutureCycles(state, todayKey) {
+       newState.nextPeriodDate = toStr(nearestPeriodCycle.periodStart);
+     }
+   }
++  if (!newState.nextUpcomingPeriodDate) {
++    const nearestPeriodCycle = fc.find(c => {
++      const ps = toStr(c.periodStart);
++      return ps && ps > todayKey;
++    });
++    if (nearestPeriodCycle) {
++      newState.nextUpcomingPeriodDate = toStr(nearestPeriodCycle.periodStart);
++    }
++  }
+ 
+   // ── 2. Fertile window + ovulation ─────────────────────────────────────────
+   // If the engine's fertile window has already ended, find the next futureCycle
+diff --git a/frontend/js/dashboard.js b/frontend/js/dashboard.js
+index d58b4dd..eec0d2a 100644
+--- a/frontend/js/dashboard.js
++++ b/frontend/js/dashboard.js
+@@ -394,11 +394,15 @@ function renderGoalToolCard(goal, cycle) {
+   // Default: next period
+   if (cycle.nextPeriodDate) {
+     const d = diffDays(todayKey, cycle.nextPeriodDate);
+-    const subtext = d > 0
++    const isDisrupted = cycle.isCycleTimingDisrupted || cycle.cycleTimingStatus === "cycle_disruption";
++    const missedCycles = Number(cycle.missedPredictedCycles || 0);
++    const subtext = isDisrupted
++      ? `Current expected cycle · timing looks more disrupted than a simple late period${missedCycles > 0 ? ` (${missedCycles} missed predicted cycle${missedCycles === 1 ? "" : "s"})` : ""}`
++      : d > 0
+       ? `Next expected period · in ${d} day${d !== 1 ? "s" : ""}`
+       : d === 0
+       ? "Next expected period · due today"
+-      : `Next expected period · about ${Math.abs(d)} day${Math.abs(d) !== 1 ? "s" : ""} late by estimate`;
++      : `Current expected period · about ${Math.abs(d)} day${Math.abs(d) !== 1 ? "s" : ""} late by estimate`;
+     el.innerHTML = `
+       <div class="stat-number">${formatDate(cycle.nextPeriodDate)}</div>
+       <p class="text-muted" style="margin-top:0.25rem;">${subtext}</p>
+@@ -2150,6 +2154,14 @@ async function loadDashboard() {
+     cycle.avgCycleLength = state.avgCycleLength  ?? cycle.avgCycleLength;
+     predictedCycleLength = state.predictedCycleLength ?? null;
+     if (state.nextPeriodDate)       cycle.nextPeriodDate = state.nextPeriodDate;
++    if (state.currentExpectedPeriodDate) cycle.currentExpectedPeriodDate = state.currentExpectedPeriodDate;
++    if (state.nextUpcomingPeriodDate) cycle.nextUpcomingPeriodDate = state.nextUpcomingPeriodDate;
++    if (state.firstPredictedPeriodDate) cycle.firstPredictedPeriodDate = state.firstPredictedPeriodDate;
++    cycle.daysLate = state.daysLate ?? cycle.daysLate ?? 0;
++    cycle.rawDaysLate = state.rawDaysLate ?? cycle.rawDaysLate ?? 0;
++    cycle.missedPredictedCycles = state.missedPredictedCycles ?? cycle.missedPredictedCycles ?? 0;
++    cycle.cycleTimingStatus = state.cycleTimingStatus ?? cycle.cycleTimingStatus ?? null;
++    cycle.isCycleTimingDisrupted = state.isCycleTimingDisrupted ?? cycle.isCycleTimingDisrupted ?? false;
+     if (state.ovulationDate)        cycle.ovulationDate  = state.ovulationDate;
+     if (state.fertileStart)         cycle.fertileStart   = state.fertileStart;
+     if (state.fertileEnd)           cycle.fertileEnd     = state.fertileEnd;
+diff --git a/frontend/js/firebaseConfig.js b/frontend/js/firebaseConfig.js
+index 1682ee1..b840999 100644
+--- a/frontend/js/firebaseConfig.js
++++ b/frontend/js/firebaseConfig.js
+@@ -8,7 +8,9 @@
+  * This file should be in .gitignore for security.
+  */
+ // Empty string = use Vite proxy (/api → http://127.0.0.1:4000). Avoids CORS entirely.
+-window.BLOOM_API_BASE = "";
++if (typeof window !== "undefined" && window.BLOOM_API_BASE === undefined) {
++  window.BLOOM_API_BASE = "";
++}
+ 
+ export const firebaseConfig = {
+   apiKey:            "AIzaSyCoY7010ONRgfc9ic6orCefKgSFAbAaOtg",

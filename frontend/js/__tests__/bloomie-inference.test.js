@@ -66,6 +66,11 @@ describe("extractEntities — symptoms", () => {
     expect(e.symptoms.heavy).toBe(true);
   });
 
+  it("detects heavy flow phrasing", () => {
+    const e = extractEntities("heavy flow affecting my day");
+    expect(e.symptoms.heavy).toBe(true);
+  });
+
   it("detects spotting", () => {
     const e = extractEntities("i noticed spotting today");
     expect(e.symptoms.spotting).toBe(true);
@@ -146,6 +151,13 @@ describe("extractEntities — symptoms", () => {
     expect(e.domainSelections.blood_colour).toContain("brown");
   });
 
+  it("captures natural period-colour phrasing like 'my period always black'", () => {
+    const e = extractEntities("my period always black");
+    expect(e.symptoms.blood_colour_any).toBe(true);
+    expect(e.symptoms.blood_colour_dark).toBe(true);
+    expect(e.domainSelections.blood_colour).toContain("black");
+  });
+
   it("captures brain fog as mind/focus state", () => {
     const e = extractEntities("i have brain fog and can't focus");
     expect(e.symptoms.brain_fog).toBe(true);
@@ -168,6 +180,11 @@ describe("extractEntities — severity", () => {
   it("extracts moderate", () => {
     const e = extractEntities("pretty bad pain, affecting my day");
     expect(e.severity).toBe("moderate");
+  });
+
+  it("extracts severe from 'bleed out bad' phrasing", () => {
+    const e = extractEntities("me bleed out bad");
+    expect(e.severity).toBe("severe");
   });
 });
 
@@ -332,6 +349,18 @@ describe("inferRoute — heavy bleeding routes", () => {
     expect(route.next).toBe("HEAVY_ROUTE_B");
     expect(REGISTERED_NODE_IDS.has(route.next)).toBe(true);
   });
+
+  it("heavy flow affecting day → HEAVY_ROUTE_B", () => {
+    const e = extractEntities("heavy flow affecting my day");
+    const route = inferRoute(e);
+    expect(route.next).toBe("HEAVY_ROUTE_B");
+  });
+
+  it("very bad heavy bleeding that is unbearable → HEAVY_ROUTE_C", () => {
+    const e = extractEntities("very bad heavy bleeding that is unbearable");
+    const route = inferRoute(e);
+    expect(route.next).toBe("HEAVY_ROUTE_C");
+  });
 });
 
 describe("inferRoute — spotting routes", () => {
@@ -386,6 +415,13 @@ describe("inferRoute — discharge route", () => {
     const route = inferRoute(e);
     expect(route.next).toBe("ELSE_DISCHARGE");
     expect(route.payload.reason).toBe("discharge_only");
+  });
+
+  it("discharge plus pelvic pain → ELSE_DISCHARGE_ENTRY", () => {
+    const e = extractEntities("i have cramps and yellow discharge");
+    const route = inferRoute(e);
+    expect(route.next).toBe("ELSE_DISCHARGE_ENTRY");
+    expect(route.payload.reason).toBe("discharge+pelvic");
   });
 });
 

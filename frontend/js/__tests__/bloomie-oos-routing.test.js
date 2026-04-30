@@ -178,6 +178,24 @@ describe("bloomie OOS routing - true positives and warm fallback", () => {
     expect(routed.payload?.oos).toBe("clarification_repair");
   });
 
+  it("routes 'what dat mean' to clarification repair", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("what dat mean");
+    expect(routed.payload?.oos).toBe("clarification_repair");
+  });
+
+  it("routes 'weh yuh mean' to clarification repair", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("weh yuh mean");
+    expect(routed.payload?.oos).toBe("clarification_repair");
+  });
+
+  it("routes 'seh dat again' to clarification repair", () => {
+    const { routeUserText } = makeRouter();
+    const routed = routeUserText("seh dat again");
+    expect(routed.payload?.oos).toBe("clarification_repair");
+  });
+
   it("routes 'look yah nuh' to clarification repair", () => {
     const { routeUserText } = makeRouter();
     const routed = routeUserText("look yah nuh");
