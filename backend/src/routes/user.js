@@ -140,8 +140,21 @@ router.post("/profile", requireAuth, async (req, res) => {
       });
     }
 
-    const savedDoc = await userRef.get();
-    const savedData = savedDoc.data();
+    let savedData = {
+      ...(existing || {}),
+      profile,
+      healthProfile,
+      biometricProfile,
+      phaseProfile,
+    };
+    try {
+      const savedDoc = await userRef.get();
+      if (savedDoc?.exists && typeof savedDoc.data === "function") {
+        savedData = savedDoc.data();
+      }
+    } catch (readErr) {
+      console.warn(`[profile] post-save read skipped uid=${uid}:`, readErr?.message || readErr);
+    }
 
     console.log(`[profile] saved uid=${uid}`, JSON.stringify(savedData));
     return res.json({

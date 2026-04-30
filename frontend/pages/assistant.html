@@ -220,6 +220,50 @@
 
     .chat-send-btn:active { transform: scale(0.96); }
 
+    .chat-voice-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1.5px solid var(--color-border);
+      background: var(--color-bg);
+      color: var(--color-primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.05rem;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    .chat-voice-btn:hover {
+      border-color: var(--color-primary);
+      background: var(--color-primary-lightest, #fce4ec);
+      transform: scale(1.06);
+    }
+
+    .chat-voice-btn.is-listening {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+      box-shadow: 0 0 0 4px rgba(212, 116, 154, 0.16);
+    }
+
+    .chat-voice-btn[hidden] { display: none; }
+
+    .chat-voice-status {
+      min-height: 1.1rem;
+      margin: 0.45rem 0 0 0.15rem;
+      color: var(--color-text-muted);
+      font-size: 0.8rem;
+      line-height: 1.35;
+    }
+
+    .chat-voice-status.is-listening {
+      color: var(--color-primary-dark);
+      font-weight: 700;
+    }
+
     .tiny-note {
       font-size: 0.76rem;
       text-align: center;
@@ -279,8 +323,10 @@
               autocomplete="off"
               maxlength="240"
             />
+            <button class="chat-voice-btn" id="chat-voice-btn" type="button" aria-label="Use speech to text" aria-pressed="false">🎙</button>
             <button class="chat-send-btn chat-send-btn--text" type="submit" aria-label="Send message">Send</button>
           </form>
+          <p class="chat-voice-status" id="chat-voice-status" aria-live="polite"></p>
         </div>
       </section>
     </div>
@@ -294,6 +340,7 @@
     import { mountChat } from '/js/assistant.js';
     import { fetchCycleState } from '/js/cycle-state.js';
     import { isAnonMode } from '/js/mode.js';
+    import { mountSyncStatusBanner } from '/js/sync-status.js';
 
     function parseDateKey(dateKey) {
       return new Date(`${dateKey}T00:00:00`);
@@ -334,6 +381,9 @@
     renderNav('assistant');
     renderFooter();
     renderModeBanner(document.getElementById('banner-area'));
+    mountSyncStatusBanner(document.getElementById('banner-area'), {
+      message: "Bloomie is having trouble reaching cloud sync. You can keep chatting, but some saved context may be local for now.",
+    });
 
     // Fade navbar out on scroll
     window.addEventListener('scroll', () => {

@@ -1,10 +1,45 @@
 import { auth, db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 
+function isFirebaseAuthTokenError(err) {
+  const code = String(err?.code || "");
+  const message = String(err?.message || "");
+  return (
+    code.startsWith("auth/") ||
+    /Firebase ID token|Decoding Firebase ID token|id token|token has expired|token has been revoked/i.test(message)
+  );
+}
+
+function isTransientFirebaseBackendError(err) {
+  const code = String(err?.code || "").toLowerCase();
+  const message = String(err?.message || "").toLowerCase();
+  return (
+    code === "unavailable" ||
+    code === "deadline-exceeded" ||
+    code === "resource-exhausted" ||
+    code === "internal" ||
+    code === "14" ||
+    code === "4" ||
+    message.includes("could not reach cloud firestore") ||
+    message.includes("firestore backend") ||
+    message.includes("deadline exceeded") ||
+    message.includes("service unavailable") ||
+    message.includes("etimedout") ||
+    message.includes("econnreset") ||
+    message.includes("enotfound")
+  );
+}
+
 function normalizeBiometricLevel(value) {
   if (value === null || value === undefined || value === "") return null;
   const normalized = String(value).trim().toLowerCase();
   return normalized || null;
+}
+
+function deleteFieldValue() {
+  return typeof admin.firestore.FieldValue.delete === "function"
+    ? admin.firestore.FieldValue.delete()
+    : null;
 }
 
 export async function requireAuth(req, res, next) {
@@ -146,16 +181,16 @@ export async function requireAuth(req, res, next) {
           consentSensitive: profile.consentSensitive ?? false,
           remindersEnabled: profile.remindersEnabled ?? false,
           reminderTime: profile.reminderTime ?? "09:00",
-          role: admin.firestore.FieldValue.delete(),
-          avgCycleLength: admin.firestore.FieldValue.delete(),
-          periodDuration: admin.firestore.FieldValue.delete(),
-          sleepScore: admin.firestore.FieldValue.delete(),
-          activityLevel: admin.firestore.FieldValue.delete(),
-          stressLevel: admin.firestore.FieldValue.delete(),
-          weightKg: admin.firestore.FieldValue.delete(),
-          heightCm: admin.firestore.FieldValue.delete(),
-          lmpDate: admin.firestore.FieldValue.delete(),
-          lmp: admin.firestore.FieldValue.delete(),
+          role: deleteFieldValue(),
+          avgCycleLength: deleteFieldValue(),
+          periodDuration: deleteFieldValue(),
+          sleepScore: deleteFieldValue(),
+          activityLevel: deleteFieldValue(),
+          stressLevel: deleteFieldValue(),
+          weightKg: deleteFieldValue(),
+          heightCm: deleteFieldValue(),
+          lmpDate: deleteFieldValue(),
+          lmp: deleteFieldValue(),
         },
         healthProfile: {
           avgCycleLength:
@@ -168,8 +203,8 @@ export async function requireAuth(req, res, next) {
             healthProfile.heightCm ?? profile.heightCm ?? null,
           lmpDate:
             healthProfile.lmpDate ?? healthProfile.lmp ?? profile.lmpDate ?? profile.lmp ?? null,
-          lmp: admin.firestore.FieldValue.delete(),
-          sleepScore: admin.firestore.FieldValue.delete(),
+          lmp: deleteFieldValue(),
+          sleepScore: deleteFieldValue(),
         },
         biometricProfile: {
           activityLevel:
@@ -187,14 +222,18 @@ export async function requireAuth(req, res, next) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
-      await userRef.set(backfill, { merge: true });
+      try {
+        await userRef.set(backfill, { merge: true });
 
-      data.role = backfill.role;
-      data.email = backfill.email;
-      data.profile = backfill.profile;
-      data.healthProfile = backfill.healthProfile;
-      data.biometricProfile = backfill.biometricProfile;
-      data.game = backfill.game;
+        data.role = backfill.role;
+        data.email = backfill.email;
+        data.profile = backfill.profile;
+        data.healthProfile = backfill.healthProfile;
+        data.biometricProfile = backfill.biometricProfile;
+        data.game = backfill.game;
+      } catch (backfillErr) {
+        console.warn("requireAuth backfill skipped:", backfillErr?.message || backfillErr);
+      }
     }
 
     const safeProfile = data.profile || {};
@@ -226,7 +265,24 @@ export async function requireAuth(req, res, next) {
     return next();
   } catch (err) {
     console.error("requireAuth error:", err);
-    return res.status(401).json({ error: "Invalid token" });
+    if (isFirebaseAuthTokenError(err)) {
+      return res.status(401).json({
+        error: "Invalid token",
+        code: err.code || "auth/invalid-token",
+      });
+    }
+
+    if (isTransientFirebaseBackendError(err)) {
+      return res.status(503).json({
+        error: "Authentication temporarily unavailable",
+        code: "AUTH_BACKEND_UNAVAILABLE",
+      });
+    }
+
+    return res.status(500).json({
+      error: "Authentication check failed",
+      code: "AUTH_CHECK_FAILED",
+    });
   }
 }
 

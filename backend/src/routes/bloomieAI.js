@@ -78,12 +78,12 @@ const VALID_TONES = new Set([
 // Codes align with bloomie-inference.js entity keys where possible so the
 // frontend can optionally map signals onto existing internal structures.
 const VALID_EXTRACT_SYMPTOMS = new Set([
-  "late", "heavy", "large_clots", "spotting", "cramps", "pelvic",
+  "late", "heavy", "large_clots", "spotting", "pelvic",
   "one_sided_pain", "ovulation_pain", "pain_during_sex",
-  "nausea", "dizzy", "fatigue", "breast_pain",
+  "nausea", "dizziness", "fatigue", "breast_tender",
   "mood", "anxiety", "depression", "irritability",
-  "night_sweats", "discharge", "unusual_discharge", "odor",
-  "bloating", "headache", "migraine", "back_pain",
+  "night_sweats", "discharge", "unusual_discharge", "discharge_foul_smell",
+  "bloating", "headache", "joint_pain",
 ]);
 
 const VALID_EXTRACT_TIMING = new Set([
@@ -117,9 +117,9 @@ const EXTRACT_SYSTEM_PROMPT = [
   "Output ONLY compact JSON matching this exact schema (no markdown, no surrounding text):",
   '{"symptoms":["<code>"],"timing":["<code>"],"severity":"mild|moderate|severe|null","tone":"anxious|distressed|frustrated|casual|deflecting|neutral","repair":false,"pregnancySignals":["<code>"],"redFlags":["<code>"],"confidence":0.0}',
   "Valid symptom codes (use only these):",
-  "late, heavy, large_clots, spotting, cramps, pelvic, one_sided_pain, ovulation_pain, pain_during_sex,",
-  "nausea, dizzy, fatigue, breast_pain, mood, anxiety, depression, irritability,",
-  "night_sweats, discharge, unusual_discharge, odor, bloating, headache, migraine, back_pain.",
+  "late, heavy, large_clots, spotting, pelvic, one_sided_pain, ovulation_pain, pain_during_sex,",
+  "nausea, dizziness, fatigue, breast_tender, mood, anxiety, depression, irritability,",
+  "night_sweats, discharge, unusual_discharge, discharge_foul_smell, bloating, headache, joint_pain.",
   "Valid timing codes: late_period, missed_period, early_period, irregular, recent_onset, ongoing, worsening, improving.",
   "Valid red flag codes: heavy_and_dizzy, one_sided_severe, signs_of_infection, very_heavy, syncope_risk.",
   "repair: true if the user expresses frustration at not being understood or helped by the app.",

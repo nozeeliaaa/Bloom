@@ -118,12 +118,12 @@ export function buildFollowUpClarifier({ concern, missing = [], seed = "" } = {}
   if (concern === "heavy_bleeding") {
     if (missing.includes("amount") && missing.includes("timing")) {
       return {
-        text: "Quick check so I can place the bleeding better 🩷 are you soaking through pads or seeing clots, and has this been going on just today or for a few days?",
+        text: "Quick check so I can triage this safely 🩷 are you soaking through a pad or tampon every hour, feeling dizzy or faint, passing large clots, having severe one-sided pain, or is the pain unbearable or much worse than usual?",
       };
     }
     if (missing.includes("amount")) {
       return {
-        text: "Quick check 🩷 are you soaking through pads quickly, or is it heavier than usual but still manageable?",
+        text: "Quick check 🩷 are you soaking through a pad or tampon every hour, feeling dizzy or faint, passing large clots, or having severe one-sided pain?",
       };
     }
     return {

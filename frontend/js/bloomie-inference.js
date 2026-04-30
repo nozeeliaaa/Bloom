@@ -509,7 +509,7 @@ function extractDuration(t) {
 
 // ── 1c. Severity ──────────────────────────────────────────────────────────────
 function extractSeverity(t) {
-  if (/\b(severe|very bad|really bad|unbearable|kill.*me|kill.*mi|murder.*mi|cannot.*function|can't.*function|10\/10|worst|bleed.*out.*bad|bleeding bad)\b/.test(t)) {
+  if (/\b(severe|very bad|really bad|really painful|awful|terrible|horrible|excruciating|unbearable|kill.*me|kill.*mi|murder.*mi|cannot.*function|can't.*function|10\/10|worst|bleed.*out.*bad|bleeding bad)\b/.test(t)) {
     return "severe";
   }
   // Medication failure or movement-limiting pain also signals severe intensity
@@ -526,6 +526,30 @@ function extractSeverity(t) {
     return "severe";
   }
   return null;
+}
+
+function hasHeavyBleedingDescriptor(t) {
+  return /\b(very\s+heavy|so+\s+heavy|heavy\s+(?:flow|bleeding|period)|flow\s+is\s+heavy|bleeding\s+(?:is\s+)?heavy|really\s+heavy|so\s+much\s+(?:blood|bleeding)|flooding|soaking|bleeding\s+through|bleed\s+through)\b/.test(t);
+}
+
+function hasSevereCrampDescriptor(t) {
+  return /\b((?:awful|terrible|horrible|severe|really\s+bad|really\s+painful|very\s+painful|unbearable|worst)\s+(?:cramps?|pain)|cramps?\s+(?:are|feel|is)?\s*(?:awful|terrible|horrible|severe|really\s+bad|really\s+painful|very\s+painful|unbearable|worse|worsening)|pain\s+(?:is|feels)?\s*(?:unbearable|worse|worsening|severe))\b/.test(t);
+}
+
+function buildHeavyPeriodTriagePrompt(t) {
+  const contextLine = /\bpcos|polycystic\b/.test(t)
+    ? "PCOS can make cycles irregular, and bleeding that returns after a gap can sometimes be heavier or more painful than usual. "
+    : /\birregular|skip(?:ped)?|missed|gap|back my period|period (?:came|come|returned|is back)|got(?:ten)? (?:back )?my period\b/.test(t)
+      ? "When periods are irregular or return after a gap, bleeding can sometimes feel heavier or more painful than usual. "
+      : "";
+
+  const symptomLine = hasHeavyBleedingDescriptor(t) && hasSevereCrampDescriptor(t)
+    ? "Since you're describing heavy bleeding and severe cramps, "
+    : hasHeavyBleedingDescriptor(t)
+      ? "Since you're describing heavy bleeding, "
+      : "Since you're describing severe cramps, ";
+
+  return `${contextLine}${symptomLine}I want to check a few warning signs: are you soaking through a pad or tampon every hour or faster, feeling dizzy, faint, weak, or short of breath, passing large clots, having severe one-sided pelvic pain, or is the pain unbearable or much worse than usual?`;
 }
 
 // ── 1d. Timing ────────────────────────────────────────────────────────────────
@@ -839,15 +863,15 @@ export function detectAmbiguousInputDetail(text, entities) {
     );
   }
 
-  // "heavy bleeding" without severity context (and not already urgent)
+  // Explicit heavy bleeding or severe cramps should go straight to safety
+  // triage, not a basic "is it light/normal/heavy?" classification.
   if (
-    sym.heavy &&
-    !entities?.severity &&
+    (hasHeavyBleedingDescriptor(t) || (sym.pelvic && hasSevereCrampDescriptor(t))) &&
     !entities?.urgent &&
-    words.length <= 8
+    words.length <= 28
   ) {
     return createClarificationDescriptor(
-      "When you say heavy — are you soaking through a pad or tampon in about an hour or less, or is it heavier than usual but manageable?",
+      buildHeavyPeriodTriagePrompt(t),
       "bleeding_amount"
     );
   }
@@ -994,8 +1018,17 @@ export function detectMissingContextDetail(entities, text) {
     );
   }
 
-  // Bleeding but no severity/amount (and not already urgent)
-  if ((sym.heavy || sym.spotting) && !entities?.severity && !entities?.urgent) {
+  // Explicit heavy bleeding should not be re-classified as light/normal/heavy.
+  // Move directly into safety triage.
+  if (sym.heavy && !entities?.urgent) {
+    return createClarificationDescriptor(
+      buildHeavyPeriodTriagePrompt(t),
+      "bleeding_amount"
+    );
+  }
+
+  // Spotting but no severity/amount (and not already urgent)
+  if (sym.spotting && !entities?.severity && !entities?.urgent) {
     return createClarificationDescriptor(
       "Is it light spotting, more like a normal period, or heavier than usual?",
       "bleeding_amount"

@@ -361,6 +361,15 @@ describe("inferRoute - heavy bleeding routes", () => {
     const route = inferRoute(e);
     expect(route.next).toBe("HEAVY_ROUTE_C");
   });
+
+  it("awful cramps with very heavy flow is treated as severe heavy-period triage", () => {
+    const e = extractEntities("I have PCOS and I just got back my period. The cramps are awful this time and the flow is soooo heavy.");
+    expect(e.symptoms.heavy).toBe(true);
+    expect(e.symptoms.pelvic).toBe(true);
+    expect(e.severity).toBe("severe");
+    const route = inferRoute(e);
+    expect(route.next).toBe("HEAVY_ROUTE_C");
+  });
 });
 
 describe("inferRoute - spotting routes", () => {
@@ -527,5 +536,24 @@ describe("clarification helpers - ambiguity and missing context", () => {
     const entities = extractEntities(text);
     const q = detectMissingContext(entities, text);
     expect(q).toMatch(/pelvic|belly|stomach/i);
+  });
+
+  it("does not ask basic flow classification when heavy bleeding is explicit", () => {
+    const text = "my flow is so heavy";
+    const entities = extractEntities(text);
+    const q = detectMissingContext(entities, text);
+    expect(q).toMatch(/soaking through a pad or tampon every hour/i);
+    expect(q).toMatch(/dizzy|faint|clots|one-sided/i);
+    expect(q).not.toMatch(/light spotting|normal period|heavier than usual/i);
+  });
+
+  it("recognizes PCOS plus returned heavy painful period and asks safety triage", () => {
+    const text = "I have PCOS and I just got back my period. The cramps are awful this time and the flow is soooo heavy.";
+    const entities = extractEntities(text);
+    const q = detectAmbiguousInput(text, entities);
+    expect(q).toMatch(/PCOS can make cycles irregular/i);
+    expect(q).toMatch(/heavy bleeding and severe cramps/i);
+    expect(q).toMatch(/soaking through a pad or tampon every hour|dizzy|large clots|one-sided|unbearable/i);
+    expect(q).not.toMatch(/light spotting|normal period|heavier than usual/i);
   });
 });

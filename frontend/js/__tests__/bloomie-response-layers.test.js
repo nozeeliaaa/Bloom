@@ -105,7 +105,18 @@ describe("silent clue detection", () => {
       primaryFocusApplied: true,
     });
     expect(shouldAskFollowUp(ctx)).toBe(true);
-    expect(buildFollowUpQuestion(ctx)).toMatch(/soaking through pads?|heavier than usual/i);
+    expect(buildFollowUpQuestion(ctx)).toMatch(/soaking through a pad|dizzy|clots|one-sided/i);
+    expect(buildFollowUpQuestion(ctx)).not.toMatch(/heavier than usual but still manageable/i);
+  });
+
+  it("does not ask explicit heavy flow to re-classify bleeding amount", () => {
+    const ctx = makeContext({
+      text: "my flow is so heavy",
+      normalizedText: "my flow is so heavy",
+      symptoms: { heavy: true },
+    });
+    expect(buildFollowUpQuestion(ctx)).toMatch(/How long has the heavier bleeding/i);
+    expect(buildFollowUpQuestion(ctx)).not.toMatch(/light spotting|normal period|heavier than usual/i);
   });
 });
 

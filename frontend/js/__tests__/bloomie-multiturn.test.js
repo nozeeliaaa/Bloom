@@ -235,7 +235,8 @@ describe("multi-turn: latest input priority", () => {
 
     const text = getChatBoxText();
     expect(text).toMatch(/clots|cramps/i);
-    expect(text).toMatch(/soaking through a pad|heavier than usual/i);
+    expect(text).toMatch(/soaking through a pad|dizzy|one-sided/i);
+    expect(text).not.toMatch(/heavier than usual but still manageable/i);
     expect(text).not.toMatch(/belly, lower pelvic area, or somewhere else/i);
   });
 

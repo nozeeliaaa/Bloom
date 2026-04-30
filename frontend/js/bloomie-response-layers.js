@@ -171,7 +171,17 @@ export function getMissingClues(context = {}) {
   if (concern === "heavy_bleeding") {
     const mentionedAmount =
       !!entities.severity ||
-      hasAny(t, [/\bsoaking\b/, /\bsoak through\b/, /\bheavier than usual\b/, /\bmanageable\b/, /\blots?\b/]);
+      hasAny(t, [
+        /\bsoaking\b/,
+        /\bsoak through\b/,
+        /\bheavy\s+(?:flow|bleeding|period)\b/,
+        /\b(?:very|really|so+)\s+heavy\b/,
+        /\bflow\s+is\s+heavy\b/,
+        /\bbleeding\s+(?:is\s+)?heavy\b/,
+        /\bheavier than usual\b/,
+        /\bmanageable\b/,
+        /\blots?\b/,
+      ]);
     const mentionedTiming =
       !!entities.duration ||
       hasAny(t, [/\btoday\b/, /\bsince\b/, /\bdays?\b/, /\bweek\b/, /\bhours?\b/]);

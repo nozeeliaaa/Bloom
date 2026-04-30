@@ -30,6 +30,7 @@ import { getUserGoal, goalLabel, goalDesc, isGoalAgeLocked } from "./goals.js";
 import { triggerNotifications } from "./notifications.js";
 import { getTodaysPhaseInsights } from "./phase-education.js";
 import { fetchCycleState } from "./cycle-state.js";
+import { mountSyncStatusBanner } from "./sync-status.js";
 import {
   collectCustomSymptomRecurrence,
   customSymptomLooksUrgent,
@@ -51,6 +52,9 @@ renderNav("dashboard");
 renderFooter();
 renderBloomieFab();
 renderModeBanner(document.getElementById("banner-area"));
+mountSyncStatusBanner(document.getElementById("banner-area"), {
+  message: "Cloud sync is having trouble. Your dashboard is showing saved local data until it reconnects.",
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2628,4 +2632,3 @@ ensureLogsPromise().then(async logs => {
 
   triggerNotifications(cycle, logs);
 });
-

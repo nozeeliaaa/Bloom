@@ -8,7 +8,7 @@ import { resolveIntentAssist, classifyRepairClarification, extractMultiIntentTag
 import { extractSignalsAI }   from "./bloomie-extract.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent, logAnalyticsEvent, bloomieDebug } from "./bloomie-logger.js";
-import { getIdToken, getUser } from "./auth.js";
+import { getIdToken, getUser, isAdminCached } from "./auth.js";
 import { generateIntegratedSignals, getBloomieSymptomContext } from "./algorithms/bloom-symptom-engine.js";
 import { generateAnomalySignals } from "./algorithms/bloom-anomaly-engine.js";
 import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhaseConfidence } from "./algorithms/bloom-date-utils.js";
@@ -126,7 +126,9 @@ export function Chat() {
               placeholder="Use the buttons below…"
               autocomplete="off"
             />
+            <button class="chat-voice-btn" id="chat-voice-btn" type="button" aria-label="Use speech to text" aria-pressed="false">🎙</button>
           </form>
+          <p class="chat-voice-status" id="chat-voice-status" aria-live="polite"></p>
 
           <p class="tiny-note tiny-note--bloomie">
             NOTE: Bloom is not a diagnostic tool.
@@ -239,6 +241,8 @@ export function initBloomieChat({
   const $box = document.getElementById(chatBoxId);
   const $input = document.getElementById(inputId);
   const $form = document.getElementById(formId);
+  const $voiceBtn = document.getElementById("chat-voice-btn");
+  const $voiceStatus = document.getElementById("chat-voice-status");
   const $charCount = document.getElementById("chat-char-count");
 
   if (!$box) throw new Error(`Missing #${chatBoxId}`);
@@ -888,11 +892,111 @@ export function initBloomieChat({
     ctx.pendingAmbiguityContext = null;
     ctx.pendingContradictionContext = null;
     ctx.pendingContextProbe = null;
+    ctx.entityHistory = [];
+    ctx.conversationProfile.returnedTopic = null;
 
     if (!latestDomains.has("bleeding")) {
       ctx.heavyFlags = {};
       ctx.conversationState = createEmptyConversationState();
     }
+  }
+
+  function isLowInfoContextualFollowUp(text) {
+    return /^\s*(yes|no|nope|yep|not yet|still no|same|same thing|still same|again|also|and)\b/i.test(String(text || ""));
+  }
+
+  function getRelevantEntityHistory(current, history = [], normalizedText = "") {
+    if (!Array.isArray(history) || !history.length) return [];
+    if (!isLowInfoContextualFollowUp(normalizedText)) return [];
+
+    const currentDomains = detectInputDomains(current, { explicitOnly: true });
+    if (!currentDomains.size) return history.slice(-2);
+
+    return history
+      .filter((entry) => hasDomainOverlap(detectInputDomains(entry, { explicitOnly: true }), currentDomains))
+      .slice(-2);
+  }
+
+  const AI_SIGNAL_TO_LOCAL_SYMPTOM = {
+    late: "late",
+    heavy: "heavy",
+    large_clots: "large_clots",
+    spotting: "spotting",
+    pelvic: "pelvic",
+    one_sided_pain: "pelvic",
+    ovulation_pain: "ovulation_pain",
+    pain_during_sex: "pain_during_sex",
+    nausea: "nausea",
+    dizziness: "dizziness",
+    fatigue: "mood",
+    breast_tender: "breast_tender",
+    mood: "mood",
+    anxiety: "anxiety",
+    depression: "depression",
+    irritability: "irritability",
+    night_sweats: "night_sweats",
+    discharge: "discharge",
+    unusual_discharge: "unusual_discharge",
+    discharge_foul_smell: "discharge_foul_smell",
+    bloating: "bloating",
+    headache: "headache",
+    joint_pain: "joint_pain",
+  };
+
+  function applyAISignalsToEntities(baseEntities, signals) {
+    if (!signals) return baseEntities;
+    const next = {
+      ...baseEntities,
+      symptoms: { ...(baseEntities?.symptoms || {}) },
+      pregnancy: { ...(baseEntities?.pregnancy || {}) },
+    };
+
+    for (const code of signals.symptoms || []) {
+      const localKey = AI_SIGNAL_TO_LOCAL_SYMPTOM[code];
+      if (localKey && Object.prototype.hasOwnProperty.call(next.symptoms, localKey)) {
+        next.symptoms[localKey] = true;
+      }
+    }
+
+    if (!next.severity && signals.severity) next.severity = signals.severity;
+    if ((signals.timing || []).some((code) => code === "late_period" || code === "missed_period")) {
+      next.symptoms.late = true;
+    }
+    if ((signals.timing || []).includes("irregular")) {
+      next.symptoms.irregular = true;
+    }
+
+    return next;
+  }
+
+  const AI_ASSIST_HEALTH_GATE = /\b(period|bleed(?:ing)?|blood|late|missed|spotting|spot|cramp|pain|pelvic|pregnant|pregnancy|discharge|mood|tired|exhausted|cycle|irregular|heavy|clot|dizzy|nausea|ovulat|hormone|endo|pcos|fibroid|symptom|flow|lmp|emotional|sad|angry|vex|frustrated|anxious|fatigue|energy|breast|back|headache|night.?sweat)\b/i;
+
+  function shouldUseAIEntityAssist(entities, normalizedText) {
+    return !!(
+      normalizedText &&
+      AI_ASSIST_HEALTH_GATE.test(normalizedText) &&
+      !entities?.urgent &&
+      !ctx.urgency &&
+      !hasExplicitCanonicalHealthSignal(entities)
+    );
+  }
+
+  async function enrichWeakEntitiesWithAI(entities, normalizedText) {
+    const signals = await extractSignalsAI(normalizedText);
+    if (!signals) return entities;
+
+    ctx.aiSignals = signals;
+    bloomieDebug("ai", {
+      source:     "extract",
+      mode:       "weak_entity_enrichment",
+      symptoms:   signals.symptoms.join(",") || "none",
+      timing:     signals.timing.join(",")   || "none",
+      severity:   signals.severity ?? "null",
+      repair:     signals.repair,
+      redFlags:   signals.redFlags.join(",") || "none",
+      confidence: signals.confidence,
+    });
+    return applyAISignalsToEntities(entities, signals);
   }
 
   function buildRepairRecoveryQuestion() {
@@ -1065,6 +1169,76 @@ export function initBloomieChat({
   ctx.userNickname = profile?.nickname ?? null;
   const memory = ctx.isAnon ? null : loadLocalBloomieMemory();
   ctx.memory = memory ?? {};
+
+  const debugPanel = createBloomieDebugPanel();
+
+  function canShowBloomieDebugPanel() {
+    try {
+      return isBloomieDebugEnabled() || isAdminCached();
+    } catch {
+      return isBloomieDebugEnabled();
+    }
+  }
+
+  function createBloomieDebugPanel() {
+    if (!$box || !canShowBloomieDebugPanel()) return null;
+    if (!document.getElementById("bloomie-debug-panel-style")) {
+      const style = document.createElement("style");
+      style.id = "bloomie-debug-panel-style";
+      style.textContent = `
+        .bloomie-debug-panel {
+          margin: 0.55rem 1rem 0.75rem;
+          border: 1px solid var(--color-border);
+          border-radius: 12px;
+          background: rgba(255, 243, 247, 0.8);
+          color: var(--color-text);
+          font-size: 0.78rem;
+          overflow: hidden;
+        }
+        .bloomie-debug-panel summary {
+          cursor: pointer;
+          padding: 0.55rem 0.7rem;
+          font-weight: 800;
+          color: var(--color-primary-dark);
+        }
+        .bloomie-debug-panel pre {
+          margin: 0;
+          padding: 0 0.7rem 0.7rem;
+          white-space: pre-wrap;
+          font: 0.76rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          color: var(--color-text-muted);
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const panel = document.createElement("details");
+    panel.id = "bloomie-debug-panel";
+    panel.className = "bloomie-debug-panel";
+    panel.innerHTML = `
+      <summary>Why Bloomie said this</summary>
+      <pre id="bloomie-debug-panel-body">Waiting for a turn...</pre>
+    `;
+    $box.insertAdjacentElement("afterend", panel);
+    return panel;
+  }
+
+  function updateBloomieDebugPanel(extra = {}) {
+    if (!debugPanel) return;
+    const body = debugPanel.querySelector("#bloomie-debug-panel-body");
+    if (!body) return;
+    const reasoning = ctx.lastReasoning || {};
+    const payload = {
+      state: ctx.state,
+      interpretation: reasoning.interpretation ?? null,
+      strategy: reasoning.strategy ?? null,
+      confidence: reasoning.confidence ?? null,
+      next: reasoning.next ?? null,
+      route: extra.route ?? ctx.lastRoute ?? null,
+      why: reasoning.why ?? null,
+    };
+    body.textContent = JSON.stringify(payload, null, 2);
+  }
 
   function emitDueReminders() {
     const due = popDueReminders();
@@ -1278,6 +1452,110 @@ export function initBloomieChat({
     updateChatCharCount();
     $input.addEventListener("input", updateChatCharCount);
   }
+
+  function setupSpeechToText() {
+    if (!$voiceBtn || !$input) return;
+
+    const SpeechRecognitionCtor =
+      window.SpeechRecognition || window.webkitSpeechRecognition || null;
+
+    if (!SpeechRecognitionCtor) {
+      $voiceBtn.hidden = true;
+      if ($voiceStatus) {
+        $voiceStatus.textContent = "Speech input is not available in this browser.";
+      }
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = loadChatPrefs().chatLanguage === "en-jm" ? "en-JM" : "en-US";
+
+    let listening = false;
+    let baseText = "";
+    let finalTranscript = "";
+
+    const setListening = (on) => {
+      listening = on;
+      $voiceBtn.classList.toggle("is-listening", on);
+      $voiceBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      $voiceBtn.setAttribute("aria-label", on ? "Stop speech to text" : "Use speech to text");
+      $voiceBtn.textContent = on ? "■" : "🎙";
+      if (on) {
+        $input.placeholder = "Listening...";
+        if ($voiceStatus) {
+          $voiceStatus.textContent = "Listening... tap the mic again to stop. Your transcript will not send until you press Send.";
+          $voiceStatus.classList.add("is-listening");
+        }
+      } else {
+        $input.placeholder = "Type here or use the buttons…";
+        if ($voiceStatus) {
+          $voiceStatus.textContent = finalTranscript
+            ? "Transcript ready. Edit it if needed, then press Send."
+            : "";
+          $voiceStatus.classList.remove("is-listening");
+        }
+      }
+    };
+
+    recognition.addEventListener("start", () => {
+      baseText = String($input.value || "").trim();
+      finalTranscript = "";
+      setListening(true);
+    });
+
+    recognition.addEventListener("result", (event) => {
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const chunk = event.results[i]?.[0]?.transcript || "";
+        if (event.results[i]?.isFinal) {
+          finalTranscript += chunk;
+        } else {
+          interimTranscript += chunk;
+        }
+      }
+
+      const transcript = `${finalTranscript} ${interimTranscript}`.replace(/\s+/g, " ").trim();
+      const nextValue = [baseText, transcript].filter(Boolean).join(" ").slice(0, CHAT_INPUT_MAX);
+      $input.value = nextValue;
+      updateChatCharCount();
+      if ($voiceStatus && transcript) {
+        $voiceStatus.textContent = "Listening... tap the mic again to stop. Your transcript will not send until you press Send.";
+      }
+    });
+
+    recognition.addEventListener("end", () => {
+      setListening(false);
+      $input.focus();
+    });
+
+    recognition.addEventListener("error", (event) => {
+      setListening(false);
+      if (event?.error && event.error !== "no-speech" && event.error !== "aborted") {
+        console.warn("[Bloomie] speech-to-text error:", event.error);
+        if ($voiceStatus) {
+          $voiceStatus.textContent = "Speech input had trouble starting. You can still type your message.";
+        }
+      }
+    });
+
+    $voiceBtn.addEventListener("click", () => {
+      if (listening) {
+        recognition.stop();
+        return;
+      }
+
+      try {
+        recognition.lang = loadChatPrefs().chatLanguage === "en-jm" ? "en-JM" : "en-US";
+        recognition.start();
+      } catch (err) {
+        console.warn("[Bloomie] speech-to-text could not start:", err?.message || err);
+      }
+    });
+  }
+
+  setupSpeechToText();
 
   // ── Low-information / gibberish detector ─────────────────────────────────────
   // Returns true for inputs like "feeeee", "aaaa", "lollllll", "...." that carry
@@ -1840,6 +2118,7 @@ export function initBloomieChat({
       const _collapsed  = normalizedStages.collapsed;
       let normalizedText = normalizedStages.normalized;
       normalizedText = contextualizeLowInfoReply(normalizedText);
+      const latestOnlyNormalizedText = normalizedText;
       const currentOnlyPreviewEntities = extractEntities(normalizedText);
 
       if (pendingClarification) {
@@ -1885,9 +2164,12 @@ export function initBloomieChat({
         hasPendingContext = false;
       }
 
-      const latestInputOverridesFlow = shouldLatestInputOverrideFlow(currentOnlyPreviewEntities, normalizedText);
+      const latestInputOverridesFlow = shouldLatestInputOverrideFlow(currentOnlyPreviewEntities, latestOnlyNormalizedText);
       if (latestInputOverridesFlow) {
         resetFlowForLatestInput(detectInputDomains(currentOnlyPreviewEntities, { explicitOnly: true }));
+        effectiveInput = text;
+        normalizedText = latestOnlyNormalizedText;
+        hasPendingContext = false;
       }
       const declaredAge = detectDeclaredAge(normalizedText);
       if (declaredAge !== null) {
@@ -2045,8 +2327,13 @@ export function initBloomieChat({
       const extractionText = useAccumulatedExtraction
         ? buildAccumulatedExtractionText(normalizedText)
         : normalizedText;
-      const entities = extractEntities(extractionText);
+      let entities = latestInputOverridesFlow
+        ? currentOnlyPreviewEntities
+        : extractEntities(extractionText);
       if (useAccumulatedExtraction) entities.raw = normalizedText;
+      if (shouldUseAIEntityAssist(entities, normalizedText)) {
+        entities = await enrichWeakEntitiesWithAI(entities, normalizedText);
+      }
 
       // Mark minor support nudge availability once a real symptom turn appears.
       // This keeps minor-safe continuity even when routing stays in node flows.
@@ -2132,6 +2419,25 @@ export function initBloomieChat({
           return;
         }
 
+        if (
+          !entities.urgent &&
+          ctx.cumulativeRiskFlags.has("late_period") &&
+          ctx.cumulativeRiskFlags.has("one_sided_pain")
+        ) {
+          const reason = "cumulative: late_period+one_sided_pain";
+          ctx.urgency = true;
+          logSafetyEvent("urgent_trigger", {
+            input:     normalizedText,
+            route:     "HEAVY_URGENT",
+            reason,
+            topic:     ctx.topic,
+            riskLevel: ctx.riskLevel,
+          });
+          logAnalyticsEvent("urgency_escalation", { route: "HEAVY_URGENT", reason }, ctx);
+          transition("HEAVY_URGENT", { entities });
+          return;
+        }
+
         const cumulative = checkCumulativeRisk([...ctx.entityHistory.slice(-4), entities]);
         if (cumulative.escalate && !entities.urgent) {
           const reason = cumulative.reason || "cumulative: escalating multi-turn risk";
@@ -2171,6 +2477,7 @@ export function initBloomieChat({
 
       const currentTurnFocus = rankTurnFocus(entities, normalizedText);
       const clarificationEntities = currentTurnFocus?.primaryEntities || entities;
+      let deferredClarifier = null;
 
       // ── Contradiction detection ───────────────────────────────────────────
       {
@@ -2214,16 +2521,12 @@ export function initBloomieChat({
           if (pending.key === clarificationKeyToSuppress || ctx.declinedClarificationKeys.has(pending.key)) {
             // intentionally continue with best available context
           } else {
-            ctx.pendingAmbiguityContext = { originalText: effectiveInput };
-            setPendingClarification(ambiguityQ, {
+            deferredClarifier = {
+              prompt: ambiguityQ,
               kind: "ambiguity",
               originalText: effectiveInput,
               spec: ambiguity?.spec || null,
-            });
-            const prompt = chooseClarifyingPrompt(ambiguityQ, { kind: "ambiguity", normalizedText });
-            say([prompt]);
-            render();
-            return;
+            };
           }
         }
       }
@@ -2232,7 +2535,7 @@ export function initBloomieChat({
       {
         const contextProbe = detectMissingContextDetail(clarificationEntities, normalizedText);
         const contextProbeQ = contextProbe?.prompt || null;
-        if (contextProbeQ && !entities.urgent && !ctx.pendingContradictionContext && !ctx.pendingAmbiguityContext) {
+        if (contextProbeQ && !deferredClarifier && !entities.urgent && !ctx.pendingContradictionContext && !ctx.pendingAmbiguityContext) {
           const pending = createPendingClarification({
             prompt: contextProbeQ,
             kind: "missing_context",
@@ -2242,16 +2545,12 @@ export function initBloomieChat({
           if (pending.key === clarificationKeyToSuppress || ctx.declinedClarificationKeys.has(pending.key)) {
             // intentionally continue with best available context
           } else {
-            ctx.pendingContextProbe = { originalText: effectiveInput };
-            setPendingClarification(contextProbeQ, {
+            deferredClarifier = {
+              prompt: contextProbeQ,
               kind: "missing_context",
               originalText: effectiveInput,
               spec: contextProbe?.spec || null,
-            });
-            const prompt = chooseClarifyingPrompt(contextProbeQ, { kind: "missing_context", normalizedText });
-            say([prompt]);
-            render();
-            return;
+            };
           }
         }
       }
@@ -2304,7 +2603,9 @@ export function initBloomieChat({
       // messages remain visible to inferRoute (e.g. "late period" then
       // "I also have nausea" now routes correctly as late+nausea).
       const latestDomains = detectInputDomains(entities, { explicitOnly: true });
-      const mergeHistory = latestInputOverridesFlow ? [] : ctx.entityHistory.slice(-2);
+      const mergeHistory = latestInputOverridesFlow
+        ? []
+        : getRelevantEntityHistory(entities, ctx.entityHistory, normalizedText);
       const mergedEntities = mergeEntities(entities, mergeHistory);
       const mergedTurnFocus = rankTurnFocus(mergedEntities, normalizedText);
       ctx.entityHistory = [...mergeHistory, entities];
@@ -2607,6 +2908,7 @@ export function initBloomieChat({
           topInterpretation: interpretationScorecard.topInterpretation ?? null,
         };
         bloomieDebug("reasoning", ctx.lastReasoning);
+        updateBloomieDebugPanel();
 
         if (decision.strategy === "repair" && Array.isArray(decision.reply)) {
           const delay = estimateSayTime(decision.reply);
@@ -2704,6 +3006,31 @@ export function initBloomieChat({
           topic:       ctx.topic,
           riskLevel:   ctx.riskLevel,
         });
+      }
+
+      if (
+        !inferred?.next &&
+        deferredClarifier &&
+        !entities.urgent &&
+        (deferredClarifier.kind === "ambiguity" || !shouldReserveTurnForConfidenceRouting)
+      ) {
+        if (deferredClarifier.kind === "ambiguity") {
+          ctx.pendingAmbiguityContext = { originalText: deferredClarifier.originalText };
+        } else if (deferredClarifier.kind === "missing_context") {
+          ctx.pendingContextProbe = { originalText: deferredClarifier.originalText };
+        }
+        setPendingClarification(deferredClarifier.prompt, {
+          kind: deferredClarifier.kind,
+          originalText: deferredClarifier.originalText,
+          spec: deferredClarifier.spec || null,
+        });
+        const prompt = chooseClarifyingPrompt(deferredClarifier.prompt, {
+          kind: deferredClarifier.kind,
+          normalizedText,
+        });
+        say([prompt]);
+        render();
+        return;
       }
 
       const cycleCtx   = buildCycleCtx();
@@ -2842,41 +3169,6 @@ export function initBloomieChat({
       // Awaited only if we actually reach the LOW-tier routing decision below.
       // Returns null silently when: rule is confident, no health keywords, API fails.
       const _intentAssistPromise = resolveIntentAssist(normalizedText, ctx.routeConfidence);
-
-      // ── Signal extractor: fire in parallel, store fire-and-forget ─────────────
-      // Runs at the same pipeline position as intent assist, using the same
-      // canonical normalizedText. Never awaited in the hot path - result arrives
-      // on ctx.aiSignals whenever the network responds (within 1200 ms).
-      //
-      // Safety contract (enforced here and documented in bloomie-extract.js):
-      //   • Signals are advisory only - they enrich ctx but do NOT override
-      //     rule-based routing or safety triggers.
-      //   • If entities.urgent is true (rule layer flagged urgency) or
-      //     ctx.urgency is true (active urgent thread), signals are discarded.
-      //   • null result on any failure = Bloomie behaves exactly as before.
-      if (!entities.urgent && !ctx.urgency) {
-        extractSignalsAI(normalizedText)
-          .then(signals => {
-            if (!signals) return;
-            // Store on ctx for optional use by follow-up logic, memory
-            // persistence, analytics, and summary generation.
-            // Never referenced by inferRoute(), safety checks, or NODES directly.
-            ctx.aiSignals = signals;
-            bloomieDebug("ai", {
-              source:     "extract",
-              symptoms:   signals.symptoms.join(",") || "none",
-              timing:     signals.timing.join(",")   || "none",
-              severity:   signals.severity ?? "null",
-              repair:     signals.repair,
-              redFlags:   signals.redFlags.join(",") || "none",
-              confidence: signals.confidence,
-            });
-          })
-          .catch(() => {
-            // Extractor errors are already logged inside bloomie-extract.js.
-            // Nothing to do here - Bloomie continues unaffected.
-          });
-      }
 
       // ── Safety log: urgent_trigger (keyword router path) ──────────────────
       if (routed?.next === "HEAVY_URGENT") {
@@ -3720,6 +4012,8 @@ export function initBloomieChat({
     console.log(`[Bloomie Pipeline] Tone: ${tone}`);
     console.log(`[Bloomie Pipeline] Urgency: ${urgency}`);
     console.log(`[Bloomie Pipeline] Route: ${route}`);
+    ctx.lastRoute = route;
+    updateBloomieDebugPanel({ route });
   }
 
   // ── Advice deduplication helpers ───────────────────────────────────────────────────
