@@ -32,7 +32,7 @@ export function normalizeCustomSymptomDisplayText(text, max = 80) {
 export function customSymptomLooksUrgent(text) {
   const t = normalizeCustomSymptomText(text);
   if (!t) return false;
-  return /\b(faint|fainted|fainting|passed out|pass out|trouble breathing|can't breathe|cant breathe|shortness of breath|severe pain|very heavy bleeding|heavy bleeding|chest pain)\b/.test(t);
+  return /\b(faint|fainted|fainting|passed out|passing out|pass out|trouble breathing|can't breathe|cant breathe|cannot breathe|shortness of breath|severe pain|very heavy bleeding|heavy bleeding|chest pain)\b/.test(t);
 }
 
 export function collectCustomSymptomRecurrence(logsByDate, days = 30, fromDate = new Date()) {
@@ -57,6 +57,8 @@ export function collectCustomSymptomRecurrence(logsByDate, days = 30, fromDate =
           displayText: normalizeCustomSymptomDisplayText(item?.text),
           count: 0,
           dates: [],
+          dateCount: 0,
+          firstDate: null,
           lastDate: null,
         });
       }
@@ -64,6 +66,8 @@ export function collectCustomSymptomRecurrence(logsByDate, days = 30, fromDate =
       const row = map.get(normalizedText);
       row.count += 1;
       row.dates.push(dateKey);
+      row.dateCount = new Set(row.dates).size;
+      if (!row.firstDate || dateKey < row.firstDate) row.firstDate = dateKey;
       if (!row.lastDate || dateKey > row.lastDate) row.lastDate = dateKey;
       if (!row.displayText && item?.text) row.displayText = normalizeCustomSymptomDisplayText(item.text);
     }
@@ -87,16 +91,21 @@ export function summarizeCustomSymptoms(
 
   const repeated = recurrence.filter((row) => row.count >= 2).slice(0, Math.max(0, maxItems));
   const insights = repeated.map((row, idx) => {
+    const dayPhrase = row.dateCount > 1
+      ? ` across ${row.dateCount} recent days`
+      : "";
     const message = row.count >= 3
-      ? `You've logged "${row.displayText}" ${row.count} times recently.`
+      ? `You've logged "${row.displayText}" ${row.count} times recently${dayPhrase}.`
       : idx % 2 === 0
-      ? `You've logged "${row.displayText}" more than once recently.`
-      : `"${row.displayText}" has come up again in your recent history.`;
+      ? `You've logged "${row.displayText}" more than once recently${dayPhrase}.`
+      : `"${row.displayText}" has come up again in your recent history${dayPhrase}.`;
 
     return {
       kind: "recurring",
       displayText: row.displayText,
       count: row.count,
+      dateCount: row.dateCount,
+      firstDate: row.firstDate,
       lastDate: row.lastDate,
       urgent: customSymptomLooksUrgent(row.displayText),
       message,
@@ -123,11 +132,17 @@ export function summarizeCustomSymptoms(
     kind: "one_off",
     displayText: top.displayText,
     count: top.count,
+    dateCount: top.dateCount,
+    firstDate: top.firstDate,
     lastDate: top.lastDate,
     urgent: customSymptomLooksUrgent(top.displayText),
-    message: `Saved to your symptom history. If "${top.displayText}" comes up again, it may form part of a pattern.`,
+    message: `This has been saved to your symptom history. If "${top.displayText}" comes up again, it may form part of a pattern.`,
     guidance: customSymptomLooksUrgent(top.displayText)
       ? "If this symptom feels severe, sudden, or worrying, consider seeking medical advice."
       : "",
   }];
+}
+
+export function buildCustomSymptomInsights(logsByDate, options = {}) {
+  return summarizeCustomSymptoms(logsByDate, options);
 }

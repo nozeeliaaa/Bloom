@@ -1,4 +1,5 @@
 import { normalizeText } from "./bloomie-routing.js";
+import { matchesRepairClarification } from "./bloomie-intent.js";
 
 function hasAnySymptoms(symptoms = {}) {
   return Object.values(symptoms).some(Boolean);
@@ -13,13 +14,7 @@ function hasLateContext({ entities, overdueDays, lastIntent, state }) {
 }
 
 function isClarificationInput(t) {
-  return [
-    /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
-    /^\s*(what|huh)\s*\??\s*$/i,
-    /\b(what do you mean|say that again|explain that again|explain simpler)\b/i,
-    /\b(me|mi)\s+nuh\s+(understand|get it)\b/i,
-    /\b(wah dat mean|wah yuh mean)\b/i,
-  ].some((rx) => rx.test(t));
+  return matchesRepairClarification(t);
 }
 
 // Reviewed allowlist for interpretation scoring.
@@ -32,6 +27,10 @@ export const ALLOWED_INTERPRETATION_KEYS = new Set([
   "ovulation_pattern",
   "luteal_pattern",
   "discharge_irritation_cluster",
+  "foul_discharge_alone",
+  "fever_with_discharge_or_pain",
+  "bleeding_after_sex",
+  "severe_unmanaged_pain",
   "stress_related_delay",
   "irregular_cycle_pattern",
   "prolonged_bleeding",
@@ -224,6 +223,41 @@ export function scoreInterpretationBoard(board) {
     push("discharge_irritation_cluster", 0.78, ["discharge", "irritation_or_itching"]);
   }
 
+  // ── FOUL-SMELLING DISCHARGE (no itching required) ─────────────────────────
+  if (s.discharge_foul_smell) {
+    push("foul_discharge_alone", 0.84, ["foul_smelling_discharge"]);
+  }
+
+  // ── FEVER + DISCHARGE OR PELVIC PAIN ─────────────────────────────────────
+  // Targets infection-risk combinations (PID, BV with complication, etc.)
+  const hasFever = s.fever || /\b(fever|feverish|running a fever|running a temperature)\b/.test(t);
+  if (hasFever && (s.discharge_foul_smell || s.unusual_discharge || hasDischarge || s.pelvic || hasTag(board, "pelvic_pain") || hasTag(board, "cramps"))) {
+    push("fever_with_discharge_or_pain", 0.91, [
+      "fever",
+      s.discharge_foul_smell ? "foul_discharge" : (hasDischarge ? "discharge" : null),
+      (s.pelvic || hasTag(board, "pelvic_pain")) ? "pelvic_pain" : null,
+      s.chills ? "chills" : null,
+    ]);
+  }
+
+  // ── BLEEDING AFTER SEX ────────────────────────────────────────────────────
+  if (s.bleeding_after_sex) {
+    push("bleeding_after_sex", 0.87, ["bleeding_after_sex"]);
+  }
+
+  // ── SEVERE UNMANAGED PAIN ─────────────────────────────────────────────────
+  // Pain + severe intensity OR explicit medication-failure language.
+  // Only fires when there is no heavy bleeding signal (that is already handled
+  // by heavy_bleeding_red_flag) to avoid double-routing the same event.
+  const hasMedicationFailure = /\b(nothing.*helps?|pain.*not.*going|can'?t.*move|medication.*didn'?t.*help|medicine.*not.*working|ibuprofen.*didn'?t|painkiller.*not|tried.*pain.*still|pain.*meds.*not|pills.*not.*helping)\b/.test(t);
+  const hasSeverePain = board.severity === "severe" || hasMedicationFailure;
+  if ((s.pelvic || hasTag(board, "pelvic_pain") || hasTag(board, "cramps")) && hasSeverePain && !hasHeavySignal) {
+    push("severe_unmanaged_pain", 0.88, [
+      s.pelvic ? "pelvic_pain" : "cramps",
+      hasMedicationFailure ? "medication_failure" : "severe_intensity",
+    ]);
+  }
+
   if (
     hasLateSignal &&
     (/\bstress|stressed|anxious|anxiety|overwhelmed\b/.test(t) || s.anxiety || hasTag(board, "mood_change"))
@@ -249,19 +283,28 @@ export function scoreInterpretationBoard(board) {
   }
 
   const explicitPeriMention = s.peri_mention || /\b(perimenopause|change of life|the change)\b/.test(t);
-  const periCluster = (s.irregular || hasTag(board, "cycle_irregularity")) &&
-    (s.hot_flashes || s.night_sweats || s.cold_flashes) &&
-    (s.insomnia || s.mood || s.fatigue || hasTag(board, "mood_change"));
+  const hasIrregularity  = s.irregular || hasTag(board, "cycle_irregularity");
+  const hasVasomotor     = s.hot_flashes || s.night_sweats || s.cold_flashes;
+  const hasSleepMood     = s.insomnia || s.mood || s.fatigue || hasTag(board, "mood_change");
+  // Strong cluster (original): all three groups present → higher confidence
+  const periClusterStrong  = hasIrregularity && hasVasomotor && hasSleepMood;
+  // Partial cluster: irregularity + at least one of vasomotor or sleep/mood
+  const periClusterPartial = hasIrregularity && (hasVasomotor || hasSleepMood);
+  const periCluster = periClusterStrong || periClusterPartial;
   const lifeStageAllowsPeri =
     !board.mode.isPregnancy &&
     !board.mode.isPostpartum &&
     !board.mode.isTTC;
   if (lifeStageAllowsPeri && (explicitPeriMention || periCluster)) {
-    push("possible_perimenopause_pattern", explicitPeriMention ? 0.86 : 0.72, [
-      explicitPeriMention ? "explicit_perimenopause_mention" : null,
-      periCluster ? "irregular_vasomotor_sleep_cluster" : null,
-      lifeStageAllowsPeri ? "life_stage_compatible" : null,
-    ]);
+    push("possible_perimenopause_pattern",
+      explicitPeriMention ? 0.86 : (periClusterStrong ? 0.72 : 0.65),
+      [
+        explicitPeriMention ? "explicit_perimenopause_mention" : null,
+        periClusterStrong  ? "irregular_vasomotor_sleep_cluster" : null,
+        periClusterPartial && !periClusterStrong ? "irregular_with_partial_cluster" : null,
+        lifeStageAllowsPeri ? "life_stage_compatible" : null,
+      ]
+    );
   }
 
   const hasIrregularSignalByCycleEngine = board.cycle.cycleSignals.some((sig) =>
@@ -456,6 +499,52 @@ export function selectResponseStrategy(board, interpretations) {
     return {
       strategy: "defer",
       interpretation: top.key,
+      why: top.why,
+      confidence: topScore,
+    };
+  }
+
+  // ── NEW: safety-gap fixes ──────────────────────────────────────────────────
+
+  if (top.key === "fever_with_discharge_or_pain") {
+    return {
+      strategy: "triage",
+      interpretation: top.key,
+      next: "ELSE_DISCHARGE_ENTRY",
+      payload: { reason: "reasoning:fever_with_discharge_or_pain" },
+      why: top.why,
+      confidence: topScore,
+    };
+  }
+
+  if (top.key === "foul_discharge_alone") {
+    return {
+      strategy: "clarify",
+      interpretation: top.key,
+      next: "ELSE_DISCHARGE_ENTRY",
+      payload: { reason: "reasoning:foul_discharge_alone" },
+      why: top.why,
+      confidence: topScore,
+    };
+  }
+
+  if (top.key === "bleeding_after_sex") {
+    return {
+      strategy: "clarify",
+      interpretation: top.key,
+      next: "SPOT_INTRO",
+      payload: { reason: "reasoning:bleeding_after_sex", postSex: true },
+      why: top.why,
+      confidence: topScore,
+    };
+  }
+
+  if (top.key === "severe_unmanaged_pain") {
+    return {
+      strategy: "triage",
+      interpretation: top.key,
+      next: "HEAVY_ROUTE_C",
+      payload: { reason: "reasoning:severe_unmanaged_pain" },
       why: top.why,
       confidence: topScore,
     };

@@ -1,9 +1,22 @@
 // ─── 1. ENTITY EXTRACTOR ─────────────────────────────────────────────────────
+import {
+  catalogKeyToSelectionCode,
+  findSymptomMatchesFromText,
+  groupSymptomMatchesByCategory,
+  normalizeCategory,
+} from "./bloomie-symptom-catalog.js";
+
 // Canonical domain -> option catalog for richer symptom understanding.
 // importance:
 // - routing_critical: should stay easily available to routing/safety logic
 // - log_only: mainly for journaling/summaries
 // - insight_only: enriches pattern insight and phase-aware interpretation
+//
+// Temporary compatibility layer:
+// The backend symptom catalog is now the main source of truth for matching and
+// category grouping. This object remains only to preserve legacy Bloomie option
+// codes and cover a few natural-language aliases until that alias layer is
+// fully catalog-driven.
 export const SYMPTOM_DOMAIN_OPTION_CATALOG = {
   digestion: [
     { code: "bloated", importance: "insight_only", matchers: [/\bbloat|bloated|bloating|feel puffy|puffy\b/, /\bstomach\b.*\bfull\b/] },
@@ -22,15 +35,18 @@ export const SYMPTOM_DOMAIN_OPTION_CATALOG = {
   ],
   discharge: [
     { code: "sticky", importance: "log_only", matchers: [/\bsticky discharge|sticky\b.*\bdown there\b/] },
-    { code: "creamy", importance: "log_only", matchers: [/\bcreamy discharge|milky discharge|white discharge\b/] },
-    { code: "eggwhite", importance: "insight_only", matchers: [/\begg.?white discharge|egg white|ewcm|clear stretchy\b/] },
-    { code: "watery", importance: "insight_only", matchers: [/\bwatery discharge|very wet down there\b/] },
-    { code: "yellow", importance: "routing_critical", matchers: [/\byellow discharge\b/] },
-    { code: "green", importance: "routing_critical", matchers: [/\bgreen discharge\b/] },
-    { code: "gray", importance: "routing_critical", matchers: [/\bgray discharge|grey discharge\b/] },
-    { code: "brown", importance: "routing_critical", matchers: [/\bbrown discharge\b/] },
-    { code: "blood_tinged", importance: "routing_critical", matchers: [/\bblood tinged discharge|blood in discharge\b/] },
-    { code: "foul_smell", importance: "routing_critical", matchers: [/\bfoul smell|fishy smell|bad odor|bad odour\b/] },
+    { code: "creamy", importance: "log_only", matchers: [/\bcreamy discharge|milky discharge|white discharge|white lotion|lotiony white|lotion.*discharge\b/] },
+    { code: "eggwhite", importance: "insight_only", matchers: [/\begg.?white discharge|egg white|ewcm|clear stretchy|stretchy clear|slimy string|stringy slime|clear string|snot.?like|slimy.*stretchy|clear.*slime|slime.*clear\b/] },
+    { code: "watery", importance: "insight_only", matchers: [/\bwatery discharge|very wet down there|clear watery rush|watery rush|soaked clear|clear.*soak|panty.*soak.*clear|rush.*clear|clear.*rush|wet gush|gush.*clear|clear.*gush\b/] },
+    { code: "thick_clumpy", importance: "routing_critical", matchers: [/\bthick white chunks?|white chunks?|cottage cheese|thick clumpy|clumpy discharge|chunky discharge|curd.?like\b/] },
+    { code: "yellow", importance: "routing_critical", matchers: [/\byellow discharge|yellowish\b/] },
+    { code: "green", importance: "routing_critical", matchers: [/\bgreen discharge|greenish\b/] },
+    { code: "gray", importance: "routing_critical", matchers: [/\bgray discharge|grey discharge|grayish|greyish\b/] },
+    { code: "brown", importance: "routing_critical", matchers: [/\bbrown discharge|spotting brown|brown spotting\b/] },
+    { code: "blood_tinged", importance: "routing_critical", matchers: [/\bblood tinged discharge|blood.?tinged|blood in discharge|blood mixed mucus|blood.*mucus|mucus.*blood\b/] },
+    { code: "foul_smell", importance: "routing_critical", matchers: [/\bfoul smell|fishy smell|bad odor|bad odour|smell bad|smells bad|bad smell|strong smell\b/] },
+    { code: "increased_volume", importance: "insight_only", matchers: [/\ba lot came out|panty soaked|panties soaked|underwear soaked|soaked.*pant|sudden rush|felt a rush|wet rush|gush|a lot of discharge|so much discharge\b/] },
+    { code: "decreased_volume", importance: "log_only", matchers: [/\bbarely anything|hardly any discharge|little discharge|less discharge|dry down there|feels dry\b/] },
   ],
   skin: [
     { code: "oily_skin", importance: "insight_only", matchers: [/\boily skin|greasy skin\b/] },
@@ -75,7 +91,7 @@ export const SYMPTOM_DOMAIN_OPTION_CATALOG = {
   cycle: [
     { code: "late_period", importance: "routing_critical", matchers: [/\bperiod.*late|missed period|period nuh come|period hasn't come\b/] },
     { code: "spotting", importance: "routing_critical", matchers: [/\bspotting|spot\b.*\bblood\b/] },
-    { code: "heavy_flow", importance: "routing_critical", matchers: [/\bheavy bleeding|soaking through|flooding\b/] },
+    { code: "heavy_flow", importance: "routing_critical", matchers: [/\bheavy bleeding|heavy flow|soaking through|flooding\b/] },
     { code: "clots", importance: "routing_critical", matchers: [/\bclots?|passing clots?\b/] },
     { code: "irregular_cycle", importance: "routing_critical", matchers: [/\birregular period|cycle.*irregular|unpredictable cycle\b/] },
   ],
@@ -106,13 +122,14 @@ export const SYMPTOM_DOMAIN_OPTION_CATALOG = {
     { code: "leakage", importance: "log_only", matchers: [/\burine leakage|leak when i cough|peeing leakage\b/] },
   ],
   blood_colour: [
-    { code: "bright_red", importance: "insight_only", matchers: [/\bbright red blood\b/] },
-    { code: "dark_red", importance: "insight_only", matchers: [/\bdark red blood\b/] },
-    { code: "pink", importance: "insight_only", matchers: [/\bpink blood\b/] },
-    { code: "brown", importance: "insight_only", matchers: [/\bbrown blood\b/] },
-    { code: "black", importance: "log_only", matchers: [/\bblack blood\b/] },
-    { code: "orange_tinge", importance: "log_only", matchers: [/\borange tinge\b/] },
-    { code: "gray", importance: "log_only", matchers: [/\bgray blood|grey blood\b/] },
+    { code: "bright_red", importance: "insight_only", matchers: [/\bbright red blood|fresh red blood|fresh red|period.*bright red|period.*fresh red|bleeding.*bright red\b/] },
+    { code: "dark_red", importance: "insight_only", matchers: [/\bdark red blood|deep red blood|wine colo(?:u)?r|wine red|period.*dark red|period.*deep red|bleeding.*dark red\b/] },
+    { code: "light_red", importance: "insight_only", matchers: [/\blight red blood|light red|period.*light red\b/] },
+    { code: "pink", importance: "insight_only", matchers: [/\bpink blood|pinkish|period.*pink\b/] },
+    { code: "brown", importance: "insight_only", matchers: [/\bbrown blood|period.*brown|bleeding.*brown\b/] },
+    { code: "black", importance: "log_only", matchers: [/\bblack blood|almost black|period.*black|bleeding.*black\b/] },
+    { code: "orange_tinge", importance: "log_only", matchers: [/\borange tinge|orange tint|orange blood|period.*orange\b/] },
+    { code: "gray", importance: "log_only", matchers: [/\bgray blood|grey blood|period.*gray|period.*grey|bleeding.*gray|bleeding.*grey\b/] },
   ],
   energy: [
     { code: "fatigue", importance: "routing_critical", matchers: [/\bfatigue|wiped out\b/] },
@@ -154,23 +171,37 @@ export const LOG_ONLY_DOMAIN_OPTIONS = new Set(
 
 function extractDomainSelections(t) {
   const selections = {};
+  const catalogMatches = findSymptomMatchesFromText(t);
+
+  for (const match of catalogMatches) {
+    const domain = normalizeCategory(match.category);
+    if (!selections[domain]) selections[domain] = [];
+    selections[domain].push(catalogKeyToSelectionCode(match.key, match.category));
+  }
+
+  // Legacy compatibility: preserve historic Bloomie option codes where older
+  // flows/tests still depend on them. These aliases are additive, not primary.
   for (const [domain, options] of Object.entries(SYMPTOM_DOMAIN_OPTION_CATALOG)) {
     const hits = [];
     for (const option of options) {
       if (option.matchers.some((rx) => rx.test(t))) hits.push(option.code);
     }
-    if (hits.length) selections[domain] = [...new Set(hits)];
+    if (hits.length) selections[domain] = [...new Set([...(selections[domain] || []), ...hits])];
   }
+
   return selections;
 }
 
 export function extractEntities(text) {
   const t = String(text || "").toLowerCase().trim();
   const domainSelections = extractDomainSelections(t);
+  const catalogMatches = findSymptomMatchesFromText(t);
 
   return {
     symptoms:  extractSymptoms(t),
     domainSelections,
+    catalogMatches,
+    catalogMatchesByCategory: groupSymptomMatchesByCategory(catalogMatches),
     duration:  extractDuration(t),
     severity:  extractSeverity(t),
     timing:    extractTiming(t),
@@ -198,11 +229,11 @@ function extractSymptoms(t) {
       /\bnothing yet\b/.test(t) ||
       /\b(i didn'?t|i did not|didn'?t)\s+(get it|get mine|see it)\b/.test(t)
     ),
-    heavy:          /\b(heavy|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through|so much blood|so much bleeding)\b/.test(t),
+    heavy:          /\b(heavy|heavy flow|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleed.*out.*bad|bleeding.*bad|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through|so much blood|so much bleeding)\b/.test(t),
     spotting:       /\b(spot|spotting|pink|brown.*discharge|blood.*between|between.*period)\b/.test(t),
     pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly|one.sided.*pain|one.side.*hurt|one side.*hurt|lower.*abdominal.*pain|side.*hurts|sharp.*pelvic|back.*hurting|my back hurting)\b/.test(t),
     mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it|feel.*low|so low|feel low|feeling low|angry|anger|mad|vex|frustrated|frustration|annoyed|snappy|happy|happier|good mood|excited|calm|overwhelmed|don't feel like myself|dont feel like myself|not like myself)\b/.test(t),
-    discharge:      /\b(discharge|discharge.*weird|smell off|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation|down.*there.*(?:off|wrong|weird|not normal|funny|odd|irritat|uncomfort)|(?:something|sumn).*(?:wrong|weird|off).*(?:down there|down deh|down below))\b/.test(t),
+    discharge:      /\b(discharge|discharge.*weird|smell off|odor|white.*coming|something.*coming|unusual odour|vaginal.*discharge|down.*there.*wet|wet.*down.*there|vaginal.*burning|vaginal.*itching|unusual.*vaginal|vaginal.*sensation|panty soaked|panties soaked|underwear soaked|felt a rush|sudden rush|wet gush|clear.*slime|slime.*clear|snot.?like|down.*there.*(?:off|wrong|weird|not normal|funny|odd|irritat|uncomfort)|(?:something|sumn).*(?:wrong|weird|off).*(?:down there|down deh|down below))\b/.test(t),
     nausea:         /\b(nausea|nauseous|vomit|vomiting|sick to.*stomach|throw up|queasy|feel sick)\b/.test(t),
     dizziness:      /\b(dizzy|dizziness|lightheaded|faint|head.*spin|head.*swim)\b/.test(t),
 
@@ -223,10 +254,15 @@ function extractSymptoms(t) {
     diarrhea:       /\b(diarrhea|loose.*stool|watery.*stool|running.*belly|belly.*running|running stomach|running to bathroom)\b/.test(t),
 
     // ── DISCHARGE (typed) ────────────────────────────────────────────────────
-    discharge_eggwhite: /\b(ewcm|egg.?white|egg white discharge|clear.*stretchy|stretchy.*clear|slippery.*discharge|watery.*discharge)\b/.test(t),
+    discharge_eggwhite: /\b(ewcm|egg.?white|egg white discharge|clear.*stretchy|stretchy.*clear|slippery.*discharge|watery.*discharge|slimy string|stringy slime|clear string|snot.?like|clear.*slime|slime.*clear)\b/.test(t),
     discharge_creamy:   /\b(creamy.*discharge|white.*discharge|milky.*discharge|lotion.*discharge)\b/.test(t),
     discharge_sticky:   /\b(sticky.*discharge|thick.*discharge|clumpy.*discharge|cottage.*cheese|chunky.*discharge)\b/.test(t),
-    unusual_discharge:  /\b(unusual.*discharge|strange.*discharge|funny.*smell|fishy.*smell|yellow.*discharge|green.*discharge|grey.*discharge|vaginal.*burning|burning.*down.*there|vaginal.*itching|itching.*down.*there|unusual.*odour|unusual.*odor)\b/.test(t),
+    unusual_discharge:  /\b(unusual.*discharge|strange.*discharge|funny.*smell|fishy.*smell|yellow.*discharge|yellowish|green.*discharge|greenish|grey.*discharge|gray.*discharge|greyish|grayish|cottage.*cheese|thick.*clumpy|vaginal.*burning|burning.*down.*there|vaginal.*itching|itching.*down.*there|unusual.*odour|unusual.*odor|smell bad|smells bad)\b/.test(t),
+    blood_colour_any:   /\b(bright red blood|fresh red blood|fresh red|dark red blood|deep red blood|wine colo(?:u)?r|wine red|light red blood|light red|pink blood|pinkish|brown blood|black blood|almost black|orange tinge|orange tint|orange blood|gray blood|grey blood|period.*(?:bright red|fresh red|dark red|deep red|light red|pink|brown|black|orange|gray|grey)|bleeding.*(?:bright red|dark red|brown|black|gray|grey))\b/.test(t),
+    blood_colour_bright:/\b(bright red blood|fresh red blood|fresh red|light red blood|light red|period.*bright red|period.*fresh red|period.*light red|bleeding.*bright red)\b/.test(t),
+    blood_colour_dark:  /\b(dark red blood|deep red blood|wine colo(?:u)?r|wine red|brown blood|black blood|almost black|period.*dark red|period.*deep red|period.*brown|period.*black|bleeding.*dark red|bleeding.*brown|bleeding.*black)\b/.test(t),
+    blood_colour_pink:  /\b(pink blood|pinkish|period.*pink)\b/.test(t),
+    blood_colour_concern:/\b(orange tinge|orange tint|orange blood|gray blood|grey blood|period.*orange|period.*gray|period.*grey|bleeding.*gray|bleeding.*grey)\b/.test(t),
 
     // ── SKIN / HAIR ──────────────────────────────────────────────────────────
     acne:           /\b(acne|pimple|pimples|breakout|breaking out|spots.*face|face.*spots|blemish|blemishes|zit|zits)\b/.test(t),
@@ -238,6 +274,10 @@ function extractSymptoms(t) {
     night_sweats:   /\b(night sweat|sweating.*night|wake.*drenched|soaked.*sleep|sweat.*sleep|wake up.*sweat)/.test(t),
     cold_flashes:   /\b(cold flash|suddenly.*cold|cold.*chills|shiver.*random|chills.*random)\b/.test(t),
     bbt_shift:      /\b(basal.*temp|bbt|body.*temperature.*shift|temp.*rise|temperature.*drop.*cycle)\b/.test(t),
+
+    // ── FEVER / ILLNESS ───────────────────────────────────────────────────────
+    fever:  /\b(fever|feverish|running a fever|running a temperature|temperature is up|temperature is high|i have a fever|i got a fever|got a temperature|feel hot and sick)\b/.test(t),
+    chills: /\b(chills|shivering|shaky.*cold|cold shakes|got the chills|feel.*chilly.*sick|chills.*fever|fever.*chills)\b/.test(t),
 
     // ── COGNITIVE / MENTAL ───────────────────────────────────────────────────
     brain_fog:      /\b(brain fog|foggy|can't think|cant think|think.*slow|head.*cloudy|cloudy.*head|not thinking.*clear|mental.*fog|not.*thinking.*clearly|i'm not thinking|can't concentrate clearly)\b/.test(t),
@@ -281,6 +321,12 @@ function extractSymptoms(t) {
     weight_change:  /\b(weight.*change|gained.*weight|gaining.*weight|losing.*weight|weight.*gain|weight.*loss|scale.*up|scale.*down)\b/.test(t),
     smell_sensitivity: /\b(smell.*sensitive|sensitive.*smell|everything.*smell|smell.*strong|can smell.*everything|smell.*bother)\b/.test(t),
     nasal_congestion:  /\b(stuffy.*nose|congested|nasal.*congestion|blocked.*nose|nose.*block)\b/.test(t),
+
+    // ── POST-SEX BLEEDING ─────────────────────────────────────────────────────
+    bleeding_after_sex: /\b(bleed.*after.*sex|bleeding.*after.*sex|bled.*after.*sex|blood.*after.*sex|spot.*after.*sex|spotting.*after.*sex|pink.*after.*sex|bleed.*intercourse|bleeding.*intercourse|bled.*intercourse|blood.*after.*intercourse)\b/.test(t),
+
+    // ── FOUL-SMELLING DISCHARGE ───────────────────────────────────────────────
+    discharge_foul_smell: /\b(foul.*discharge|fishy.*discharge|discharge.*smell.*bad|discharge.*foul|bad.*smell.*discharge|fishy.*smell|discharge.*bad.*odou?r|bad.*odou?r.*discharge|strong.*smell.*discharge|discharge.*strong.*smell|smell.*coming.*down|smell.*down.*there|vaginal.*foul|vaginal.*fishy)\b/.test(t),
 
     // ── PERIMENOPAUSE / MENOPAUSE ─────────────────────────────────────────
     peri_mention:       /\b(perimenopause|peri menopause|peri-menopause|going through the change|the change|change of life|premenopause)\b/.test(t),
@@ -354,11 +400,15 @@ export const SYMPTOM_TO_CATALOG_KEYS = {
   weight_change:      ["WEIGHT_CHANGE"],
   smell_sensitivity:  ["SMELL_SENSITIVITY"],
   nasal_congestion:   ["NASAL_CONGESTION"],
-  peri_mention:       ["IRREGULAR_PERIOD", "HOT_FLASHES"],
-  menopause_mention:  ["MISSED_PERIOD", "HOT_FLASHES"],
-  mood_rage:          ["MOOD_SWINGS", "IRRITABILITY"],
-  memory_issues:      ["FORGETFUL", "BRAIN_FOG", "POOR_CONCENTRATION"],
-  body_temp:          ["HOT_FLASHES", "COLD_FLASHES"],
+  peri_mention:         ["IRREGULAR_PERIOD", "HOT_FLASHES"],
+  menopause_mention:    ["MISSED_PERIOD", "HOT_FLASHES"],
+  mood_rage:            ["MOOD_SWINGS", "IRRITABILITY"],
+  memory_issues:        ["FORGETFUL", "BRAIN_FOG", "POOR_CONCENTRATION"],
+  body_temp:            ["HOT_FLASHES", "COLD_FLASHES"],
+  fever:                ["FEVER"],
+  chills:               ["CHILLS"],
+  bleeding_after_sex:   ["SPOTTING", "VAGINAL_BLEEDING"],
+  discharge_foul_smell: ["DISCHARGE_FOUL_SMELL"],
 };
 
 // Friendly display labels for symptom catalog codes (used in Bloomie responses)
@@ -459,7 +509,11 @@ function extractDuration(t) {
 
 // ── 1c. Severity ──────────────────────────────────────────────────────────────
 function extractSeverity(t) {
-  if (/\b(severe|very bad|really bad|unbearable|kill.*me|kill.*mi|murder.*mi|cannot.*function|can't.*function|10\/10|worst)\b/.test(t)) {
+  if (/\b(severe|very bad|really bad|unbearable|kill.*me|kill.*mi|murder.*mi|cannot.*function|can't.*function|10\/10|worst|bleed.*out.*bad|bleeding bad)\b/.test(t)) {
+    return "severe";
+  }
+  // Medication failure or movement-limiting pain also signals severe intensity
+  if (/\b(nothing.*helps?|nothing.*working|pain.*not.*going|can'?t.*move|medication.*didn'?t|medicine.*not.*working|ibuprofen.*didn'?t|painkiller.*not|tried.*pain.*still|pain.*meds.*not|pills.*not.*helping)\b/.test(t)) {
     return "severe";
   }
   if (/\b(bad|moderate|pretty bad|affecting|interfering|hard to|difficult|bad bad)\b/.test(t)) {
@@ -468,7 +522,7 @@ function extractSeverity(t) {
   if (/\b(mild|little|likkle|not bad|manageable|okay|bearable|slight|a bit|a likkle)\b/.test(t)) {
     return "mild";
   }
-  if (/\b(hurt bad|pain bad|bleed bad|bleed nuff|hurt nuff|cramp bad|cramp nuff)\b/.test(t)) {
+  if (/\b(hurt bad|pain bad|bleed bad|bleed nuff|hurt nuff|cramp bad|cramp nuff|me bleed bad)\b/.test(t)) {
     return "severe";
   }
   return null;
@@ -511,6 +565,9 @@ export function inferRoute(entities) {
   const { symptoms, duration, severity, timing, pregnancy, urgent } = entities;
   const sym = symptoms;
   const raw = entities.raw || "";
+  const hasDischargeConcern =
+    sym.discharge || sym.unusual_discharge || sym.discharge_eggwhite ||
+    sym.discharge_creamy || sym.discharge_sticky || sym.odor;
 
   // ── IMPLICIT LATE GUARD ─────────────────────────────────────────────────────
   // Treat implicit pronoun signals ("it hasn't come", "still waiting", etc.) as
@@ -572,7 +629,7 @@ export function inferRoute(entities) {
   }
 
   // Spotting + unusual discharge/odor → provider soon (checked before mid_cycle so discharge wins)
-  if (sym.spotting && sym.discharge) {
+  if (sym.spotting && hasDischargeConcern) {
     return { next: "SPOT_PROVIDER_SOON", payload: { inferred: true, reason: "spotting+discharge" } };
   }
 
@@ -625,8 +682,14 @@ export function inferRoute(entities) {
   }
 
   // Discharge without spotting → else intro discharge
-  if (sym.discharge && !sym.spotting && !sym.pelvic) {
+  if (hasDischargeConcern && !sym.spotting && !sym.pelvic) {
     return { next: "ELSE_DISCHARGE", payload: { inferred: true, reason: "discharge_only" } };
+  }
+
+  // Pelvic pain + unusual discharge should move out of stale bleeding paths
+  // and into the discharge entry flow, which can then account for pain.
+  if (sym.pelvic && hasDischargeConcern) {
+    return { next: "ELSE_DISCHARGE_ENTRY", payload: { inferred: true, also: "pelvic", reason: "discharge+pelvic" } };
   }
 
   // Nausea + late → pregnancy concern
@@ -711,7 +774,7 @@ export function detectDownplaying(text) {
 // ── 3b. Ambiguous input detector ─────────────────────────────────────────────
 // Returns a targeted clarifying question string when the input is too vague to
 // route safely, or null when input is clear enough to proceed.
-export function detectAmbiguousInput(text, entities) {
+export function detectAmbiguousInputDetail(text, entities) {
   const t   = String(text || "").toLowerCase().trim();
   const sym = entities?.symptoms || {};
   const words = t.split(/\s+/).filter(Boolean);
@@ -725,11 +788,16 @@ export function detectAmbiguousInput(text, entities) {
     !/\b(pelvic|lower\s+(?:belly|abdomen)|one.?sided|cramp|cramps|period pain)\b/.test(t);
 
   if (hasDownThereVague) {
-    return "Got you 💗 Is it more like discharge, irritation, pain, or just a general off feeling down there?";
+    return createClarificationDescriptor(
+      "Got you 💗 Is it more like discharge, irritation, pain, or just a general off feeling down there?"
+    );
   }
 
   if (hasBroadBellyPain && !sym.heavy && !sym.late && !sym.discharge && !entities?.urgent && words.length <= 10) {
-    return "Got you 💗 Is it more like cramps low in your pelvis, or more your stomach/belly in general?";
+    return createClarificationDescriptor(
+      "Got you 💗 Is it more like cramps low in your pelvis, or more your stomach/belly in general?",
+      "pain_location"
+    );
   }
 
   // "dizzy" or "dizziness" alone (short message, dizziness signal, no other anchor)
@@ -738,7 +806,10 @@ export function detectAmbiguousInput(text, entities) {
     !sym.heavy && !sym.pelvic && !sym.late && !sym.spotting && !sym.nausea &&
     words.length <= 5
   ) {
-    return "Is the dizziness happening alongside any bleeding, or more on its own?";
+    return createClarificationDescriptor(
+      "Is the dizziness happening alongside any bleeding, or more on its own?",
+      "dizziness_context"
+    );
   }
 
   // "feeling sick" / "feel sick" alone — must match text directly (nausea regex misses this phrase)
@@ -747,7 +818,10 @@ export function detectAmbiguousInput(text, entities) {
     words.length <= 6 &&
     !sym.pelvic && !sym.late && !sym.heavy
   ) {
-    return "Is it more like nausea and stomach discomfort, or do you feel generally unwell with things like chills or fever?";
+    return createClarificationDescriptor(
+      "Is it more like nausea and stomach discomfort, or do you feel generally unwell with things like chills or fever?",
+      "general_symptom_context"
+    );
   }
 
   // Generic "pain" or "it hurts" alone with no location or severity
@@ -759,7 +833,10 @@ export function detectAmbiguousInput(text, entities) {
     !sym.heavy && !sym.late && !sym.dizziness &&
     words.length <= 5
   ) {
-    return "Where is the pain — is it more in your lower belly, pelvic area, or somewhere else? And on a scale of 1 to 5, how intense is it?";
+    return createClarificationDescriptor(
+      "Where is the pain — is it more in your lower belly, pelvic area, or somewhere else? And on a scale of 1 to 5, how intense is it?",
+      "pain_location"
+    );
   }
 
   // "heavy bleeding" without severity context (and not already urgent)
@@ -769,7 +846,10 @@ export function detectAmbiguousInput(text, entities) {
     !entities?.urgent &&
     words.length <= 8
   ) {
-    return "When you say heavy — are you soaking through a pad or tampon in about an hour or less, or is it heavier than usual but manageable?";
+    return createClarificationDescriptor(
+      "When you say heavy — are you soaking through a pad or tampon in about an hour or less, or is it heavier than usual but manageable?",
+      "bleeding_amount"
+    );
   }
 
   // "is this normal?" — seeking reassurance without specific context
@@ -777,16 +857,22 @@ export function detectAmbiguousInput(text, entities) {
     /\b(is this normal|is that normal|dat normal|is it normal)\b/.test(t) &&
     !sym.heavy && !sym.late && !sym.pelvic && !sym.dizziness
   ) {
-    return "That depends on what's going on 🩷 Tell me more about what you're experiencing and I can give you a much better answer.";
+    return createClarificationDescriptor(
+      "That depends on what's going on 🩷 Tell me more about what you're experiencing and I can give you a much better answer."
+    );
   }
 
   return null;
 }
 
+export function detectAmbiguousInput(text, entities) {
+  return detectAmbiguousInputDetail(text, entities)?.prompt || null;
+}
+
 // ── 3c. Contradiction detector ────────────────────────────────────────────────
 // Returns a clarifying prompt when the message contains logically contradictory
 // signals, or null when the message is internally consistent.
-export function detectContradiction(text, _entities) {
+export function detectContradictionDetail(text, _entities) {
   const t = String(text || "").toLowerCase();
 
   // "heavy" / "soaking" + "just spotting" / minimising bleed word
@@ -794,7 +880,10 @@ export function detectContradiction(text, _entities) {
     /\b(heavy|soaking)\b/.test(t) &&
     /\b(just spotting|just a spot|likkle|light spotting|only spotting)\b/.test(t)
   ) {
-    return "You mentioned both heavy bleeding and spotting — could you describe what you're seeing? Are you soaking through protection, or is it more of a light stain?";
+    return createClarificationDescriptor(
+      "You mentioned both heavy bleeding and spotting — could you describe what you're seeing? Are you soaking through protection, or is it more of a light stain?",
+      "bleeding_amount"
+    );
   }
 
   // "late" / "missed period" + "my period started"
@@ -802,12 +891,16 @@ export function detectContradiction(text, _entities) {
     /\b(late|missed period|period.*late|my period is late)\b/.test(t) &&
     /\b(my period started|period started|period came|period come|period begin|period began|it started yesterday|started yesterday|started today)\b/.test(t)
   ) {
-    return "It sounds like you might be saying your period started but was also late — is that right? When did bleeding begin?";
+    return createClarificationDescriptor(
+      "It sounds like you might be saying your period started but was also late — is that right? When did bleeding begin?"
+    );
   }
 
   // "negative" test + "positive" test in same message
   if (/\bnegative\b/.test(t) && /\bpositive\b/.test(t) && /\btest(s|ed|ing)?\b/.test(t)) {
-    return "I want to make sure I understood — did you get a negative result, a positive result, or both on different tests?";
+    return createClarificationDescriptor(
+      "I want to make sure I understood — did you get a negative result, a positive result, or both on different tests?"
+    );
   }
 
   // "no pain" / "not in pain" + pain descriptor
@@ -815,7 +908,9 @@ export function detectContradiction(text, _entities) {
     /\b(no pain|not in pain|don(?:'|')?t have pain|dont have pain|pain free|no cramps)\b/.test(t) &&
     /\b(severe|really bad|unbearable|bad pain|so much pain|cramps badly)\b/.test(t)
   ) {
-    return "You mentioned no pain but also described pain — could you clarify? Is it mild, or is it actually quite uncomfortable?";
+    return createClarificationDescriptor(
+      "You mentioned no pain but also described pain — could you clarify? Is it mild, or is it actually quite uncomfortable?"
+    );
   }
 
   // "not sexually active" / "haven't had sex" + "had sex" / "unprotected"
@@ -823,7 +918,9 @@ export function detectContradiction(text, _entities) {
     /\b(not sexually active|haven(?:'|')?t had sex|havent had sex|not having sex|i don(?:'|')?t have sex|i dont have sex)\b/.test(t) &&
     /\b(had sex|we had sex|unprotected|slept with|breed)\b/.test(t)
   ) {
-    return "I want to make sure I understand your situation so I can give you the right guidance — is there any chance of pregnancy this cycle?";
+    return createClarificationDescriptor(
+      "I want to make sure I understand your situation so I can give you the right guidance — is there any chance of pregnancy this cycle?"
+    );
   }
 
   // "fine" / "okay" + urgency-adjacent severity signal — minimising serious symptoms
@@ -835,7 +932,9 @@ export function detectContradiction(text, _entities) {
       /\bfaint|\bpass out/.test(t) ? "fainting" :
       /\bbleed/.test(t) ? "bleeding" :
       /\bpain/.test(t) ? "pain" : "the symptom you mentioned";
-    return `I want to make sure — you mentioned ${symptomWord} but also said you're okay. Is the ${symptomWord} manageable or actually quite uncomfortable?`;
+    return createClarificationDescriptor(
+      `I want to make sure — you mentioned ${symptomWord} but also said you're okay. Is the ${symptomWord} manageable or actually quite uncomfortable?`
+    );
   }
 
   // Multiple conflicting timing words for the same event
@@ -844,7 +943,9 @@ export function detectContradiction(text, _entities) {
     /\blast week\b/.test(t) &&
     /\blast month\b/.test(t)
   ) {
-    return "I want to get the timing right — when did this start? Yesterday, last week, or longer ago?";
+    return createClarificationDescriptor(
+      "I want to get the timing right — when did this start? Yesterday, last week, or longer ago?"
+    );
   }
 
   // "no cramps" / "cramp free" + severe cramping description
@@ -852,16 +953,22 @@ export function detectContradiction(text, _entities) {
     /\b(no cramps|cramp free|no period pain)\b/.test(t) &&
     /\b(severe cramps|bad cramps|cramps are bad|cramps so bad|cramps killing|cramping badly)\b/.test(t)
   ) {
-    return "You mentioned no cramps but also described severe cramping — could you clarify? Are the cramps manageable or actually quite bad?";
+    return createClarificationDescriptor(
+      "You mentioned no cramps but also described severe cramping — could you clarify? Are the cramps manageable or actually quite bad?"
+    );
   }
 
   return null;
 }
 
+export function detectContradiction(text, entities) {
+  return detectContradictionDetail(text, entities)?.prompt || null;
+}
+
 // ── 3d. Missing context detector ─────────────────────────────────────────────
 // Returns a single targeted probe question when a health symptom is present but
 // critical context is missing, or null when context is sufficient.
-export function detectMissingContext(entities, text) {
+export function detectMissingContextDetail(entities, text) {
   const t   = String(text || "").toLowerCase();
   const sym = entities?.symptoms || {};
 
@@ -872,18 +979,27 @@ export function detectMissingContext(entities, text) {
     !/\b(pelvic|lower\s+(?:belly|abdomen)|one.?sided|cramp|cramps)\b/.test(t) &&
     !entities?.severity
   ) {
-    return "Quick check: is this more crampy low-pelvic pain, or more general stomach/belly discomfort?";
+    return createClarificationDescriptor(
+      "Quick check: is this more crampy low-pelvic pain, or more general stomach/belly discomfort?",
+      "pain_location"
+    );
   }
 
   // Pain signal but no location and no pelvic/belly entity
   const hasPain = /\b(pain|hurt|hurts|hurting|ache|aches|sore)\b/.test(t);
   if (hasPain && !sym.pelvic && !sym.headache && !sym.joint_pain && !entities?.severity) {
-    return "Where does the pain feel like it's coming from — more in your belly, lower pelvic area, or somewhere else?";
+    return createClarificationDescriptor(
+      "Where does the pain feel like it's coming from — more in your belly, lower pelvic area, or somewhere else?",
+      "pain_location"
+    );
   }
 
   // Bleeding but no severity/amount (and not already urgent)
   if ((sym.heavy || sym.spotting) && !entities?.severity && !entities?.urgent) {
-    return "Is it light spotting, more like a normal period, or heavier than usual?";
+    return createClarificationDescriptor(
+      "Is it light spotting, more like a normal period, or heavier than usual?",
+      "bleeding_amount"
+    );
   }
 
   // Discharge with no descriptor
@@ -892,10 +1008,17 @@ export function detectMissingContext(entities, text) {
     !sym.unusual_discharge && !sym.discharge_sticky &&
     !sym.discharge_eggwhite && !sym.discharge_creamy
   ) {
-    return "Has the colour, smell, or texture changed, or does it just seem like more than usual?";
+    return createClarificationDescriptor(
+      "Has the colour, smell, or texture changed, or does it just seem like more than usual?",
+      "discharge_descriptor"
+    );
   }
 
   return null;
+}
+
+export function detectMissingContext(entities, text) {
+  return detectMissingContextDetail(entities, text)?.prompt || null;
 }
 
 // ── 3e. Cumulative risk checker ───────────────────────────────────────────────
@@ -932,3 +1055,4 @@ export function checkCumulativeRisk(entityHistory) {
 
   return { escalate: false, reason: null };
 }
+import { createClarificationDescriptor } from "./bloomie-clarification-specs.js";

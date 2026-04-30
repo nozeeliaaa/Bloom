@@ -112,6 +112,8 @@ function sanitize(payload) {
   if (typeof payload.reason   === "string") out.reason   = payload.reason;
   if (typeof payload.category === "string") out.category = payload.category;
   if (typeof payload.fromNode === "string") out.fromNode = payload.fromNode;
+  if (typeof payload.topic    === "string") out.topic    = payload.topic.slice(0, 80);
+  if (typeof payload.riskLevel === "string") out.riskLevel = payload.riskLevel.slice(0, 40);
   if (payload.urgencyFlag     !== undefined) out.urgencyFlag = !!payload.urgencyFlag;
   if (Array.isArray(payload.symptoms))            out.symptoms              = payload.symptoms.slice(0, 20);
   if (payload.containsHealthKeywords !== undefined) out.containsHealthKeywords = !!payload.containsHealthKeywords;

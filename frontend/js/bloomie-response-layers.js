@@ -1,3 +1,5 @@
+import { buildFollowUpClarifier } from "./bloomie-clarifier.js";
+
 function normalizeWhitespace(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
@@ -21,10 +23,18 @@ function hasAny(text, patterns) {
 }
 
 function getConcernKey(context = {}) {
+  const leadDomain = String(context.turnFocus?.leadDomain || "").toLowerCase();
   const reason = String(context.inferredReason || context.lastIntent || "").toLowerCase();
   const symptoms = context.entities?.symptoms || {};
 
+  if (leadDomain === "late") return "late_period";
+  if (leadDomain === "bleeding") return "heavy_bleeding";
+  if (leadDomain === "pain") return "pelvic_pain";
+  if (leadDomain === "discharge") return "discharge";
+  if (leadDomain === "pregnancy") return "pregnancy_concern";
+
   if (reason.includes("late") || symptoms.late || symptoms.implicit_late) return "late_period";
+  if (reason.includes("heavy") || symptoms.heavy || symptoms.large_clots) return "heavy_bleeding";
   if (reason.includes("spot") || symptoms.spotting) return "spotting";
   if (reason.includes("pelvic") || symptoms.pelvic || symptoms.ovulation_pain) return "pelvic_pain";
   if (reason.includes("pregnan") || context.entities?.pregnancy?.chance) return "pregnancy_concern";
@@ -158,6 +168,18 @@ export function getMissingClues(context = {}) {
     if (!mentionedIrregularity) missing.push("cycle_context");
   }
 
+  if (concern === "heavy_bleeding") {
+    const mentionedAmount =
+      !!entities.severity ||
+      hasAny(t, [/\bsoaking\b/, /\bsoak through\b/, /\bheavier than usual\b/, /\bmanageable\b/, /\blots?\b/]);
+    const mentionedTiming =
+      !!entities.duration ||
+      hasAny(t, [/\btoday\b/, /\bsince\b/, /\bdays?\b/, /\bweek\b/, /\bhours?\b/]);
+
+    if (!mentionedAmount) missing.push("amount");
+    if (!mentionedTiming) missing.push("timing");
+  }
+
   if (concern === "pelvic_pain") {
     if (!entities.severity) missing.push("severity");
     if (!hasAny(t, [/\bbleed|bleeding|spotting|period\b/])) missing.push("bleeding_context");
@@ -179,10 +201,19 @@ export function getMissingClues(context = {}) {
   return { concern, missing };
 }
 
+export function getFollowUpKey(context = {}) {
+  const { concern, missing } = getMissingClues(context);
+  if (!concern || !missing.length) return null;
+  return `followup:${concern}:${[...missing].sort().join("+")}`;
+}
+
 export function shouldAskFollowUp(context = {}) {
   if (context.entities?.urgent || context.inferredNext?.includes?.("URGENT")) return false;
   if (context.hasPendingClarifier) return false;
   if (context.isShortFollowUp) return false;
+  const followUpKey = getFollowUpKey(context);
+  if (followUpKey && context.askedFollowUpKeys?.has?.(followUpKey)) return false;
+  if (countActiveSymptoms(context.entities?.symptoms) >= 2 && !context.primaryFocusApplied) return false;
   const { concern, missing } = getMissingClues(context);
   if (!concern || missing.length === 0) return false;
   const shortConcernTurn = normalizeWhitespace(context.normalizedText || context.text).split(" ").length <= 6;
@@ -192,38 +223,11 @@ export function shouldAskFollowUp(context = {}) {
 export function buildFollowUpQuestion(context = {}) {
   const { concern, missing } = getMissingClues(context);
   if (!concern || !missing.length) return null;
-
-  if (concern === "late_period") {
-    if (missing.includes("pregnancy_possibility") && missing.includes("stress_or_routine")) {
-      return "Okay 🩷 I'll ask a couple things that can help narrow it down - any chance of pregnancy this cycle, or have stress, sleep, illness, or routine changes been different lately?";
-    }
-    if (missing.includes("pregnancy_possibility")) {
-      return "Quick check 🩷 is there any chance of pregnancy this cycle?";
-    }
-    return "Quick check 🩷 have stress, sleep, illness, or routine changes been different lately?";
-  }
-
-  if (concern === "pelvic_pain") {
-    if (missing.includes("severity") && (missing.includes("bleeding_context") || missing.includes("cycle_timing"))) {
-      return "Quick check so I can guide you better 🩷 is the pain mild, moderate, or severe, and is it happening with bleeding or at another point in your cycle?";
-    }
-    if (missing.includes("severity")) {
-      return "How strong would you say the pain is right now - mild, moderate, or severe?";
-    }
-    return "Is it happening with bleeding, or at another point in your cycle?";
-  }
-
-  if (concern === "spotting") {
-    if (missing.includes("amount") && missing.includes("timing")) {
-      return "Just to place it better 🩷 is it light spotting or more like bleeding, and was it around your expected period or at another time?";
-    }
-    if (missing.includes("pain")) {
-      return "Are you getting any cramps or pain with the spotting?";
-    }
-    return "Was it closer to light spotting or more like bleeding?";
-  }
-
-  return null;
+  return buildFollowUpClarifier({
+    concern,
+    missing,
+    seed: `${context.normalizedText || context.text}|${concern}`,
+  })?.text || null;
 }
 
 export function shouldUseMiniReplay(context = {}) {
@@ -333,6 +337,74 @@ export function buildSoftContinuePrompt(context = {}) {
     ],
   };
   return chooseVariant(variants[concern] || variants.general, `${concern}|${context.sessionDepth || 0}`);
+}
+
+function lineFeelsOpenEnded(line) {
+  const text = normalizeWhitespace(line).toLowerCase();
+  if (!text) return false;
+  return /\?$/.test(text) || /\b(if you want|tell me|let me know|would you like|do you want)\b/.test(text);
+}
+
+export function composeResponseLayers(context = {}, options = {}) {
+  const guidance = options.guidance || {};
+  const baseLines = Array.isArray(guidance.lines) ? guidance.lines.filter(Boolean) : [];
+  const emergency = !!options.emergency;
+  const guidanceOpener = options.guidanceOpener || "";
+  const patternLine = options.patternLine || null;
+  const secondaryAcknowledgement = options.secondaryAcknowledgement || null;
+  const alreadyShown = options.alreadyShown || {};
+
+  if (emergency) {
+    return {
+      lines: [...(guidanceOpener ? [guidanceOpener] : []), ...baseLines],
+      meta: {
+        tinyWinType: null,
+        usedSoftContinue: false,
+      },
+    };
+  }
+
+  const realityCheckPrefix = maybeBuildRealityCheckPrefix(context);
+  const tinyWinType = !realityCheckPrefix ? detectTinyWin(context) : null;
+  const tinyWinAlreadyShown = tinyWinType ? alreadyShown.tinyWins?.has?.(tinyWinType) : false;
+  const tinyWinLine = tinyWinType && !tinyWinAlreadyShown
+    ? buildTinyWinLine(tinyWinType, context.normalizedText || context.text || "")
+    : null;
+  const miniReplay = !realityCheckPrefix && shouldUseMiniReplay(context)
+    ? buildMiniReplay(context)
+    : null;
+  const hiddenConcernFollowUp = buildEmotionalFollowUp(context);
+  const effectiveTinyWinLine =
+    hiddenConcernFollowUp && tinyWinType === "body_awareness"
+      ? null
+      : tinyWinLine;
+  const shouldSoftContinueNow = !hiddenConcernFollowUp && shouldAddSoftContinue(
+    {
+      ...context,
+      hiddenConcern: !!detectHiddenConcern(
+        context.normalizedText || context.text,
+        context.inferredReason || context.lastIntent,
+        context.tone
+      ),
+      followUpAsked: false,
+    },
+    guidance
+  );
+  const softContinue = shouldSoftContinueNow && !alreadyShown.softContinue
+    ? buildSoftContinuePrompt(context)
+    : null;
+
+  const leadLine = realityCheckPrefix || miniReplay || guidanceOpener || null;
+  const supportLead = effectiveTinyWinLine || (!leadLine ? patternLine : null);
+  const suffixLine = hiddenConcernFollowUp || (!baseLines.some(lineFeelsOpenEnded) ? softContinue : null);
+
+  return {
+    lines: [supportLead, secondaryAcknowledgement, leadLine, ...baseLines, suffixLine].filter(Boolean),
+    meta: {
+      tinyWinType,
+      usedSoftContinue: !!(suffixLine && suffixLine === softContinue),
+    },
+  };
 }
 
 export function softenEscalationLine(line) {

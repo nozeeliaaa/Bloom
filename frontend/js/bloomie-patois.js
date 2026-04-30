@@ -1050,91 +1050,15 @@ export function fuzzyCorrect(input) {
   return result;
 }
 
-// ─── 4. INTENT BOOSTERS ───────────────────────────────────────────────────────
-// After normalization, append extra scoring keywords for patterns that are
-// hard to capture with word-swaps alone.
-
-const INTENT_BOOSTERS = [
-  {
-    // NOTE: boost uses "late period" not "late missed period". "missed period"
-    // in boosted text activates scoreSignals' pregnancy signal via
-    // /unprotected|missed.*period/ → false PREGNANCY_ENTRY on pure-late inputs.
-    patterns: [/period.*not.*come|period.*late|missed.*period|\bno\b.*period/i],
-    boost: " late period",
-  },
-  {
-    // NOTE: boost must NOT include "pain" — combined with "severe" it triggers
-    // extractUrgency's severe.*pain pattern causing false escalation.
-    patterns: [/cramp|pelvic pain|stomach pain|belly pain|lower abdom/i],
-    boost: " cramp pelvic",
-  },
-  {
-    patterns: [/spotting|light bleed|brown discharge|pink discharge/i],
-    boost: " spotting light stain",
-  },
-  {
-    // NOTE: "missed period" removed from boost — it activated sym.late prematurely,
-    // causing the late+pregnancy combo rule to fire before spotting+pregnancy rules.
-    patterns: [/pregnant|pregnancy|positive test|might be pregnant/i],
-    boost: " pregnant pregnancy",
-  },
-  {
-    patterns: [/heavy bleed|soaking through|bleed through|passing clots/i],
-    boost: " heavy bleeding soaking",
-  },
-  {
-    patterns: [/mood|irritable|anxious|sad|overwhelmed|low mood|cry/i],
-    boost: " mood anxious sad irritable",
-  },
-  {
-    // NOTE: boost must NOT include "faint" — it is in extractUrgency's regex and
-    // causes false escalation when the user only mentions weakness (not fainting).
-    // "dizziness" and "lightheaded" are NOT urgency keywords so they are safe.
-    patterns: [/faint|dizzy|lightheaded|pass out/i],
-    boost: " dizzy lightheaded",
-  },
-  {
-    // Amenorrhea — periods missing for extended time
-    patterns: [/amenorrhea|period.*months|months.*period|period.*stopped|period.*absent|not.*had.*period|missed.*more.*period|period.*gone/i],
-    boost: " amenorrhea missing period months absent",
-  },
-  {
-    // TTC — trying to conceive context
-    patterns: [/trying to conceive|ttc|trying to get pregnant|want.*pregnant|fertile days|ovulation.*test/i],
-    boost: " ttc trying to conceive ovulation fertile",
-  },
-  {
-    // Postpartum context
-    patterns: [/postpartum|gave birth|had.*baby|after.*baby|breastfeeding|period.*return/i],
-    boost: " postpartum after birth breastfeeding",
-  },
-  {
-    // Lifestyle change signals that delay periods
-    patterns: [/stressed|stress|lost weight|gained weight|exercise.*intense|intensely|been sick|illness|travel|sleep.*poor|not sleeping/i],
-    boost: " lifestyle change stress weight exercise",
-  },
-  {
-    // Birth control context
-    patterns: [/birth control|on the pill|started pill|stopped pill|iud|implant|coil|bc/i],
-    boost: " birth control pill contraception",
-  },
-  {
-    // Emotional distress / fear
-    patterns: [/scared|afraid|worried|ashamed|embarrassed|frightened|fear|nervous.*about.*health/i],
-    boost: " scared worried emotional distress",
-  },
-];
-
-// ─── 5. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
+// ─── 4. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
 
 /**
  * normalizePatois(rawText) → String
  *
- * Full 4-stage preprocessing pipeline:
+ * Full preprocessing pipeline:
  *   Stage 1: Phrase-level exact matching
  *   Stage 2: Word-level exact matching
  *   Stage 3: Fuzzy matching (Levenshtein) for near-miss Patois tokens
- *   Stage 4: Intent boosters
  *
  * @param  {string} rawText  - Raw text from the chat input
  * @returns {string}          - Normalized English text
@@ -1182,14 +1106,7 @@ export function normalizePatois(rawText) {
   // canonical pipeline order (normalizePatois → fuzzyCorrect → extractEntities).
   text = fuzzyCorrect(text) ?? text;
 
-  // ── Stage 4: intent boosters ──────────────────────────────────────────────
-  for (const booster of INTENT_BOOSTERS) {
-    if (booster.patterns.some((rx) => rx.test(text))) {
-      text += booster.boost;
-    }
-  }
-
-  return text;
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /**

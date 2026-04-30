@@ -3,6 +3,163 @@
  * Local helper functions shared across all Bloomie node modules.
  * Called once inside createNodes() with the full env object.
  */
+export function createEmptyConversationState() {
+  return {
+    symptoms: {
+      clots:             undefined,
+      clotsLarge:        undefined,
+      heavyFlow:         undefined,
+      cramps:            undefined,
+      symptomatic:       undefined,
+      possiblePregnancy: undefined,
+    },
+    asked: {
+      clotsSize:      false,
+      heavyFlowCheck: false,
+      symptomCheck:   false,
+      pregnancyCheck: false,
+    },
+  };
+}
+
+function normalizeConversationText(text = "") {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function extractBleedingConversationSignals(text = "", entities = {}) {
+  const t = normalizeConversationText(text);
+  const symptoms = entities?.symptoms || {};
+  const pregnancy = entities?.pregnancy || {};
+  const next = {};
+
+  const hasAny = (patterns = []) => patterns.some((rx) => rx.test(t));
+
+  if (hasAny([
+    /\b(no|not|without|never)\s+(any\s+)?clots?\b/,
+    /\b(not|isnt|isn t|aren t|arent)\s+passing\s+clots?\b/,
+    /\b(nope)\s+(on\s+the\s+)?clots?\b/,
+  ])) {
+    next.clots = false;
+    next.clotsLarge = false;
+  } else if (hasAny([
+    /\bclots?\b/,
+    /\bpassing\s+clots?\b/,
+    /\bclotting\b/,
+  ]) || symptoms.large_clots) {
+    next.clots = true;
+  }
+
+  if (next.clots !== false) {
+    if (hasAny([
+      /\b(large|big|bigger|larger)\s+clots?\b/,
+      /\bclots?\s+(larger|bigger)\s+than\s+(a\s+)?(coin|quarter)\b/,
+      /\b(quarter|50 cent|50 cent coin|50 cent piece|50-cent|grape|golf ball)\s+(size|sized)\b/,
+    ]) || symptoms.large_clots) {
+      next.clotsLarge = true;
+      next.clots = true;
+    } else if (hasAny([
+      /\bsmall\s+clots?\b/,
+      /\btiny\s+clots?\b/,
+      /\bjust\s+small\s+clots?\b/,
+    ])) {
+      next.clotsLarge = false;
+      next.clots = true;
+    }
+  }
+
+  if (hasAny([
+    /\b(not|isnt|isn t|aren t|arent)\s+heavy\b/,
+    /\bnot\s+bleeding\s+heavily\b/,
+    /\bnot\s+soaking\b/,
+  ])) {
+    next.heavyFlow = false;
+  } else if (hasAny([
+    /\bheavy\b/,
+    /\bheavy\s+(flow|bleeding)\b/,
+    /\bsoaking(\s+through)?\b/,
+    /\bflooding\b/,
+    /\bbleeding\s+a\s+lot\b/,
+  ]) || symptoms.heavy) {
+    next.heavyFlow = true;
+  }
+
+  if (hasAny([
+    /\b(no|not)\s+(really\s+)?(cramps?|pelvic pain)\b/,
+  ])) {
+    next.cramps = false;
+  } else if (symptoms.pelvic || hasAny([/\bcramps?\b/, /\bpelvic\s+pain\b/])) {
+    next.cramps = true;
+  }
+
+  if (hasAny([
+    /\b(no|not)\s+(dizzy|faint|weak)\b/,
+    /\bnot\s+short\s+of\s+breath\b/,
+  ])) {
+    next.symptomatic = false;
+  } else if (
+    symptoms.dizziness ||
+    hasAny([
+      /\bdizzy|dizziness|lightheaded\b/,
+      /\bfaint|fainting\b/,
+      /\bvery\s+weak|weakness\b/,
+      /\bshort\s+of\s+breath\b/,
+    ])
+  ) {
+    next.symptomatic = true;
+  }
+
+  if (hasAny([
+    /\b(no\s+chance|not)\s+(i am|i'm|im)?\s*pregnant\b/,
+    /\bcan t be pregnant|cant be pregnant\b/,
+    /\bno\s+chance\s+of\s+pregnancy\b/,
+  ])) {
+    next.possiblePregnancy = false;
+  } else if (
+    pregnancy.chance ||
+    pregnancy.result === "positive" ||
+    pregnancy.result === "unclear" ||
+    hasAny([
+      /\bmaybe\s+pregnant\b/,
+      /\bmight\s+be\s+pregnant\b/,
+      /\bnot\s+sure\s+if\s+i\s+m\s+pregnant\b/,
+      /\bchance\s+i\s+m\s+pregnant\b/,
+      /\brecently\s+pregnant\b/,
+      /\bmiscarriage\b/,
+      /\bgiven\s+birth\b/,
+    ])
+  ) {
+    next.possiblePregnancy = true;
+  }
+
+  return next;
+}
+
+export function mergeBleedingConversationState(previous = createEmptyConversationState(), updates = {}) {
+  const next = {
+    symptoms: { ...(previous?.symptoms || {}) },
+    asked: { ...(previous?.asked || {}) },
+  };
+
+  for (const [key, value] of Object.entries(updates || {})) {
+    if (value === undefined) continue;
+    next.symptoms[key] = value;
+  }
+
+  if (next.symptoms.clots === false) {
+    next.symptoms.clotsLarge = false;
+  }
+  if (next.symptoms.clotsLarge === true) {
+    next.symptoms.clots = true;
+  }
+
+  return next;
+}
+
 export function buildNodeHelpers(env) {
   const {
     ctx, pick, ack, addDays, fmtDate, daysBetween, bloomieMemory,
@@ -13,6 +170,84 @@ export function buildNodeHelpers(env) {
     buildSymptomInsightLine, buildCycleSignalLine, getNickname,
     pregnancyAlgorithm,
   } = env;
+
+  function ensureConversationState() {
+    const current = ctx.conversationState || createEmptyConversationState();
+    ctx.conversationState = {
+      symptoms: { ...createEmptyConversationState().symptoms, ...(current.symptoms || {}) },
+      asked: { ...createEmptyConversationState().asked, ...(current.asked || {}) },
+    };
+    return ctx.conversationState;
+  }
+
+  function getLatestUserMessage() {
+    const history = Array.isArray(ctx.history) ? ctx.history : [];
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i]?.from === "user" && history[i]?.text) return history[i].text;
+    }
+    return "";
+  }
+
+  function getLatestEntities() {
+    const history = Array.isArray(ctx.entityHistory) ? ctx.entityHistory : [];
+    return history.length ? history[history.length - 1] : {};
+  }
+
+  function syncBleedingConversationState() {
+    const current = ensureConversationState();
+    const updates = extractBleedingConversationSignals(getLatestUserMessage(), getLatestEntities());
+    ctx.conversationState = mergeBleedingConversationState(current, updates);
+    return ctx.conversationState;
+  }
+
+  function markBleedingQuestionAsked(key) {
+    const current = ensureConversationState();
+    if (key in current.asked) current.asked[key] = true;
+  }
+
+  function setBleedingConversationAnswer(key, value) {
+    const current = ensureConversationState();
+    if (key in current.symptoms && value !== undefined) {
+      current.symptoms[key] = value;
+      if (key === "clots" && value === false) current.symptoms.clotsLarge = false;
+      if (key === "clotsLarge" && value === true) current.symptoms.clots = true;
+    }
+  }
+
+  function getBleedingConversationState() {
+    return ensureConversationState();
+  }
+
+  function syncHeavyFlagsFromConversationState() {
+    const state = ensureConversationState();
+    const flags = ctx.heavyFlags = ctx.heavyFlags || {};
+    if (state.symptoms.heavyFlow === true) flags.heavierThanUsual = true;
+    if (state.symptoms.clotsLarge === true) flags.largeClots = true;
+    if (state.symptoms.symptomatic === true) flags.symptomatic = true;
+    if (state.symptoms.possiblePregnancy === true) flags.possiblePregnancy = true;
+    if (state.symptoms.clots === false && flags.largeClots) delete flags.largeClots;
+    return flags;
+  }
+
+  function getNextBleedingFollowUp({ skip = [] } = {}) {
+    const state = ensureConversationState();
+    const { symptoms, asked } = state;
+    const skipped = new Set(skip);
+
+    if (!skipped.has("clots_size") && symptoms.clots === true && symptoms.clotsLarge === undefined && !asked.clotsSize) {
+      return "clots_size";
+    }
+    if (!skipped.has("heavy_flow_check") && symptoms.heavyFlow === undefined && !asked.heavyFlowCheck) {
+      return "heavy_flow_check";
+    }
+    if (!skipped.has("symptom_check") && symptoms.symptomatic === undefined && !asked.symptomCheck) {
+      return "symptom_check";
+    }
+    if (!skipped.has("pregnancy_check") && symptoms.possiblePregnancy === undefined && !asked.pregnancyCheck) {
+      return "pregnancy_check";
+    }
+    return null;
+  }
 
   // ── computeTestPlan ──────────────────────────────────────────────────────
   function computeTestPlan({ expectedPeriodDate = null, sexDate = null, today = new Date() } = {}) {
@@ -473,6 +708,13 @@ export function buildNodeHelpers(env) {
     withNickname(greet(true, "Thanks for talking with me")) + " If anything changes or you notice new symptoms, you can come back anytime. Remember you know your body best.";
 
   return {
+    ensureConversationState,
+    syncBleedingConversationState,
+    markBleedingQuestionAsked,
+    setBleedingConversationAnswer,
+    getBleedingConversationState,
+    syncHeavyFlagsFromConversationState,
+    getNextBleedingFollowUp,
     computeTestPlan,
     getMoodContinuitySignal,
     buildMoodContinuityLine,

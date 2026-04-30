@@ -1,4 +1,6 @@
 import { pick, scoreSignals, resolveSignals, detectOutOfScope, normalizeText } from "./bloomie-routing.js";
+import { handleRepairClarification } from "./bloomie-repair.js";
+import { buildRepairClarificationCopy, buildSoftClarifierCopy } from "./bloomie-clarifier.js";
 import { extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
 import { getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 
@@ -8,27 +10,38 @@ export function createOOS(env) {
     bloomieMemory, daysUntilNextPeriod, isLateContextActive,
   } = env;
 
+  function closestSupportedLane(text = "") {
+    const t = normalizeText(text);
+    if (/\b(bleed|bleeding|flow|clot|clots|spotting|blood)\b/.test(t)) return "bleeding or flow";
+    if (/\b(discharge|odor|odour|smell|itch|burning|wet|eggwhite)\b/.test(t)) return "discharge";
+    if (/\b(cramp|pain|pelvic|abdomen|stomach|waist)\b/.test(t)) return "pain or cramps";
+    if (/\b(late|missed|period|cycle|ovulation|ovulate)\b/.test(t)) return "cycle timing";
+    if (/\b(mood|sad|anxious|anxiety|irritable|cry|overwhelmed|low)\b/.test(t)) return "mood changes";
+    return "bleeding, discharge, pain, mood, or cycle timing";
+  }
+
   const OOS_DEFAULT = [
-    () => {
+    (text) => {
       // Soft two-tier fallback for unclear input:
       // Tier 1: ask whether it's cycle/symptom related.
       // Tier 2: ask for a bit more detail (after repeated unclear turns).
       const oosCount = (bloomieMemory?.oosCount ?? 0) + (ctx.oosStreakCount ?? 0);
+      const lane = closestSupportedLane(text);
       if (oosCount >= 5) {
         return pick([
-          "I might be missing something — is this about your period, symptoms, or something else? 🩷",
-          "Tell me a little more about what's going on and I'll try to help 🩷",
+          `I'm still not fully sure I understood, but I do want to help 🩷 If this is about ${lane}, tell me that part and I'll guide you from there.`,
+          `I may be missing part of what you mean 🩷 If this is about ${lane}, give me that main piece and I'll stay with you.`,
         ]);
       }
       if (oosCount >= 2) {
         return pick([
-          "Tell me a little more about what's going on, and I'll try to help 🩷",
-          "I still want to help — can you share the main symptom in a few words? 🩷",
+          `I'm not fully sure I understood that, but I still want to help 🩷 If this is about ${lane}, tell me that part and I'll guide you from there.`,
+          `I want to make sure I help with the right thing 🩷 If this is about ${lane}, say the main symptom or concern in a few words.`,
         ]);
       }
       return pick([
-        "I might be missing something — is this about your period, symptoms, or something else? 🩷",
-        "I'm not fully catching you yet 🩷 Is this about your cycle, pain, spotting, discharge, or mood changes?",
+        `I'm not fully sure I understood that yet, but I'm here with you 🩷 If this is about ${lane}, tell me that part and I'll guide you from there.`,
+        `I want to make sure I point you the right way 🩷 If this is about ${lane}, say that piece and I'll take it from there.`,
       ]);
     },
   ];
@@ -776,20 +789,21 @@ export function createOOS(env) {
         /\b(wah dat mean|wah yuh mean)\b/i,
       ],
       replies: [
-        () => "My bad 🩷 Let me say that more simply.",
-        () => {
-          const daysLeft = typeof daysUntilNextPeriod === "function" ? daysUntilNextPeriod() : null;
-          const inLateContext = (typeof isLateContextActive === "function" && isLateContextActive({ includePromptContext: true }))
-            || (typeof daysLeft === "number" && daysLeft < -1);
-          if (inLateContext) {
-            const days = typeof daysLeft === "number" && daysLeft < -1 ? Math.abs(daysLeft) : null;
-            return days
-              ? `I mean your logged dates suggest your period is later than expected — around ${days} day${days === 1 ? "" : "s"} late by estimate.`
-              : "I mean your logged dates suggest your period looks later than expected.";
-          }
-          return "I can rephrase anything — tell me which part felt confusing and I’ll make it clearer.";
-        },
-        () => "Do you want to focus on cramps, spotting, or pregnancy chance?",
+        () => buildRepairClarificationCopy({
+          label: "clarification",
+          daysUntilNextPeriod: typeof daysUntilNextPeriod === "function" ? daysUntilNextPeriod() : null,
+          isLateContextActive: typeof isLateContextActive === "function" && isLateContextActive({ includePromptContext: true }),
+        })[0],
+        () => buildRepairClarificationCopy({
+          label: "clarification",
+          daysUntilNextPeriod: typeof daysUntilNextPeriod === "function" ? daysUntilNextPeriod() : null,
+          isLateContextActive: typeof isLateContextActive === "function" && isLateContextActive({ includePromptContext: true }),
+        })[1],
+        () => buildRepairClarificationCopy({
+          label: "clarification",
+          daysUntilNextPeriod: typeof daysUntilNextPeriod === "function" ? daysUntilNextPeriod() : null,
+          isLateContextActive: typeof isLateContextActive === "function" && isLateContextActive({ includePromptContext: true }),
+        })[2],
       ],
       forceNext: "START_MENU",
     },
@@ -967,10 +981,11 @@ export function createOOS(env) {
   }
 
   function routeRepairClarifier(t) {
-    const repairCats = OOS.filter((cat) => cat.name === "clarification_repair" || cat.name === "confused_with_bloomie");
-    const cat = findCategory(repairCats, t);
-    if (!cat) return null;
-    return renderCategoryReply(cat, t);
+    return handleRepairClarification(t, {
+      daysUntilNextPeriod: daysUntilNextPeriod(),
+      isLateContextActive: isLateContextActive({ includePromptContext: true }),
+      next: "START_MENU",
+    });
   }
 
   function routeMinorSupport(t) {
@@ -1012,17 +1027,7 @@ export function createOOS(env) {
       /\b(still no|not yet|nope|same thing|still same)\b/i,
     ];
     if (!SOFT_REPRO_CLARIFY_PATTERNS.some((rx) => rx.test(t))) return null;
-    return {
-      reply: [
-        pick([
-          "I might be missing part of what you mean 🩷",
-          "I hear you — let me make sure I understood 🩷",
-        ]),
-        "Is this about your cycle or a body symptom (like cramps, spotting, discharge, or mood changes)?",
-      ],
-      next: "ELSE_NOT_SURE_ROUTE",
-      payload: { reason: "soft_clarify" },
-    };
+    return buildSoftClarifierCopy({ normalizedText: t });
   }
 
   function routeUserText(rawText) {
@@ -1062,7 +1067,7 @@ export function createOOS(env) {
     const heavyRouteA = [
       "soaking", "soaked", "flooding", "bleed through", "bleed nuff",
       "pad full", "tampon full", "changing every hour",
-      "bleed out", "bleeding out bad", "pad full up", "tampon full up",
+      "bleed out", "bleed out bad", "bleeding out bad", "pad full up", "tampon full up",
       "blood everywhere", "nuff blood",
     ];
     const heavyRouteB = [
