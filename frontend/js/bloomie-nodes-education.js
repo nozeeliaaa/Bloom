@@ -1,6 +1,6 @@
 /**
  * bloomie-nodes-education.js
- * General symptom education nodes — lazy-loaded chunk.
+ * General symptom education nodes - lazy-loaded chunk.
  * Covers educational explainers for cycle basics, common symptoms,
  * and condition overviews (non-diagnostic).
  *
@@ -36,7 +36,7 @@ export function createEducationNodes(env, helpers) {
 
     EDUC_MORE_SYMPTOMS: {
       say: [
-        "Totally fair — there are a lot of symptom questions beyond the basics 🩷",
+        "Totally fair - there are a lot of symptom questions beyond the basics 🩷",
         "Pick whichever one fits what you're curious about right now.",
       ],
       choices: [
@@ -70,15 +70,15 @@ export function createEducationNodes(env, helpers) {
       ],
     },
 
-    /* ── TYPE 1: SUPPORTED EDUCATIONAL — specific factual questions ───────── */
+    /* ── TYPE 1: SUPPORTED EDUCATIONAL - specific factual questions ───────── */
 
     // "what is a period" / "why do periods happen"
     EDUC_PERIOD: {
       say: [
-        "A period (menstruation) is the monthly shedding of the uterine lining — the tissue your body built up in case of pregnancy 🩷",
+        "A period (menstruation) is the monthly shedding of the uterine lining - the tissue your body built up in case of pregnancy 🩷",
         "Each cycle, rising oestrogen thickens the lining. When pregnancy doesn't occur, oestrogen and progesterone levels drop, signalling the body to shed that lining as blood and tissue through the vagina.",
-        "A typical period lasts 3–7 days and occurs on a cycle of 21–35 days. Flow can range from light to heavy — what's normal varies widely from person to person.",
-        "Mild cramping in the first 1–2 days is common. It's caused by prostaglandins — hormone-like compounds that trigger uterine contractions to help expel the lining.",
+        "A typical period lasts 3–7 days and occurs on a cycle of 21–35 days. Flow can range from light to heavy - what's normal varies widely from person to person.",
+        "Mild cramping in the first 1–2 days is common. It's caused by prostaglandins - hormone-like compounds that trigger uterine contractions to help expel the lining.",
         ...safeFooter(),
       ],
       choices: [
@@ -95,9 +95,9 @@ export function createEducationNodes(env, helpers) {
     EDUC_OVULATION: {
       say: [
         "Ovulation is when one of your ovaries releases a mature egg, ready to potentially be fertilised 🩷",
-        "It typically happens around 12–14 days before your next expected period — not necessarily on day 14, which is only accurate for a perfect 28-day cycle.",
+        "It typically happens around 12–14 days before your next expected period - not necessarily on day 14, which is only accurate for a perfect 28-day cycle.",
         "The process is triggered by a surge in luteinising hormone (LH). The released egg travels down the fallopian tube toward the uterus. It can only be fertilised for 12–24 hours after release.",
-        "Because sperm can survive 3–5 days in the body, the fertile window actually spans about 5–6 days — the 4–5 days before ovulation and the day itself.",
+        "Because sperm can survive 3–5 days in the body, the fertile window actually spans about 5–6 days - the 4–5 days before ovulation and the day itself.",
         "Signs you may be ovulating: cervical mucus becomes clear and stretchy (like egg whites), a slight rise in basal body temperature, and sometimes a mild one-sided pelvic ache called mittelschmerz.",
         ...safeFooter(),
       ],
@@ -114,12 +114,12 @@ export function createEducationNodes(env, helpers) {
     EDUC_CYCLE_BASICS: {
       say: [
         "The menstrual cycle is a monthly hormonal process that prepares the body for possible pregnancy 🩷 It runs from the first day of one period to the first day of the next.",
-        "A typical cycle is 21–35 days long. 28 days is the average, but anything in that range is normal — and cycle length can vary month to month even in the same person.",
+        "A typical cycle is 21–35 days long. 28 days is the average, but anything in that range is normal - and cycle length can vary month to month even in the same person.",
         pick([
-          "There are four phases:\n\n• **Menstrual (days 1–5):** The uterine lining sheds — this is your period.\n• **Follicular (days 1–13):** Oestrogen rises, stimulating follicle growth and thickening the lining.\n• **Ovulation (~day 14):** A surge in LH triggers egg release.\n• **Luteal (days 15–28):** Progesterone rises to prepare for implantation. If no pregnancy occurs, levels drop and the cycle resets.",
-          "The four phases are:\n\n• **Menstrual** — lining sheds (your period)\n• **Follicular** — oestrogen rises, egg follicles develop\n• **Ovulation** — egg releases (~14 days before next period)\n• **Luteal** — progesterone rises; body prepares for pregnancy. When it doesn't happen, levels fall and a new cycle starts.",
+          "There are four phases:\n\n• **Menstrual (days 1–5):** The uterine lining sheds - this is your period.\n• **Follicular (days 1–13):** Oestrogen rises, stimulating follicle growth and thickening the lining.\n• **Ovulation (~day 14):** A surge in LH triggers egg release.\n• **Luteal (days 15–28):** Progesterone rises to prepare for implantation. If no pregnancy occurs, levels drop and the cycle resets.",
+          "The four phases are:\n\n• **Menstrual** - lining sheds (your period)\n• **Follicular** - oestrogen rises, egg follicles develop\n• **Ovulation** - egg releases (~14 days before next period)\n• **Luteal** - progesterone rises; body prepares for pregnancy. When it doesn't happen, levels fall and a new cycle starts.",
         ]),
-        "Oestrogen drives the first half — energy, mood lift, clear skin. Progesterone takes over after ovulation and can cause PMS symptoms when it drops sharply before your period.",
+        "Oestrogen drives the first half - energy, mood lift, clear skin. Progesterone takes over after ovulation and can cause PMS symptoms when it drops sharply before your period.",
         ...safeFooter(),
       ],
       choices: [
@@ -132,19 +132,19 @@ export function createEducationNodes(env, helpers) {
       ],
     },
 
-    /* ── TYPE 2: PARTIALLY SUPPORTED — broad topics → summary + learn ────── */
+    /* ── TYPE 2: PARTIALLY SUPPORTED - broad topics → summary + learn ────── */
 
     // "tell me everything about hormones" / "explain fertility fully"
     EDUC_BROAD: {
       say: [
         pick([
-          "That's a big topic — here's a solid overview, and I'll point you to where you can go deeper 🩷",
+          "That's a big topic - here's a solid overview, and I'll point you to where you can go deeper 🩷",
           "There's a lot to cover there 🩷 Let me give you the key points, then show you where to read more.",
-          "Great question — here's the short version 🩷",
+          "Great question - here's the short version 🩷",
         ]),
-        "At the heart of reproductive health are four hormones: oestrogen, progesterone, FSH (follicle-stimulating hormone), and LH (luteinising hormone). They drive every phase of the 21–35 day menstrual cycle — regulating ovulation, period timing, mood, energy, skin, and fertility.",
+        "At the heart of reproductive health are four hormones: oestrogen, progesterone, FSH (follicle-stimulating hormone), and LH (luteinising hormone). They drive every phase of the 21–35 day menstrual cycle - regulating ovulation, period timing, mood, energy, skin, and fertility.",
         "Fertility depends on the interplay between these hormones, ovulation timing, and the uterine environment. Factors like stress, body weight, thyroid health, and conditions like PCOS or endometriosis can all shift the balance.",
-        "For a deeper read, Bloom's **Learn** section has pamphlets written specifically for this — covering cycle tracking, hormonal conditions, fertility, and what healthy cycles look like. You'll find them in the **Learn** tab in the main navigation 🩷",
+        "For a deeper read, Bloom's **Learn** section has pamphlets written specifically for this - covering cycle tracking, hormonal conditions, fertility, and what healthy cycles look like. You'll find them in the **Learn** tab in the main navigation 🩷",
         ...safeFooter(),
       ],
       choices: [
@@ -433,7 +433,7 @@ export function createEducationNodes(env, helpers) {
         "Fibroids are non-cancerous growths in or around the uterus, and they're very common 🩷",
         "Some people have no symptoms, while others get heavy bleeding, clots, pelvic pressure, frequent urination, or longer periods.",
         "Fibroids can overlap with other causes of heavy bleeding, so imaging (usually ultrasound) helps clarify what is going on.",
-        "If bleeding is frequent or disruptive, it's reasonable to discuss options early — treatment ranges from monitoring to medication or procedures.",
+        "If bleeding is frequent or disruptive, it's reasonable to discuss options early - treatment ranges from monitoring to medication or procedures.",
         ...safeFooter(),
       ],
       choices: [

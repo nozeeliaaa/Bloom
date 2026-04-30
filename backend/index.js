@@ -6,7 +6,9 @@ dotenv.config();
 
 import userRoutes          from "./src/routes/user.js";
 import preferencesRoutes   from "./src/routes/preferences.js";
+import biometricLogRoutes from "./src/routes/biometricLogs.js";
 import cycleLogRoutes      from "./src/routes/cycleLogs.js";
+import phaseFeedbackRoutes from "./src/routes/phaseFeedback.js";
 import bloomieSafetyLogRoutes from "./src/routes/bloomieSafetyLog.js";
 import symptomLogRoutes    from "./src/routes/symptomLogs.js";
 import notificationRoutes from "./src/routes/notifications.js";
@@ -31,8 +33,9 @@ app.use(cors());
 app.use(express.json());
 app.use(globalLimiter);
 
-app.use("/user",                            userRoutes);
+app.use("/api/user", userRoutes);
 app.use("/cycle-logs",                      cycleLogRoutes);
+app.use("/api/phase-feedback", phaseFeedbackRoutes);
 app.use("/symptom-logs",                    symptomLogRoutes);
 app.use("/consent/request", consentLimiter, consentRoutes);
 app.use("/notifications", notificationRoutes);
@@ -41,6 +44,7 @@ app.use("/bloomie-safety-log", bloomieSafetyLogRoutes);
 app.use("/preferences",                     preferencesRoutes);
 app.use("/admin",           adminLimiter,   adminRoutes);
 app.use("/catalog",                         catalogRoutes);
+app.use("/api/biometric-logs", biometricLogRoutes);
 app.use("/auth",            authLimiter,    authRoutes);
 app.use("/bloomie-memory",                  bloomieMemoryRoutes);
 app.use("/feedback",                        feedbackRoutes);

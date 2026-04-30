@@ -66,9 +66,19 @@ let selectedFlow = "none";
 let selectedSymptoms = new Set();
 let selectedSymptomSeverity = new Map(); // symptom -> 1-5
 let selectedOtherSymptoms = []; // [{ text, normalizedText, severity, note, createdAt, dateKey }]
+let selectedSleepScore = null;
+let selectedStressLevel = null;
+let selectedActivityLevel = null;
 let symptomCategories = Object.fromEntries(
   Object.entries(SYMPTOM_CATEGORIES).map(([cat, list]) => [cat, [...list]])
 );
+const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
+const BIOMETRIC_LEVEL_LABELS = {
+  low: "Low",
+  moderate: "Moderate",
+  high: "High",
+  very_high: "Very high",
+};
 
 const today = new Date();
 currentYear = today.getFullYear();
@@ -229,6 +239,98 @@ function updateFlowChips() {
     c.classList.toggle("selected", c.dataset.value === selectedFlow);
   });
 }
+
+const sleepScoreInput = document.getElementById("sleep-score");
+const stressLevelInput = document.getElementById("stress-level");
+const activityLevelInput = document.getElementById("activity-level");
+const sleepScoreValueEl = document.getElementById("sleep-score-value");
+const stressLevelValueEl = document.getElementById("stress-level-value");
+const activityLevelValueEl = document.getElementById("activity-level-value");
+
+function normalizeSleepScore(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10) return null;
+  return parsed;
+}
+
+function normalizeBiometricLevel(value) {
+  if (value === undefined || value === null || value === "") return null;
+
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return BIOMETRIC_LEVELS[value - 1] ?? null;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+  return BIOMETRIC_LEVELS.includes(normalized) ? normalized : null;
+}
+
+function levelToSliderValue(level) {
+  const idx = BIOMETRIC_LEVELS.indexOf(level);
+  return idx >= 0 ? idx + 1 : 2;
+}
+
+function sliderValueToLevel(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return null;
+  return BIOMETRIC_LEVELS[parsed - 1] ?? null;
+}
+
+function updateBiometricLabels() {
+  sleepScoreValueEl.textContent =
+    selectedSleepScore === null ? "Not set" : `${selectedSleepScore}/10`;
+  stressLevelValueEl.textContent =
+    selectedStressLevel ? BIOMETRIC_LEVEL_LABELS[selectedStressLevel] : "Not set";
+  activityLevelValueEl.textContent =
+    selectedActivityLevel ? BIOMETRIC_LEVEL_LABELS[selectedActivityLevel] : "Not set";
+}
+
+function resetBiometricInputs() {
+  selectedSleepScore = null;
+  selectedStressLevel = null;
+  selectedActivityLevel = null;
+
+  sleepScoreInput.value = "7";
+  stressLevelInput.value = "2";
+  activityLevelInput.value = "2";
+  updateBiometricLabels();
+}
+
+function restoreBiometricsFromLog(existing = {}) {
+  selectedSleepScore = normalizeSleepScore(existing.sleepScore);
+  selectedStressLevel = normalizeBiometricLevel(existing.stressLevel);
+  selectedActivityLevel = normalizeBiometricLevel(existing.activityLevel);
+
+  sleepScoreInput.value = String(selectedSleepScore ?? 7);
+  stressLevelInput.value = String(levelToSliderValue(selectedStressLevel));
+  activityLevelInput.value = String(levelToSliderValue(selectedActivityLevel));
+  updateBiometricLabels();
+}
+
+function setBiometricInputsDisabled(disabled) {
+  sleepScoreInput.disabled = disabled;
+  stressLevelInput.disabled = disabled;
+  activityLevelInput.disabled = disabled;
+}
+
+sleepScoreInput.addEventListener("input", () => {
+  selectedSleepScore = normalizeSleepScore(sleepScoreInput.value);
+  updateBiometricLabels();
+});
+
+stressLevelInput.addEventListener("input", () => {
+  selectedStressLevel = sliderValueToLevel(stressLevelInput.value);
+  updateBiometricLabels();
+});
+
+activityLevelInput.addEventListener("input", () => {
+  selectedActivityLevel = sliderValueToLevel(activityLevelInput.value);
+  updateBiometricLabels();
+});
 
 // ── Symptom categories UI ──────────────────────────────────────────────────
 
@@ -554,18 +656,43 @@ function renderCalendar() {
   const ovulationSet = new Set();
 
   if (allowFertilityMarkers) {
-    if (cycleData?.allFertileDays?.length) {
-      cycleData.allFertileDays.forEach((dk) => fertileSet.add(dk));
-    } else if (cycleData?.fertileStart && cycleData?.fertileEnd) {
-      let d = new Date(cycleData.fertileStart + "T00:00:00");
-      const end = new Date(cycleData.fertileEnd + "T00:00:00");
-      while (d <= end) { fertileSet.add(toDateKey(d)); d.setDate(d.getDate() + 1); }
+    // Show exactly ONE fertile window on the calendar:
+    // prefer the resolved top-level window from cycle-state; if missing, fall
+    // back to the nearest future cycle window.
+    let chosenFertileStart = cycleData?.fertileStart ?? null;
+    let chosenFertileEnd = cycleData?.fertileEnd ?? null;
+    let chosenOvulation = cycleData?.ovulationDate ?? null;
+
+    if ((!chosenFertileStart || !chosenFertileEnd || !chosenOvulation) && predResult?.futureCycles?.length) {
+      const todayMs = new Date(todayKey + "T00:00:00").getTime();
+      const nearestFutureCycle = predResult.futureCycles.find((c) => {
+        const endMs = c?.fertileWindow?.end?.getTime?.();
+        return Number.isFinite(endMs) && endMs >= todayMs;
+      });
+
+      if (nearestFutureCycle) {
+        if ((!chosenFertileStart || !chosenFertileEnd) &&
+            nearestFutureCycle.fertileWindow?.start &&
+            nearestFutureCycle.fertileWindow?.end) {
+          chosenFertileStart = toDateKey(nearestFutureCycle.fertileWindow.start);
+          chosenFertileEnd = toDateKey(nearestFutureCycle.fertileWindow.end);
+        }
+        if (!chosenOvulation && nearestFutureCycle.ovulationDay) {
+          chosenOvulation = toDateKey(nearestFutureCycle.ovulationDay);
+        }
+      }
     }
 
-    if (cycleData?.futureOvulationDates?.length) {
-      cycleData.futureOvulationDates.forEach((dk) => ovulationSet.add(dk));
-    } else if (cycleData?.ovulationDate) {
-      ovulationSet.add(cycleData.ovulationDate);
+    if (chosenFertileStart && chosenFertileEnd) {
+      let d = new Date(chosenFertileStart + "T00:00:00");
+      const end = new Date(chosenFertileEnd + "T00:00:00");
+      while (d <= end) {
+        fertileSet.add(toDateKey(d));
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    if (chosenOvulation) {
+      ovulationSet.add(chosenOvulation);
     }
   }
 
@@ -653,12 +780,14 @@ function openLogModal(dateKey) {
   });
   document.getElementById("other-symptom-input").disabled = isFuture;
   document.getElementById("add-other-symptom-btn").disabled = isFuture;
+  setBiometricInputsDisabled(isFuture);
 
   // Reset state
   selectedFlow = "none";
   selectedSymptoms.clear();
   selectedSymptomSeverity.clear();
   selectedOtherSymptoms = [];
+  resetBiometricInputs();
   document.getElementById("notes").value = "";
   document.getElementById("other-symptom-input").value = "";
   document.getElementById("delete-log-btn").style.display = "none";
@@ -672,6 +801,7 @@ function openLogModal(dateKey) {
   const existing = allLogs[dateKey];
   if (existing) {
     selectedFlow = existing.flow || "none";
+    restoreBiometricsFromLog(existing);
 
     if (existing.symptoms) {
       existing.symptoms.forEach((s) => selectedSymptoms.add(s));
@@ -727,14 +857,24 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
 
   // Block flow and symptoms on future dates regardless of how the modal was reached
   if (new Date(dateKey + "T00:00:00") > new Date()) {
-    if (selectedFlow !== "none" || selectedSymptoms.size > 0 || selectedOtherSymptoms.length > 0) {
-      showToast("You cannot log flow or symptoms for a future date.", "error");
+    if (
+      selectedFlow !== "none" ||
+      selectedSymptoms.size > 0 ||
+      selectedOtherSymptoms.length > 0 ||
+      selectedSleepScore !== null ||
+      selectedStressLevel !== null ||
+      selectedActivityLevel !== null
+    ) {
+      showToast("Future dates are notes only. Flow, symptoms, and biometrics cannot be logged ahead.", "error");
       return;
     }
   }
 
   const data = {
     flow: selectedFlow,
+    sleepScore: selectedSleepScore,
+    stressLevel: selectedStressLevel,
+    activityLevel: selectedActivityLevel,
     symptoms: Array.from(selectedSymptoms),
     symptomSeverity: Object.fromEntries(selectedSymptomSeverity),
     otherSymptoms: selectedOtherSymptoms.map((item) => ({

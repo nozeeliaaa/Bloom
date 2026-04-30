@@ -97,7 +97,7 @@ export function createCtx() {
     usedOpeners:        new Set(),  // opener strings already shown - prevents repetition within a session
     symptomSignals:     null,       // pre-computed SymptomSignal[] from bloom-symptom-engine, or null
     aiSignals:          null,       // ExtractedSignals from bloomie-extract.js, or null when unavailable.
-                                    // Advisory only — never used to override rule-based urgent routing.
+                                    // Advisory only - never used to override rule-based urgent routing.
                                     // Shape: { symptoms, timing, severity, tone, repair,
                                     //          pregnancySignals, redFlags, confidence }
     turnFocus:          null,       // ranked lead-vs-secondary symptom snapshot for the current turn
@@ -116,7 +116,7 @@ export function createCtx() {
     userNickname:             null,
     lastNicknameUsedAtDepth:  null,
     preEndChatState:          null,   // state to restore if user cancels END_CHAT_CONFIRM
-    resolutionStatus:         null,   // "resolved" | "unresolved" | "skipped" — set by RESOLUTION_CHECK
+    resolutionStatus:         null,   // "resolved" | "unresolved" | "skipped" - set by RESOLUTION_CHECK
     closeIntentDetected:      false,  // true when user typed a goodbye phrase (END_CHAT_PATTERN fired)
     closeConfirmationPending: false,  // true while END_CHAT_CONFIRM node is visible
     pendingUnresolvedTopic:   null,   // unresolved topic currently being confirmed at close-time
@@ -171,7 +171,7 @@ export function createCtx() {
     isRetryAttempt:       false,          // true when user has sent same message twice (second repeat handling)
     loggingGapPending:    false,          // true when a symptom-logging-gap nudge is queued for next response
     bloomieAnomalyCtx:    null,           // computed at mount: { cycleAnomaly, severitySpike, level }
-    moodMentions:         [],             // [{ depth, tone, intent }] — appended each time mood is detected
+    moodMentions:         [],             // [{ depth, tone, intent }] - appended each time mood is detected
 
     // ── Reported (user-confirmed) conditions ──────────────────────────────
     reportedConditions:    [],     // condition keys stated as existing diagnoses this session,

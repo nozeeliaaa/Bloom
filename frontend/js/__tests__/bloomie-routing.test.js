@@ -103,7 +103,7 @@ describe("looksLikeGibberish", () => {
 
 // ─── scoreSignals ─────────────────────────────────────────────────────────────
 
-describe("scoreSignals — late period", () => {
+describe("scoreSignals - late period", () => {
   it("scores 'my period is late'", () => {
     const { has } = scoreSignals("my period is late");
     expect(has("late")).toBe(true);
@@ -115,7 +115,7 @@ describe("scoreSignals — late period", () => {
   });
 });
 
-describe("scoreSignals — heavy bleeding", () => {
+describe("scoreSignals - heavy bleeding", () => {
   it("scores 'heavy bleeding'", () => {
     const { has } = scoreSignals("i have heavy bleeding");
     expect(has("heavy")).toBe(true);
@@ -132,7 +132,7 @@ describe("scoreSignals — heavy bleeding", () => {
   });
 });
 
-describe("scoreSignals — spotting", () => {
+describe("scoreSignals - spotting", () => {
   it("scores 'spotting'", () => {
     const { has } = scoreSignals("i noticed some spotting");
     expect(has("spot")).toBe(true);
@@ -144,14 +144,14 @@ describe("scoreSignals — spotting", () => {
   });
 });
 
-describe("scoreSignals — mood", () => {
+describe("scoreSignals - mood", () => {
   it("scores 'anxious and tired'", () => {
     const { has } = scoreSignals("i feel anxious and so tired");
     expect(has("mood")).toBe(true);
   });
 });
 
-describe("scoreSignals — pelvic pain", () => {
+describe("scoreSignals - pelvic pain", () => {
   it("scores 'cramps'", () => {
     const { has } = scoreSignals("i have really bad cramps");
     expect(has("pelvic")).toBe(true);
@@ -163,7 +163,7 @@ describe("scoreSignals — pelvic pain", () => {
   });
 });
 
-describe("scoreSignals — pregnancy", () => {
+describe("scoreSignals - pregnancy", () => {
   it("scores 'might be pregnant'", () => {
     const { has } = scoreSignals("i think i might be pregnant");
     expect(has("pregnancy")).toBe(true);
@@ -205,9 +205,9 @@ describe("scoreSignals — pregnancy", () => {
   });
 });
 
-// ─── resolveSignals — SAFETY CRITICAL combos ─────────────────────────────────
+// ─── resolveSignals - SAFETY CRITICAL combos ─────────────────────────────────
 
-describe("resolveSignals — safety-critical combinations", () => {
+describe("resolveSignals - safety-critical combinations", () => {
   it("late + pregnancy → PREGNANCY_ENTRY", () => {
     const { sig, has } = scoreSignals("my period is late and i think i might be pregnant");
     const route = resolveSignals(sig, has);
@@ -261,14 +261,14 @@ describe("resolveSignals — safety-critical combinations", () => {
   it("no combo match returns null (single signal falls to caller)", () => {
     const { sig, has } = scoreSignals("my period is late");
     const route = resolveSignals(sig, has);
-    // Late alone has no multi-signal rule — returns null so caller handles it
+    // Late alone has no multi-signal rule - returns null so caller handles it
     expect(route).toBeNull();
   });
 });
 
-// ─── computeRouteConfidence — new fields: route, competitors, ambiguous ───────
+// ─── computeRouteConfidence - new fields: route, competitors, ambiguous ───────
 
-describe("computeRouteConfidence — route field", () => {
+describe("computeRouteConfidence - route field", () => {
   it("maps primaryIntent to the correct entry node", () => {
     const { sig } = scoreSignals("my period is very late and i missed it last month");
     const conf = computeRouteConfidence(sig, {});
@@ -301,7 +301,7 @@ describe("computeRouteConfidence — route field", () => {
   });
 });
 
-describe("computeRouteConfidence — competitors field", () => {
+describe("computeRouteConfidence - competitors field", () => {
   it("competitors is an array of node names, not intent keys", () => {
     const { sig } = scoreSignals("heavy bleeding with bad cramps and pelvic pain");
     const conf = computeRouteConfidence(sig, {});
@@ -335,7 +335,7 @@ describe("computeRouteConfidence — competitors field", () => {
   });
 });
 
-describe("computeRouteConfidence — ambiguous field", () => {
+describe("computeRouteConfidence - ambiguous field", () => {
   it("ambiguous is false when tier is high", () => {
     const { sig } = scoreSignals("my period is very late i missed it completely for weeks");
     const conf = computeRouteConfidence(sig, {});
@@ -365,7 +365,7 @@ describe("computeRouteConfidence — ambiguous field", () => {
   });
 });
 
-describe("INTENT_TO_NODE — completeness", () => {
+describe("INTENT_TO_NODE - completeness", () => {
   it("covers all signal keys used by scoreSignals", () => {
     const sigKeys = ["late", "heavy", "spot", "mood", "pelvic", "pregnancy", "discharge"];
     sigKeys.forEach(k => {

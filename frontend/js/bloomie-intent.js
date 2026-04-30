@@ -3,18 +3,18 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Hybrid intent-classification assist for Bloomie health-topic routing.
  *
- * Layer 1 — rule-based (scoreSignals + computeRouteConfidence, already run in
+ * Layer 1 - rule-based (scoreSignals + computeRouteConfidence, already run in
  *            the pipeline before this module is consulted).
  *
- * Layer 2 — AI-assisted (async, 900 ms hard timeout):
+ * Layer 2 - AI-assisted (async, 900 ms hard timeout):
  *   classifyIntentAI(rawInput, ruleResult) → { intent, confidence, reasoning } | null
  *
  * Combined resolver (the only export assistant.js calls):
  *   resolveIntentAssist(rawInput, ruleConfidence) → Promise<AssistResult|null>
  *
  * Source values (stored in ctx.intentAssist.source):
- *   "ai_primary" — rule tier was low, AI resolved the intent
- *   (null result)  — AI skipped (rule was authoritative), timed out, or failed
+ *   "ai_primary" - rule tier was low, AI resolved the intent
+ *   (null result)  - AI skipped (rule was authoritative), timed out, or failed
  *
  * Hard rules:
  *   - AI fires ONLY when rule confidence tier is "low" AND input looks
@@ -25,13 +25,13 @@
  *   - AI never controls urgency routing (HEAVY_URGENT is handled upstream).
  *
  * AI calls go through the backend at /api/bloomie/ai/intent.
- * ANTHROPIC_API_KEY lives on the server only — never in frontend code or
+ * ANTHROPIC_API_KEY lives on the server only - never in frontend code or
  * Vite public env.
  *
  * Fields sent to the backend per call:
- *   input         — current user message (trimmed, ≤500 chars)
- *   ruleTier      — rule confidence tier ("low")
- *   primaryIntent — top rule-based intent guess (may be null)
+ *   input         - current user message (trimmed, ≤500 chars)
+ *   ruleTier      - rule confidence tier ("low")
+ *   primaryIntent - top rule-based intent guess (may be null)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -189,8 +189,8 @@ export function extractMultiIntentTags(normalizedText, entities = {}, { repair =
 // somehow reached LOW confidence (e.g. very short inputs).
 //
 // Two tiers:
-//   Tier 1 — explicit health keywords (original gate, unchanged).
-//   Tier 2 — vague / indirect reproductive-health phrases (new):
+//   Tier 1 - explicit health keywords (original gate, unchanged).
+//   Tier 2 - vague / indirect reproductive-health phrases (new):
 //     Body-reference phrases ("down there", "mi body"), wrongness signals
 //     ("something off", "not feeling right", "nuh feel right"), indirect
 //     lateness ("hasn't come yet", "still waiting on it"), and similar
@@ -261,7 +261,7 @@ export async function classifyIntentAI(rawInput, ruleResult) {
     clearTimeout(timeoutId);
 
     if (!resp.ok) {
-      // Backend returns a structured error code — use it for diagnostics
+      // Backend returns a structured error code - use it for diagnostics
       const errBody = await resp.json().catch(() => ({}));
       const code    = errBody.error ?? "ai_unavailable";
       bloomieDiagnostic(code, {
@@ -308,7 +308,7 @@ export async function classifyIntentAI(rawInput, ruleResult) {
 // resolveIntentAssist(rawInput, ruleConfidence)
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * Hybrid resolver — the only function assistant.js calls.
+ * Hybrid resolver - the only function assistant.js calls.
  *
  * Fires AI only when both gates pass:
  *   1. Rule confidence tier === "low" (no reliable rule-based route)
@@ -327,7 +327,7 @@ export async function resolveIntentAssist(rawInput, ruleConfidence) {
 
   // Gate 2: only for health-related inputs.
   // Low confidence with no health keywords usually means a short/vague message
-  // that even AI cannot reliably classify — skip the round-trip.
+  // that even AI cannot reliably classify - skip the round-trip.
   if (!HEALTH_GATE.test(rawInput)) {
     bloomieDiagnostic("vague_input_no_ai_assist", {
       module:     "bloomie-intent",

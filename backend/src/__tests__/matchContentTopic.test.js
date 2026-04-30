@@ -100,7 +100,7 @@ describe("return shape", () => {
 // Priority: pamphlet > faq > glossary
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("type priority — pamphlet first", () => {
+describe("type priority - pamphlet first", () => {
   it("returns a pamphlet when one matches, even though faq also matches", () => {
     // "late period" matches both a pamphlet and an faq
     const result = matchContentTopic("my period is late");
@@ -109,7 +109,7 @@ describe("type priority — pamphlet first", () => {
 
   it("falls back to faq when all pamphlets are excluded", () => {
     // Derive excluded set by progressively draining pamphlets via the engine
-    // (topic-based filtering is insufficient — multiple topics can resolve).
+    // (topic-based filtering is insufficient - multiple topics can resolve).
     const allPamphletIds = CONTENT_CATALOG
       .filter(e => e.type === "pamphlet")
       .map(e => e.id);
@@ -196,7 +196,7 @@ describe("keyword matching", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Deduplication — shownIds and declinedIds
+// Deduplication - shownIds and declinedIds
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("deduplication", () => {

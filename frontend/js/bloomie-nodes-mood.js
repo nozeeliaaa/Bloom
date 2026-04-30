@@ -34,11 +34,11 @@ export function createMoodNodes(env, helpers) {
 
   return {
     /* ---------------- MOOD / HORMONES ---------------- */
-    // Backward-compat redirect — shows symptom pattern line first if available
+    // Backward-compat redirect - shows symptom pattern line first if available
     MOOD_INTRO: {
       say: [],
       onEnter() {
-        // MOOD_INTRO is a silent gate — personalisation is woven into MOOD_SAFETY_CHECK.
+        // MOOD_INTRO is a silent gate - personalisation is woven into MOOD_SAFETY_CHECK.
         // We transition immediately so the safety question renders with full context.
         transition("MOOD_SAFETY_CHECK");
       },
@@ -48,7 +48,7 @@ export function createMoodNodes(env, helpers) {
     // ── Step 1: Safety check always first ──────────────────────────────────
     MOOD_SAFETY_CHECK: {
       say() {
-        // ── 0. Safety guard — no personalisation when urgency is active ────
+        // ── 0. Safety guard - no personalisation when urgency is active ────
         if (ctx.urgency) {
           return [
             "I want to make sure you're okay 🩷",
@@ -61,7 +61,7 @@ export function createMoodNodes(env, helpers) {
           ctx?.lastUserMessage || ctx?.lastUserInput || ctx?.lastFreeText || ctx?.rawInput || ""
         ).toLowerCase();
 
-        // Tone detection — ctx.currentTone is the primary source (set by detectUserTone
+        // Tone detection - ctx.currentTone is the primary source (set by detectUserTone
         // before routing). Regex-based flags are fallbacks for when tone is neutral.
         const detectedTone   = ctx.currentTone ?? "neutral";
         const isPositiveMood = detectedTone === "casual"
@@ -71,7 +71,7 @@ export function createMoodNodes(env, helpers) {
         const isLowMood      = (detectedTone === "distressed" || detectedTone === "exhausted" || detectedTone === "anxious")
           || /\b(sad|down|low|empty|numb|cry|crying|emotional|overwhelmed|tired|exhausted)\b/.test(userText);
 
-        // Continuity signal — highest priority; consumes adviceGiven guard on first call
+        // Continuity signal - highest priority; consumes adviceGiven guard on first call
         const continuityLine = buildMoodContinuityLine();
 
         const moodMentionedBefore = !continuityLine && (ctx.entityHistory?.length > 1 &&
@@ -84,7 +84,7 @@ export function createMoodNodes(env, helpers) {
         const cycleLine   = buildCyclePersonalisationLine("general");
         const recallLine  = buildRecallLine();
 
-        // ── Anomaly layer — bloom-anomaly-engine + severity baseline ─────────
+        // ── Anomaly layer - bloom-anomaly-engine + severity baseline ─────────
         // Only fires when: not urgency, not already surfaced, level medium/high.
         // ctx.bloomieAnomalyCtx is computed at mount by computeMoodAnomalyCtx().
         const anomalyCtx    = ctx.bloomieAnomalyCtx;
@@ -100,7 +100,7 @@ export function createMoodNodes(env, helpers) {
           ? getToneOpener(detectedTone, ctx)
           : "";
 
-        // ── Fused opening — tone opener + context in ONE sentence ─────────────
+        // ── Fused opening - tone opener + context in ONE sentence ─────────────
         // Each branch builds ONE fused sentence. toneOpener prepends where set.
         // Structure: [toneOpener] + [context-aware ack/observation]
         const fuse = (contextSentence) =>
@@ -109,51 +109,51 @@ export function createMoodNodes(env, helpers) {
         let fusedOpening;
 
         if (continuityLine) {
-          // Continuity/escalation takes priority — fuse with tone opener if present
+          // Continuity/escalation takes priority - fuse with tone opener if present
           fusedOpening = fuse(continuityLine);
 
         } else if (isPositiveMood) {
-          // Positive mood — affirming but not dismissive; no tone opener needed
+          // Positive mood - affirming but not dismissive; no tone opener needed
           fusedOpening = pick([
-            "It's really good to notice when things feel lighter — that shift matters 🩷",
+            "It's really good to notice when things feel lighter - that shift matters 🩷",
             "I'm glad you told me, noticing a change in either direction is worth paying attention to 🩷",
-            "Good to hear — tracking how you feel on the better days is just as useful as the hard ones 🩷",
+            "Good to hear - tracking how you feel on the better days is just as useful as the hard ones 🩷",
           ]);
 
         } else if (moodMentionedBefore && (isLowMood || isAngryMood)) {
-          // Continuity — they've mentioned this already this session
+          // Continuity - they've mentioned this already this session
           const continuityPool = isLowMood
             ? [
-                "you mentioned feeling low earlier too — it sounds like this has really been sitting with you, and that's worth taking seriously 🩷",
+                "you mentioned feeling low earlier too - it sounds like this has really been sitting with you, and that's worth taking seriously 🩷",
                 "the fact that this keeps coming up tells me it isn't a small thing 🩷",
-                "this is the second time this has come up in our conversation — when it sticks around like that, it deserves more than just sitting with it alone 🩷",
+                "this is the second time this has come up in our conversation - when it sticks around like that, it deserves more than just sitting with it alone 🩷",
               ]
             : [
-                "you brought this up earlier too — it sounds like the irritability hasn't let up, which makes sense if your body is in a pattern right now 🩷",
+                "you brought this up earlier too - it sounds like the irritability hasn't let up, which makes sense if your body is in a pattern right now 🩷",
                 "when it keeps surfacing like this, it's worth looking at what's actually driving it 🩷",
                 "the fact that you've come back to this tells me it's been sitting heavier than you might be letting on 🩷",
               ];
           fusedOpening = fuse(pick(continuityPool));
 
         } else if (hasPattern && phaseLabel) {
-          // Richest signal: pattern + phase — fuse into one sentence
+          // Richest signal: pattern + phase - fuse into one sentence
           if (isLowMood) {
             fusedOpening = fuse(pick([
-              `that heavy, flat feeling makes sense right now — you're in ${phaseLabel} and this is something your body tends to go through around this point in your cycle 🩷`,
-              `feeling low at this point tracks — you're in ${phaseLabel}, and your logs show your mood tends to dip here 🩷`,
-              `what you're feeling isn't random — you're in ${phaseLabel} and this is a pattern your body repeats, even if it doesn't feel that way in the moment 🩷`,
+              `that heavy, flat feeling makes sense right now - you're in ${phaseLabel} and this is something your body tends to go through around this point in your cycle 🩷`,
+              `feeling low at this point tracks - you're in ${phaseLabel}, and your logs show your mood tends to dip here 🩷`,
+              `what you're feeling isn't random - you're in ${phaseLabel} and this is a pattern your body repeats, even if it doesn't feel that way in the moment 🩷`,
             ]));
           } else if (isAngryMood) {
             fusedOpening = fuse(pick([
-              `that irritability makes a lot of sense right now — you're in ${phaseLabel} and your logs show this is something your body does around this time 🩷`,
-              `feeling that edge is real — you're in ${phaseLabel}, and this kind of intensity shows up in your cycle at this point 🩷`,
-              `what you're experiencing isn't out of nowhere — you're in ${phaseLabel} and this is a pattern your body tends to follow 🩷`,
+              `that irritability makes a lot of sense right now - you're in ${phaseLabel} and your logs show this is something your body does around this time 🩷`,
+              `feeling that edge is real - you're in ${phaseLabel}, and this kind of intensity shows up in your cycle at this point 🩷`,
+              `what you're experiencing isn't out of nowhere - you're in ${phaseLabel} and this is a pattern your body tends to follow 🩷`,
             ]));
           } else {
             fusedOpening = fuse(pick([
-              `that feeling makes sense given where you are right now — you're in ${phaseLabel} and this tends to be when your mood shifts 🩷`,
+              `that feeling makes sense given where you are right now - you're in ${phaseLabel} and this tends to be when your mood shifts 🩷`,
               `you're in ${phaseLabel} right now, and your logs show this is something your body goes through around this point 🩷`,
-              `this isn't coming from nowhere — you're in ${phaseLabel} and your history shows mood shifts around this time in your cycle 🩷`,
+              `this isn't coming from nowhere - you're in ${phaseLabel} and your history shows mood shifts around this time in your cycle 🩷`,
             ]));
           }
 
@@ -161,43 +161,43 @@ export function createMoodNodes(env, helpers) {
           // Pattern without confirmed phase
           if (isLowMood) {
             fusedOpening = fuse(pick([
-              "that emotional heaviness is real — and looking at your logs, this isn't the first time your body has flagged this around now 🩷",
+              "that emotional heaviness is real - and looking at your logs, this isn't the first time your body has flagged this around now 🩷",
               "I can see from what you've logged that this kind of low feeling tends to come up for you, so you're not imagining it 🩷",
-              "your history shows your body tends to go through this — even if it feels isolating in the moment, it's worth taking seriously 🩷",
+              "your history shows your body tends to go through this - even if it feels isolating in the moment, it's worth taking seriously 🩷",
             ]));
           } else if (isAngryMood) {
             fusedOpening = fuse(pick([
-              "that frustration is real — and from your logs, this isn't a one-off, this is something your body cycles through 🩷",
+              "that frustration is real - and from your logs, this isn't a one-off, this is something your body cycles through 🩷",
               "I can see from your history that this kind of irritability tends to surface for you, which means it's worth paying attention to 🩷",
-              "your logs back this up — this kind of mood shift is part of a pattern your body follows, not just a bad day 🩷",
+              "your logs back this up - this kind of mood shift is part of a pattern your body follows, not just a bad day 🩷",
             ]));
           } else {
             fusedOpening = fuse(pick([
-              "this makes sense — looking at your logs, your body tends to flag these kinds of feelings around this time 🩷",
+              "this makes sense - looking at your logs, your body tends to flag these kinds of feelings around this time 🩷",
               "from what you've logged, this is part of a pattern your body follows, which means it's worth understanding rather than just pushing through 🩷",
-              "your history backs this up — mood shifts like this tend to come up for you, and that's useful information 🩷",
+              "your history backs this up - mood shifts like this tend to come up for you, and that's useful information 🩷",
             ]));
           }
 
         } else if (phaseLabel) {
-          // Phase only — no pattern data
+          // Phase only - no pattern data
           if (isLowMood) {
             fusedOpening = fuse(pick([
-              `that heavy feeling makes sense — you're in ${phaseLabel} right now, which is when emotional sensitivity often peaks 🩷`,
-              `feeling low right now tracks with where you are in your cycle — you're in ${phaseLabel} and that phase can really affect your mood 🩷`,
-              `you're in ${phaseLabel} right now and that's genuinely one of the harder points emotionally for a lot of people — what you're feeling is real 🩷`,
+              `that heavy feeling makes sense - you're in ${phaseLabel} right now, which is when emotional sensitivity often peaks 🩷`,
+              `feeling low right now tracks with where you are in your cycle - you're in ${phaseLabel} and that phase can really affect your mood 🩷`,
+              `you're in ${phaseLabel} right now and that's genuinely one of the harder points emotionally for a lot of people - what you're feeling is real 🩷`,
             ]));
           } else if (isAngryMood) {
             fusedOpening = fuse(pick([
-              `that irritability makes sense — you're in ${phaseLabel} right now, when progesterone shifts tend to make everything feel more intense 🩷`,
-              `feeling that edge is real, and it tracks — you're in ${phaseLabel}, which is often when irritability peaks 🩷`,
+              `that irritability makes sense - you're in ${phaseLabel} right now, when progesterone shifts tend to make everything feel more intense 🩷`,
+              `feeling that edge is real, and it tracks - you're in ${phaseLabel}, which is often when irritability peaks 🩷`,
               `you're in ${phaseLabel} right now, and that phase can make everything feel sharper and harder to shake 🩷`,
             ]));
           } else {
             fusedOpening = fuse(pick([
-              `what you're feeling makes sense given where you are right now — you're in ${phaseLabel}, which is often when mood shifts show up 🩷`,
+              `what you're feeling makes sense given where you are right now - you're in ${phaseLabel}, which is often when mood shifts show up 🩷`,
               `you're in ${phaseLabel} right now, and that's genuinely one of the more emotionally complex points in the cycle 🩷`,
-              `mood shifts in ${phaseLabel} are real — your hormones are doing something specific right now and your feelings are tracking with that 🩷`,
+              `mood shifts in ${phaseLabel} are real - your hormones are doing something specific right now and your feelings are tracking with that 🩷`,
             ]));
           }
 
@@ -208,29 +208,29 @@ export function createMoodNodes(env, helpers) {
           fusedOpening = fuse(recallLine);
 
         } else {
-          // No context — tone-driven generic; toneOpener already carries the ack
+          // No context - tone-driven generic; toneOpener already carries the ack
           if (isLowMood) {
             fusedOpening = fuse(pick([
               "that kind of emotional heaviness is real, and it takes something to name it and reach out about it 🩷",
-              "feeling low isn't always easy to admit — I'm glad you brought it here 🩷",
+              "feeling low isn't always easy to admit - I'm glad you brought it here 🩷",
               "that weight you're carrying is real, and it deserves to be taken seriously 🩷",
             ]));
           } else if (isAngryMood) {
             fusedOpening = fuse(pick([
-              "anger and frustration that feel out of proportion can be one of the most exhausting things to carry — and they're worth understanding, not dismissing 🩷",
+              "anger and frustration that feel out of proportion can be one of the most exhausting things to carry - and they're worth understanding, not dismissing 🩷",
               "that kind of irritability is draining to live with, especially when it feels like it's coming from nowhere 🩷",
-              "feeling that edge is real — and it's worth figuring out what's underneath it 🩷",
+              "feeling that edge is real - and it's worth figuring out what's underneath it 🩷",
             ]));
           } else {
             fusedOpening = fuse(pick([
               "mood shifts can feel really disorienting, especially when they seem to come from nowhere 🩷",
               "what you're feeling is real and worth paying attention to 🩷",
-              "I'm glad you brought this up — mood changes deserve more than just being pushed through 🩷",
+              "I'm glad you brought this up - mood changes deserve more than just being pushed through 🩷",
             ]));
           }
         }
 
-        // Anomaly add-on — one short clause appended to fusedOpening.
+        // Anomaly add-on - one short clause appended to fusedOpening.
         // Wording is specific to which signal fired: cycle timing vs. severity spike.
         let anomalyAddOn = "";
         if (hasMoodAnomaly) {
@@ -243,26 +243,26 @@ export function createMoodNodes(env, helpers) {
             ]);
           } else if (hasCycleAnomaly) {
             anomalyAddOn = pick([
-              " I'm noticing your cycle has been behaving a bit differently than usual lately — that kind of shift can affect how you feel emotionally.",
+              " I'm noticing your cycle has been behaving a bit differently than usual lately - that kind of shift can affect how you feel emotionally.",
               " Your cycle timing looks a little different from your personal pattern right now, which could be part of what's going on.",
             ]);
           } else {
             // severity spike only
             anomalyAddOn = pick([
-              " This feels a bit more intense than how things usually show up for you — I want to make sure you're okay.",
-              " I'm noticing this isn't how things typically come across in your history — worth paying attention to.",
+              " This feels a bit more intense than how things usually show up for you - I want to make sure you're okay.",
+              " I'm noticing this isn't how things typically come across in your history - worth paying attention to.",
             ]);
           }
         }
 
-        // ── First mood mention — 2-sentence response, no filler bridge ─────────
+        // ── First mood mention - 2-sentence response, no filler bridge ─────────
         // moodMentions is appended in assistant.js before routing, so length === 1
         // means this is the very first time mood has come up this session.
         const isFirstMoodMention = (ctx.moodMentions?.length ?? 0) === 1;
         if (isFirstMoodMention) {
           return [
             fusedOpening + anomalyAddOn,
-            "I do want to ask — are these feelings ever making you feel unsafe, completely unable to cope, or like you might hurt yourself?",
+            "I do want to ask - are these feelings ever making you feel unsafe, completely unable to cope, or like you might hurt yourself?",
           ];
         }
 
@@ -312,11 +312,11 @@ export function createMoodNodes(env, helpers) {
     // ── Step 2: Feeling-type-first entry ─────────────────────────────────────
     MOOD_ENTRY: {
       say() {
-        // ── Postpartum: high stakes — keep focused, surface serious signals ─
+        // ── Postpartum: high stakes - keep focused, surface serious signals ─
         if (userMode.isPostpartum) {
           return [
             "Postpartum mood shifts deserve to be taken seriously, not brushed off 🩷",
-            "If you're experiencing crying spells that won't stop, feeling disconnected from your baby, intrusive thoughts, or trouble sleeping even when your baby sleeps — please tell me.",
+            "If you're experiencing crying spells that won't stop, feeling disconnected from your baby, intrusive thoughts, or trouble sleeping even when your baby sleeps - please tell me.",
             "What feels most true for you lately?",
           ];
         }
@@ -325,7 +325,7 @@ export function createMoodNodes(env, helpers) {
         if (userMode.isPregnancy) {
           const cycleLine = buildCyclePersonalisationLine("general");
           return [
-            "Mood changes in pregnancy are real — anxiety about the pregnancy, feeling overwhelmed, or sudden intense emotions are all worth talking about 🩷",
+            "Mood changes in pregnancy are real - anxiety about the pregnancy, feeling overwhelmed, or sudden intense emotions are all worth talking about 🩷",
             ...(cycleLine ? [cycleLine] : []),
             "What feels most true for you lately?",
           ];
@@ -335,7 +335,7 @@ export function createMoodNodes(env, helpers) {
         if (userMode.isTTC) {
           return [
             "Mood shifts are real at any point in a cycle, and the emotional weight of TTC can make them feel even more intense 🩷",
-            "The uncertainty, the waiting, the hope — it all sits somewhere in the body.",
+            "The uncertainty, the waiting, the hope - it all sits somewhere in the body.",
             "What feels most true for you lately?",
           ];
         }
@@ -412,15 +412,15 @@ export function createMoodNodes(env, helpers) {
         const patternLine = buildSymptomPatternLine(["ANXIETY", "MOOD_SWINGS"]);
         const phaseInfo   = getCurrentPhase();
         const phaseLine   = phaseInfo ? insightFor(phaseInfo.phase, "mood") : null;
-        // Blend context into the opening naturally — don't append separately
+        // Blend context into the opening naturally - don't append separately
         const contextIntro = patternLine
           ? pick([
-              "Anxiety has a way of feeling bigger when it's part of a pattern — I can see this tends to come up around this time for you 🩷",
+              "Anxiety has a way of feeling bigger when it's part of a pattern - I can see this tends to come up around this time for you 🩷",
               "Looking at what you've logged, anxiety seems to be something your body tends to signal around now 🩷",
             ])
           : phaseLine
           ? phaseLine
-          : "Anxiety can show up in so many ways — racing thoughts, dread, restlessness, chest tightness, or just a feeling you can't shake 🩷";
+          : "Anxiety can show up in so many ways - racing thoughts, dread, restlessness, chest tightness, or just a feeling you can't shake 🩷";
         return [
           contextIntro,
           "Does it feel more like overthinking and spiraling, or more like sudden panic and dread?",
@@ -444,8 +444,8 @@ export function createMoodNodes(env, helpers) {
         const patternLine = buildSymptomPatternLine(["DEPRESSION", "CRYING_SPELLS", "MOOD_SWINGS"]);
         const contextIntro = patternLine
           ? pick([
-              "Low mood can be one of the most invisible things to carry — and I can see from your logs this isn't new for you 🩷",
-              "I can see this tends to come up around this point in your cycle — you're not imagining it 🩷",
+              "Low mood can be one of the most invisible things to carry - and I can see from your logs this isn't new for you 🩷",
+              "I can see this tends to come up around this point in your cycle - you're not imagining it 🩷",
             ])
           : "Low mood can look like sadness, but also numbness, withdrawal, or just feeling flat and disconnected 🩷";
         return [
@@ -473,11 +473,11 @@ export function createMoodNodes(env, helpers) {
         const isLuteal     = phaseInfo?.phase === "luteal";
         const contextIntro = patternLine
           ? pick([
-              "Irritability is one of the most dismissed cycle symptoms — and looking at your logs, I can see this is something your body flags around now 🩷",
+              "Irritability is one of the most dismissed cycle symptoms - and looking at your logs, I can see this is something your body flags around now 🩷",
               "You're not just being difficult. I can see from your history this tends to come up at this point in your cycle 🩷",
             ])
           : isLuteal
-          ? "Irritability is one of the most dismissed cycle symptoms — and the luteal phase is when it peaks for most people. It is real and it can be exhausting to manage 🩷"
+          ? "Irritability is one of the most dismissed cycle symptoms - and the luteal phase is when it peaks for most people. It is real and it can be exhausting to manage 🩷"
           : "Irritability is one of the most dismissed cycle symptoms, but it is real and it can be exhausting to manage 🩷";
         return [
           contextIntro,
@@ -550,8 +550,8 @@ export function createMoodNodes(env, helpers) {
         if (phaseInfo) {
           return [
             pick([
-              `Based on your cycle, you're currently in ${phaseInfo.label} — a phase when mood shifts are really common 🩷`,
-              `You're around ${phaseInfo.label} right now — this is often when these feelings peak for a lot of people 🩷`,
+              `Based on your cycle, you're currently in ${phaseInfo.label} - a phase when mood shifts are really common 🩷`,
+              `You're around ${phaseInfo.label} right now - this is often when these feelings peak for a lot of people 🩷`,
             ]),
             "Does this tend to show up around a specific time in your cycle, or does it feel more random?",
           ];
@@ -575,19 +575,19 @@ export function createMoodNodes(env, helpers) {
         // Weave hormone explanation into context naturally
         const hormoneExplainer = "Progesterone rises then drops sharply in the luteal phase, and that drop can affect serotonin, energy, and emotional regulation.";
         if (cycleLine) {
-          return [cycleLine, "Cycle-linked mood shifts are real and hormonal — you're not imagining it 🩷", hormoneExplainer];
+          return [cycleLine, "Cycle-linked mood shifts are real and hormonal - you're not imagining it 🩷", hormoneExplainer];
         }
         if (phaseInfo?.phase === "luteal") {
           return [
             pick([
               "Being in the luteal phase right now makes complete sense of what you're describing 🩷",
-              "The luteal phase is exactly when these kinds of mood shifts tend to peak — you're right on time 🩷",
+              "The luteal phase is exactly when these kinds of mood shifts tend to peak - you're right on time 🩷",
             ]),
             hormoneExplainer,
           ];
         }
         return [
-          "Cycle-linked mood shifts are real and hormonal — you're not imagining it 🩷",
+          "Cycle-linked mood shifts are real and hormonal - you're not imagining it 🩷",
           hormoneExplainer,
         ];
       },
@@ -685,15 +685,15 @@ export function createMoodNodes(env, helpers) {
         const patternLine  = buildSymptomPatternLine(
           ["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS", "FATIGUE"]
         );
-        // Symptom intelligence line — baseline deviations, forecast, logging nudge.
+        // Symptom intelligence line - baseline deviations, forecast, logging nudge.
         // Only fires when no patternLine already personalises the response.
         const insightLine  = !patternLine ? buildSymptomInsightLine() : null;
 
-        // Context line — blend insight into emotional validation, not as a clinical tag
+        // Context line - blend insight into emotional validation, not as a clinical tag
         const contextLine = insight
           ? `Based on what you've shared, hormone-linked mood shifts may be playing a role and you're not imagining it. ${insight}`
           : patternLine
-          ? `Based on what you've shared, hormone-linked mood shifts may be playing a role — and your own history backs that up.`
+          ? `Based on what you've shared, hormone-linked mood shifts may be playing a role - and your own history backs that up.`
           : "Based on what you've shared, hormone-linked mood shifts may be playing a role and you're not imagining it.";
 
         const moodRoute   = ctx.moodRoute;
@@ -714,17 +714,17 @@ export function createMoodNodes(env, helpers) {
           routeGuidance = "Mood shifts around your cycle are real. They can affect your emotions, energy, focus, patience, and even how social you feel. You're not being dramatic or too sensitive. Hormones really can change how your body and brain respond to stress.";
         }
 
-        // Continuity acknowledgement — if mood has been persistent across turns,
+        // Continuity acknowledgement - if mood has been persistent across turns,
         // surface it once in MOOD_GUIDE (guard ensures it only fires if not already
         // shown in MOOD_SAFETY_CHECK, since both share the adviceGiven key).
         const guideContinuityLine = buildMoodContinuityLine();
 
-        // Opening — escalation gets heavier weight, otherwise warm standard
+        // Opening - escalation gets heavier weight, otherwise warm standard
         const openingPool = guideContinuityLine
           ? [
               "I want to make sure I'm giving you what you actually need right now 🩷",
-              "Thank you for staying with this — I can hear it's been weighing on you 🩷",
-              "I appreciate you keeping this conversation going — that takes something 🩷",
+              "Thank you for staying with this - I can hear it's been weighing on you 🩷",
+              "I appreciate you keeping this conversation going - that takes something 🩷",
             ]
           : [
               "Thank you for being open with me 🩷",

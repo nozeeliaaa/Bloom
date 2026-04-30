@@ -3,20 +3,20 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Hybrid two-layer emotion detection for Bloomie.
  *
- * Layer 1 — rule-based (synchronous, always runs):
+ * Layer 1 - rule-based (synchronous, always runs):
  *   detectToneWithConfidence(text)  → { tone, confidence, signals, hasUnknownTokens }
  *
- * Layer 2 — AI-assisted (async, 800 ms hard timeout):
+ * Layer 2 - AI-assisted (async, 800 ms hard timeout):
  *   classifyEmotionAI(rawInput, ruleResult) → { confirms, tone, intensity, subtext } | null
  *
  * Combined resolver (only export assistant.js calls):
  *   resolveTone(rawInput, ctx) → { tone, intensity, subtext, source }
  *
  * Source values:
- *   "rule+ai_confirmed" — high confidence rule result confirmed by AI
- *   "ai_primary"        — rule was low / had unknown tokens, AI took over
- *   "ai_override"       — AI disagreed with rule result
- *   "rule_only"         — AI call failed / timed out; rule tone used
+ *   "rule+ai_confirmed" - high confidence rule result confirmed by AI
+ *   "ai_primary"        - rule was low / had unknown tokens, AI took over
+ *   "ai_override"       - AI disagreed with rule result
+ *   "rule_only"         - AI call failed / timed out; rule tone used
  *
  * Hard rules:
  *   - AI writes ONLY to ctx.currentTone (via resolveTone return).
@@ -26,13 +26,13 @@
  *   - Tone behaviour never activates on first message (sessionDepth gate).
  *
  * AI calls go through the backend at /api/bloomie/ai/tone.
- * ANTHROPIC_API_KEY lives on the server only — never in frontend code or
+ * ANTHROPIC_API_KEY lives on the server only - never in frontend code or
  * Vite public env.
  *
  * Fields sent to the backend per call:
- *   input          — current user message (trimmed, ≤500 chars)
- *   ruleTone       — rule-layer tone result
- *   ruleConfidence — rule-layer confidence tier
+ *   input          - current user message (trimmed, ≤500 chars)
+ *   ruleTone       - rule-layer tone result
+ *   ruleConfidence - rule-layer confidence tier
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -172,9 +172,9 @@ const TONE_SIGNALS = {
  * Rule-based tone detection with confidence scoring.
  *
  * Confidence rules:
- *   high   — exactly 1 tone category matches with 2+ signals
- *   medium — exactly 1 tone category matches with 1 signal
- *   low    — 0 matches, multi-tone (ambiguous), OR hasUnknownTokens
+ *   high   - exactly 1 tone category matches with 2+ signals
+ *   medium - exactly 1 tone category matches with 1 signal
+ *   low    - 0 matches, multi-tone (ambiguous), OR hasUnknownTokens
  *
  * @param  {string} text
  * @returns {{ tone: string, confidence: "high"|"medium"|"low", signals: object, hasUnknownTokens: boolean }}
@@ -311,7 +311,7 @@ export async function classifyEmotionAI(rawInput, ruleResult) {
 // resolveTone(rawInput, ctx)
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * Hybrid resolver — always calls both layers; AI call is non-blocking.
+ * Hybrid resolver - always calls both layers; AI call is non-blocking.
  *
  * Resolution priority:
  *   1. API null              → rule tone, intensity "medium", subtext "none"  (rule_only)
@@ -331,7 +331,7 @@ export async function resolveTone(rawInput, ctx) {
   const sessionDepth = ctx.conversationProfile?.sessionDepth ?? 0;
   const previousTone = ctx.previousTone ?? null;
 
-  // Both run immediately — AI is non-blocking (fired while pipeline normalises)
+  // Both run immediately - AI is non-blocking (fired while pipeline normalises)
   const ruleResult = detectToneWithConfidence(rawInput);
 
   // Log when rule layer is low-confidence so we know AI was needed
@@ -349,7 +349,7 @@ export async function resolveTone(rawInput, ctx) {
   let tone, intensity, subtext, source;
 
   if (aiResult === null) {
-    // AI call failed — log the fallback consequence and use rule result
+    // AI call failed - log the fallback consequence and use rule result
     bloomieDiagnostic("fallback_to_rules", {
       module:         "bloomie-tone",
       stage:          "resolveTone",
@@ -362,7 +362,7 @@ export async function resolveTone(rawInput, ctx) {
     source    = "rule_only";
 
   } else if (ruleResult.confidence === "low" || ruleResult.hasUnknownTokens) {
-    // Rule can't be trusted — use AI entirely
+    // Rule can't be trusted - use AI entirely
     tone      = aiResult.tone;
     intensity = aiResult.intensity;
     subtext   = aiResult.subtext;
@@ -376,7 +376,7 @@ export async function resolveTone(rawInput, ctx) {
     source    = "rule+ai_confirmed";
 
   } else if (aiResult.tone !== ruleResult.tone) {
-    // AI disagrees with rule — use structured diagnostic instead of console.warn
+    // AI disagrees with rule - use structured diagnostic instead of console.warn
     bloomieDiagnostic("ai_override", {
       module:  "bloomie-tone",
       stage:   "resolveTone",
@@ -410,7 +410,7 @@ export async function resolveTone(rawInput, ctx) {
  * Applies tone-aware transformations to a lines array before say() renders it.
  *
  * Only activates when source ≠ "rule_only" AND sessionDepth ≥ 2.
- * No-ops on casual / neutral — unchanged.
+ * No-ops on casual / neutral - unchanged.
  *
  * @param  {string[]} lines
  * @param  {{ tone: string, intensity: string, source: string }} toneResult
@@ -430,7 +430,7 @@ export function applyToneToLines(lines, toneResult, sessionDepth) {
     const firstIsAck = /i hear you|you're not alone|i'm here with you/i.test(result[0] ?? "");
     if (!firstIsAck) {
       result = [
-        "I hear you — you're not alone in this.",
+        "I hear you - you're not alone in this.",
         ...result.slice(0, 2),
       ];
     }
@@ -440,7 +440,7 @@ export function applyToneToLines(lines, toneResult, sessionDepth) {
     const firstIsWarm = /take a breath|i'm here|let's figure|here with you/i.test(result[0] ?? "");
     if (!firstIsWarm) {
       result = [
-        "Take a breath — I'm here and we'll look at this together.",
+        "Take a breath - I'm here and we'll look at this together.",
         ...result,
       ];
     }
@@ -450,7 +450,7 @@ export function applyToneToLines(lines, toneResult, sessionDepth) {
     const firstIsReassurance = /it'?s okay|understandable|you'?re okay|normal to/i.test(result[0] ?? "");
     if (!firstIsReassurance) {
       result = [
-        "It's okay to have questions — let's look at this together.",
+        "It's okay to have questions - let's look at this together.",
         ...result,
       ];
     }
@@ -466,7 +466,7 @@ export function applyToneToLines(lines, toneResult, sessionDepth) {
     const firstIsGentleNaming = /i notice|it's okay to minimise|worth taking a look/i.test(result[0] ?? "");
     if (!firstIsGentleNaming) {
       result = [
-        "I notice you might be downplaying this a little — that's okay. It's still worth taking a look.",
+        "I notice you might be downplaying this a little - that's okay. It's still worth taking a look.",
         ...result,
       ];
     }

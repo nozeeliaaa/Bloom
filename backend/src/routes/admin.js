@@ -244,7 +244,27 @@ router.post("/users/:uid/promote", async (req, res) => {
     if (!allowed.includes(role)) {
       return res.status(400).json({ error: "Invalid role" });
     }
+
+    if (uid === req.user.uid && role !== "admin") {
+      return res.status(400).json({ error: "Cannot demote your own admin account" });
+    }
+
+    // 1. Set Firebase custom claims
     await auth.setCustomUserClaims(uid, { role });
+
+    // 2. Sync role to Firestore users doc
+    await db.collection("users").doc(uid).set(
+      { role, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+
+    // 3. Sync adminUsers collection to match Firestore rules isAdmin() check
+    const adminRef = db.collection("adminUsers").doc(uid);
+    if (role === "admin") {
+      await adminRef.set({ grantedAt: admin.firestore.FieldValue.serverTimestamp(), grantedBy: req.user.uid });
+    } else {
+      await adminRef.delete();
+    }
 
     await logAudit({
       actorUid:   req.user.uid,
@@ -694,6 +714,97 @@ router.get("/feedback-review", async (req, res) => {
   } catch (err) {
     console.error("Admin GET /feedback-review error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BLOOMIE ANALYTICS SUMMARY
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/bloomie-analytics/summary", async (_req, res) => {
+  try {
+    const snap = await db.collection("bloomie_analytics").get();
+
+    const confidenceTierDistribution = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+    const routeDistribution = {};
+    const toneDistribution = {};
+    const emotionSourceDistribution = {};
+    const noMatchPhraseCounts = {};
+
+    let fallbackCount = 0;
+    let noMatchCount = 0;
+    let urgencyEscalationCount = 0;
+    let oosEventCount = 0;
+    let sessionDepthSum = 0;
+    let sessionDepthN = 0;
+
+    const inc = (bucket, key) => {
+      if (!key) return;
+      bucket[key] = (bucket[key] || 0) + 1;
+    };
+
+    snap.forEach((doc) => {
+      const d = doc.data() || {};
+      const eventType = String(d.eventType || "").toLowerCase();
+
+      if (eventType === "route_fallback") fallbackCount++;
+      if (eventType === "route_no_match") noMatchCount++;
+      if (eventType === "urgency_escalation") urgencyEscalationCount++;
+      if (eventType === "oos_event") oosEventCount++;
+
+      const depth =
+        Number.isFinite(d.sessionDepth) ? d.sessionDepth :
+        Number.isFinite(d.meta_sessionDepth) ? d.meta_sessionDepth :
+        null;
+      if (Number.isFinite(depth)) {
+        sessionDepthSum += depth;
+        sessionDepthN++;
+      }
+
+      if (typeof d.route === "string" && d.route) inc(routeDistribution, d.route);
+
+      const confidenceTier = String(d.meta_confidenceTier || "").toUpperCase();
+      if (confidenceTier in confidenceTierDistribution) {
+        confidenceTierDistribution[confidenceTier]++;
+      }
+
+      const tone = typeof d.tone === "string" && d.tone ? d.tone : d.meta_tone;
+      if (typeof tone === "string" && tone) inc(toneDistribution, tone);
+
+      const source = typeof d.source === "string" && d.source ? d.source : d.meta_toneSource;
+      if (typeof source === "string" && source) inc(emotionSourceDistribution, source);
+
+      if (eventType === "route_no_match" && typeof d.input === "string" && d.input.trim()) {
+        inc(noMatchPhraseCounts, d.input.trim().toLowerCase());
+      }
+    });
+
+    const topNoMatchPhrases = Object.entries(noMatchPhraseCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([phrase, count]) => ({ phrase, count }));
+
+    const avgSessionDepth = sessionDepthN > 0
+      ? Number((sessionDepthSum / sessionDepthN).toFixed(2))
+      : 0;
+
+    return res.json({
+      ok: true,
+      summary: {
+        fallbackCount,
+        noMatchCount,
+        urgencyEscalationCount,
+        oosEventCount,
+        avgSessionDepth,
+        confidenceTierDistribution,
+        routeDistribution,
+        toneDistribution,
+        emotionSourceDistribution,
+        topNoMatchPhrases,
+      },
+    });
+  } catch (err) {
+    console.error("Admin GET /bloomie-analytics/summary error:", err);
+    return res.status(500).json({ error: "Failed to load Bloomie analytics summary" });
   }
 });
 

@@ -32,12 +32,12 @@ const mockDbDocDelete   = vi.hoisted(() => vi.fn());
 const mockSubDocGet     = vi.hoisted(() => vi.fn());
 const mockQueryGet      = vi.hoisted(() => vi.fn());
 
-// Spy that records every uid passed to db.collection().doc(uid) — used to
+// Spy that records every uid passed to db.collection().doc(uid) - used to
 // verify cross-user isolation (no other user's uid should ever be queried).
 const mockTopLevelDocSpy = vi.hoisted(() => vi.fn());
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Module mocks — declared before any import; Vitest hoists these automatically
+// Module mocks - declared before any import; Vitest hoists these automatically
 // ─────────────────────────────────────────────────────────────────────────────
 
 vi.mock("../firebaseAdmin.js", () => {
@@ -127,7 +127,7 @@ import userProfileRouter from "../routes/userProfile.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test app factory
-// Creates a fresh Express app per suite — no rate limiters on these routes
+// Creates a fresh Express app per suite - no rate limiters on these routes
 // (rate limit behaviour is tested separately with dedicated minimal apps).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -279,7 +279,7 @@ describe("invalid token → 401", () => {
   });
 
   it("rejects a request using Basic auth instead of Bearer", async () => {
-    // Authorization header is present but wrong scheme — token extraction fails
+    // Authorization header is present but wrong scheme - token extraction fails
     const res = await request(app)
       .get("/user/profile")
       .set("Authorization", "Basic dXNlcjpwYXNz");
@@ -291,7 +291,7 @@ describe("invalid token → 401", () => {
     const res = await request(app)
       .get("/user/profile")
       .set("Authorization", "Bearer ");
-    // Empty string after split — verifyIdToken should throw or middleware rejects
+    // Empty string after split - verifyIdToken should throw or middleware rejects
     expect(res.status).toBe(401);
   });
 });
@@ -331,7 +331,7 @@ describe("cross-user data isolation", () => {
     expect(queriedUids).not.toContain(USER_A_UID);
   });
 
-  it("a uid field in the request body is ignored — route uses token uid", async () => {
+  it("a uid field in the request body is ignored - route uses token uid", async () => {
     // User B sends their valid token but includes user A's uid in the body.
     // The route must ignore req.body.uid and use req.user.uid (B's uid).
     seedAuthB();
@@ -361,7 +361,7 @@ describe("cross-user data isolation", () => {
     const afterA = mockTopLevelDocSpy.mock.calls.map(([uid]) => uid);
     expect(afterA).not.toContain(USER_B_UID);
 
-    // Request 2: user B — fresh mock spy call list continues from here
+    // Request 2: user B - fresh mock spy call list continues from here
     seedAuthB();
     mockDbDocGet.mockResolvedValueOnce(USER_B_DOC);
     await request(app)
@@ -369,7 +369,7 @@ describe("cross-user data isolation", () => {
       .set("Authorization", `Bearer ${USER_B_TOKEN}`);
 
     const allUids = mockTopLevelDocSpy.mock.calls.map(([uid]) => uid);
-    // A's calls are in the first half, B's in the second — never crossed
+    // A's calls are in the first half, B's in the second - never crossed
     const bCalls = allUids.slice(afterA.length);
     expect(bCalls).not.toContain(USER_A_UID);
   });
@@ -380,7 +380,7 @@ describe("cross-user data isolation", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("input sanitization", () => {
-  // ── 4a. validateUserProfile — pure function (no HTTP overhead) ─────────────
+  // ── 4a. validateUserProfile - pure function (no HTTP overhead) ─────────────
   describe("validateUserProfile", () => {
     const currentYear = new Date().getFullYear();
 
@@ -455,11 +455,11 @@ describe("input sanitization", () => {
     });
   });
 
-  // ── 4b. Nickname HTML stripping — end-to-end through GET /api/user/profile ─
+  // ── 4b. Nickname HTML stripping - end-to-end through GET /api/user/profile ─
   describe("nickname sanitization", () => {
     // Seeds the two sequential mockDbDocGet calls needed:
-    // 1st — requireAuth user-doc lookup
-    // 2nd — subDoc call is mockSubDocGet (different fn)
+    // 1st - requireAuth user-doc lookup
+    // 2nd - subDoc call is mockSubDocGet (different fn)
     function seedNicknameRequest(rawNickname) {
       mockVerifyIdToken.mockResolvedValueOnce({
         uid: USER_A_UID, email: "alice@bloom.test", email_verified: true,
@@ -528,7 +528,7 @@ describe("input sanitization", () => {
   });
 
   // ── 4c. Route-level rejection via HTTP ─────────────────────────────────────
-  describe("POST /user/profile — bad input → 400", () => {
+  describe("POST /user/profile - bad input → 400", () => {
     it("rejects a goal containing arbitrary text", async () => {
       seedAuthA();
       mockDbDocGet.mockResolvedValueOnce(EMPTY_DOC);
@@ -659,7 +659,7 @@ describe("rate limiting → 429", () => {
     const blocked = await request(app).post("/auth/verify").send({});
     expect(blocked.status).toBe(429);
 
-    // Health check is not behind the auth limiter — should still pass
+    // Health check is not behind the auth limiter - should still pass
     const health = await request(app).get("/health");
     expect(health.status).toBe(200);
   });

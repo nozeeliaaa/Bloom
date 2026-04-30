@@ -19,7 +19,13 @@
  */
 
 import { getIdToken } from "./auth.js";
+import { getMode } from "./mode.js";
 import { toDateKey }  from "./utils.js";
+
+// De-duplicate concurrent requests (dashboard + notifications + other consumers)
+// so they share one backend call per "today + last period + mode".
+const _inFlightCycleStateRequests = new Map();
+const _cacheHitLoggedKeys = new Set();
 
 // ── FutureCycles resolution ───────────────────────────────────────────────────
 // If the engine's current-cycle fertile window has already ended, look for the
@@ -134,64 +140,121 @@ function _trimLogsForBackend(logs) {
  *   fertileStart, fertileEnd, cyclesLogged, source ("backend"|"unavailable")
  */
 export async function fetchCycleState(logs) {
-  const token = await getIdToken();
-
-  // Cache key: auth type + last period day + today
+  // Cache key parts: auth type + last period day + today
   const periodDays = Object.keys(logs || {})
     .filter(k => logs[k]?.flow && logs[k].flow !== "none").sort();
   const lastPeriodDay = periodDays[periodDays.length - 1] || "none";
   const todayKey = toDateKey(new Date());
-  const cacheKey = `bloom_cs_v1_${token ? "acct" : "anon"}_${lastPeriodDay}_${todayKey}`;
+  const modeKeyForDedupe = getMode() === "account" ? "acct" : "anon";
+  const dedupeKey = `bloom_cs_req_v1_${modeKeyForDedupe}_${lastPeriodDay}_${todayKey}`;
+
+  const existingRequest = _inFlightCycleStateRequests.get(dedupeKey);
+  if (existingRequest) {
+    console.log("[cycle-state] reusing in-flight request");
+    return existingRequest;
+  }
+
+  const run = (async () => {
+
+  // Fast path: check session cache before waiting on auth token.
+  // This avoids startup lag when state is already cached.
+  const modeKey = getMode() === "account" ? "acct" : "anon";
+  const modeCacheKey = `bloom_cs_v1_${modeKey}_${lastPeriodDay}_${todayKey}`;
+  const fallbackCacheKey = `bloom_cs_v1_${modeKey === "acct" ? "anon" : "acct"}_${lastPeriodDay}_${todayKey}`;
 
   let staleState = null;
   try {
-    const hit = sessionStorage.getItem(cacheKey);
-    if (hit) {
+    const tryKeys = [modeCacheKey, fallbackCacheKey];
+    for (const key of tryKeys) {
+      const hit = sessionStorage.getItem(key);
+      if (!hit) continue;
       const { state, ts } = JSON.parse(hit);
-      if (Date.now() - ts < 6 * 60 * 60 * 1000) {
-        console.log("[cycle-state] cache hit");
+      if (Date.now() - ts < 6 * 60 * 60 * 1000 && state?.ready) {
+        if (!_cacheHitLoggedKeys.has(key)) {
+          _cacheHitLoggedKeys.add(key);
+          console.log("[cycle-state] cache hit");
+        }
         return _applyPrecedence(_resolveFutureCycles(state, todayKey), logs, todayKey);
       }
-      staleState = state; // expired by time but keep as fallback
+      // Keep only usable stale state for fallback.
+      if (state?.ready) staleState = state;
     }
   } catch (_) {}
 
+  const token = await getIdToken({ waitForAuthMs: 700 });
+  const cacheKey = `bloom_cs_v1_${token ? "acct" : "anon"}_${lastPeriodDay}_${todayKey}`;
+
   let result = null;
+  let backendDenied = null;
 
   if (!token) {
     console.log("[cycle-state] no auth token - skipping backend and using local fallback when possible");
   } else {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3200);
-      const res = await fetch("/api/cycles/state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ logs: _trimLogsForBackend(logs) }),
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeout));
-      if (res.ok) {
-        const json = await res.json();
-        if (json.state) {
-          const s = json.state;
-          console.log(
-            `[cycle-state] backend: phase=${s.phase} day=${s.dayInCycle}` +
-            ` conf=${s.confidence?.level} predictedLen=${s.predictedCycleLength}` +
-            ` cyclesLogged=${s.cyclesLogged}`
-          );
-          result = { ...s, source: "backend" };
+    const backendAttempts = [5000];
+    for (let i = 0; i < backendAttempts.length && !result && !backendDenied; i++) {
+      const timeoutMs = backendAttempts[i];
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        const res = await fetch("/api/cycles/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ logs: _trimLogsForBackend(logs) }),
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeout));
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.state) {
+            const s = json.state;
+            console.log(
+              `[cycle-state] backend: phase=${s.phase} day=${s.dayInCycle}` +
+              ` conf=${s.confidence?.level} predictedLen=${s.predictedCycleLength}` +
+              ` cyclesLogged=${s.cyclesLogged}`
+            );
+            result = { ...s, source: "backend" };
+          }
+        } else {
+          const body = await res.text().catch(() => "");
+          if (res.status === 401 || res.status === 403) {
+            backendDenied = { status: res.status, body };
+          } else {
+            console.warn(
+              `[cycle-state] backend error attempt ${i + 1}/${backendAttempts.length}`,
+              res.status,
+              body
+            );
+          }
         }
-      } else {
-        const body = await res.text().catch(() => "");
-        console.warn("[cycle-state] backend error", res.status, body);
+      } catch (e) {
+        const msg = e?.name === "AbortError"
+          ? `request timed out after ${timeoutMs}ms`
+          : e.message;
+        console.warn(
+          `[cycle-state] backend unreachable attempt ${i + 1}/${backendAttempts.length}:`,
+          msg
+        );
       }
-    } catch (e) {
-      console.warn("[cycle-state] backend unreachable:", e.message);
     }
   }
 
+  if (backendDenied) {
+    const status = backendDenied.status;
+    const body = backendDenied.body || "";
+    console.warn("[cycle-state] backend access denied", status, body);
+    return {
+      ready: false,
+      source: "backend-denied",
+      errorCode: status === 401 ? "AUTH_REQUIRED" : "CONSENT_OR_PERMISSION_REQUIRED",
+      message:
+        status === 401
+          ? "Sign in again to sync your cycle state from the backend."
+          : "This account does not currently have permission to load backend cycle state.",
+    };
+  }
+
   if (!result) {
-    if (staleState) {
+    if (staleState?.ready) {
       console.warn("[cycle-state] backend unavailable - serving stale cache as fallback");
       return _applyPrecedence(_resolveFutureCycles(staleState, todayKey), logs, todayKey);
     }
@@ -233,6 +296,18 @@ export async function fetchCycleState(logs) {
 
   result = _applyPrecedence(_resolveFutureCycles(result, todayKey), logs, todayKey);
 
-  try { sessionStorage.setItem(cacheKey, JSON.stringify({ state: result, ts: Date.now() })); } catch (_) {}
+  if (result?.ready) {
+    try { sessionStorage.setItem(cacheKey, JSON.stringify({ state: result, ts: Date.now() })); } catch (_) {}
+  }
   return result;
+  })();
+
+  _inFlightCycleStateRequests.set(dedupeKey, run);
+  try {
+    return await run;
+  } finally {
+    if (_inFlightCycleStateRequests.get(dedupeKey) === run) {
+      _inFlightCycleStateRequests.delete(dedupeKey);
+    }
+  }
 }

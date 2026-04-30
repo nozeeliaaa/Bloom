@@ -5,17 +5,17 @@ import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// GET /api/user/profile — return sanitised nickname for the authenticated user.
+// GET /api/user/profile - return sanitised nickname for the authenticated user.
 // Ownership is enforced: uid comes exclusively from the verified token set by
 // requireAuth. No request parameter can redirect this to another user's data.
 router.get("/", requireAuth, async (req, res) => {
-  // Explicit ownership guard — belt-and-suspenders after requireAuth.
+  // Explicit ownership guard - belt-and-suspenders after requireAuth.
   // Guards against middleware ordering changes or future refactors.
   const uid = req.user?.uid;
   if (!uid) return res.status(401).json({ nickname: null });
 
   try {
-    // Schema: users/{uid} stores a nested `profile` object — NOT a subcollection.
+    // Schema: users/{uid} stores a nested `profile` object - NOT a subcollection.
     // { profile: { nickname, role, goal, yearOfBirth, ... }, createdAt, updatedAt }
     const doc = await db.collection("users").doc(uid).get();
 
@@ -47,7 +47,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     return res.json({ nickname });
   } catch (err) {
-    // Log server-side for observability — never send error details to the client.
+    // Log server-side for observability - never send error details to the client.
     console.error(`[GET /api/user/profile] uid=${uid}`, err.message ?? err);
     return res.json({ nickname: null });
   }

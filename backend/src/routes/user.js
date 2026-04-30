@@ -1,4 +1,3 @@
-﻿// src/routes/user.js
 import express from "express";
 import admin from "firebase-admin";
 import { db, auth } from "../firebaseAdmin.js";
@@ -7,22 +6,6 @@ import { validateUserProfile } from "../validators/validateUser.js";
 import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
 const router = express.Router();
-
-// Sanitize a nickname string: strip HTML, control chars, truncate to 30 chars.
-// Returns a non-empty string or null.
-function sanitizeNickname(raw) {
-  if (typeof raw !== "string") return null;
-  let s = raw
-    .replace(/\0/g, "")
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-    .replace(/<script\b[^>]*>.*?<\/script>/gis, "")
-    .replace(/<style\b[^>]*>.*?<\/style>/gis, "")
-    .replace(/<[^>]*>/g, "")
-    .trim()
-    .slice(0, 30)
-    .trim();
-  return s.length > 0 ? s : null;
-}
 
 function computeAgeBand(yob) {
   const age = new Date().getFullYear() - yob;
@@ -41,15 +24,14 @@ router.post("/profile", requireAuth, async (req, res) => {
     const snap = await userRef.get();
     const existing = snap.exists ? snap.data() : null;
     const existingProfile = existing?.profile || {};
+    const existingBiometricProfile = existing?.biometricProfile || {};
 
-    // ---- Validate incoming body ----
     const validation = validateUserProfile(req.body, existingProfile);
     if (!validation.valid) {
       console.log(`[profile] validation failed:`, validation.error);
       return res.status(400).json({ error: validation.error });
     }
 
-    // ---- Build profile object ----
     const finalYearOfBirth =
       req.body.yearOfBirth === undefined
         ? existingProfile?.yearOfBirth ?? null
@@ -60,7 +42,7 @@ router.post("/profile", requireAuth, async (req, res) => {
     const profile = {
       nickname:
         req.body.nickname !== undefined
-          ? sanitizeNickname(req.body.nickname)
+          ? String(req.body.nickname).slice(0, 40)
           : (existingProfile?.nickname ?? null),
       avatar:
         req.body.avatar !== undefined
@@ -79,53 +61,60 @@ router.post("/profile", requireAuth, async (req, res) => {
       yearOfBirth: finalYearOfBirth,
       ageBand: finalYearOfBirth ? computeAgeBand(finalYearOfBirth) : null,
       consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
-      remindersEnabled: req.body.remindersEnabled ?? existingProfile?.remindersEnabled ?? false,
-      reminderTime: req.body.reminderTime ?? existingProfile?.reminderTime ?? "09:00",
     };
 
     const healthProfile = {
-      avgCycleLength: req.body.avgCycleLength !== undefined
-        ? (req.body.avgCycleLength === null ? null : Number(req.body.avgCycleLength))
-        : existing?.healthProfile?.avgCycleLength ?? null,
+      avgCycleLength:
+        req.body.avgCycleLength !== undefined
+          ? (req.body.avgCycleLength === null ? null : Number(req.body.avgCycleLength))
+          : existing?.healthProfile?.avgCycleLength ?? null,
 
-      periodDuration: req.body.periodDuration !== undefined
-        ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
-        : existing?.healthProfile?.periodDuration ?? null,
+      periodDuration:
+        req.body.periodDuration !== undefined
+          ? (req.body.periodDuration === null ? null : Number(req.body.periodDuration))
+          : existing?.healthProfile?.periodDuration ?? null,
 
-      sleepScore: req.body.sleepScore !== undefined
-        ? (req.body.sleepScore === null ? null : Number(req.body.sleepScore))
-        : existing?.healthProfile?.sleepScore ?? null,
+      weightKg:
+        req.body.weightKg !== undefined
+          ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
+          : existing?.healthProfile?.weightKg ?? null,
 
-      weightKg: req.body.weightKg !== undefined
-        ? (req.body.weightKg === null ? null : Number(req.body.weightKg))
-        : existing?.healthProfile?.weightKg ?? null,
-
-      heightCm: req.body.heightCm !== undefined
-        ? (req.body.heightCm === null ? null : Number(req.body.heightCm))
-        : existing?.healthProfile?.heightCm ?? null,
+      heightCm:
+        req.body.heightCm !== undefined
+          ? (req.body.heightCm === null ? null : Number(req.body.heightCm))
+          : existing?.healthProfile?.heightCm ?? null,
     };
 
-    await userRef.set(
-      {
-        profile,
-        healthProfile,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+    const biometricProfile = {
+      sleepScore: existingBiometricProfile.sleepScore ?? null,
+      stressLevel: existingBiometricProfile.stressLevel ?? null,
+      activityLevel: existingBiometricProfile.activityLevel ?? null,
+    };
 
-    // Track which fields changed
+    const existingPhaseProfile = existing?.phaseProfile || {};
+
+    const phaseProfile = {
+      lastPeriodStart: existingPhaseProfile.lastPeriodStart ?? null,
+      phaseEstimation: existingPhaseProfile.phaseEstimation ?? null,
+    };
+
+    await userRef.set({
+      profile,
+      healthProfile,
+      biometricProfile,
+      phaseProfile,   
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
     const changedFields = Object.keys(req.body).filter((k) => k !== "role");
 
-    // Special case: YOB being set for the first time is a locked action
     const yobJustSet =
       req.body.yearOfBirth !== undefined && !existingProfile?.yearOfBirth;
 
     if (yobJustSet) {
       const ageBand = computeAgeBand(Number(req.body.yearOfBirth));
 
-      // Set as Firebase custom claim so middleware can read req.user.ageBand
       const existingClaims = req.user || {};
       await auth.setCustomUserClaims(uid, {
         role: existingClaims.role || "user",
@@ -159,6 +148,8 @@ router.post("/profile", requireAuth, async (req, res) => {
       ok: true,
       profile: savedData?.profile ?? null,
       healthProfile: savedData?.healthProfile ?? null,
+      biometricProfile: savedData?.biometricProfile ?? null,
+      phaseProfile: savedData?.phaseProfile ?? null,
     });
   } catch (err) {
     console.error("POST /profile error:", err);
@@ -166,7 +157,7 @@ router.post("/profile", requireAuth, async (req, res) => {
   }
 });
 
-// Game progress
+// ─── Game progress ────────────────────────────────────────────────────────────
 
 function computeLevel(xp) {
   if (xp >= 2250) return 10;
@@ -198,17 +189,24 @@ router.post("/game", requireAuth, async (req, res) => {
     if (typeof xpEarned !== "number" || xpEarned < 0 || xpEarned > 300) {
       return res.status(400).json({ error: "Invalid xpEarned value" });
     }
+
     const userRef = db.collection("users").doc(req.user.uid);
     const snap = await userRef.get();
     const existing = snap.data()?.game || { xp: 0, level: 1, sessionsPlayed: 0 };
+
     const newXP = (existing.xp || 0) + xpEarned;
     const newLevel = computeLevel(newXP);
     const newSessions = (existing.sessionsPlayed || 0) + 1;
+
     await userRef.set(
       { game: { xp: newXP, level: newLevel, sessionsPlayed: newSessions } },
       { merge: true }
     );
-    return res.json({ ok: true, game: { xp: newXP, level: newLevel, sessionsPlayed: newSessions } });
+
+    return res.json({
+      ok: true,
+      game: { xp: newXP, level: newLevel, sessionsPlayed: newSessions },
+    });
   } catch (err) {
     console.error("POST /game error:", err);
     return res.status(500).json({ error: "Failed to save game progress" });
@@ -221,11 +219,13 @@ router.get("/profile", requireAuth, async (req, res) => {
     const uid = req.user.uid;
     const doc = await db.collection("users").doc(uid).get();
     if (!doc.exists) return res.json(null);
+
     const data = doc.data();
-    // Normalize legacy goal value before returning
+
     if (data?.profile?.goal === "track_cycle") {
       data.profile.goal = "period";
     }
+
     return res.json(data);
   } catch (err) {
     console.error("GET /profile error:", err);

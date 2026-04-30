@@ -3,6 +3,8 @@
  */
 import { isAccountMode, isAnonMode } from "./mode.js";
 import { getUser } from "./auth.js";
+import { startSessionTimeoutGuard } from "./session-timeout.js";
+import symptoms from '../data/symptoms.json';
 import { initTheme } from "./theme-manager.js";
 
 // Single source of truth for this key
@@ -34,6 +36,8 @@ export function icon(name, size = 18) {
 
 /* ===== NAVIGATION ===== */
 export function renderNav(activePage = "") {
+  startSessionTimeoutGuard();
+
   const nav = document.createElement("nav");
   nav.className = "navbar";
   nav.setAttribute("role", "navigation");
@@ -322,30 +326,21 @@ export function getFirstDayOfWeek(year, month) {
 }
 
 /* ===== SYMPTOM LIST ===== */
-export const SYMPTOM_CATEGORIES = {
-  "Bleeding":       ["Vaginal bleeding", "Spotting", "Heavy flow", "Large clots"],
-  "Pain":           ["Cramps", "Pelvic pain", "Ovulation pain", "Headache", "Joint or muscle pain", "Breast tenderness"],
-  "Digestive":      ["Bloating", "Gassy", "Heartburn", "Nausea", "Constipation", "Diarrhea"],
-  "Discharge":      ["No discharge", "Sticky discharge", "Creamy discharge", "Egg-white discharge", "Unusual discharge"],
-  "Energy & Sleep": ["Fatigue", "Insomnia", "Brain fog", "Forgetfulness", "Poor concentration"],
-  "Mood":           ["Mood swings", "Irritability", "Anxiety", "Low mood", "Crying spells", "Calm", "Stressed"],
-  "Skin & Hair":    ["Acne", "Dry skin", "Hair thinning"],
-  "Temperature":    ["Hot flashes", "Night sweats", "Cold flashes", "Basal temp shift"],
-  "Cravings":       ["Sweet cravings", "Salty cravings", "Greasy food cravings", "Spicy food cravings", "Increased appetite", "Decreased appetite"],
-  "Physical":       ["Fluid retention", "Frequent urination", "Smell sensitivity", "Nasal congestion", "Weight change"],
-  "Social":         ["Sociable", "Withdrawn"],
-  "Cycle":          ["Missed period", "Irregular period"],
-  "Fertility":      ["Increased libido", "Decreased libido", "Cervical mucus change", "Vaginal dryness", "Pain during sex"],
-};
+export const SYMPTOM_CATEGORIES = symptoms.reduce((acc, symptom) => {
+  const { category, label } = symptom;
+  if (!acc[category]) acc[category] = [];
+  acc[category].push(label);
+  return acc;
+}, {});
 
-/** Emoji icon for each symptom label — no external dependency */
+/** Emoji icon for each symptom label - no external dependency */
 export const SYMPTOM_ICONS = {
   // Bleeding
   "Vaginal bleeding":           "🩸",
   "Spotting":                   "🩷",
   "Heavy flow":                 "🔴",
   "Large clots":                "🩸",
-  // Blood Colour — coloured circles to match the actual shade
+  // Blood Colour - coloured circles to match the actual shade
   "Bright red blood":           "🔴",
   "Dark red blood":             "🟥",
   "Light red blood":            "🩷",

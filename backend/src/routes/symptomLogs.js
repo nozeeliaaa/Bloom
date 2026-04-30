@@ -2,21 +2,13 @@
 import express from "express";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
+import { validateSymptomItem } from "../validators/validateSymptomLog.js";
 
 const router = express.Router();
 
 // --- helpers ---
 function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
-}
-
-function isValidSeverity(n) {
-  return Number.isInteger(n) && n >= 0 && n <= 5;
-}
-
-function sanitizeText(s, max = 300) {
-  if (typeof s !== "string") return "";
-  return s.trim().slice(0, max);
 }
 
 async function ensureSymptomLogsParent(uid) {
@@ -27,6 +19,20 @@ async function ensureSymptomLogsParent(uid) {
   } else {
     await parentRef.set({ updatedAt: new Date() }, { merge: true });
   }
+}
+
+async function hasSensitiveConsent(uid) {
+  const snap = await db
+    .collection("consents")
+    .where("teenUid", "==", uid)
+    .where("status", "==", "approved")
+    .limit(1)
+    .get();
+
+  if (snap.empty) return false;
+
+  const consent = snap.docs[0].data();
+  return !!consent.scope?.sensitiveModules;
 }
 
 // Collection path: symptomLogs/{uid}/entries/{dateKey}
@@ -54,43 +60,29 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
 
     const cleaned = [];
 
+    const teenHasSensitiveConsent =
+        req.user.ageBand === "10-17"
+          ? await hasSensitiveConsent(uid)
+          : true;
+
+
     for (let idx = 0; idx < items.length; idx++) {
-      const it = items[idx];
+      const result = await validateSymptomItem(items[idx], idx);
 
-      if (!it.code || typeof it.code !== "string") {
-        return res.status(400).json({ error: `items[${idx}].code is required` });
+      if (!result.valid) {
+        return res.status(400).json({ error: result.error });
       }
+      
+      const { normalized, catalogData } = result;
 
-      const code = it.code.trim().toUpperCase();
-
-      const catalogDoc = await db.collection("symptomCatalog").doc(code).get();
-      if (!catalogDoc.exists) {
-        return res.status(400).json({
-          error: `items[${idx}].code "${code}" is not a valid symptom key`,
-        });
-      }
-
-      const catalogData = catalogDoc.data();
-
-      // Block only sensitive symptoms for teens without consent
-      if (catalogData.sensitive && req.user.ageBand === "10-17") {
+      if (catalogData.sensitive && !teenHasSensitiveConsent) {
         return res.status(403).json({
-          error: `Symptom "${code}" requires guardian consent`,
+          error: `Symptom "${normalized.code}" requires guardian consent`,
+          code: "CONSENT_REQUIRED",
         });
       }
 
-      const severity = Number(it.severity);
-      if (!isValidSeverity(severity)) {
-        return res.status(400).json({
-          error: `items[${idx}].severity must be an integer between 0 and 5`,
-        });
-      }
-
-      cleaned.push({
-        code,
-        severity,
-        note: sanitizeText(it.note, 200),
-      });
+      cleaned.push(normalized);
     }
 
     const docRef = db

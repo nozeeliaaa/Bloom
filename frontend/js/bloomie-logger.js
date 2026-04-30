@@ -3,26 +3,26 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Fire-and-forget safety + analytics event loggers.
  *
- * logSafetyEvent   — writes to POST /api/bloomie-safety-log (auth required)
+ * logSafetyEvent   - writes to POST /api/bloomie-safety-log (auth required)
  *   Three safety event types:
- *     urgent_trigger  — inferRoute / keyword router resolved to HEAVY_URGENT
- *     oos_fallback    — user input fell to OOS handler (no health route matched)
- *     escalation      — HEAVY_URGENT node actually rendered ("seek care" shown)
+ *     urgent_trigger  - inferRoute / keyword router resolved to HEAVY_URGENT
+ *     oos_fallback    - user input fell to OOS handler (no health route matched)
+ *     escalation      - HEAVY_URGENT node actually rendered ("seek care" shown)
  *
- * logAnalyticsEvent — writes to POST /api/bloomie/analytics (auth optional)
+ * logAnalyticsEvent - writes to POST /api/bloomie/analytics (auth optional)
  *   Ten analytics event types:
- *     route_matched        — HIGH confidence route selected
- *     route_clarification  — MEDIUM confidence, soft confirmation shown
- *     route_fallback       — CONFIDENCE_FALLBACK triggered (repeat low-conf)
- *     route_no_match       — LOW confidence, NARROWING shown
- *     urgency_escalation   — any _URGENT node reached
- *     oos_event            — OOS handler fired
- *     oos_repair           — NARROWING triggered by OOS streak
- *     emotion_classified   — tone resolved for a message
- *     session_end          — beforeunload fired
- *     memory_recall_used   — backgroundContext or entityHistory seeded from storage
+ *     route_matched        - HIGH confidence route selected
+ *     route_clarification  - MEDIUM confidence, soft confirmation shown
+ *     route_fallback       - CONFIDENCE_FALLBACK triggered (repeat low-conf)
+ *     route_no_match       - LOW confidence, NARROWING shown
+ *     urgency_escalation   - any _URGENT node reached
+ *     oos_event            - OOS handler fired
+ *     oos_repair           - NARROWING triggered by OOS streak
+ *     emotion_classified   - tone resolved for a message
+ *     session_end          - beforeunload fired
+ *     memory_recall_used   - backgroundContext or entityHistory seeded from storage
  *
- * Neither function ever throws — logging must never interrupt the chat flow.
+ * Neither function ever throws - logging must never interrupt the chat flow.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -42,24 +42,24 @@ const ANALYTICS_TIMEOUT_MS   = 2000;
 // Wraps fetch() with a hard deadline that *actually cancels* the in-flight
 // request when the deadline fires.  The old Promise.race() approach let the
 // underlying connection continue to consume resources and hold a TCP slot open
-// even after the caller had already moved on — only the JS-side Promise was
+// even after the caller had already moved on - only the JS-side Promise was
 // settled, not the network request.
 //
 // How it works:
 //   1. An AbortController is created and its signal is passed to fetch().
 //   2. A setTimeout schedules controller.abort() at the deadline.
-//   3. .finally() always clears the timer — whether the fetch resolved,
-//      rejected, or was aborted — so no dangling timers outlive fast responses.
+//   3. .finally() always clears the timer - whether the fetch resolved,
+//      rejected, or was aborted - so no dangling timers outlive fast responses.
 //   4. If abort fires first, fetch() rejects with a DOMException whose
 //      .name === "AbortError".  All callers wrap calls in .catch(() => {})
-//      so this is silently swallowed — it never surfaces to the user.
+//      so this is silently swallowed - it never surfaces to the user.
 //
 // Failure taxonomy after this change:
 //   - Timeout:         AbortController fires → fetch rejects AbortError → caught
 //   - Network failure: fetch rejects TypeError → caught
 //   - HTTP non-2xx:    fetch resolves (response.ok === false) → handled per call
 //   - AbortController unavailable (ancient runtime): graceful degradation to
-//     plain fetch with no timeout — acceptable for best-effort logging.
+//     plain fetch with no timeout - acceptable for best-effort logging.
 //
 function fetchWithTimeout(url, options, timeoutMs) {
   let controller, timerId;
@@ -67,7 +67,7 @@ function fetchWithTimeout(url, options, timeoutMs) {
     controller = new AbortController();
     timerId = setTimeout(() => controller.abort(), timeoutMs);
   } catch {
-    // AbortController not available — fall back to plain fetch with no timeout.
+    // AbortController not available - fall back to plain fetch with no timeout.
     return fetch(url, options);
   }
   return fetch(url, { ...options, signal: controller.signal })
@@ -75,7 +75,7 @@ function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 export function logSafetyEvent(type, payload = {}) {
-  // Skip logging for anonymous users — no account, no record
+  // Skip logging for anonymous users - no account, no record
   if (!isAccountMode()) return;
 
   // Kick off async without awaiting or propagating errors
@@ -137,7 +137,7 @@ export function anonymise(text) {
 
 /**
  * Snapshot of conversation state attached to every analytics event.
- * ctx may be null (e.g. session_end fired after ctx teardown) — all fields
+ * ctx may be null (e.g. session_end fired after ctx teardown) - all fields
  * default gracefully.
  */
 export function buildSessionMeta(ctx) {
@@ -172,7 +172,7 @@ function sanitizeAnalytics(payload) {
 
 /**
  * Fire-and-forget analytics logger.
- * Auth is optional — anonymous users are tracked without a uid.
+ * Auth is optional - anonymous users are tracked without a uid.
  * Cancels the request via AbortController after ANALYTICS_TIMEOUT_MS (2000 ms)
  * so a slow network never holds open a connection beyond that window.
  */
@@ -182,7 +182,7 @@ export function logAnalyticsEvent(eventType, payload = {}, ctx = null) {
 
 // ─── Debug console logger ─────────────────────────────────────────────────────
 //
-// Gated on a localStorage flag — zero output in production by default.
+// Gated on a localStorage flag - zero output in production by default.
 // Enable from the browser DevTools console:
 //   localStorage.setItem("BLOOMIE_DEBUG", "true")   then refresh
 //   localStorage.removeItem("BLOOMIE_DEBUG")          to disable
@@ -192,23 +192,23 @@ export function logAnalyticsEvent(eventType, payload = {}, ctx = null) {
 // filterable by "[Bloomie:" in the DevTools console search box.
 //
 // Categories and what they record:
-//   "route"            — route chosen, source (inferRoute / keyword_router / intent_ai), reason
-//   "confidence"       — tier (high/medium/low), primary intent, signal score
-//   "ai"               — intent AI source, route chosen, whether it changed routing
-//   "fallback"         — OOS or START_MENU fallback and why rules gave up
-//   "unhandled_health" — health-related message that fell to generic OOS reply
+//   "route"            - route chosen, source (inferRoute / keyword_router / intent_ai), reason
+//   "confidence"       - tier (high/medium/low), primary intent, signal score
+//   "ai"               - intent AI source, route chosen, whether it changed routing
+//   "fallback"         - OOS or START_MENU fallback and why rules gave up
+//   "unhandled_health" - health-related message that fell to generic OOS reply
 
 const _DEBUG =
   typeof window !== "undefined" &&
   isBloomieDebugEnabled();
 
 const _CAT_STYLES = {
-  route:            "color:#6366f1;font-weight:bold",  // indigo  — routing decision
-  confidence:       "color:#0ea5e9;font-weight:bold",  // sky     — confidence tier
-  ai:               "color:#8b5cf6;font-weight:bold",  // violet  — AI layer result
-  fallback:         "color:#f59e0b;font-weight:bold",  // amber   — rule fallback / OOS
-  unhandled_health: "color:#ef4444;font-weight:bold",  // red     — health msg dropped
-  diagnostic:       "color:#db2777;font-weight:bold",  // pink    — internal diagnostics
+  route:            "color:#6366f1;font-weight:bold",  // indigo  - routing decision
+  confidence:       "color:#0ea5e9;font-weight:bold",  // sky     - confidence tier
+  ai:               "color:#8b5cf6;font-weight:bold",  // violet  - AI layer result
+  fallback:         "color:#f59e0b;font-weight:bold",  // amber   - rule fallback / OOS
+  unhandled_health: "color:#ef4444;font-weight:bold",  // red     - health msg dropped
+  diagnostic:       "color:#db2777;font-weight:bold",  // pink    - internal diagnostics
 };
 
 /**
@@ -236,36 +236,36 @@ export function bloomieDebug(category, fields = {}) {
 // ─── Internal diagnostic logger ───────────────────────────────────────────────
 //
 // Structured events for silent fallback points inside Bloomie.
-// Never surfaces details to the user — purely internal observability.
+// Never surfaces details to the user - purely internal observability.
 //
 // Console output is gated on the same BLOOMIE_DEBUG localStorage flag as
 // bloomieDebug().  Backend storage fires for every call so failures are
 // visible post-session even without the flag.
 //
 // Event schema (all fields optional except `event`):
-//   event          — one of the DIAGNOSTIC_EVENT_TYPES below
-//   ts             — Unix ms (auto-set)
-//   module         — source file (e.g. "bloomie-tone", "bloomie-intent", "db")
-//   stage          — function or step within the module
-//   confidence     — rule confidence tier if relevant
-//   fallbackTarget — what Bloomie fell back to (e.g. "rule_tone", "rule_routing")
-//   reason         — non-sensitive error description (≤120 chars, never raw user text)
+//   event          - one of the DIAGNOSTIC_EVENT_TYPES below
+//   ts             - Unix ms (auto-set)
+//   module         - source file (e.g. "bloomie-tone", "bloomie-intent", "db")
+//   stage          - function or step within the module
+//   confidence     - rule confidence tier if relevant
+//   fallbackTarget - what Bloomie fell back to (e.g. "rule_tone", "rule_routing")
+//   reason         - non-sensitive error description (≤120 chars, never raw user text)
 //
 // Diagnostic event catalogue:
-//   ai_timeout           — AI call exceeded the hard timeout
-//   ai_parse_error       — AI returned unparseable / malformed JSON
-//   ai_unavailable       — Backend AI endpoint returned non-2xx or is unconfigured
-//   ai_invalid_response  — AI returned valid JSON but invalid field values
-//   ai_override          — AI disagreed with rule result (AI took precedence)
-//   fallback_to_rules    — AI failed/null; rule-based path used instead
-//   vague_input_no_ai_assist — Low-confidence but no health keywords; AI skipped
-//   routing_low_confidence   — Rule layer returned low-confidence tier
-//   cache_read_failed    — localStorage or Firestore read silently failed
-//   cache_write_failed   — localStorage or Firestore write silently failed
-//   backend_unavailable  — A backend endpoint returned non-2xx unexpectedly
-//   memory_load_failed   — Bloomie memory could not be loaded for the session
-//   profile_sync_failed  — User profile could not be loaded or saved
-//   settings_sync_failed — User settings could not be synced
+//   ai_timeout           - AI call exceeded the hard timeout
+//   ai_parse_error       - AI returned unparseable / malformed JSON
+//   ai_unavailable       - Backend AI endpoint returned non-2xx or is unconfigured
+//   ai_invalid_response  - AI returned valid JSON but invalid field values
+//   ai_override          - AI disagreed with rule result (AI took precedence)
+//   fallback_to_rules    - AI failed/null; rule-based path used instead
+//   vague_input_no_ai_assist - Low-confidence but no health keywords; AI skipped
+//   routing_low_confidence   - Rule layer returned low-confidence tier
+//   cache_read_failed    - localStorage or Firestore read silently failed
+//   cache_write_failed   - localStorage or Firestore write silently failed
+//   backend_unavailable  - A backend endpoint returned non-2xx unexpectedly
+//   memory_load_failed   - Bloomie memory could not be loaded for the session
+//   profile_sync_failed  - User profile could not be loaded or saved
+//   settings_sync_failed - User settings could not be synced
 
 /**
  * bloomieDiagnostic(event, fields, ctx?)
@@ -284,7 +284,7 @@ export function bloomieDiagnostic(event, fields = {}, ctx = null) {
   // Structured console output (debug-gated)
   bloomieDebug("diagnostic", { event, ...fields });
 
-  // Fire to analytics backend — fire-and-forget, never blocks
+  // Fire to analytics backend - fire-and-forget, never blocks
   logAnalyticsEvent(event, {
     source: typeof fields.module        === "string" ? fields.module.slice(0, 40)        : undefined,
     type:   typeof fields.stage         === "string" ? fields.stage.slice(0, 40)         : undefined,

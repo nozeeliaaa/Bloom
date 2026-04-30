@@ -1,6 +1,6 @@
 /**
  * bloomie-nodes-perimenopause.js
- * Perimenopause pathway and related education nodes — lazy-loaded chunk.
+ * Perimenopause pathway and related education nodes - lazy-loaded chunk.
  * Covers: PERIMENOPAUSE_INTRO, PERI_VASOMOTOR_ROUTE, PERI_CYCLE_ROUTE,
  * PERI_ABSENCE_CHECK, PERI_MOOD_ROUTE, PERI_COGNITIVE_NOTE, PERI_SLEEP_ROUTE,
  * PERI_VAGINAL_ROUTE, PERI_MIXED_ROUTE, PERI_UNSURE_ROUTE, PERI_MONITOR_WRAP,
@@ -33,31 +33,31 @@ export function createPerimenopauseNodes(env, helpers) {
     const sig = recentPeriSignals();
     if (entry === "cycle") {
       if (sig.hasHeavy && sig.hasPelvic) {
-        return "That helps narrow things down — when cycle changes come with heavy flow and pelvic pain together, the pattern is more meaningful than any one symptom alone 🩷";
+        return "That helps narrow things down - when cycle changes come with heavy flow and pelvic pain together, the pattern is more meaningful than any one symptom alone 🩷";
       }
       if (sig.hasHeavy) {
-        return "That gives me more context — you've also mentioned heavier bleeding, which can be useful when cycle changes are part of the picture 🩷";
+        return "That gives me more context - you've also mentioned heavier bleeding, which can be useful when cycle changes are part of the picture 🩷";
       }
       if (sig.hasLate || sig.hasSpotting) {
-        return "That gives me more context — timing shifts plus late/spotting patterns often tell a clearer story over time 🩷";
+        return "That gives me more context - timing shifts plus late/spotting patterns often tell a clearer story over time 🩷";
       }
       return null;
     }
     if (entry === "mood") {
       if (sig.hasSleep && sig.hasMood) {
-        return "That helps narrow things down — mood and sleep changes clustering together is common in hormone transitions 🩷";
+        return "That helps narrow things down - mood and sleep changes clustering together is common in hormone transitions 🩷";
       }
       if (sig.hasHeavy || sig.hasLate) {
-        return "That gives me more context — mood changes alongside cycle shifts can happen when hormones are fluctuating 🩷";
+        return "That gives me more context - mood changes alongside cycle shifts can happen when hormones are fluctuating 🩷";
       }
       return null;
     }
     if (entry === "vaso") {
       if (sig.hasSleep) {
-        return "That gives me more context — hot flashes/night sweats plus sleep disruption often reinforce each other 🩷";
+        return "That gives me more context - hot flashes/night sweats plus sleep disruption often reinforce each other 🩷";
       }
       if (sig.hasLate || sig.hasHeavy) {
-        return "That helps narrow things down — vasomotor symptoms alongside cycle changes can point toward a broader hormonal transition pattern 🩷";
+        return "That helps narrow things down - vasomotor symptoms alongside cycle changes can point toward a broader hormonal transition pattern 🩷";
       }
       return null;
     }
@@ -145,7 +145,7 @@ export function createPerimenopauseNodes(env, helpers) {
           "Mood changes, brain fog, and emotional intensity during perimenopause are real, not imagined, not dramatic 🩷",
           ...(contextLine ? [contextLine] : []),
           "Estrogen affects serotonin and other brain chemicals, so as levels fluctuate, mood stability can too.",
-          "That gives me more context — when symptoms cluster over time (for example mood + sleep + cycle shifts), the pattern is often more informative than one symptom on its own.",
+          "That gives me more context - when symptoms cluster over time (for example mood + sleep + cycle shifts), the pattern is often more informative than one symptom on its own.",
           "Is it more like anxiety and irritability, or more like low mood and exhaustion?",
         ];
       },
@@ -282,7 +282,7 @@ export function createPerimenopauseNodes(env, helpers) {
           "Each category has real trade-offs, side effects, how easy they are to use, how quickly fertility returns and a provider or pharmacist can walk you through what fits your situation, your body, and your life.",
           "If you don't have a regular provider, a sexual health clinic or a pharmacist are both great first steps 🩷",
         ];
-        if (ctx.isMinor) lines.unshift("Asking about this is a smart, healthy thing to do — you should feel good about looking into it 🩷");
+        if (ctx.isMinor) lines.unshift("Asking about this is a smart, healthy thing to do - you should feel good about looking into it 🩷");
         return lines;
       },
       choices: [

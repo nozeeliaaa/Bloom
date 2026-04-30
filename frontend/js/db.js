@@ -32,6 +32,7 @@ const ASSIST_KEY = "bloom_assistant_session";
 
 // Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → localhost:4000)
 const API_BASE = window.BLOOM_API_BASE || "";
+const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
 
 // --------------------
 // localStorage helpers
@@ -133,6 +134,28 @@ function fallbackLabelFromSymptomCode(code) {
     .join(" ");
 }
 
+function normalizeSleepScore(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10) return null;
+  return parsed;
+}
+
+function normalizeBiometricLevel(value) {
+  if (value === undefined || value === null || value === "") return null;
+
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return BIOMETRIC_LEVELS[value - 1] ?? null;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+  return BIOMETRIC_LEVELS.includes(normalized) ? normalized : null;
+}
+
 function indexSymptomCatalog(symptoms = []) {
   _symptomCatalogByCode = new Map();
   _symptomCatalogByLabel = new Map();
@@ -228,6 +251,9 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
       ...(merged[dateKey] || {}),
       date: dateKey,
       flow: flowStr,
+      sleepScore: normalizeSleepScore(entry.sleepScore),
+      stressLevel: normalizeBiometricLevel(entry.stressLevel),
+      activityLevel: normalizeBiometricLevel(entry.activityLevel),
       notes: entry.notes || "",
     };
   }
@@ -331,6 +357,9 @@ export async function saveDailyLog(dateKey, log) {
       headers,
       body: JSON.stringify({
         flowLevel: flowNum,
+        sleepScore: normalizeSleepScore(localEntry.sleepScore),
+        stressLevel: normalizeBiometricLevel(localEntry.stressLevel),
+        activityLevel: normalizeBiometricLevel(localEntry.activityLevel),
         notes: localEntry.notes || "",
       }),
     });

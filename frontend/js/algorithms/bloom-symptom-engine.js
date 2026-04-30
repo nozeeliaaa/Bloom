@@ -31,7 +31,7 @@ export const SYMPTOM_CATEGORIES = {
 export const ALL_SYMPTOM_CODES = Object.values(SYMPTOM_CATEGORIES).flat();
 
 /* ------------------------------------------------------------------ */
-/* Phase Map — single source of truth for phase-context logic        */
+/* Phase Map - single source of truth for phase-context logic        */
 /* ------------------------------------------------------------------ */
 
 export const SYMPTOM_PHASE_MAP = {
@@ -85,7 +85,7 @@ export const SYMPTOM_PHASE_MAP = {
   },
 };
 
-// ── Phase map validation — runs at module load time ──────────────────────────
+// ── Phase map validation - runs at module load time ──────────────────────────
 // Throws immediately if any code in SYMPTOM_PHASE_MAP is not in ALL_SYMPTOM_CODES.
 // This catches typos that would silently break phase logic.
 for (const [_phase, { expected: _exp = [], unexpected: _unexp = [] }] of Object.entries(SYMPTOM_PHASE_MAP)) {
@@ -102,23 +102,23 @@ const PMS_CLUSTER = [
   "CRAVING_SWEET", "CRAVING_SALTY", "HEADACHE", "INSOMNIA",
 ];
 
-/** Menstrual cluster — VAGINAL_BLEEDING required, then ≥2 of these */
+/** Menstrual cluster - VAGINAL_BLEEDING required, then ≥2 of these */
 const MENSTRUAL_CLUSTER_SUPPORT = [
   "CRAMPS", "FATIGUE", "BLOATING", "MOOD_SWINGS", "HEADACHE", "NAUSEA",
 ];
 
-/** Ovulation cluster — DISCHARGE_EGGWHITE required, then ≥1 of these */
+/** Ovulation cluster - DISCHARGE_EGGWHITE required, then ≥1 of these */
 const OVULATION_CLUSTER_SUPPORT = [
   "OVULATION_PAIN", "BBT_SHIFT", "INCREASED_LIBIDO", "SPOTTING",
 ];
 
-/** Perimenopause cluster — requires ≥3 of these */
+/** Perimenopause cluster - requires ≥3 of these */
 const PERIMENOPAUSE_CLUSTER = [
   "HOT_FLASHES", "NIGHT_SWEATS", "INSOMNIA", "MOOD_SWINGS",
   "IRREGULAR_PERIOD", "VAGINAL_DRYNESS", "BRAIN_FOG", "DECREASED_LIBIDO",
 ];
 
-/** Hormonal pattern (PCOS-adjacent) — requires ≥2 of set A + ≥1 of set B */
+/** Hormonal pattern (PCOS-adjacent) - requires ≥2 of set A + ≥1 of set B */
 const HORMONAL_CLUSTER_A = ["ACNE", "HAIR_THINNING", "WEIGHT_CHANGE", "IRREGULAR_PERIOD"];
 const HORMONAL_CLUSTER_B = ["FATIGUE", "MOOD_SWINGS", "BLOATING"];
 
@@ -135,7 +135,7 @@ const PHASE_UNEXPECTED_MIN = 2; // minimum unexpected symptoms for unexpected si
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/* ── Symptom Forecast — configurable thresholds ─────────────────────────── */
+/* ── Symptom Forecast - configurable thresholds ─────────────────────────── */
 /** Minimum completed cycles before any forecast is shown. */
 const FORECAST_MIN_CYCLES_REQUIRED   = 2;
 /** A symptom must appear in at least this many distinct past cycles to qualify. */
@@ -399,7 +399,7 @@ function isSymptomPersistentAtSeverity(symptomHistory, code, minSeverity, days, 
 }
 
 /**
- * Check if a symptom code is new — not seen in any historical entry
+ * Check if a symptom code is new - not seen in any historical entry
  * (looked-back across all available history, approximately `lookbackCycles` cycles).
  * Returns true if the code has never been logged in history.
  * @param {Array} symptomHistory
@@ -508,7 +508,7 @@ function phaseFromDayOfCycle(dayOfCycle, cycleLength = 28) {
  *
  * Returns an array of { start: Date, length: number } newest-first.
  * Index 0 is always the current (possibly incomplete) cycle.
- * Indices 1+ are completed past cycles — these are the ones used as
+ * Indices 1+ are completed past cycles - these are the ones used as
  * forecast evidence.
  *
  * This is intentionally approximate: ±1 day boundary errors do not
@@ -548,7 +548,7 @@ function reconstructCycleStarts(lastPeriodStart, cycleLengths, maxCycles = FOREC
  * Only entries that fall within a reconstructed cycle window are included.
  *
  * @param {Array}  symptomHistory
- * @param {Array<{ start: Date, length: number }>} cycleStarts  — newest-first
+ * @param {Array<{ start: Date, length: number }>} cycleStarts  - newest-first
  * @returns {Map<string, Array>}
  */
 export function groupSymptomsByCycleWindow(symptomHistory, cycleStarts) {
@@ -727,7 +727,7 @@ export function formatSymptomForecastList(labels) {
  * @param {string[]}    labels
  * @param {string|null} phase
  * @param {number|null} dayOfCycle
- * @param {string}      basis  — "phase" | "day_window" | "combined"
+ * @param {string}      basis  - "phase" | "day_window" | "combined"
  * @returns {string}
  */
 export function buildForecastMessage(labels, phase, dayOfCycle, basis) {
@@ -760,9 +760,9 @@ export function buildForecastMessage(labels, phase, dayOfCycle, basis) {
  * Detect whether logged symptoms are typical or atypical for the current phase.
  *
  * Signals:
- *   SYMPTOMS_MATCH_PHASE           — ≥3 logged symptoms are in the expected list
- *   SYMPTOMS_UNEXPECTED_FOR_PHASE  — ≥2 logged symptoms are in the unexpected list
- *   PHASE_UNKNOWN_LIMITED_CONTEXT  — phase is null, context is limited
+ *   SYMPTOMS_MATCH_PHASE           - ≥3 logged symptoms are in the expected list
+ *   SYMPTOMS_UNEXPECTED_FOR_PHASE  - ≥2 logged symptoms are in the unexpected list
+ *   PHASE_UNKNOWN_LIMITED_CONTEXT  - phase is null, context is limited
  *
  * @param {Object} params
  * @param {Array<{code: string}>} params.loggedSymptoms
@@ -809,7 +809,7 @@ export function detectPhaseContextSignal({
     const isLowConfidence = phaseConfidence === "low" || phaseConfidence == null;
     const level = (phaseConfidence == null) ? "low" : "medium";
     const message = isLowConfidence
-      ? `If you are in your ${phase} phase, some of these symptoms are less typical — though cycle timing can vary.`
+      ? `If you are in your ${phase} phase, some of these symptoms are less typical - though cycle timing can vary.`
       : `Bloom noticed some symptoms that are less typical for the ${phase} phase. This could reflect cycle variability, or it may be worth keeping an eye on.`;
     return makeSignal({
       code: "SYMPTOMS_UNEXPECTED_FOR_PHASE",
@@ -875,7 +875,7 @@ export function detectSymptomPatternSignal({
     });
   }
 
-  // ── Hormonal pattern (PCOS-adjacent — never name the condition) ───────────
+  // ── Hormonal pattern (PCOS-adjacent - never name the condition) ───────────
   const hormonalA = HORMONAL_CLUSTER_A.filter(c => codes.has(c));
   const hormonalB = HORMONAL_CLUSTER_B.filter(c => codes.has(c));
   if (hormonalA.length >= 2 && hormonalB.length >= 1) {
@@ -885,7 +885,7 @@ export function detectSymptomPatternSignal({
       show: true,
       title: "Hormonal pattern worth discussing",
       message: "Bloom noticed a combination of symptoms that can sometimes be associated with hormonal patterns worth discussing with a provider.",
-      guidance: "This pattern is worth mentioning at your next appointment — logging regularly gives your provider more to work with.",
+      guidance: "This pattern is worth mentioning at your next appointment - logging regularly gives your provider more to work with.",
       debug: { matchedA: hormonalA, matchedB: hormonalB },
     });
   }
@@ -915,7 +915,7 @@ export function detectSymptomPatternSignal({
         show: true,
         title: "Period symptoms detected",
         message: "Bloom noticed a pattern that aligns with period symptoms. These are common experiences during menstruation.",
-        guidance: "Make sure to log your period start date if you haven't — it helps Bloom keep predictions accurate.",
+        guidance: "Make sure to log your period start date if you haven't - it helps Bloom keep predictions accurate.",
         debug: { matched: menstrualSupport },
       });
     }
@@ -1052,7 +1052,7 @@ export function detectBaselineDeviationSignal({
       message: newSymptoms.length === 1
         ? `Bloom noticed a symptom you haven't logged before in this context. It may be a one-off, but it's good to keep an eye on it.`
         : `Bloom noticed ${newSymptoms.length} symptoms you haven't logged before together. Keep tracking to see if they form a pattern.`,
-      guidance: "Log it again if it comes back — a pattern over a few cycles gives Bloom more to work with.",
+      guidance: "Log it again if it comes back - a pattern over a few cycles gives Bloom more to work with.",
       debug: { newSymptoms, phase },
     });
   }
@@ -1134,7 +1134,7 @@ export function detectReproductiveGuidanceSignal({
       show: true,
       title: "Ovulation signs are aligning",
       message: "The combination of egg-white discharge, a temperature shift, and ovulation pain are consistent with ovulation.",
-      guidance: "This is a good time to log your basal body temperature if you haven't yet — the data will strengthen your cycle predictions.",
+      guidance: "This is a good time to log your basal body temperature if you haven't yet - the data will strengthen your cycle predictions.",
       debug: { codes: [...codes], phase },
     });
   }
@@ -1147,7 +1147,7 @@ export function detectReproductiveGuidanceSignal({
         code: "SPOTTING_CONTEXT_NOTE",
         level: "medium",
         show: true,
-        title: "Spotting with other symptoms — worth a check",
+        title: "Spotting with other symptoms - worth a check",
         message: "Spotting alongside pelvic pain or unusual discharge is worth getting checked by a provider, especially if it's new or different for you.",
         guidance: "If the spotting is light and you feel well, monitor for 48 hours. If it's accompanied by pain or changes, seek a provider's input.",
         debug: { phase, hasPain: codes.has("PELVIC_PAIN"), hasDischarge: codes.has("UNUSUAL_DISCHARGE") },
@@ -1171,7 +1171,7 @@ export function detectReproductiveGuidanceSignal({
         show: true,
         title: "Spotting in the luteal phase",
         message: "Spotting in the luteal phase can happen for various hormonal reasons, including around the time of implantation if applicable.",
-        guidance: "Keep logging — if this becomes a regular pattern, it's worth mentioning to a provider.",
+        guidance: "Keep logging - if this becomes a regular pattern, it's worth mentioning to a provider.",
         debug: { phase },
       });
     }
@@ -1186,7 +1186,7 @@ export function detectReproductiveGuidanceSignal({
       show: true,
       title: "Cycle timing may have shifted",
       message: "Bloom noticed a symptom usually associated with ovulation in what appears to be your luteal phase. Your cycle timing may have shifted.",
-      guidance: "Log your temperature if you can — it will help Bloom recalibrate your prediction.",
+      guidance: "Log your temperature if you can - it will help Bloom recalibrate your prediction.",
       debug: { phase, marker: "DISCHARGE_EGGWHITE_IN_LUTEAL" },
     });
   }
@@ -1219,7 +1219,7 @@ export function detectReproductiveGuidanceSignal({
  *
  * @param {Object} params
  * @param {Array<{code: string, severity: number}>} params.loggedSymptoms
- * @param {Object} params.severityMap  — pre-built { [code]: severity }
+ * @param {Object} params.severityMap  - pre-built { [code]: severity }
  * @param {Array} params.symptomHistory
  * @param {Date} [params.today]
  * @returns {CycleSignal}
@@ -1236,7 +1236,7 @@ export function detectSafetyEscalationSignal({
   // Pre-index history for O(n) persistence checks instead of O(n²)
   const historyMap = buildHistoryMap(symptomHistory);
 
-  // ── SEEK_URGENT_CARE (level: high) — highest priority ────────────────────
+  // ── SEEK_URGENT_CARE (level: high) - highest priority ────────────────────
 
   // Rule 1: Heavy flow severe + fatigue (dizziness-adjacent)
   if (codes.has("HEAVY_FLOW") && sev("HEAVY_FLOW") >= SEVERITY_SEVERE && codes.has("FATIGUE")) {
@@ -1246,7 +1246,7 @@ export function detectSafetyEscalationSignal({
       show: true,
       title: "This needs attention today",
       message: "Heavy flow at this level combined with significant fatigue needs same-day attention.",
-      guidance: "Please seek care today — these symptoms together should be assessed by a clinician.",
+      guidance: "Please seek care today - these symptoms together should be assessed by a clinician.",
       category: "safety",
       debug: {
         triggers:   ["HEAVY_FLOW", "FATIGUE"],
@@ -1264,7 +1264,7 @@ export function detectSafetyEscalationSignal({
       show: true,
       title: "This needs attention today",
       message: "Heavy bleeding with large clots at this intensity needs same-day assessment.",
-      guidance: "Please seek care today — heavy flow with large clots should not be managed at home without guidance.",
+      guidance: "Please seek care today - heavy flow with large clots should not be managed at home without guidance.",
       category: "safety",
       debug: {
         triggers:   ["HEAVY_FLOW", "LARGE_CLOTS"],
@@ -1274,7 +1274,7 @@ export function detectSafetyEscalationSignal({
     });
   }
 
-  // Rule 3: Ectopic risk indicator — cramps + spotting + missed period
+  // Rule 3: Ectopic risk indicator - cramps + spotting + missed period
   if (
     codes.has("CRAMPS") && sev("CRAMPS") >= SEVERITY_SEVERE &&
     codes.has("SPOTTING") &&
@@ -1286,7 +1286,7 @@ export function detectSafetyEscalationSignal({
       show: true,
       title: "This needs attention today",
       message: "Severe cramping alongside spotting and a missed period needs to be checked urgently. In rare cases this combination can indicate something that needs prompt assessment.",
-      guidance: "Please seek care today — do not wait to see if this resolves on its own.",
+      guidance: "Please seek care today - do not wait to see if this resolves on its own.",
       category: "safety",
       debug: {
         triggers:   ["CRAMPS", "SPOTTING", "MISSED_PERIOD"],
@@ -1306,7 +1306,7 @@ export function detectSafetyEscalationSignal({
       show: true,
       title: "This needs attention today",
       message: "Severe pelvic pain alongside symptoms that may indicate fever needs prompt medical assessment.",
-      guidance: "Please seek care today — severe pain with signs of fever should not wait.",
+      guidance: "Please seek care today - severe pain with signs of fever should not wait.",
       category: "safety",
       debug: {
         triggers:   ["PELVIC_PAIN", "NIGHT_SWEATS", "COLD_FLASHES"],
@@ -1325,7 +1325,7 @@ export function detectSafetyEscalationSignal({
       show: true,
       title: "This needs attention today",
       message: "Unusual discharge alongside pelvic pain and symptoms that may indicate fever is a combination that needs same-day attention.",
-      guidance: "Please seek care today — this combination can sometimes indicate an infection that needs prompt treatment.",
+      guidance: "Please seek care today - this combination can sometimes indicate an infection that needs prompt treatment.",
       category: "safety",
       debug: {
         triggers:   ["UNUSUAL_DISCHARGE", "PELVIC_PAIN", "NIGHT_SWEATS", "COLD_FLASHES"],
@@ -1343,7 +1343,7 @@ export function detectSafetyEscalationSignal({
           code: "SEEK_URGENT_CARE",
           level: "high",
           show: true,
-          title: "Severe symptoms persisting — this needs attention",
+          title: "Severe symptoms persisting - this needs attention",
           message: `Bloom noticed that ${item.code.replace(/_/g, " ").toLowerCase()} has been logged at maximum severity for ${PERSISTENCE_DAYS} days in a row. Symptoms this intense for this long are always worth getting checked.`,
           guidance: "Please speak with a provider today.",
           category: "safety",
@@ -1374,7 +1374,7 @@ export function detectSafetyEscalationSignal({
       show: true,
       title: "These symptoms together are worth getting checked",
       message: "Bloom noticed a combination of symptoms that together are worth getting checked the same day.",
-      guidance: "Please seek care today — these symptoms together should be assessed by a clinician.",
+      guidance: "Please seek care today - these symptoms together should be assessed by a clinician.",
       category: "safety",
       debug: {
         urgentMarkerCount: urgentMarkers.length,
@@ -1397,7 +1397,7 @@ export function detectSafetyEscalationSignal({
       show: true,
       title: "Possible infection-related symptoms",
       message: "Bloom noticed symptoms that can sometimes accompany fever or infection alongside pelvic symptoms. This combination is worth getting checked.",
-      guidance: "If you have a temperature, pelvic pain, or unusual discharge together — seek care today.",
+      guidance: "If you have a temperature, pelvic pain, or unusual discharge together - seek care today.",
       category: "safety",
       debug: {
         triggers:        ["NIGHT_SWEATS", "COLD_FLASHES"],
@@ -1415,7 +1415,7 @@ export function detectSafetyEscalationSignal({
       show: true,
       title: "Heavy bleeding with significant fatigue",
       message: "Heavy bleeding with significant fatigue or dizziness needs same-day attention.",
-      guidance: "Please seek care today — heavy bleeding combined with fatigue can indicate anaemia or other conditions that need assessment.",
+      guidance: "Please seek care today - heavy bleeding combined with fatigue can indicate anaemia or other conditions that need assessment.",
       category: "safety",
       debug: {
         triggers:   ["HEAVY_FLOW", "FATIGUE"],
@@ -1474,7 +1474,7 @@ export function detectSafetyEscalationSignal({
           show: true,
           title: "Persistent symptoms at high intensity",
           message: `Bloom noticed that ${item.code.replace(/_/g, " ").toLowerCase()} has been at a high intensity for ${PERSISTENCE_DAYS} or more days. Symptoms that persist at this level are worth discussing with a provider.`,
-          guidance: "Book an appointment if this is still happening — symptoms that last this long at this intensity deserve professional attention.",
+          guidance: "Book an appointment if this is still happening - symptoms that last this long at this intensity deserve professional attention.",
           category: "safety",
           debug: {
             triggers:        [item.code],
@@ -1512,7 +1512,7 @@ export function detectDataQualitySignal({
 } = {}) {
   const loggingGapDays = settings.loggingGapDays ?? DEFAULT_LOGGING_GAP_DAYS;
 
-  // NOT_ENOUGH_HISTORY_FOR_BASELINE — suppresses baseline signals
+  // NOT_ENOUGH_HISTORY_FOR_BASELINE - suppresses baseline signals
   if (cycleCount < 2) {
     return makeSignal({
       code: "NOT_ENOUGH_HISTORY_FOR_BASELINE",
@@ -1521,12 +1521,12 @@ export function detectDataQualitySignal({
       debug: {
         reason:     "Fewer than 2 completed cycles logged",
         cycleCount,
-        note:       "Baseline deviation signals are suppressed — pattern and safety signals are unaffected",
+        note:       "Baseline deviation signals are suppressed - pattern and safety signals are unaffected",
       },
     });
   }
 
-  // SYMPTOM_LOGGING_GAP — no log entries in the last N days
+  // SYMPTOM_LOGGING_GAP - no log entries in the last N days
   if (Array.isArray(symptomHistory) && symptomHistory.length > 0) {
     const sorted    = [...symptomHistory].sort((a, b) => (b.dateKey || "").localeCompare(a.dateKey || ""));
     const lastEntry = sorted[0];
@@ -1548,7 +1548,7 @@ export function detectDataQualitySignal({
           show: true,
           title: "It's been a while since you last logged",
           message: `Bloom hasn't received symptom logs in the last ${daysSinceLast} days. Logging regularly helps Bloom give you more personalised context.`,
-          guidance: "Try logging symptoms for even a few days — it helps Bloom spot patterns and give better insight.",
+          guidance: "Try logging symptoms for even a few days - it helps Bloom spot patterns and give better insight.",
           debug: { daysSinceLast, threshold: loggingGapDays, lastEntryDateKey: lastEntry.dateKey },
         });
       }
@@ -1560,12 +1560,12 @@ export function detectDataQualitySignal({
       show: true,
       title: "No symptom history yet",
       message: "Bloom doesn't have symptom logs yet. Logging symptoms regularly helps Bloom give you more personalised context.",
-      guidance: "Start logging symptoms on the daily log page — even simple entries help.",
+      guidance: "Start logging symptoms on the daily log page - even simple entries help.",
       debug: { reason: "No symptom history" },
     });
   }
 
-  // LOW_SEVERITY_DATA — symptoms present but all severity = 0
+  // LOW_SEVERITY_DATA - symptoms present but all severity = 0
   if (
     Array.isArray(loggedSymptoms) &&
     loggedSymptoms.length > 0 &&
@@ -1576,7 +1576,7 @@ export function detectDataQualitySignal({
       level: "low",
       show: false,
       debug: {
-        note:      "Symptoms are present but all severity values are 0 — guidance is limited without severity information",
+        note:      "Symptoms are present but all severity values are 0 - guidance is limited without severity information",
         codeCount: loggedSymptoms.length,
       },
     });
@@ -1602,7 +1602,7 @@ export function detectDataQualitySignal({
  * current cycle day or phase. Produces one supportive, non-diagnostic signal.
  *
  * This detector is PURELY forward-looking. It does not explain what is
- * happening biologically right now (that is detectPhaseContextSignal's job) —
+ * happening biologically right now (that is detectPhaseContextSignal's job) -
  * it predicts what the user is *likely to notice soon* based on their own
  * recurring history.
  *
@@ -1617,14 +1617,14 @@ export function detectDataQualitySignal({
  *
  * @param {Object}   params
  * @param {Array}    params.symptomHistory
- * @param {Array}    params.loggedSymptoms        — today's logged symptoms (excluded from forecast)
+ * @param {Array}    params.loggedSymptoms        - today's logged symptoms (excluded from forecast)
  * @param {string|null} params.phase
  * @param {number|null} params.dayOfCycle
  * @param {number[]} params.cycleLengths
  * @param {number}   params.cycleCount
  * @param {Date|null} params.lastPeriodStart
- * @param {boolean}  params.hasHighPrioritySignal — true when a high-level safety signal is active
- * @param {Object}   params.settings              — overrides for configurable thresholds
+ * @param {boolean}  params.hasHighPrioritySignal - true when a high-level safety signal is active
+ * @param {Object}   params.settings              - overrides for configurable thresholds
  * @returns {SymptomSignal}
  */
 export function detectSymptomForecastSignal({
@@ -1760,11 +1760,11 @@ export function detectSymptomForecastSignal({
  *
  * @param {Object}  params
  * @param {Array<{code: string, severity: number, note?: string, dateKey?: string}>} [params.loggedSymptoms=[]]
- * @param {string|null}  [params.phase=null]          — "menstrual"|"follicular"|"ovulation"|"luteal"|null
- * @param {number|null}  [params.dayOfCycle=null]     — integer current day in cycle
- * @param {number[]}     [params.cycleLengths=[]]     — past cycle lengths in days
- * @param {number}       [params.cycleCount=0]        — completed cycles logged
- * @param {Array}        [params.symptomHistory=[]]   — [{dateKey, items:[{code, severity}]}]
+ * @param {string|null}  [params.phase=null]          - "menstrual"|"follicular"|"ovulation"|"luteal"|null
+ * @param {number|null}  [params.dayOfCycle=null]     - integer current day in cycle
+ * @param {number[]}     [params.cycleLengths=[]]     - past cycle lengths in days
+ * @param {number}       [params.cycleCount=0]        - completed cycles logged
+ * @param {Array}        [params.symptomHistory=[]]   - [{dateKey, items:[{code, severity}]}]
  * @param {Date|null}    [params.lastPeriodStart=null]
  * @param {boolean}      [params.missedPeriod=false]
  * @param {boolean}      [params.pregnancyRelevant=false]
@@ -1788,7 +1788,7 @@ export function generateSymptomSignals({
 } = {}) {
   let signals = [];
 
-  // 1. Data quality — always first; its output governs baseline suppression
+  // 1. Data quality - always first; its output governs baseline suppression
   const dataQuality = detectDataQualitySignal({ symptomHistory, loggedSymptoms, cycleCount, settings });
   signals.push(dataQuality);
   const baselineSuppressed = dataQuality.code === "NOT_ENOUGH_HISTORY_FOR_BASELINE" && cycleCount < 2;
@@ -1796,7 +1796,7 @@ export function generateSymptomSignals({
   // Build severity map once for all detectors
   const severityMap = buildSeverityMap(loggedSymptoms);
 
-  // 2. Safety escalation — always second, highest precedence
+  // 2. Safety escalation - always second, highest precedence
   signals.push(
     detectSafetyEscalationSignal({ loggedSymptoms, severityMap, symptomHistory, today })
   );
@@ -1811,7 +1811,7 @@ export function generateSymptomSignals({
     detectSymptomPatternSignal({ loggedSymptoms, phase, dayOfCycle })
   );
 
-  // 5. Baseline deviation — suppressed if NOT_ENOUGH_HISTORY_FOR_BASELINE fired
+  // 5. Baseline deviation - suppressed if NOT_ENOUGH_HISTORY_FOR_BASELINE fired
   if (!baselineSuppressed) {
     signals.push(
       detectBaselineDeviationSignal({ loggedSymptoms, symptomHistory, phase, cycleCount })
@@ -1825,7 +1825,7 @@ export function generateSymptomSignals({
     })
   );
 
-  // 7. Symptom forecast — personalised, forward-looking, low priority.
+  // 7. Symptom forecast - personalised, forward-looking, low priority.
   //    Suppressed when any high-priority signal is already active, so it never
   //    competes with safety or urgent guidance.
   const hasHighSignal = signals.some(s => s.level === "high" && s.show);
@@ -1894,7 +1894,7 @@ export function getHighestPrioritySymptomSignal(signals = []) {
 /**
  * Produce a Bloomie-ready summary from generated symptom signals.
  *
- * @param {SymptomSignal[]} signals — output of generateSymptomSignals()
+ * @param {SymptomSignal[]} signals - output of generateSymptomSignals()
  * @returns {{
  *   hasUrgentSignal: boolean,
  *   primarySignal: SymptomSignal|null,
@@ -1960,11 +1960,11 @@ export function getBloomieSymptomContext(signals = []) {
  * Run both cycle and symptom engines together, cross-validate their outputs,
  * and return a unified result object.
  *
- * Step 1 — Run cycle engine.
- * Step 2 — Extract intelligence from cycle signals to enrich symptom engine inputs.
- * Step 3 — Run symptom engine with enriched inputs.
- * Step 4 — Cross-validate: elevate or annotate signals where both engines agree.
- * Step 5 — Return combined result.
+ * Step 1 - Run cycle engine.
+ * Step 2 - Extract intelligence from cycle signals to enrich symptom engine inputs.
+ * Step 3 - Run symptom engine with enriched inputs.
+ * Step 4 - Cross-validate: elevate or annotate signals where both engines agree.
+ * Step 5 - Return combined result.
  *
  * @returns {{
  *   cycleSignals: Object[],
@@ -1996,7 +1996,7 @@ export function generateIntegratedSignals({
   pregnancyRelevant         = false,
   settings                  = {},
 } = {}) {
-  // Step 1 — Run cycle engine
+  // Step 1 - Run cycle engine
   const cycleSignals = generateCycleSignals({
     expectedNextPeriodWindow,
     today,
@@ -2009,7 +2009,7 @@ export function generateIntegratedSignals({
     settings,
   });
 
-  // Step 2 — Extract intelligence from cycle signals to enrich symptom inputs
+  // Step 2 - Extract intelligence from cycle signals to enrich symptom inputs
   const cycleCodes = new Set(cycleSignals.map(s => s.code));
   let phaseConfidence = "high";
   let enrichedMissedPeriod = missedPeriod;
@@ -2030,7 +2030,7 @@ export function generateIntegratedSignals({
     enrichedSettings.cycleShiftDetected = true;
   }
 
-  // Step 3 — Run symptom engine with enriched inputs
+  // Step 3 - Run symptom engine with enriched inputs
   let symptomSignals = generateSymptomSignals({
     loggedSymptoms,
     phase,
@@ -2046,7 +2046,7 @@ export function generateIntegratedSignals({
     phaseConfidence,
   });
 
-  // Step 4 — Cross-validate and annotate where both engines agree
+  // Step 4 - Cross-validate and annotate where both engines agree
   const crossValidatedNotes = [];
   const symptomCodes = new Set(symptomSignals.map(s => s.code));
 
@@ -2084,7 +2084,7 @@ export function generateIntegratedSignals({
   // SEEK_URGENT_CARE (symptom) + MISSED_PERIOD (cycle) → add ectopic risk note
   if (symptomCodes.has("SEEK_URGENT_CARE") && cycleCodes.has("MISSED_PERIOD")) {
     crossValidatedNotes.push(
-      "Urgent symptoms combined with cycle engine missed period signal — ectopic risk context added."
+      "Urgent symptoms combined with cycle engine missed period signal - ectopic risk context added."
     );
     symptomSignals = symptomSignals.map(s =>
       s.code === "SEEK_URGENT_CARE"
@@ -2096,7 +2096,7 @@ export function generateIntegratedSignals({
     );
   }
 
-  // SYMPTOM_FORECAST suppression — cycle engine context can invalidate forecast timing.
+  // SYMPTOM_FORECAST suppression - cycle engine context can invalidate forecast timing.
   //   • MISSED_PERIOD / EXTENDED_ABSENCE: cycle timing is unknown; luteal-style forecasts
   //     would be misleading.
   //   • SUDDEN_CYCLE_SHIFT: reconstructed cycle positions are unreliable.
@@ -2123,7 +2123,7 @@ export function generateIntegratedSignals({
     );
   }
 
-  // Step 5 — Return combined result
+  // Step 5 - Return combined result
   const topCycleSignal   = getHighestPrioritySignal(cycleSignals);
   const topSymptomSignal = getHighestPrioritySymptomSignal(symptomSignals);
   const bloomieContext   = getBloomieSymptomContext(symptomSignals);
@@ -2140,12 +2140,12 @@ export function generateIntegratedSignals({
 }
 
 /* ------------------------------------------------------------------ */
-/* Advanced Insights — symptom-pattern detection                      */
+/* Advanced Insights - symptom-pattern detection                      */
 /* ------------------------------------------------------------------ */
 
 /**
  * Dedupe groups for the PAIN hierarchy.
- * Only one PAIN signal surfaces — the highest-priority detector wins.
+ * Only one PAIN signal surfaces - the highest-priority detector wins.
  */
 const SYMPTOM_GROUPS = {
   PAIN:      ["DYSMENORRHEA_PATTERN", "PAINFUL_PERIOD_PATTERN", "MENSTRUAL_DISCOMFORT_PATTERN"],
@@ -2158,7 +2158,7 @@ for (const [group, codes] of Object.entries(SYMPTOM_GROUPS)) {
   for (const code of codes) _ADVSYM_TO_GROUP[code] = group;
 }
 
-/** Numeric priority per code — higher wins deduplication within a group */
+/** Numeric priority per code - higher wins deduplication within a group */
 const ADVSYM_PRIORITIES = {
   DYSMENORRHEA_PATTERN:         5,
   PAINFUL_PERIOD_PATTERN:       4,
@@ -2255,7 +2255,7 @@ function _dedupeSymptomSignals(signals) {
 /* ── Individual advanced symptom pattern detectors ─────────────────── */
 
 /**
- * DYSMENORRHEA_PATTERN — menstrual phase + moderate-to-high cramps/pelvic pain.
+ * DYSMENORRHEA_PATTERN - menstrual phase + moderate-to-high cramps/pelvic pain.
  * Most specific pain signal; takes priority over all other PAIN group signals.
  */
 function _detectDysmenorrhea({ loggedSymptoms, severityMap, phase, symptomHistory }) {
@@ -2291,7 +2291,7 @@ function _detectDysmenorrhea({ loggedSymptoms, severityMap, phase, symptomHistor
 
   const message =
     `Based on your logs, Bloom noticed ${sevLabel} ${_advSympLabel(primaryHit)} during your menstrual phase${supportStr}. ` +
-    `Pain at this level during your period — especially when other symptoms are also present — tends to represent a heavier end of what people typically experience. ` +
+    `Pain at this level during your period - especially when other symptoms are also present - tends to represent a heavier end of what people typically experience. ` +
     recurrNote +
     `Bloom flags this gently and non-diagnostically, but if this kind of pain is affecting your day-to-day, it may be worth raising with a healthcare provider.`;
 
@@ -2312,7 +2312,7 @@ function _detectDysmenorrhea({ loggedSymptoms, severityMap, phase, symptomHistor
 }
 
 /**
- * PAINFUL_PERIOD_PATTERN — menstrual phase + mild cramps/pelvic pain.
+ * PAINFUL_PERIOD_PATTERN - menstrual phase + mild cramps/pelvic pain.
  * Fires only when pain is present but below the dysmenorrhea severity threshold.
  */
 function _detectPainfulPeriod({ loggedSymptoms, severityMap, phase, symptomHistory }) {
@@ -2345,7 +2345,7 @@ function _detectPainfulPeriod({ loggedSymptoms, severityMap, phase, symptomHisto
   const message =
     `Bloom noticed ${sevLabel} ${_advSympLabel(painHit)} in your logs during your period${supportStr}. ` +
     recurrNote +
-    `Mild period discomfort is very common, and Bloom is noting this pattern so your logs stay as complete as possible — not to flag anything concerning.`;
+    `Mild period discomfort is very common, and Bloom is noting this pattern so your logs stay as complete as possible - not to flag anything concerning.`;
 
   return _makeAdvSympSignal({
     code:    "PAINFUL_PERIOD_PATTERN",
@@ -2363,7 +2363,7 @@ function _detectPainfulPeriod({ loggedSymptoms, severityMap, phase, symptomHisto
 }
 
 /**
- * MENSTRUAL_DISCOMFORT_PATTERN — menstrual phase + broad symptom cluster (≥ 2 symptoms).
+ * MENSTRUAL_DISCOMFORT_PATTERN - menstrual phase + broad symptom cluster (≥ 2 symptoms).
  * The widest-net pain fallback; fires when no pain-specific pattern qualifies.
  */
 function _detectMenstrualDiscomfort({ loggedSymptoms, severityMap, phase, symptomHistory }) {
@@ -2418,12 +2418,12 @@ function _detectMenstrualDiscomfort({ loggedSymptoms, severityMap, phase, sympto
 }
 
 /**
- * LEUKORRHEA_PATTERN — recurring normal discharge outside the menstrual phase.
+ * LEUKORRHEA_PATTERN - recurring normal discharge outside the menstrual phase.
  * Suppressed when UNUSUAL_DISCHARGE is also present (that warrants separate attention).
  * Requires ≥ 2 past occurrences of normal discharge to qualify as a pattern.
  */
 function _detectLeukorrhea({ loggedSymptoms, severityMap, phase, symptomHistory }) {
-  // Discharge is harder to observe during bleeding — skip menstrual phase
+  // Discharge is harder to observe during bleeding - skip menstrual phase
   if (phase === "menstrual" || !phase) return null;
 
   const NORMAL_CODES = [

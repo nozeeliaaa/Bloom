@@ -367,7 +367,7 @@ export function selectResponseStrategy(board, interpretations) {
     const days = board.cycle.overdueDays;
     const lateLine = board.cycle.hasLateContext
       ? (typeof days === "number" && days < -1
-          ? `I mean your period looks later than expected from your logged dates — around ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} late by estimate.`
+          ? `I mean your period looks later than expected from your logged dates - around ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} late by estimate.`
           : "I mean your period looks later than expected from your logged dates.")
       : "I can rephrase it in a simpler way.";
     return {

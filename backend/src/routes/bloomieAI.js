@@ -3,7 +3,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Secure proxy for Bloomie AI classification calls.
  *
- * Keeps ANTHROPIC_API_KEY server-side only — it is never exposed to the browser
+ * Keeps ANTHROPIC_API_KEY server-side only - it is never exposed to the browser
  * or bundled into frontend code.
  *
  * Endpoints
@@ -22,14 +22,14 @@
  *
  * POST /api/bloomie/ai/extract
  *   Extracts structured health signals from a normalized user message.
- *   AI produces structured JSON only — no advice text, no free-form responses.
+ *   AI produces structured JSON only - no advice text, no free-form responses.
  *   Body:    { input: string }
  *   Returns: { symptoms, timing, severity, tone, repair, pregnancySignals, redFlags, confidence } (200)
  *            { error: "ai_timeout"|"ai_parse_error"|"ai_unavailable"|... } (503/422/400)
  *
  * Security notes
  * ──────────────
- * - Auth is optional (same pattern as bloomieAnalytics.js) — Bloomie AI runs
+ * - Auth is optional (same pattern as bloomieAnalytics.js) - Bloomie AI runs
  *   for anonymous users too.
  * - Rate-limited to 30 req/min per IP (AI calls are expensive; real usage is
  *   much lower since AI fires only when rule confidence is low).
@@ -98,13 +98,13 @@ const VALID_EXTRACT_TONES = new Set([
 ]);
 
 // Red-flag codes are a strict subset used only for advisory signalling.
-// They NEVER override Bloomie's rule-based urgent routing — safety logic
+// They NEVER override Bloomie's rule-based urgent routing - safety logic
 // remains entirely deterministic and is not gated on AI confidence.
 const VALID_EXTRACT_RED_FLAGS = new Set([
-  "heavy_and_dizzy",    // heavy bleeding + dizziness — ectopic / haemorrhage risk marker
-  "one_sided_severe",   // unilateral severe pain — ectopic risk marker
-  "signs_of_infection", // fever + abnormal discharge — infection risk marker
-  "very_heavy",         // soaking through protection — haemorrhage risk marker
+  "heavy_and_dizzy",    // heavy bleeding + dizziness - ectopic / haemorrhage risk marker
+  "one_sided_severe",   // unilateral severe pain - ectopic risk marker
+  "signs_of_infection", // fever + abnormal discharge - infection risk marker
+  "very_heavy",         // soaking through protection - haemorrhage risk marker
   "syncope_risk",       // actual or near-fainting
 ]);
 
@@ -124,7 +124,7 @@ const EXTRACT_SYSTEM_PROMPT = [
   "Valid red flag codes: heavy_and_dizzy, one_sided_severe, signs_of_infection, very_heavy, syncope_risk.",
   "repair: true if the user expresses frustration at not being understood or helped by the app.",
   "pregnancySignals: subset of the symptoms array that are pregnancy-relevant (nausea, late, breast_pain, etc.).",
-  "confidence: 0.0 to 1.0 — how confident you are in the extraction given the message clarity.",
+  "confidence: 0.0 to 1.0 - how confident you are in the extraction given the message clarity.",
   "Use [] for arrays when nothing applies. Use null for severity when unclear or not mentioned.",
   "If the message contains no health content at all, return: {}",
 ].join(" ");
@@ -237,7 +237,7 @@ router.post("/intent", aiLimiter, async (req, res) => {
         "Classify the user message into EXACTLY ONE of:",
         "late, heavy, spot, mood, pelvic, pregnancy, discharge, hormones, else.",
         "Use 'else' only when NO menstrual or reproductive health topic applies.",
-        "Respond ONLY with compact JSON — no markdown, no extra text.",
+        "Respond ONLY with compact JSON - no markdown, no extra text.",
         '{"intent":"late","confidence":"high|medium|low","reasoning":"<5 words max>"}',
       ].join(" "),
       userContent: input.trim(),
@@ -286,7 +286,7 @@ router.post("/tone", aiLimiter, async (req, res) => {
       system: [
         "You are a single-message emotion classifier for a women's health chat app.",
         `Rule-based result: ${ruleHints}.`,
-        "Respond ONLY with a JSON object — no surrounding text, no markdown.",
+        "Respond ONLY with a JSON object - no surrounding text, no markdown.",
         'Format: {"confirms":true,"tone":"distressed|anxious|frustrated|casual|deflecting|neutral","intensity":"high|medium|low","subtext":"<one short phrase or none>"}',
       ].join(" "),
       userContent: input.trim(),
@@ -317,7 +317,7 @@ router.post("/tone", aiLimiter, async (req, res) => {
  * Structured health signal extraction proxy.
  *
  * Receives the normalized user message and returns structured signals only.
- * AI is strictly constrained to a fixed vocabulary — it cannot generate
+ * AI is strictly constrained to a fixed vocabulary - it cannot generate
  * advice text or free-form health guidance.
  *
  * Fields forwarded to Anthropic: input only (≤500 chars, trimmed).
@@ -344,7 +344,7 @@ router.post("/extract", aiLimiter, async (req, res) => {
       timeoutMs:   1200, // longer than intent (more fields) but still well inside UX window
     });
 
-    // Empty object = no health content — return safe empty result
+    // Empty object = no health content - return safe empty result
     if (!parsed || typeof parsed !== "object" || Object.keys(parsed).length === 0) {
       return res.json({
         symptoms: [], timing: [], severity: null, tone: null,
@@ -374,7 +374,7 @@ router.post("/extract", aiLimiter, async (req, res) => {
       ? parsed.pregnancySignals.filter(s => typeof s === "string" && VALID_EXTRACT_SYMPTOMS.has(s))
       : [];
 
-    // redFlags are advisory only — the client must NOT use these to override
+    // redFlags are advisory only - the client must NOT use these to override
     // Bloomie's rule-based urgent routing. Enforced in bloomie-extract.js.
     const redFlags = Array.isArray(parsed.redFlags)
       ? parsed.redFlags.filter(f => typeof f === "string" && VALID_EXTRACT_RED_FLAGS.has(f))

@@ -194,6 +194,7 @@
             const data = await profileRes.json();
             const profile = data?.profile || data || {};
             const healthProfile = data?.healthProfile || {};
+            const biometricProfile = data?.biometricProfile || {};
             if (profile) {
               localStorage.setItem('bloom_onboarded', '1');
               let realGoal = profile.goal;
@@ -206,17 +207,27 @@
               const restored = {};
               if (profile.nickname)       restored.nickname       = profile.nickname;
               if (profile.yearOfBirth)    restored.yob            = profile.yearOfBirth;
-              const avgCycleLength = profile.avgCycleLength ?? healthProfile.avgCycleLength;
-              const periodDuration = profile.periodDuration ?? healthProfile.periodDuration;
-              const sleepScore = profile.sleepScore ?? healthProfile.sleepScore;
-              const weightKg = profile.weightKg ?? healthProfile.weightKg;
-              const heightCm = profile.heightCm ?? healthProfile.heightCm;
+              const avgCycleLength = healthProfile.avgCycleLength;
+              const periodDuration = healthProfile.periodDuration;
+              const sleepScore = biometricProfile.sleepScore ?? healthProfile.sleepScore ?? profile.sleepScore;
+              const activityLevel = biometricProfile.activityLevel ?? profile.activityLevel;
+              const stressLevel = biometricProfile.stressLevel ?? profile.stressLevel;
+              const weightKg = healthProfile.weightKg;
+              const heightCm = healthProfile.heightCm;
+              const lmpDate = healthProfile.lmpDate ?? healthProfile.lmp ?? profile.lmpDate ?? profile.lmp ?? null;
               if (avgCycleLength != null) restored.avgCycleLength = avgCycleLength;
               if (periodDuration != null) restored.periodDuration = periodDuration;
               if (sleepScore != null)     restored.sleepScore     = sleepScore;
+              if (activityLevel)          restored.activityLevel  = activityLevel;
+              if (stressLevel)            restored.stressLevel    = stressLevel;
               if (weightKg != null)       restored.weightKg       = weightKg;
               if (heightCm != null)       restored.heightCm       = heightCm;
               if (profile.avatar)         localStorage.setItem('bloom_avatar', profile.avatar);
+              if (realGoal === "pregnancy" && lmpDate) {
+                localStorage.setItem("bloom_lmp", lmpDate);
+              } else {
+                localStorage.removeItem("bloom_lmp");
+              }
               localStorage.setItem('bloom_profile', JSON.stringify(restored));
             }
           } else {

@@ -6,10 +6,10 @@
  * Tests for user nickname feature.
  *
  * Covers:
- *   1. loadUserProfile() — success, null, fetch error, timeout, non-ok
- *   2. canUseNickname()  — all guard conditions
- *   3. withNickname()    — append, no-op, side-effects
- *   4. Integration       — null fetch, null ctx, urgency, first message
+ *   1. loadUserProfile() - success, null, fetch error, timeout, non-ok
+ *   2. canUseNickname()  - all guard conditions
+ *   3. withNickname()    - append, no-op, side-effects
+ *   4. Integration       - null fetch, null ctx, urgency, first message
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -54,7 +54,7 @@ describe("loadUserProfile()", () => {
   let loadUserProfile;
 
   beforeAll(async () => {
-    // Import the real module once — auth mock is already registered above.
+    // Import the real module once - auth mock is already registered above.
     ({ loadUserProfile } = await import("../db.js"));
   });
 
@@ -152,18 +152,18 @@ describe("canUseNickname()", () => {
     vi.doUnmock("../db.js");
   });
 
-  it("is false when userNickname is null — ctx.userNickname stays null", () => {
+  it("is false when userNickname is null - ctx.userNickname stays null", () => {
     const chat = mountChat(initBloomieChat, { profile: null });
     expect(chat.getState().userNickname).toBeNull();
   });
 
-  it("is false when ctx.urgency is true — nickname never appears in urgency flow", () => {
+  it("is false when ctx.urgency is true - nickname never appears in urgency flow", () => {
     mountChat(initBloomieChat, { profile: { nickname: "Zara" } });
     sendMessage("I'm soaking through my pads and feel faint");
     expect(getChatText()).not.toMatch(/,\s*Zara/);
   });
 
-  it("is false when sessionDepth < 2 — first user message is depth 1", () => {
+  it("is false when sessionDepth < 2 - first user message is depth 1", () => {
     const chat = mountChat(initBloomieChat, { profile: { nickname: "Zara" } });
     sendMessage("my period is late");
     const depth = chat.getState().conversationProfile?.sessionDepth ?? 0;
@@ -271,7 +271,7 @@ describe("nickname integration", () => {
   });
 
   it("nickname never appears in the first greeting message (sessionDepth 0)", () => {
-    // Mount only — no user messages, so sessionDepth = 0 and canUseNickname = false
+    // Mount only - no user messages, so sessionDepth = 0 and canUseNickname = false
     document.body.innerHTML = `
       <div id="chat-box"></div>
       <form id="chat-form"><input id="chat-input" /></form>

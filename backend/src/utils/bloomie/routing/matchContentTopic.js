@@ -11,8 +11,8 @@
  *   3. glossary
  *
  * Rules:
- *  • Deterministic — no randomness except pick() on equal-score ties.
- *  • No external fetches — all content is defined in the catalog below.
+ *  • Deterministic - no randomness except pick() on equal-score ties.
+ *  • No external fetches - all content is defined in the catalog below.
  *  • Never repeats a shownId or declinedId passed in from Bloomie memory.
  *  • Alias map normalises synonyms before matching so "period", "menses",
  *    "menstruation", "monthly" all resolve to the same topic token.
@@ -213,7 +213,7 @@ export const CONTENT_CATALOG = [
   {
     id: "pam-mental-health-cycle", type: "pamphlet",
     title: "Hormones and Mental Health Across Your Cycle",
-    shortAnswer: "How cycle phases affect mood, anxiety, and energy — and what actually helps.",
+    shortAnswer: "How cycle phases affect mood, anxiety, and energy - and what actually helps.",
     link: "/resources/pamphlets/mental-health-cycle",
     topics: ["mood", "pms", "hormones"],
     keywords: ["pmdd", "serotonin", "sleep", "fatigue", "energy", "wellbeing"],
@@ -295,7 +295,7 @@ export const CONTENT_CATALOG = [
   {
     id: "faq-pcos-diagnosis", type: "faq",
     title: "How is PCOS diagnosed?",
-    shortAnswer: "PCOS is diagnosed through a combination of symptoms, blood tests, and an ultrasound — no single test confirms it.",
+    shortAnswer: "PCOS is diagnosed through a combination of symptoms, blood tests, and an ultrasound - no single test confirms it.",
     link: "/resources/faq/pcos-diagnosis",
     topics: ["pcos"],
     keywords: ["diagnosis", "blood test", "ultrasound", "scan", "confirmed"],
@@ -303,7 +303,7 @@ export const CONTENT_CATALOG = [
   {
     id: "faq-hormones-mood", type: "faq",
     title: "Why do hormones affect my mood?",
-    shortAnswer: "Oestrogen and progesterone influence serotonin and GABA, which regulate mood — so hormonal shifts can directly change how you feel.",
+    shortAnswer: "Oestrogen and progesterone influence serotonin and GABA, which regulate mood - so hormonal shifts can directly change how you feel.",
     link: "/resources/faq/hormones-mood",
     topics: ["hormones", "mood", "pms"],
     keywords: ["why", "serotonin", "feel", "chemical", "brain"],
@@ -313,7 +313,7 @@ export const CONTENT_CATALOG = [
   {
     id: "glos-lmp", type: "glossary",
     title: "LMP (Last Menstrual Period)",
-    shortAnswer: "The date your most recent period started — used to calculate cycle length and estimated due dates.",
+    shortAnswer: "The date your most recent period started - used to calculate cycle length and estimated due dates.",
     link: "/resources/glossary/lmp",
     topics: ["menstruation", "late_period"],
     keywords: ["last period", "lmp", "start date"],
@@ -345,7 +345,7 @@ export const CONTENT_CATALOG = [
   {
     id: "glos-dysmenorrhea", type: "glossary",
     title: "Dysmenorrhea",
-    shortAnswer: "The medical term for painful periods — primary dysmenorrhea is common cramping; secondary is caused by an underlying condition.",
+    shortAnswer: "The medical term for painful periods - primary dysmenorrhea is common cramping; secondary is caused by an underlying condition.",
     link: "/resources/glossary/dysmenorrhea",
     topics: ["pelvic_pain"],
     keywords: ["dysmenorrhea", "painful", "prostaglandins"],
@@ -353,7 +353,7 @@ export const CONTENT_CATALOG = [
   {
     id: "glos-amenorrhea", type: "glossary",
     title: "Amenorrhea",
-    shortAnswer: "The absence of a period — primary means it never started; secondary means it stopped after previously being regular.",
+    shortAnswer: "The absence of a period - primary means it never started; secondary means it stopped after previously being regular.",
     link: "/resources/glossary/amenorrhea",
     topics: ["late_period", "menstruation"],
     keywords: ["amenorrhea", "no period", "absent", "stopped"],

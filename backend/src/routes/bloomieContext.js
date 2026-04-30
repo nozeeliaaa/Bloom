@@ -9,9 +9,9 @@ const router = express.Router();
  * GET /api/bloomie-context
  *
  * Returns a clean, runtime-only context object for Bloomie.
- * Built fresh per request — never stored.
+ * Built fresh per request - never stored.
  *
- * Auth: required (user can only access their own context — uid from token).
+ * Auth: required (user can only access their own context - uid from token).
  */
 router.get("/", requireAuth, async (req, res) => {
   const uid = req.user?.uid;

@@ -11,6 +11,34 @@ function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 }
 
+function toBool(val) {
+  return val === true || val === "true";
+}
+
+const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
+
+function normalizeBiometricLevel(value) {
+  if (value === undefined || value === null || value === "") return null;
+
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return BIOMETRIC_LEVELS[value - 1] ?? null;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+  return BIOMETRIC_LEVELS.includes(normalized) ? normalized : null;
+}
+
+function normalizeSleepScore(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10) return null;
+  return parsed;
+}
+
 async function ensureCycleLogsParent(uid) {
   const parentRef = db.collection("cycleLogs").doc(uid);
   const snap = await parentRef.get();
@@ -44,13 +72,28 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       .collection("entries")
       .doc(dateKey);
 
+    const periodDay =
+      req.body.periodDay === null || req.body.periodDay === undefined
+        ? null
+        : Number(req.body.periodDay);
+
+    if (periodDay !== null && (!Number.isInteger(periodDay) || periodDay < 1 || periodDay > 10)) {
+      return res.status(400).json({ error: "periodDay must be an integer between 1 and 10" });
+    }
+
     const payload = {
       dateKey,
-      periodDay: req.body.periodDay ?? null,
+      periodDay,
       flowLevel: req.body.flowLevel ?? null,
-      hadSex: req.body.hadSex ?? false,
-      contraceptionUsed: req.body.contraceptionUsed ?? false,
-      notes: typeof req.body.notes === "string" ? req.body.notes.trim() : "",
+      sleepScore: normalizeSleepScore(req.body.sleepScore),
+      stressLevel: normalizeBiometricLevel(req.body.stressLevel),
+      activityLevel: normalizeBiometricLevel(req.body.activityLevel),
+      hadSex: toBool(req.body.hadSex),
+      contraceptionUsed: toBool(req.body.contraceptionUsed),
+      notes:
+        typeof req.body.notes === "string"
+          ? req.body.notes.trim().slice(0, 500)
+          : "",
       updatedAt: new Date(),
     };
 

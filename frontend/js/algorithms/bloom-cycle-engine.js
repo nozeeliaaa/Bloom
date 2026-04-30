@@ -915,7 +915,7 @@ export function detectSuspiciousEntrySignal(dates = []) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Advanced Insights — period-pattern detection                       */
+/* Advanced Insights - period-pattern detection                       */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -1025,7 +1025,7 @@ function _detectAmenorrheaPattern({ lastPeriodStart, today, cycleLengths, settin
   const timePhrase = months >= 3 ? `about ${months} months` : `roughly ${weeks} weeks`;
 
   const message =
-    `Bloom noticed that your last logged period was on ${lastStr} — ${timePhrase} ago. ` +
+    `Bloom noticed that your last logged period was on ${lastStr} - ${timePhrase} ago. ` +
     `Based on your cycle history, a gap of ${daysSince} days is significantly longer than your usual spacing of around ${avgCycle} days. ` +
     `Cycles can sometimes pause or shift due to stress, hormonal changes, or other factors. ` +
     `If this kind of extended gap is new for you, it may be worth keeping track and checking in with a healthcare provider if it continues.`;

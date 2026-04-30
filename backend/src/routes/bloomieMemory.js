@@ -41,7 +41,10 @@ router.put("/", requireAuth, requireConsent, async (req, res) => {
     const { lastSymptoms, lastIntent, lastSeverity, lastDuration, lastPregnancyChance, recentTopics } = req.body;
 
     const symptoms = Array.isArray(lastSymptoms)
-      ? lastSymptoms.filter(s => VALID_SYMPTOM_KEYS.has(s)).slice(0, 20)
+      ? lastSymptoms
+        .filter(s => VALID_SYMPTOM_KEYS.has(s))
+        .flatMap(s => SYMPTOM_TO_CATALOG_KEYS[s] || [s]) // 🔥 convert
+        .slice(0, 20)
       : [];
 
     const severity = VALID_SEVERITIES.has(lastSeverity) ? lastSeverity : null;

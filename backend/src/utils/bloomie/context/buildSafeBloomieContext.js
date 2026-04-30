@@ -2,7 +2,7 @@
  * src/utils/bloomie/context/buildSafeBloomieContext.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Builds a clean, runtime-only context object for Bloomie from multiple
- * Firestore sources. The result is never persisted — it is assembled fresh
+ * Firestore sources. The result is never persisted - it is assembled fresh
  * per request and discarded after use.
  *
  * Critical rules
@@ -10,7 +10,7 @@
  * • This context is NOT stored in Bloomie memory.
  * • It does NOT duplicate user-profile or cycle data into bloomieMemory.
  * • It does NOT expose Firestore document structure (no .id, .ref, .metadata).
- * • It never throws — every field degrades gracefully to null / [].
+ * • It never throws - every field degrades gracefully to null / [].
  * • No business logic: no rules engine, no routing, no clinical decisions.
  *
  * Firestore reads (always parallel, never nested)

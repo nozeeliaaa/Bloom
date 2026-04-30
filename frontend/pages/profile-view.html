@@ -166,10 +166,6 @@
             Typical period duration (days)
             <input class="form-input" id="period-duration" type="number" placeholder="e.g., 5" min="1" max="14" />
           </label>
-          <label class="form-label">
-            Sleep score (1-10)
-            <input class="form-input" id="sleep-score" type="number" placeholder="e.g., 7" min="1" max="10" step="1" />
-          </label>
           <div>
             <div class="weight-label-row">
               <label class="form-label" for="weight">Weight</label>
@@ -246,7 +242,6 @@
     const yobEl            = document.getElementById("yob");
     const avgCycleEl       = document.getElementById("avg-cycle");
     const periodDurEl      = document.getElementById("period-duration");
-    const sleepScoreEl     = document.getElementById("sleep-score");
     const lmpFieldEl       = document.getElementById("lmp-field");
     const lmpDateEl        = document.getElementById("lmp-date");
     const yobLockedNote    = document.getElementById("yob-locked-note");
@@ -339,7 +334,20 @@
     }
 
     function loadProfile() {
-      try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
+      try {
+        const parsed = JSON.parse(localStorage.getItem(LS_PROFILE)) || {};
+        if (
+          Object.prototype.hasOwnProperty.call(parsed, "sleepScore") ||
+          Object.prototype.hasOwnProperty.call(parsed, "activityLevel") ||
+          Object.prototype.hasOwnProperty.call(parsed, "stressLevel")
+        ) {
+          delete parsed.sleepScore;
+          delete parsed.activityLevel;
+          delete parsed.stressLevel;
+          localStorage.setItem(LS_PROFILE, JSON.stringify(parsed));
+        }
+        return parsed;
+      }
       catch { return {}; }
     }
 
@@ -371,9 +379,9 @@
       yobEl.value       = p.yob            || "";
       avgCycleEl.value  = p.avgCycleLength || "";
       periodDurEl.value = p.periodDuration || "";
-      sleepScoreEl.value = p.sleepScore ?? "";
       const lmp = localStorage.getItem(LS_LMP);
       if (lmp) lmpDateEl.value = lmp;
+      else lmpDateEl.value = "";
 
       setWeightUnit(weightUnit);
       if (p.weightKg) {
@@ -401,6 +409,57 @@
       lmpFieldEl.classList.toggle("visible", getUserGoal() === "pregnancy");
     }
 
+    function saveProfileToLocal(profileLike = {}) {
+      const clean = {
+        nickname: typeof profileLike.nickname === "string" ? profileLike.nickname : "",
+        yob: profileLike.yob ? Number(profileLike.yob) : "",
+        avgCycleLength: profileLike.avgCycleLength ?? null,
+        periodDuration: profileLike.periodDuration ?? null,
+        weightKg: profileLike.weightKg ?? null,
+        heightCm: profileLike.heightCm ?? null,
+      };
+      localStorage.setItem(LS_PROFILE, JSON.stringify(clean));
+      return clean;
+    }
+
+    function applyBackendProfile(data = {}) {
+      const profile = data?.profile || {};
+      const healthProfile = data?.healthProfile || {};
+      const lmpDate = healthProfile.lmpDate ?? healthProfile.lmp ?? profile.lmpDate ?? profile.lmp ?? null;
+      const merged = saveProfileToLocal({
+        nickname: profile.nickname || "",
+        yob: profile.yearOfBirth || "",
+        avgCycleLength: healthProfile.avgCycleLength ?? null,
+        periodDuration: healthProfile.periodDuration ?? null,
+        weightKg: healthProfile.weightKg ?? null,
+        heightCm: healthProfile.heightCm ?? null,
+      });
+      if (profile.avatar) localStorage.setItem(LS_AVATAR, profile.avatar);
+      if (profile.yearOfBirth) localStorage.setItem(LS_YOB_LOCKED, "true");
+      if (lmpDate) localStorage.setItem(LS_LMP, lmpDate);
+      else localStorage.removeItem(LS_LMP);
+      fillFields();
+      return merged;
+    }
+
+    async function hydrateFromBackendProfile() {
+      if (!getUser()) return false;
+      try {
+        const token = await getIdToken();
+        if (!token) return false;
+        const apiBase = window.BLOOM_API_BASE ?? "";
+        const res = await fetch(`${apiBase}/api/user/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        applyBackendProfile(data);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
     // Single save handler - saves everything: avatar + details + lifestyle
     saveBtn.addEventListener("click", async () => {
       const nickname  = nicknameEl.value.trim();
@@ -408,7 +467,6 @@
       const wasLocked = !!localStorage.getItem(LS_YOB_LOCKED);
       const avgCycle  = avgCycleEl.value.trim();
       const periodDur = periodDurEl.value.trim();
-      const sleepScore = sleepScoreEl.value.trim();
       const lmp       = lmpDateEl.value;
       const weightRaw = parseFloat(weightEl.value);
 
@@ -416,14 +474,6 @@
         const n = Number(yob);
         if (!Number.isFinite(n) || n < 1900 || n > 2100) {
           showStatus("Year of Birth must be between 1900 and 2100.");
-          return;
-        }
-      }
-
-      if (sleepScore) {
-        const n = Number(sleepScore);
-        if (!Number.isFinite(n) || n < 1 || n > 10) {
-          showStatus("Sleep score must be between 1 and 10.");
           return;
         }
       }
@@ -452,11 +502,10 @@
         yob: yob ? Number(yob) : "",
         avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
         periodDuration: periodDur ? Number(periodDur) : null,
-        sleepScore: sleepScore ? Number(sleepScore) : null,
         weightKg,
         heightCm,
       };
-      localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
+      saveProfileToLocal(profile);
 
       if (yob && !wasLocked) {
         localStorage.setItem(LS_YOB_LOCKED, "true");
@@ -478,7 +527,7 @@
             nickname,
             avgCycleLength: avgCycle  ? Number(avgCycle)  : null,
             periodDuration: periodDur ? Number(periodDur) : null,
-            sleepScore: sleepScore ? Number(sleepScore) : null,
+            lmpDate: getUserGoal() === "pregnancy" ? (lmp || null) : null,
             weightKg:  weightKg  ?? null,
             heightCm:  heightCm  ?? null,
             avatar:    selectedAvatar,
@@ -549,33 +598,7 @@
     populateYobSelect();
     fillFields();
     toggleLmpField();
-
-    // Background sync on page load
-    (async () => {
-      if (!getUser()) return;
-      try {
-        const token = await getIdToken();
-        if (!token) return;
-        const p = loadProfile();
-        const avatar = localStorage.getItem(LS_AVATAR);
-        const payload = {};
-        if (p.nickname)       payload.nickname       = p.nickname;
-        if (p.yob)            payload.yearOfBirth    = Number(p.yob);
-        if (p.avgCycleLength) payload.avgCycleLength = Number(p.avgCycleLength);
-        if (p.periodDuration) payload.periodDuration = Number(p.periodDuration);
-        if (p.sleepScore)     payload.sleepScore     = Number(p.sleepScore);
-        if (p.weightKg)       payload.weightKg       = Number(p.weightKg);
-        if (p.heightCm)       payload.heightCm       = Number(p.heightCm);
-        if (avatar && avatar !== "👤") payload.avatar = avatar;
-        if (Object.keys(payload).length === 0) return;
-        const apiBase = window.BLOOM_API_BASE ?? '';
-        await fetch(`${apiBase}/api/user/profile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-          body: JSON.stringify(payload),
-        });
-      } catch (_) {}
-    })();
+    hydrateFromBackendProfile();
   </script>
 </body>
 </html>

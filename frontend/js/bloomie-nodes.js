@@ -1,20 +1,20 @@
 /**
- * bloomie-nodes.js — thin assembler
+ * bloomie-nodes.js - thin assembler
  *
  * Imports all domain-specific node creators and merges them into a single
  * NODES object. This file is intentionally small; all node content lives
  * in the domain sub-modules below.
  *
  * Domain split:
- *   bloomie-nodes-helpers.js      — shared helper functions & computed constants
- *   bloomie-nodes-core.js         — routing, safety, app-help, session, resolution
- *   bloomie-nodes-period.js       — heavy bleeding, spotting, late/missed period
- *   bloomie-nodes-pregnancy.js    — pregnancy test timing, abortion support
- *   bloomie-nodes-mood.js         — mood, energy, emotional wellbeing
- *   bloomie-nodes-pelvic.js       — pelvic pain, sex-related pain
- *   bloomie-nodes-general.js      — "something else", discharge, cycle-smart, TTC/postpartum, mode
- *   bloomie-nodes-education.js    — symptom education (EDUC_*)          [lazy-loaded]
- *   bloomie-nodes-perimenopause.js — perimenopause pathway + PCOS/endo education [lazy-loaded]
+ *   bloomie-nodes-helpers.js      - shared helper functions & computed constants
+ *   bloomie-nodes-core.js         - routing, safety, app-help, session, resolution
+ *   bloomie-nodes-period.js       - heavy bleeding, spotting, late/missed period
+ *   bloomie-nodes-pregnancy.js    - pregnancy test timing, abortion support
+ *   bloomie-nodes-mood.js         - mood, energy, emotional wellbeing
+ *   bloomie-nodes-pelvic.js       - pelvic pain, sex-related pain
+ *   bloomie-nodes-general.js      - "something else", discharge, cycle-smart, TTC/postpartum, mode
+ *   bloomie-nodes-education.js    - symptom education (EDUC_*)          [lazy-loaded]
+ *   bloomie-nodes-perimenopause.js - perimenopause pathway + PCOS/endo education [lazy-loaded]
  *
  * Lazy-loading strategy
  * ─────────────────────
@@ -26,7 +26,7 @@
  *
  * If the network is very slow and a user reaches an education/perimenopause
  * node before the module resolves, transition() guards with `if (!node) return`
- * — the click is silently dropped. This is an acceptable edge case for < 1%
+ * - the click is silently dropped. This is an acceptable edge case for < 1%
  * of sessions on very slow connections; the alternative would be blocking the
  * entire initial load for 28 KB of rarely-immediate content.
  *
@@ -57,7 +57,7 @@ export function createNodes(env) {
     ...createGeneralNodes(env, helpers),
   };
 
-  // ── Lazy chunks — fetched in parallel with initial greeting animation ─────
+  // ── Lazy chunks - fetched in parallel with initial greeting animation ─────
   //
   // Dynamic import() starts the network request right now but does not block
   // this function from returning. Nodes from these modules are Object.assigned
@@ -67,7 +67,7 @@ export function createNodes(env) {
   //
   // Do NOT add safety-critical or first-click nodes to these deferred groups.
 
-  // bloomie-educ chunk (~12 KB) — SYMPTOM_EDUCATION, EDUC_PERIOD, EDUC_HEAVY,
+  // bloomie-educ chunk (~12 KB) - SYMPTOM_EDUCATION, EDUC_PERIOD, EDUC_HEAVY,
   // EDUC_CRAMPS, EDUC_SPOTTING, EDUC_MOOD, EDUC_LATE, EDUC_CYCLE_BASICS, etc.
   // Reachable only after ≥ 2 menu clicks; has ample time to load.
   import("./bloomie-nodes-education.js")
@@ -79,7 +79,7 @@ export function createNodes(env) {
       // continues to function normally on all other paths.
     });
 
-  // bloomie-peri chunk (~16 KB) — PERIMENOPAUSE_INTRO, PERI_* pathway,
+  // bloomie-peri chunk (~16 KB) - PERIMENOPAUSE_INTRO, PERI_* pathway,
   // EDUC_MENOPAUSE, EDUC_CONTRACEPTION, EDUC_PCOS, EDUC_ENDO.
   // Reachable 1 click from START_MENU; natural typing delay (~3 s) gives
   // sufficient load window on all but the slowest connections.

@@ -141,7 +141,7 @@ beforeEach(async () => {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe("normaliseMemoryForRead — date comparison", () => {
+describe("normaliseMemoryForRead - date comparison", () => {
   it("same-day lastSessionDate: sticky flags are preserved as-is", async () => {
     seedMemory({
       lastSessionDate:     `${TODAY}T09:00:00.000Z`,

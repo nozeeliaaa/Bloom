@@ -152,7 +152,7 @@ function withConfidence(tier, primaryIntent, competingIntents = []) {
     primaryIntent,
     competingIntents,
     confidenceNote: tier === "medium"
-      ? `Just to confirm — is this about ${(primaryIntent || "").replace(/_/g, " ")}?`
+      ? `Just to confirm - is this about ${(primaryIntent || "").replace(/_/g, " ")}?`
       : null,
     route,
     competitors,
@@ -183,7 +183,7 @@ afterEach(() => {
 
 // ── Pure function: computeRouteConfidence tier rules ──────────────────────────
 
-describe("computeRouteConfidence — tier rules (real implementation)", () => {
+describe("computeRouteConfidence - tier rules (real implementation)", () => {
   it("urgency always → high tier + HEAVY_URGENT route + ambiguous false", () => {
     const { sig } = scoreSignals("i am bleeding heavily");
     const conf = computeRouteConfidence(sig, { urgent: true });
@@ -262,7 +262,7 @@ describe("computeRouteConfidence — tier rules (real implementation)", () => {
   });
 });
 
-describe("computeRouteConfidence — route and competitors fields", () => {
+describe("computeRouteConfidence - route and competitors fields", () => {
   it("route matches INTENT_TO_NODE[primaryIntent]", () => {
     const { sig } = scoreSignals("my period is very late this month");
     const conf = computeRouteConfidence(sig, {});
@@ -302,7 +302,7 @@ describe("computeRouteConfidence — route and competitors fields", () => {
 
 // ── Integration: HIGH tier → routes directly ──────────────────────────────────
 
-describe("confidence router — HIGH tier", () => {
+describe("confidence router - HIGH tier", () => {
   it("routes directly without showing MEDIUM_CONFIRM or NARROWING", () => {
     withConfidence("high", "late");
     sendMessage(CANONICAL_INPUT);
@@ -334,7 +334,7 @@ describe("confidence router — HIGH tier", () => {
 
 // ── Integration: MEDIUM tier → MEDIUM_CONFIRM ────────────────────────────────
 
-describe("confidence router — MEDIUM tier", () => {
+describe("confidence router - MEDIUM tier", () => {
   it("transitions to MEDIUM_CONFIRM and sets pendingRoute", () => {
     withConfidence("medium", "late", ["pelvic"]);
     sendMessage(CANONICAL_INPUT);
@@ -411,7 +411,7 @@ describe("confidence router — MEDIUM tier", () => {
 
 // ── Integration: LOW tier → NARROWING ────────────────────────────────────────
 
-describe("confidence router — LOW tier", () => {
+describe("confidence router - LOW tier", () => {
   it("transitions to NARROWING on first LOW", () => {
     withConfidence("low", "late", []);
     sendMessage(CANONICAL_INPUT);
@@ -450,7 +450,7 @@ describe("confidence router — LOW tier", () => {
 
 // ── Integration: repeated LOW → CONFIDENCE_FALLBACK ──────────────────────────
 
-describe("confidence router — CONFIDENCE_FALLBACK after repeated LOW", () => {
+describe("confidence router - CONFIDENCE_FALLBACK after repeated LOW", () => {
   it("routes to CONFIDENCE_FALLBACK when confidenceFallbackCount reaches 2", () => {
     // First LOW → NARROWING (count 0 → 1)
     withConfidence("low", "late", []);
@@ -462,7 +462,7 @@ describe("confidence router — CONFIDENCE_FALLBACK after repeated LOW", () => {
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().confidenceFallbackCount).toBe(2);
 
-    // Third LOW — use a distinct input to avoid the exact-repeat guard
+    // Third LOW - use a distinct input to avoid the exact-repeat guard
     // (3 identical messages in a row → ELSE_NOT_SURE_ROUTE instead of CONFIDENCE_FALLBACK)
     withConfidence("low", "late", []);
     sendMessage("i missed my period");
@@ -499,7 +499,7 @@ describe("confidence router — CONFIDENCE_FALLBACK after repeated LOW", () => {
 
 // ── Integration: CLARIFICATION_PAIRS promotion ────────────────────────────────
 
-describe("confidence router — CLARIFICATION_PAIRS", () => {
+describe("confidence router - CLARIFICATION_PAIRS", () => {
   // The pair check uses conf.competingIntents[0], not the routing signals.
   // withConfidence injects the pair into the mocked confidence result,
   // while CANONICAL_INPUT reaches the confidence router reliably.
@@ -530,7 +530,7 @@ describe("confidence router — CLARIFICATION_PAIRS", () => {
   });
 
   it("single HIGH signal with no competitor does not promote", () => {
-    // mood with no competitors — no pair formed → routes directly
+    // mood with no competitors - no pair formed → routes directly
     withConfidence("high", "mood", []);
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().state).not.toBe("MEDIUM_CONFIRM");
@@ -538,7 +538,7 @@ describe("confidence router — CLARIFICATION_PAIRS", () => {
   });
 
   it("non-paired HIGH competitors do not promote to MEDIUM_CONFIRM", () => {
-    // late + discharge — not a defined clarification pair
+    // late + discharge - not a defined clarification pair
     withConfidence("high", "late", ["discharge"]);
     sendMessage(CANONICAL_INPUT);
     // Should route directly (not a known pair)
@@ -556,7 +556,7 @@ describe("confidence router — CLARIFICATION_PAIRS", () => {
 
 // ── confidenceFallbackCount streak reset ──────────────────────────────────────
 
-describe("confidenceFallbackCount — streak reset on successful routing", () => {
+describe("confidenceFallbackCount - streak reset on successful routing", () => {
   it("LOW → LOW → HIGH resets count to 0", () => {
     // First LOW: count goes to 1
     withConfidence("low", "late", []);
@@ -587,7 +587,7 @@ describe("confidenceFallbackCount — streak reset on successful routing", () =>
     sendMessage("my period is a week late");
     expect(chat.getState().confidenceFallbackCount).toBe(0);
 
-    // New LOW starts fresh — count is 1, not 3
+    // New LOW starts fresh - count is 1, not 3
     withConfidence("low", "late", []);
     sendMessage("something something cycle");
     expect(chat.getState().confidenceFallbackCount).toBe(1);
@@ -602,11 +602,11 @@ describe("confidenceFallbackCount — streak reset on successful routing", () =>
     withConfidence("low", "late", []);
     sendMessage("i missed my period");
 
-    // Recover via HIGH — resets count
+    // Recover via HIGH - resets count
     withConfidence("high", "late", []);
     sendMessage("my period is a week late");
 
-    // One more LOW — should go to NARROWING (count=1), not CONFIDENCE_FALLBACK
+    // One more LOW - should go to NARROWING (count=1), not CONFIDENCE_FALLBACK
     withConfidence("low", "late", []);
     sendMessage("something about my cycle");
     expect(chat.getState().state).toBe("NARROWING");
@@ -620,7 +620,7 @@ describe("confidenceFallbackCount — streak reset on successful routing", () =>
     expect(chat.getState().state).toBe("NARROWING");
     expect(chat.getState().confidenceFallbackCount).toBe(1);
 
-    // Click a topic button from NARROWING — this is a successful exit
+    // Click a topic button from NARROWING - this is a successful exit
     clickButton("cycle");
     expect(chat.getState().confidenceFallbackCount).toBe(0);
   });
@@ -636,7 +636,7 @@ describe("confidenceFallbackCount — streak reset on successful routing", () =>
     sendMessage("i missed my period");
     expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
 
-    // Confirm — resets streak
+    // Confirm - resets streak
     clickButton("yes_confirm");
     expect(chat.getState().confidenceFallbackCount).toBe(0);
   });
@@ -645,14 +645,14 @@ describe("confidenceFallbackCount — streak reset on successful routing", () =>
 
 // ── _MEDIUM_YES null/malformed pendingRoute recovery ─────────────────────────
 
-describe("_MEDIUM_YES — null and malformed pendingRoute recovery", () => {
+describe("_MEDIUM_YES - null and malformed pendingRoute recovery", () => {
   it("_MEDIUM_YES with null route in pendingRoute recovers into NARROWING", () => {
     // Get into MEDIUM_CONFIRM
     withConfidence("medium", "late", ["pelvic"]);
     sendMessage(CANONICAL_INPUT);
     expect(chat.getState().state).toBe("MEDIUM_CONFIRM");
 
-    // getState() shallow-copies ctx, but pendingRoute is shared by reference —
+    // getState() shallow-copies ctx, but pendingRoute is shared by reference -
     // nulling .next on the shared object is the reliable way to corrupt it.
     chat.getState().pendingRoute.next = null;
 

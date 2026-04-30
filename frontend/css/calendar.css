@@ -7,7 +7,7 @@
   --ovulation:        #1A8080;   /* Ovulation - dark teal            */
   --fertility:        #2dd4bf;   /* Fertile window - teal            */
   --follicular-color: #60a5fa;   /* Follicular - periwinkle blue     */
-  --luteal-color:     #f59e0b;   /* Luteal - amber/gold              */
+  --luteal-color:     var(--phase-luteal);   /* Luteal - purple          */
 }
 
 /* Wrapper */
@@ -269,6 +269,12 @@
   border-color: var(--fertility);
 }
 
+/* Follicular = SOLID PERIWINKLE BLUE */
+.legend-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 40%, white);
+  border-color: var(--follicular-color);
+}
+
 /* Ovulation = TEAL STRIPES */
 .legend-ovulation {
   border-color: var(--ovulation);
@@ -299,6 +305,11 @@
     transparent 6px,
     transparent 12px
   );
+}
+
+[data-theme="dark"] .legend-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 25%, transparent);
+  border-color: var(--follicular-color);
 }
 
 /* ===== Modal symptoms scroll ===== */
@@ -358,4 +369,8 @@
 .swatch-fertile {
   background: var(--fertility);
   border-color: var(--fertility);
+}
+.swatch-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 40%, white);
+  border-color: var(--follicular-color);
 }

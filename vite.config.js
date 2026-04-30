@@ -48,7 +48,7 @@ export default defineConfig({
         // Vite's default content-hash filenames.
         //
         // Do NOT add bloomie-nodes-core, -period, -mood, -pelvic, -pregnancy,
-        // or -general here — those are statically imported and must be present
+        // or -general here - those are statically imported and must be present
         // before the first user interaction.
         manualChunks(id) {
           if (id.includes("bloomie-nodes-education"))    return "bloomie-educ";

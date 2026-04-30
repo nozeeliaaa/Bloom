@@ -126,7 +126,7 @@
     .dot-fertile    { background: #7EC8C8; }
     .dot-ovulation  { background: #1A8080; }
     .dot-follicular { background: #A8C8E8; }
-    .dot-luteal     { background: #E8B86D; }
+    .dot-luteal     { background: var(--phase-luteal); }
     .dot-other      { background: #DDD4E8; }
     .cycle-chart-container { width: 100%; height: 420px; }
     .card-estimate-note { font-size: 0.72rem; color: var(--color-text-muted); margin-top: 0.75rem; opacity: 0.75; }
@@ -179,13 +179,94 @@
       border-radius: 999px;
       font-size: 1.05rem;
       font-weight: 800;
+      border: 1px solid transparent;
     }
     .phase-menstrual  { background: var(--phase-menstrual-bg);  color: var(--phase-menstrual); }
     .phase-follicular { background: var(--phase-follicular-bg); color: var(--phase-follicular); }
     .phase-ovulation  { background: var(--phase-ovulation-bg);  color: var(--phase-ovulation); }
-    .phase-luteal     { background: var(--phase-luteal-bg);     color: var(--phase-luteal); }
+    .phase-luteal     { background: var(--phase-luteal-bg); color: var(--phase-luteal); border-color: var(--phase-luteal); }
     .phase-unknown    { background: var(--phase-unknown-bg);    color: var(--phase-unknown); }
     .phase-dot { width: 11px; height: 11px; border-radius: 50%; background: currentColor; display: inline-block; }
+    .phase-estimate-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: center;
+      text-align: center;
+    }
+    .phase-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .phase-confidence-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .phase-confidence-dot--high   { background: #3f8d4a; }
+    .phase-confidence-dot--medium { background: #a06b00; }
+    .phase-confidence-dot--low    { background: #cc4f7a; }
+    .phase-confidence-text {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
+    .phase-feedback-divider {
+      color: var(--color-border);
+      font-size: 0.85rem;
+      margin: 0 0.1rem;
+    }
+    .phase-feedback-label {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
+    .phase-thumb-btn {
+      background: none;
+      border: none;
+      padding: 0 0.1rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      opacity: 0.55;
+      line-height: 1;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .phase-thumb-btn:hover { opacity: 1; transform: scale(1.2); }
+    .phase-correction-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding-top: 0.35rem;
+      align-items: center;
+    }
+    .phase-feedback-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.35rem;
+    }
+    .phase-feedback-btn {
+      border: 1.5px solid var(--color-border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.25rem 0.75rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .phase-feedback-btn:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary-dark);
+      background: var(--color-primary-lightest, #fce4ec);
+    }
+    .phase-feedback-note {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
 
     /* Goal sections - hidden by default, shown by JS */
     .goal-section { margin-top: 1rem; display: none; }
@@ -523,13 +604,13 @@
     body.goal-pregnancy .dash-mid { display: none; }
     body.goal-pregnancy .dash-top { display: none; }
 
-    /* Hide today/advanced/history for symptom goals — replaced by symptom insight card */
+    /* Hide today/advanced/history only for strict symptom-only goals */
     body.goal-no-period #today-insight-card,
     body.goal-no-period #advanced-insight-card,
-    body.goal-perimenopause #today-insight-card,
-    body.goal-perimenopause #advanced-insight-card { display: none; }
+    body.goal-track-symptoms #today-insight-card,
+    body.goal-track-symptoms #advanced-insight-card { display: none; }
     body.goal-no-period .dash-mid,
-    body.goal-perimenopause .dash-mid { display: none; }
+    body.goal-track-symptoms .dash-mid { display: none; }
 
     /* Pregnancy insights card grid */
     .pregnancy-insights-grid {

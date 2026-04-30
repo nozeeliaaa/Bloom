@@ -4,12 +4,12 @@
  * Builds a safe, transparent future-capability messaging line for Bloomie.
  *
  * Rules:
- *  • Always indicates FUTURE capability — never implies current capability.
+ *  • Always indicates FUTURE capability - never implies current capability.
  *  • Uses gentle uncertain language ("may", "could", "over time", "in future versions").
  *  • Never mentions diagnosis improvement or treatment capability.
  *  • Never surfaces during urgent flows (returns null when urgentFlag is true).
  *  • Returns one brief, warm line or null.
- *  • Deterministic — no randomness, making responses stable and testable.
+ *  • Deterministic - no randomness, making responses stable and testable.
  *
  * Use cases:
  *  1. User asks how Bloomie could improve in future             → "improvement"
@@ -21,7 +21,7 @@
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Message pools — indexed by context key.
+// Message pools - indexed by context key.
 // Each entry is an array of safe, interchangeable lines.
 // Index 0 is the default; additional lines reserved for future A/B use.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ const FUTURE_LINES = {
   ],
   general_scope: [
     "At the moment I stay grounded in the information currently available, but future improvements may allow better long-term pattern tracking.",
-    "I work with what's currently logged in Bloom — as records build over time, future versions may be able to offer more tailored insights.",
+    "I work with what's currently logged in Bloom - as records build over time, future versions may be able to offer more tailored insights.",
   ],
   future_products: [
     "As Bloom evolves, richer logged history could help make cycle-related support more tailored over time.",
@@ -85,10 +85,10 @@ const CONTEXT_PATTERNS = [
  * Returns one safe, future-framed capability line for the given context,
  * or null if the flow is urgent or the context is unrecognised.
  *
- * @param {string} [context="general"] — one of: "general" | "improvement" |
+ * @param {string} [context="general"] - one of: "general" | "improvement" |
  *   "personalization" | "general_scope" | "future_products"
  * @param {object} [options]
- * @param {boolean} [options.urgentFlag=false] — when true returns null;
+ * @param {boolean} [options.urgentFlag=false] - when true returns null;
  *   future-capability lines must never surface during urgent or red-flag flows.
  * @returns {string|null}
  */
@@ -108,7 +108,7 @@ export function buildFutureCapabilityLine(context = "general", { urgentFlag = fa
  * Designed to be called before routing so the caller can decide whether
  * to attach a future-capability line to a response.
  *
- * @param {string} text — raw or normalised user input
+ * @param {string} text - raw or normalised user input
  * @returns {"improvement"|"personalization"|"general_scope"|"future_products"|null}
  */
 export function detectFutureCapabilityContext(text) {

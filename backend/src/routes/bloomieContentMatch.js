@@ -14,7 +14,7 @@ const router = express.Router();
  * Returns the best content match for the given user input, filtered against
  * content already shown or declined (read from bloomieMemory).
  *
- * Auth: required — uid used to fetch memory exclusions, never from body.
+ * Auth: required - uid used to fetch memory exclusions, never from body.
  */
 router.post("/", requireAuth, async (req, res) => {
   const uid = req.user?.uid;
@@ -28,7 +28,7 @@ router.post("/", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "inputText is required" });
   }
 
-  // Read exclusions from bloomieMemory — single read, best-effort
+  // Read exclusions from bloomieMemory - single read, best-effort
   let shownIds    = [];
   let declinedIds = [];
   try {
@@ -39,7 +39,7 @@ router.post("/", requireAuth, async (req, res) => {
       declinedIds = Array.isArray(data?.declinedSuggestions)     ? data.declinedSuggestions     : [];
     }
   } catch (err) {
-    // Non-fatal — proceed without exclusions rather than blocking the match
+    // Non-fatal - proceed without exclusions rather than blocking the match
     console.error(`[POST /api/bloomie-content-match] memory read uid=${uid}`, err.message ?? err);
   }
 

@@ -299,7 +299,15 @@
     const LS_AVATAR  = "bloom_avatar";
 
     function loadProfile(){
-      try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
+      try {
+        const data = JSON.parse(localStorage.getItem(LS_PROFILE)) || {};
+        return {
+          ...(data.profile || {}),
+          ...(data.healthProfile || {}),
+          biometricProfile: data.biometricProfile || {},
+          phaseProfile: data.phaseProfile || {}
+        };
+      }
       catch { return {}; }
     }
 
@@ -317,10 +325,67 @@
         user ? "Signed in • View Profile to edit details" : "Not signed in • View Profile to edit details";
     }
 
-    onAuthChange((user) => {
+    onAuthChange(async (user) => {
       updateMiniProfile(user);
-      const logoutBtn = document.getElementById("profile-logout-btn");
-      if (logoutBtn) logoutBtn.hidden = !user;
+
+      if (user) {
+        try {
+          const token = await getIdToken();
+          const apiBase = window.BLOOM_API_BASE || "";
+
+          const res = await fetch(`${apiBase}/api/user/profile`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const profile = data.profile || {};
+
+            // update localStorage with fresh backend data
+            const existing = (() => {
+              try { return JSON.parse(localStorage.getItem("bloom_profile")) || {}; }
+              catch { return {}; }
+            })();
+
+            const updated = {
+              ...existing,
+              profile: {
+                ...(existing.profile || {}),
+                nickname: profile.nickname || "",
+                yob: profile.yearOfBirth || ""
+              },
+              healthProfile: {
+                ...(existing.healthProfile || {}),
+                avgCycleLength: data.healthProfile?.avgCycleLength ?? existing.healthProfile?.avgCycleLength ?? null,
+                periodDuration: data.healthProfile?.periodDuration ?? existing.healthProfile?.periodDuration ?? null,
+                weightKg: data.healthProfile?.weightKg ?? existing.healthProfile?.weightKg ?? null,
+                heightCm: data.healthProfile?.heightCm ?? existing.healthProfile?.heightCm ?? null
+              },
+              biometricProfile: {
+                ...(existing.biometricProfile || {}),
+                sleepScore: data.biometricProfile?.sleepScore ?? existing.biometricProfile?.sleepScore ?? null,
+                stressLevel: data.biometricProfile?.stressLevel ?? existing.biometricProfile?.stressLevel ?? null,
+                activityLevel: data.biometricProfile?.activityLevel ?? existing.biometricProfile?.activityLevel ?? null
+              },
+              phaseProfile: {
+                ...(existing.phaseProfile || {}),
+                lastPeriodStart: data.phaseProfile?.lastPeriodStart ?? existing.phaseProfile?.lastPeriodStart ?? null,
+                phaseEstimation: data.phaseProfile?.phaseEstimation ?? existing.phaseProfile?.phaseEstimation ?? null
+              }
+            };
+
+            localStorage.setItem("bloom_profile", JSON.stringify(updated));
+
+            if (profile.avatar) {
+              localStorage.setItem("bloom_avatar", profile.avatar);
+            }
+
+            updateMiniProfile(user); // refresh UI
+          }
+        } catch (e) {
+          console.error("Profile sync failed", e);
+        }
+      }
     });
 
     document.getElementById("profile-logout-btn")?.addEventListener("click", async () => {
@@ -335,7 +400,7 @@
     const GOAL_ICONS = {
       period: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
       ttc:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
-      track_symptoms: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
+      no_period: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
       pregnancy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
       perimenopause: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
     };

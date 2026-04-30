@@ -12,7 +12,7 @@
  *
  * WHY IT IS SAFE
  * ──────────────
- * 1. AI produces structured JSON only — no advice text, no reply text, no
+ * 1. AI produces structured JSON only - no advice text, no reply text, no
  *    free-form health guidance. The backend prompt forbids it explicitly.
  * 2. Every returned value is validated against a fixed allowlist on BOTH the
  *    backend (server-side first defence) and here (client-side second defence).
@@ -20,7 +20,7 @@
  *    The caller in assistant.js must check `entities.urgent` and `ctx.urgency`
  *    before applying any signal; this module does not enforce that itself but
  *    documents the contract.
- * 4. The result is purely advisory — if it is null (any failure path), Bloomie
+ * 4. The result is purely advisory - if it is null (any failure path), Bloomie
  *    behaves exactly as it does today with zero observable difference.
  *
  * HOW FALLBACK WORKS
@@ -39,14 +39,14 @@
  * OUTPUT SHAPE (ExtractedSignals)
  * ────────────────────────────────
  * {
- *   symptoms:         string[]  — Bloomie-compatible symptom/entity keys
- *   timing:           string[]  — timing descriptor codes
+ *   symptoms:         string[]  - Bloomie-compatible symptom/entity keys
+ *   timing:           string[]  - timing descriptor codes
  *   severity:         "mild"|"moderate"|"severe"|null
- *   tone:             string|null — emotional tone code
- *   repair:           boolean   — true if user seems frustrated at the app
- *   pregnancySignals: string[]  — pregnancy-relevant subset of symptoms
- *   redFlags:         string[]  — advisory risk markers (NEVER override routing)
- *   confidence:       number    — 0.0–1.0
+ *   tone:             string|null - emotional tone code
+ *   repair:           boolean   - true if user seems frustrated at the app
+ *   pregnancySignals: string[]  - pregnancy-relevant subset of symptoms
+ *   redFlags:         string[]  - advisory risk markers (NEVER override routing)
+ *   confidence:       number    - 0.0–1.0
  * }
  *
  * MAPPING TO INTERNAL FIELDS
@@ -155,7 +155,7 @@ function validateExtractedSignals(parsed) {
     ? parsed.redFlags.filter(f => typeof f === "string" && VALID_RED_FLAGS.has(f))
     : [];
 
-  // If nothing useful was extracted, treat as null — no point storing empty signals.
+  // If nothing useful was extracted, treat as null - no point storing empty signals.
   if (
     symptoms.length === 0 &&
     timing.length === 0 &&

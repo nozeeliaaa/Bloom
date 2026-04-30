@@ -154,7 +154,7 @@ export function resolveOOSFollowUp(rawText, lastOOS) {
 // ─── 2b. REPORTED-CONDITION DETECTION ────────────────────────────────────────
 //
 // ┌─────────────────────────────────────────────────────────────────────────┐
-// │  THREE-WAY DISTINCTION — read before changing anything in this section  │
+// │  THREE-WAY DISTINCTION - read before changing anything in this section  │
 // ├─────────────────────────────────────────────────────────────────────────┤
 // │                                                                         │
 // │  1. REPORTED DIAGNOSIS (user_reported)                                  │
@@ -189,7 +189,7 @@ export function resolveOOSFollowUp(rawText, lastOOS) {
 // │       → routes to DIAGNOSIS_REDIRECT (validates concern, no diagnosis)  │
 // │                                                                         │
 // │  3. DIAGNOSIS-SEEKING REQUEST (diagnosis_request)                       │
-// │     The user is asking Bloomie to diagnose them — typically a direct    │
+// │     The user is asking Bloomie to diagnose them - typically a direct    │
 // │     question or an invitation for Bloomie to confirm/rule out a         │
 // │     specific condition.                                                  │
 // │                                                                         │
@@ -213,8 +213,8 @@ export function resolveOOSFollowUp(rawText, lastOOS) {
  * Used by all reported-condition helpers and the REPORTED_CONDITION_ACK node.
  *
  * Each entry:
- *   name  — user-facing display string (never "your ___", just the label)
- *   rx    — matches both formal and colloquial spellings / abbreviations
+ *   name  - user-facing display string (never "your ___", just the label)
+ *   rx    - matches both formal and colloquial spellings / abbreviations
  */
 export const CONDITION_META = {
   pcos:          { name: "PCOS",               rx: /\bpcos\b|\bpolycystic ovary syndrome\b|\bpolycystic ovaries\b/i },
@@ -235,7 +235,7 @@ export const CONDITION_META = {
  * Matched against the NORMALIZED text only, so casing is irrelevant.
  * Used by extractConditionKey() to resolve colloquial mentions.
  *
- * Amenorrhea aliases are only surfaced when tied to a reporting phrase —
+ * Amenorrhea aliases are only surfaced when tied to a reporting phrase -
  * "no period for months" alone is too ambiguous to classify as a diagnosis.
  */
 export const CONDITION_ALIASES = {
@@ -306,7 +306,7 @@ export function extractConditionKey(t) {
 
 /**
  * Patterns that signal the user is REPORTING an existing diagnosis
- * (not seeking one). Order matters — more specific patterns first.
+ * (not seeking one). Order matters - more specific patterns first.
  */
 const REPORTED_PREFIXES = [
   /\b(i was diagnosed with|i've been diagnosed with|my doctor (diagnosed me with|said i have|told me i have|confirmed (i have|that i have))|i've been told (i have|that i have)|i was told (i have|that i have))\b/i,
@@ -317,7 +317,7 @@ const REPORTED_PREFIXES = [
 
 /**
  * Patterns that indicate diagnosis-SEEKING language. When any match,
- * detectReportedCondition returns null — the existing diagnosis_request
+ * detectReportedCondition returns null - the existing diagnosis_request
  * OOS path handles it instead.
  */
 const SEEKING_PATTERNS = [
@@ -330,7 +330,7 @@ const SEEKING_PATTERNS = [
 
 /**
  * Management / treatment question patterns for a known reported condition.
- * These are checked ONLY when ctx.reportedConditions is non-empty — the user
+ * These are checked ONLY when ctx.reportedConditions is non-empty - the user
  * must have already stated a diagnosis earlier in the session.
  */
 const MANAGEMENT_PATTERNS = [
@@ -356,7 +356,7 @@ const CONDITION_SYMPTOM_PATTERNS = [
 /**
  * detectReportedCondition(text) → ReportedConditionResult | null
  *
- * Pure function — no side effects, no ctx.
+ * Pure function - no side effects, no ctx.
  * Returns a structured object when the user reports an EXISTING confirmed
  * diagnosis; returns null otherwise.
  *
@@ -370,8 +370,8 @@ const CONDITION_SYMPTOM_PATTERNS = [
  * }
  *
  * confidence values:
- *   0.95 — explicit clinical reporting phrase ("I was diagnosed with")
- *   0.80 — clear ownership statement ("I have PCOS" / "due to my fibroids")
+ *   0.95 - explicit clinical reporting phrase ("I was diagnosed with")
+ *   0.80 - clear ownership statement ("I have PCOS" / "due to my fibroids")
  */
 export function detectReportedCondition(rawText) {
   if (!rawText || typeof rawText !== "string") return null;
@@ -380,7 +380,7 @@ export function detectReportedCondition(rawText) {
   // Bail immediately on diagnosis-seeking language
   if (SEEKING_PATTERNS.some(rx => rx.test(t))) return null;
 
-  // High-confidence group — explicit clinical reporting prefix
+  // High-confidence group - explicit clinical reporting prefix
   const HIGH_PREFIXES = [
     REPORTED_PREFIXES[0], // "I was diagnosed with…" etc.
     REPORTED_PREFIXES[1], // "diagnosed with…" / "I already have…"
@@ -399,7 +399,7 @@ export function detectReportedCondition(rawText) {
     }
   }
 
-  // Medium-confidence group — ownership / causal statement
+  // Medium-confidence group - ownership / causal statement
   const MED_PREFIXES = [
     REPORTED_PREFIXES[2], // "I have PCOS" / "I've got fibroids"
     REPORTED_PREFIXES[3], // "because of my PCOS"
@@ -471,7 +471,7 @@ export function detectConditionSymptomQuestion(rawText, reportedConditions) {
 // A score ≥ 1 is treated as "possibly in-scope" for routing purposes.
 
 const _VAGUE_HEALTH_PATTERNS = [
-  // "something wrong/off/not right/strange" — generic wrongness signal
+  // "something wrong/off/not right/strange" - generic wrongness signal
   /something(?:'s)?\s+(?:wrong|off|not right|not normal|strange|weird|different)\b/,
   /sumn\s+(?:wrong|off|not right)/,              // Patois: sumn = something
   /something feels?\s+(?:wrong|off|weird|strange|different|not right)/,
@@ -628,7 +628,7 @@ export function scoreSignals(t) {
 // ─── 3b. SEMANTIC CHOICE INTENTS ─────────────────────────────────────────────
 
 /**
- * CHOICE_INTENT_MAP — maps a choice id to a semantic intent string.
+ * CHOICE_INTENT_MAP - maps a choice id to a semantic intent string.
  *
  * Intents are used by resolveChoiceByIntent() so that typed yes/no/unsure
  * answers can match choice objects even when their id isn't literally "yes",
@@ -636,14 +636,14 @@ export function scoreSignals(t) {
  * choice object to override this lookup.
  *
  * Intent vocabulary:
- *   affirm            — affirmative answer (yes, yeah, i think so, probably…)
- *   deny              — negative answer (no, nope, probably not…)
- *   unsure            — uncertain answer (not sure, idk, maybe, can't tell…)
- *   test_positive     — pregnancy/OPK test read as positive
- *   test_negative     — pregnancy/OPK test read as negative
- *   test_unclear      — test result unclear or faint
- *   pregnancy_possible — user is or might be pregnant
- *   irregular_cycle   — user has or suspects an irregular cycle
+ *   affirm            - affirmative answer (yes, yeah, i think so, probably…)
+ *   deny              - negative answer (no, nope, probably not…)
+ *   unsure            - uncertain answer (not sure, idk, maybe, can't tell…)
+ *   test_positive     - pregnancy/OPK test read as positive
+ *   test_negative     - pregnancy/OPK test read as negative
+ *   test_unclear      - test result unclear or faint
+ *   pregnancy_possible - user is or might be pregnant
+ *   irregular_cycle   - user has or suspects an irregular cycle
  */
 export const CHOICE_INTENT_MAP = {
   yes:         "affirm",
@@ -683,13 +683,13 @@ export function resolveChoiceByIntent(choices, intent) {
  * falling through to the full intent pipeline.
  *
  * Types:
- *   "yes_no"      — yes / no / not-sure (ids: yes, no, ns)
- *   "test_result" — positive / negative / unclear (ids: pos, neg, unc)
- *   "severity"    — mild / moderate / severe (ids: mild, mod, sev)
- *   "timing"      — before / during / any / other time-relative ids
- *   "duration"    — few days / a week / most of cycle (ids: few, week, most)
- *   "choice"      — has choices but none of the above shapes
- *   null          — no choices (open-text node or no relevant shape)
+ *   "yes_no"      - yes / no / not-sure (ids: yes, no, ns)
+ *   "test_result" - positive / negative / unclear (ids: pos, neg, unc)
+ *   "severity"    - mild / moderate / severe (ids: mild, mod, sev)
+ *   "timing"      - before / during / any / other time-relative ids
+ *   "duration"    - few days / a week / most of cycle (ids: few, week, most)
+ *   "choice"      - has choices but none of the above shapes
+ *   null          - no choices (open-text node or no relevant shape)
  */
 export function classifyNodeQuestion(choices) {
   if (!Array.isArray(choices) || !choices.length) return null;
@@ -771,7 +771,7 @@ const INTENT_LABELS = {
 };
 
 /**
- * INTENT_TO_NODE — maps a resolved intent key to its entry node
+ * INTENT_TO_NODE - maps a resolved intent key to its entry node
  */
 export const INTENT_TO_NODE = {
   late:        "LATE_INTRO",

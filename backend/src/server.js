@@ -1,6 +1,3 @@
-// server.js
-import dotenv from "dotenv";
-dotenv.config();
 
 // ── Startup env var checks ──────────────────────────────────
 // Firebase credentials are handled by firebaseAdmin.js (uses serviceAccountKey.json as local fallback)
@@ -30,7 +27,9 @@ import { db } from "./firebaseAdmin.js";
 import { runDailyRemindersJob } from "./jobs/sendDailyReminders.js";
 import cycleLogRoutes from "./routes/cycleLogs.js";
 import notificationRoutes from "./routes/notifications.js";
+import biometricLogRoutes from "./routes/biometricLogs.js";
 import symptomLogRoutes from "./routes/symptomLogs.js";
+import phaseFeedbackRoutes from "./routes/phaseFeedback.js";
 import consentRoutes from "./routes/consent.js";
 import catalogRoutes from "./routes/catalog.js";
 import userRoutes from "./routes/user.js";
@@ -38,6 +37,7 @@ import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import bloomieMemoryRoutes from "./routes/bloomieMemory.js";
 import bloomieSafetyLogRoutes from "./routes/bloomieSafetyLog.js";
+import bloomieAnalyticsRoutes from "./routes/bloomieAnalytics.js";
 import feedbackRoutes from "./routes/feedback.js";
 import preferencesRoutes from "./routes/preferences.js";
 import cyclesMLRoutes from "./routes/cyclesML.js";
@@ -121,7 +121,11 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/bloomie-memory",    bloomieMemoryRoutes);
 app.use("/api/bloomie-safety-log", bloomieSafetyLogRoutes);
+app.use("/api/bloomie/analytics", bloomieAnalyticsRoutes);
+app.use("/api/biometric-logs", biometricLogRoutes);
+app.use("/api/phase-feedback", phaseFeedbackRoutes);
 app.use("/api/feedback",           feedbackRoutes);
+app.use("/api/cycle-logs", cycleLogRoutes);
 app.use("/api/preferences",        preferencesRoutes);
 app.use("/api/cycles",             cyclesMLRoutes);
 app.use("/api/contact",            contactRoutes);
