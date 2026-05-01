@@ -233,6 +233,14 @@
 /* Stats grid spacing */
 .admin-stats-grid { margin-bottom: 1.25rem; }
 
+/* Overview stats: keep a clean 2x2 layout on wide screens
+   so Pamphlets and Clinics sit side-by-side under New users. */
+@media (min-width: 900px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* Stat card icon row */
 .admin-stat-card .card-body { padding: 1rem 1.1rem; }
 
@@ -320,4 +328,142 @@
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(212, 116, 154, 0.15);
   outline: none;
+}
+
+/* Support inbox */
+.support-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.support-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.support-summary-pill strong {
+  font-size: 0.86rem;
+}
+
+.support-summary-pill--new {
+  background: #fff6df;
+  color: #7b5900;
+  border-color: #efd48c;
+}
+
+.support-summary-pill--open {
+  background: #ebf3ff;
+  color: #12468f;
+  border-color: #b6d2ff;
+}
+
+.support-summary-pill--resolved {
+  background: #ecf9f2;
+  color: #1e6d45;
+  border-color: #a7e2c0;
+}
+
+.support-list {
+  gap: 0.9rem;
+}
+
+.support-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  padding: 0.95rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.support-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.support-card-id {
+  font-weight: 800;
+  font-size: 1.02rem;
+  letter-spacing: 0.01em;
+}
+
+.support-card-date {
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+}
+
+.support-card-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.support-card-badge--new {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.support-card-badge--open {
+  background: #cfe2ff;
+  color: #084298;
+}
+
+.support-card-badge--resolved {
+  background: #d1e7dd;
+  color: #0a3622;
+}
+
+.support-card-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.45rem 0.8rem;
+}
+
+.support-meta-row {
+  font-size: 0.88rem;
+}
+
+.support-meta-row strong {
+  color: var(--color-text);
+}
+
+.support-card-message {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  background: var(--color-bg-soft, #f7f2f5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.8rem;
+}
+
+.support-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.support-status-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.84rem;
+  color: var(--color-text-muted);
 }

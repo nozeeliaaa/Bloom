@@ -44,20 +44,16 @@ router.get("/stats", async (req, res) => {
       .count()
       .get();
 
-    const goalsPromise = db.collection("users").select("profile").get();
-
     const [
       usersSnap,
       clinicsSnap,
       pamphletsSnap,
       newUsersSnap,
-      allUsers,
     ] = await Promise.all([
       usersCountPromise,
       clinicsCountPromise,
       pamphletsCountPromise,
       newUsersPromise,
-      goalsPromise,
     ]);
 
     const totalUsers = usersSnap.data().count;
@@ -65,44 +61,13 @@ router.get("/stats", async (req, res) => {
     const totalPamphlets = pamphletsSnap.data().count;
     const newUsersThisWeek = newUsersSnap.data().count;
 
-    let totalCycleLogs = 0;
-    let totalSymptomLogs = 0;
-
-    try {
-      const entriesSnap = await db.collectionGroup("entries").get();
-
-      entriesSnap.forEach((doc) => {
-        const data = doc.data();
-
-        if (data.flow && data.flow !== "none") {
-          totalCycleLogs++;
-        }
-
-        if (Array.isArray(data.items) && data.items.length > 0) {
-          totalSymptomLogs++;
-        }
-      });
-    } catch (err) {
-      console.warn("Entries aggregation failed:", err.message);
-    }
-
-    const goalDistribution = {};
-    allUsers.forEach((doc) => {
-      const data = doc.data();
-      const goal = data?.profile?.goal || "unknown";
-      goalDistribution[goal] = (goalDistribution[goal] || 0) + 1;
-    });
-
     res.json({
       ok: true,
       stats: {
         totalUsers,
         newUsersThisWeek,
-        totalCycleLogs,
-        totalSymptomLogs,
         totalPamphlets,
         totalClinics,
-        goalDistribution,
       },
     });
   } catch (err) {

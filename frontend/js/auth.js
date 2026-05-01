@@ -15,8 +15,8 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut,
-} from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { getFirebaseAuth, getFirebaseDB } from "./firebase.js";
 import { getMode, setMode } from "./mode.js";
 

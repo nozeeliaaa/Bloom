@@ -34,6 +34,15 @@ const SUBJECT_LABELS = {
   other:         "Other",
 };
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function generateRequestId() {
   const year   = new Date().getFullYear();
   const suffix = Date.now().toString(36).slice(-5).toUpperCase();
@@ -59,18 +68,24 @@ router.post("/", limiter, async (req, res) => {
 
     const requestId = generateRequestId();
 
-    // 1 = Save to Firestore
-    await db.collection("contactMessages").add({
-      requestId,
-      subject:    safeSubject,
-      message:    safeMessage,
-      replyEmail: safeEmail   || null,
-      name:       safeName    || null,
-      userId:     safeUserId  || null,
-      status:     "new",
-      source:     "contact-form",
-      createdAt:  FieldValue.serverTimestamp(),
-    });
+    // 1 = Save to Firestore (best-effort)
+    let stored = false;
+    try {
+      await db.collection("contactMessages").add({
+        requestId,
+        subject:    safeSubject,
+        message:    safeMessage,
+        replyEmail: safeEmail   || null,
+        name:       safeName    || null,
+        userId:     safeUserId  || null,
+        status:     "new",
+        source:     "contact-form",
+        createdAt:  FieldValue.serverTimestamp(),
+      });
+      stored = true;
+    } catch (writeErr) {
+      console.warn("[contact] Firestore write failed:", writeErr?.message || writeErr);
+    }
 
     const subjectLabel = SUBJECT_LABELS[safeSubject] || safeSubject;
 
@@ -79,35 +94,42 @@ router.post("/", limiter, async (req, res) => {
       <h2 style="font-family:sans-serif;color:#d85a98;">New message via Bloom Contact Form</h2>
       <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse;width:100%;max-width:560px;">
         <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;width:130px;">Request ID</td>
-            <td style="padding:6px 12px;border-left:3px solid #d85a98;font-family:monospace;">${requestId}</td></tr>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;font-family:monospace;">${escapeHtml(requestId)}</td></tr>
         <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;">Subject</td>
-            <td style="padding:6px 12px;border-left:3px solid #d85a98;">${subjectLabel}</td></tr>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;">${escapeHtml(subjectLabel)}</td></tr>
         <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;">Name</td>
-            <td style="padding:6px 12px;border-left:3px solid #d85a98;">${safeName || "<em>not provided</em>"}</td></tr>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;">${safeName ? escapeHtml(safeName) : "<em>not provided</em>"}</td></tr>
         <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;">Reply-to</td>
-            <td style="padding:6px 12px;border-left:3px solid #d85a98;">${safeEmail || "<em>not provided</em>"}</td></tr>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;">${safeEmail ? escapeHtml(safeEmail) : "<em>not provided</em>"}</td></tr>
         <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;">User ID</td>
-            <td style="padding:6px 12px;border-left:3px solid #d85a98;font-family:monospace;">${safeUserId || "<em>anonymous</em>"}</td></tr>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;font-family:monospace;">${safeUserId ? escapeHtml(safeUserId) : "<em>anonymous</em>"}</td></tr>
         <tr><td style="padding:6px 12px;font-weight:bold;background:#f9f0f5;vertical-align:top;">Message</td>
-            <td style="padding:6px 12px;border-left:3px solid #d85a98;white-space:pre-wrap;">${safeMessage}</td></tr>
+            <td style="padding:6px 12px;border-left:3px solid #d85a98;white-space:pre-wrap;">${escapeHtml(safeMessage)}</td></tr>
       </table>
       <p style="font-family:sans-serif;font-size:12px;color:#999;margin-top:16px;">
         Sent via Bloom Help &amp; Contact page &mdash; ${new Date().toUTCString()}
       </p>
     `;
 
+    let emailSent = false;
     try {
-      await sendToHelpdesk({
-        subject: `[Bloom Contact] ${subjectLabel} = ${requestId}`,
+      emailSent = await sendToHelpdesk({
+        subject: `[Bloom Contact] ${subjectLabel} - ${requestId}`,
         html,
         replyTo: safeEmail || undefined,
       });
     } catch (mailErr) {
-      // Email failure must not block the response = message is already saved in Firestore
-      console.warn("[contact] email send failed (message still saved):", mailErr.message);
+      console.warn("[contact] email send failed:", mailErr.message);
     }
 
-    res.json({ ok: true, requestId });
+    if (!emailSent) {
+      return res.status(503).json({
+        error: "Helpdesk inbox is temporarily unavailable. Please try again shortly.",
+        requestId,
+      });
+    }
+
+    res.json({ ok: true, requestId, stored });
   } catch (e) {
     console.error("[contact] POST error:", e);
     res.status(500).json({ error: "Failed to send message. Please try again." });

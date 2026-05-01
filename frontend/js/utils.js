@@ -4,7 +4,6 @@
 import { isAccountMode, isAnonMode } from "./mode.js";
 import { getUser } from "./auth.js";
 import { startSessionTimeoutGuard } from "./session-timeout.js";
-import symptoms from '../data/symptoms.json';
 import { initTheme } from "./theme-manager.js";
 
 // Single source of truth for this key
@@ -12,6 +11,37 @@ export const MODE_BANNER_ONCE_KEY = "bloom_show_mode_banner_once";
 
 // Initialize theme on every page load (prevents flash of wrong theme)
 initTheme();
+
+// Load symptom catalog at runtime so static hosting (Firebase web.app) does
+// not try to execute JSON as a JavaScript module.
+const SYMPTOM_DATA_CACHE_KEY = "bloom_symptom_catalog_v1";
+const SYMPTOM_DATA_URL = "/data/symptoms.json";
+
+async function loadSymptomCatalog() {
+  try {
+    const cached = sessionStorage.getItem(SYMPTOM_DATA_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch (_) {
+    // Ignore cache parse errors and fall through to network fetch.
+  }
+
+  try {
+    const res = await fetch(SYMPTOM_DATA_URL, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [];
+    try { sessionStorage.setItem(SYMPTOM_DATA_CACHE_KEY, JSON.stringify(list)); } catch (_) {}
+    return list;
+  } catch (err) {
+    console.warn("[utils] Failed to load symptoms.json:", err?.message || err);
+    return [];
+  }
+}
+
+const symptoms = await loadSymptomCatalog();
 
 /* ===== ICONS (inline SVG) ===== */
 export const ICONS = {
@@ -107,6 +137,36 @@ export function renderNav(activePage = "") {
   `;
 
   document.body.prepend(nav);
+
+  const brandLink = nav.querySelector(".navbar-brand");
+  brandLink?.addEventListener("click", (e) => {
+    // Keep standard browser behavior for modified/middle clicks.
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+      return;
+    }
+
+    const homeHref = "/index.html";
+    let referrer = null;
+    try {
+      referrer = document.referrer ? new URL(document.referrer) : null;
+    } catch (_) {
+      referrer = null;
+    }
+    const current = window.location.href;
+    const sameOriginReferrer =
+      !!referrer &&
+      referrer.origin === window.location.origin &&
+      referrer.href !== current;
+
+    e.preventDefault();
+
+    if (sameOriginReferrer && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    window.location.href = homeHref;
+  });
 
   const toggle = nav.querySelector(".nav-toggle");
   const linkContainer = nav.querySelector(".navbar-links");

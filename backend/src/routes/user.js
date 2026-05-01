@@ -7,6 +7,11 @@ import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
 const router = express.Router();
 
+function isFirestoreQuotaError(err) {
+  const msg = String(err?.message || "").toLowerCase();
+  return err?.code === 8 || msg.includes("resource_exhausted") || msg.includes("quota exceeded");
+}
+
 function computeAgeBand(yob) {
   const age = new Date().getFullYear() - yob;
   if (age >= 10 && age <= 17) return "10-17";
@@ -216,6 +221,17 @@ router.post("/game", requireAuth, async (req, res) => {
 /* Get user profile */
 router.get("/profile", requireAuth, async (req, res) => {
   try {
+    if (req.user?.firestoreDegraded) {
+      return res.json({
+        degraded: true,
+        profile: null,
+        healthProfile: null,
+        biometricProfile: null,
+        phaseProfile: null,
+        game: null,
+      });
+    }
+
     const uid = req.user.uid;
     const doc = await db.collection("users").doc(uid).get();
     if (!doc.exists) return res.json(null);
@@ -228,7 +244,19 @@ router.get("/profile", requireAuth, async (req, res) => {
 
     return res.json(data);
   } catch (err) {
-    console.error("GET /profile error:", err);
+    if (isFirestoreQuotaError(err)) {
+      console.warn("GET /profile quota exceeded; returning degraded profile payload");
+      return res.json({
+        degraded: true,
+        profile: null,
+        healthProfile: null,
+        biometricProfile: null,
+        phaseProfile: null,
+        game: null,
+      });
+    }
+
+    console.error("GET /profile error:", err?.message ?? err);
     return res.status(500).json({ error: "Failed to fetch profile" });
   }
 });

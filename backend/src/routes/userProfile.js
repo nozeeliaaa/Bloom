@@ -13,6 +13,7 @@ router.get("/", requireAuth, async (req, res) => {
   // Guards against middleware ordering changes or future refactors.
   const uid = req.user?.uid;
   if (!uid) return res.status(401).json({ nickname: null });
+  if (req.user?.firestoreDegraded) return res.json({ nickname: null, degraded: true });
 
   try {
     // Schema: users/{uid} stores a nested `profile` object - NOT a subcollection.

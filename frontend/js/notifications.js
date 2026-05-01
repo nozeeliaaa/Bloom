@@ -14,7 +14,7 @@
  */
  
 import { getFirebaseMessaging } from "./firebase.js";
-import { getToken, onMessage }  from "firebase/messaging";
+import { getToken, onMessage }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging.js";
 import { getIdToken }           from "./auth.js";
 import { loadBloomPreferencesLocal } from "./bloom-storage.js";
  

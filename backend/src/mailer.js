@@ -14,7 +14,7 @@
 
 import nodemailer from "nodemailer";
 
-const HELPDESK_EMAIL = "bloomhelpdesk@outlook.com";
+const HELPDESK_EMAIL = "Bloomhelpdesk@outlook.com";
 
 function createTransport() {
   return nodemailer.createTransport({
@@ -36,7 +36,7 @@ function createTransport() {
 export async function sendToHelpdesk({ subject, html, replyTo }) {
   if (!process.env.HELPDESK_EMAIL_PASS) {
     console.warn("[mailer] HELPDESK_EMAIL_PASS not set - skipping email.");
-    return;
+    return false;
   }
 
   const transporter = createTransport();
@@ -47,6 +47,7 @@ export async function sendToHelpdesk({ subject, html, replyTo }) {
     subject,
     html,
   });
+  return true;
 }
 
 /**
@@ -56,7 +57,7 @@ export async function sendToHelpdesk({ subject, html, replyTo }) {
 export async function sendMailTo({ to, subject, html }) {
   if (!process.env.HELPDESK_EMAIL_PASS) {
     console.warn("[mailer] HELPDESK_EMAIL_PASS not set - skipping email.");
-    return;
+    return false;
   }
 
   const transporter = createTransport();
@@ -66,4 +67,5 @@ export async function sendMailTo({ to, subject, html }) {
     subject,
     html,
   });
+  return true;
 }

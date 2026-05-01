@@ -1,7 +1,18 @@
 import { defineConfig } from "vite";
 import { resolve } from "path";
+import { readdirSync } from "fs";
 
 const LOCAL_API_TARGET = "http://127.0.0.1:4000";
+const PAGES_DIR = resolve(__dirname, "frontend/pages");
+
+const pageInputs = Object.fromEntries(
+  readdirSync(PAGES_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".html"))
+    .map((entry) => [
+      entry.name.replace(/\.html$/i, ""),
+      resolve(PAGES_DIR, entry.name),
+    ])
+);
 
 export default defineConfig({
   root: "frontend",
@@ -38,6 +49,7 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    target: "es2022",
     rollupOptions: {
       output: {
         // Named chunks for the two lazy-loaded Bloomie node banks.
@@ -57,17 +69,8 @@ export default defineConfig({
       },
       input: {
         index: resolve(__dirname, "frontend/index.html"),
-        dashboard: resolve(__dirname, "frontend/pages/dashboard.html"),
-        calendar: resolve(__dirname, "frontend/pages/calendar.html"),
-        log: resolve(__dirname, "frontend/pages/log.html"),
-        login: resolve(__dirname, "frontend/pages/login.html"),
-        register: resolve(__dirname, "frontend/pages/register.html"),
-        settings: resolve(__dirname, "frontend/pages/settings.html"),
-        survey: resolve(__dirname, "frontend/pages/survey.html"),
-        clinics: resolve(__dirname, "frontend/pages/clinics.html"),
-        pamphlets: resolve(__dirname, "frontend/pages/pamphlets.html"),
-        assistant: resolve(__dirname, "frontend/pages/assistant.html"),
-        profile: resolve(__dirname, "frontend/pages/profile.html"),
+        notFound: resolve(__dirname, "frontend/404.html"),
+        ...pageInputs,
       },
     },
   },

@@ -1,10 +1,37 @@
 import { auth, db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 
+const AUTH_USER_CACHE_TTL_MS = Number(process.env.AUTH_USER_CACHE_TTL_MS || 5 * 60 * 1000);
+const authUserCache = new Map();
+const AUTH_DEGRADED_WARN_WINDOW_MS = Number(process.env.AUTH_DEGRADED_WARN_WINDOW_MS || 30 * 1000);
+const authDegradedWarnAt = new Map();
+
 function normalizeBiometricLevel(value) {
   if (value === null || value === undefined || value === "") return null;
   const normalized = String(value).trim().toLowerCase();
   return normalized || null;
+}
+
+function getCachedAuthUser(uid) {
+  const entry = authUserCache.get(uid);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > AUTH_USER_CACHE_TTL_MS) {
+    authUserCache.delete(uid);
+    return null;
+  }
+  return entry.user;
+}
+
+function setCachedAuthUser(uid, user) {
+  authUserCache.set(uid, { user, ts: Date.now() });
+}
+
+function shouldLogDegradedWarn(uid) {
+  const last = authDegradedWarnAt.get(uid) || 0;
+  const now = Date.now();
+  if (now - last < AUTH_DEGRADED_WARN_WINDOW_MS) return false;
+  authDegradedWarnAt.set(uid, now);
+  return true;
 }
 
 export async function requireAuth(req, res, next) {
@@ -18,8 +45,28 @@ export async function requireAuth(req, res, next) {
 
   try {
     const decoded = await auth.verifyIdToken(token);
-    const userRef = db.collection("users").doc(decoded.uid);
-    const userDoc = await userRef.get();
+    if (!decoded.email_verified) {
+      return res.status(403).json({
+        error: "Email not verified",
+        code: "EMAIL_NOT_VERIFIED",
+      });
+    }
+
+    const cachedUser = getCachedAuthUser(decoded.uid);
+    if (cachedUser) {
+      req.user = {
+        ...cachedUser,
+        uid: decoded.uid,
+        email: decoded.email || null,
+        email_verified: !!decoded.email_verified,
+        firestoreDegraded: cachedUser.firestoreDegraded === true,
+      };
+      return next();
+    }
+
+    try {
+      const userRef = db.collection("users").doc(decoded.uid);
+      const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
       await userRef.set({
@@ -63,26 +110,21 @@ export async function requireAuth(req, res, next) {
         role: "user",
         ageBand: null,
         yob: null,
+        firestoreDegraded: false,
       };
+      setCachedAuthUser(decoded.uid, req.user);
 
       return next();
     }
 
-    if (!decoded.email_verified) {
-      return res.status(403).json({
-        error: "Email not verified",
-        code: "EMAIL_NOT_VERIFIED",
-      });
-    }
-
-    const data = userDoc.data() || {};
-    const isAdminUser =
-      data.role === "admin"
-        ? (await db.collection("adminUsers").doc(decoded.uid).get()).exists
-        : false;
-    const profile = data.profile || {};
-    const healthProfile = data.healthProfile || {};
-    const biometricProfile = data.biometricProfile || {};
+      const data = userDoc.data() || {};
+      const isAdminUser =
+        data.role === "admin"
+          ? (await db.collection("adminUsers").doc(decoded.uid).get()).exists
+          : false;
+      const profile = data.profile || {};
+      const healthProfile = data.healthProfile || {};
+      const biometricProfile = data.biometricProfile || {};
 
     if (!data.email && decoded.email) {
       await userRef.set(
@@ -221,9 +263,31 @@ export async function requireAuth(req, res, next) {
       role: isAdminUser ? "admin" : (decoded.role || data.role || "user"),
       ageBand,
       yob: safeProfile.yearOfBirth || null,
+      firestoreDegraded: false,
     };
+    setCachedAuthUser(decoded.uid, req.user);
 
     return next();
+    } catch (firestoreErr) {
+      // Graceful degradation during temporary Firestore outages
+      // (e.g. quota exceeded) so core authenticated APIs can still run.
+      if (shouldLogDegradedWarn(decoded.uid)) {
+        console.warn(
+          `[requireAuth] Firestore unavailable for uid=${decoded.uid}; using token-only auth`,
+          firestoreErr?.message ?? firestoreErr
+        );
+      }
+      req.user = {
+        uid: decoded.uid,
+        email: decoded.email || null,
+        email_verified: !!decoded.email_verified,
+        role: "user",
+        ageBand: null,
+        yob: null,
+        firestoreDegraded: true,
+      };
+      return next();
+    }
   } catch (err) {
     console.error("requireAuth error:", err);
     return res.status(401).json({ error: "Invalid token" });

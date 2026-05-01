@@ -34,7 +34,6 @@ onAuthChange(async (user) => {
 
   initTabs();
   loadOverview();
-  loadBloomieAnalytics();
 });
 
 // ─────────────────────────────────────────
@@ -81,21 +80,18 @@ function initTabs() {
       if (target === "users") loadUsers();
       if (target === "pamphlets") loadPamphlets();
       if (target === "clinics") loadClinics();
-      if (target === "overview") loadBloomieAnalytics();
       if (target === "support") loadSupportMessages();
     });
   });
 
   document.getElementById("admin-refresh-btn").addEventListener("click", () => {
     const active = document.querySelector(".admin-tab.active")?.dataset.tab;
-    if (active === "overview") { loadOverview(); loadBloomieAnalytics(); }
+    if (active === "overview") loadOverview();
     if (active === "users") loadUsers();
     if (active === "pamphlets") loadPamphlets();
     if (active === "clinics") loadClinics();
     if (active === "support") loadSupportMessages();
   });
-
-  document.getElementById("ba-refresh-btn")?.addEventListener("click", loadBloomieAnalytics);
 
   document.getElementById("users-refresh")?.addEventListener("click", loadUsers);
 }
@@ -109,8 +105,6 @@ async function loadOverview() {
 
     setText("stat-users", stats.totalUsers ?? "-");
     setText("stat-new-users", stats.newUsersThisWeek ?? "-");
-    setText("stat-cycle-logs", stats.totalCycleLogs ?? "-");
-    setText("stat-symptom-logs", stats.totalSymptomLogs ?? "-");
 
     // Pamphlet + clinic counts come from their own endpoints
     api("GET", "/pamphlets")
@@ -123,8 +117,6 @@ async function loadOverview() {
   } catch (err) {
     setText("stat-users", "-");
     setText("stat-new-users", "-");
-    setText("stat-cycle-logs", "-");
-    setText("stat-symptom-logs", "-");
     setText("stat-pamphlets", "-");
     setText("stat-clinics", "-");
     console.error("[admin] overview load failed:", err);
@@ -578,6 +570,10 @@ function escHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+function escAttr(str) {
+  return escHtml(str).replace(/'/g, "&#039;");
+}
+
 // ─────────────────────────────────────────
 // BLOOMIE ANALYTICS
 // ─────────────────────────────────────────
@@ -669,57 +665,102 @@ async function loadBloomieAnalytics() {
 // ─────────────────────────────────────────
 
 const STATUS_LABELS = { new: "New", open: "Open", resolved: "Resolved" };
-const STATUS_COLOURS = {
-  new:      "background:#fff3cd;color:#856404;",
-  open:     "background:#cfe2ff;color:#084298;",
-  resolved: "background:#d1e7dd;color:#0a3622;",
+const STATUS_BADGE_CLASSES = {
+  new: "support-card-badge--new",
+  open: "support-card-badge--open",
+  resolved: "support-card-badge--resolved",
+};
+const SUBJECT_LABELS = {
+  bug: "Something is not working",
+  data: "Question about my data",
+  privacy: "Privacy concern",
+  feedback: "General feedback",
+  accessibility: "Accessibility issue",
+  other: "Other",
 };
 
 async function loadSupportMessages() {
   const list   = document.getElementById("support-list");
   const filter = document.getElementById("support-status-filter").value;
+  const summaryWrap = document.getElementById("support-summary");
   list.innerHTML = "<p class='text-muted'>Loading…</p>";
+  if (summaryWrap) summaryWrap.hidden = true;
 
   try {
-    const url = "/api/admin/contact-messages" + (filter ? `?status=${filter}` : "");
-    const { messages } = await api("GET", url.replace("/api/admin", ""));
+    const { messages } = await api("GET", "/contact-messages");
 
-    if (!messages.length) {
+    const counts = { new: 0, open: 0, resolved: 0 };
+    messages.forEach((m) => {
+      if (Object.prototype.hasOwnProperty.call(counts, m.status)) counts[m.status] += 1;
+    });
+    setText("support-count-new", counts.new);
+    setText("support-count-open", counts.open);
+    setText("support-count-resolved", counts.resolved);
+    if (summaryWrap) summaryWrap.hidden = false;
+
+    const filtered = filter ? messages.filter((m) => m.status === filter) : messages;
+
+    if (!filtered.length) {
       list.innerHTML = "<p class='text-muted'>No support requests found.</p>";
       return;
     }
 
-    list.innerHTML = messages.map(m => {
-      const date    = m.createdAt ? new Date(m.createdAt).toLocaleString() : "-";
-      const badge   = `<span style="padding:2px 8px;border-radius:999px;font-size:0.78rem;font-weight:700;${STATUS_COLOURS[m.status] || ""}">${STATUS_LABELS[m.status] || m.status}</span>`;
+    list.innerHTML = filtered.map((m) => {
+      const date = m.createdAt ? new Date(m.createdAt).toLocaleString() : "-";
+      const statusClass = STATUS_BADGE_CLASSES[m.status] || "support-card-badge--new";
+      const statusLabel = STATUS_LABELS[m.status] || (m.status || "-");
+      const subjectLabel = SUBJECT_LABELS[m.subject] || m.subject || "-";
+      const hasReply = Boolean(m.replyEmail);
+      const mailHref = hasReply
+        ? `mailto:${escAttr(m.replyEmail)}?subject=${encodeURIComponent(`Re: Bloom support ${m.requestId || ""}`)}`
+        : "";
       const options = ["new", "open", "resolved"]
-        .map(s => `<option value="${s}"${m.status === s ? " selected" : ""}>${STATUS_LABELS[s]}</option>`)
+        .map((s) => `<option value="${s}"${m.status === s ? " selected" : ""}>${STATUS_LABELS[s]}</option>`)
         .join("");
 
       return `
-        <div class="admin-list-item" style="flex-direction:column;align-items:flex-start;gap:0.4rem;">
-          <div class="admin-row" style="width:100%;">
+        <article class="support-card">
+          <div class="support-card-header">
             <div>
-              <strong>${m.requestId || "-"}</strong>
-              <span class="text-muted" style="margin-left:0.5rem;font-size:0.85rem;">${date}</span>
-              ${badge}
+              <div class="support-card-id">${escHtml(m.requestId || "-")}</div>
+              <div class="support-card-date">${escHtml(date)}</div>
             </div>
-            <select class="admin-select" data-id="${m.id}" data-action="status" style="width:auto;">
-              ${options}
-            </select>
+            <span class="support-card-badge ${statusClass}">${escHtml(statusLabel)}</span>
           </div>
-          <div style="font-size:0.88rem;"><strong>Subject:</strong> ${m.subject || "-"}</div>
-          ${m.name    ? `<div style="font-size:0.88rem;"><strong>Name:</strong> ${m.name}</div>` : ""}
-          ${m.replyEmail ? `<div style="font-size:0.88rem;"><strong>Reply-to:</strong> ${m.replyEmail}</div>` : ""}
-          <div style="font-size:0.88rem;white-space:pre-wrap;background:var(--color-bg-soft,#f5f0f3);padding:0.5rem 0.75rem;border-radius:8px;width:100%;box-sizing:border-box;">${m.message || ""}</div>
-        </div>`;
+
+          <div class="support-card-meta">
+            <div class="support-meta-row"><strong>Subject:</strong> ${escHtml(subjectLabel)}</div>
+            ${m.name ? `<div class="support-meta-row"><strong>Name:</strong> ${escHtml(m.name)}</div>` : ""}
+            ${m.replyEmail ? `<div class="support-meta-row"><strong>Reply-to:</strong> ${escHtml(m.replyEmail)}</div>` : ""}
+            ${m.userId ? `<div class="support-meta-row"><strong>User ID:</strong> ${escHtml(m.userId)}</div>` : ""}
+          </div>
+
+          <div class="support-card-message">${escHtml(m.message || "-")}</div>
+
+          <div class="support-card-footer">
+            <div>
+              ${
+                hasReply
+                  ? `<a class="btn btn-outline btn-sm" href="${mailHref}">Reply by Email</a>`
+                  : `<span class="text-muted" style="font-size:0.84rem;">No reply email provided</span>`
+              }
+            </div>
+            <label class="support-status-group">
+              <span>Status</span>
+              <select class="admin-select" data-id="${escAttr(m.id)}" data-action="status">
+                ${options}
+              </select>
+            </label>
+          </div>
+        </article>`;
     }).join("");
 
     // Status change handlers
-    list.querySelectorAll("select[data-action='status']").forEach(sel => {
+    list.querySelectorAll("select[data-action='status']").forEach((sel) => {
       sel.addEventListener("change", async () => {
         try {
           await api("PATCH", `/contact-messages/${sel.dataset.id}/status`, { status: sel.value });
+          await loadSupportMessages();
         } catch (err) {
           alert("Could not update status: " + err.message);
         }
@@ -728,6 +769,7 @@ async function loadSupportMessages() {
 
   } catch (err) {
     list.innerHTML = `<p class="text-muted">Failed to load: ${err.message}</p>`;
+    if (summaryWrap) summaryWrap.hidden = true;
   }
 }
 

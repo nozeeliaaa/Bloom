@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/css/main.css" />
 
   <style>
-    /* ── Tab nav ─────────────────────────────────────────────────── */
+    /* â”€â”€ Tab nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .help-tabs {
       display: flex;
       gap: 0.25rem;
@@ -40,7 +40,7 @@
     .help-panel { display: none; }
     .help-panel.active { display: block; }
 
-    /* ── How to Use steps ────────────────────────────────────────── */
+    /* â”€â”€ How to Use steps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .how-section { margin-bottom: 1.75rem; }
     .how-section h3 { margin-bottom: 0.75rem; font-size: 1rem; }
     .step-list { list-style: none; padding: 0; margin: 0; counter-reset: steps; }
@@ -69,7 +69,7 @@
       margin-top: 1px;
     }
 
-    /* ── FAQ accordion ───────────────────────────────────────────── */
+    /* â”€â”€ FAQ accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .faq-item {
       border-bottom: 1px solid var(--color-border);
     }
@@ -102,7 +102,7 @@
     }
     .faq-item.open .faq-a { display: block; }
 
-    /* ── Glossary ────────────────────────────────────────────────── */
+    /* â”€â”€ Glossary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .gloss-search-wrap {
       position: relative;
       margin-bottom: 1rem;
@@ -219,7 +219,7 @@
     }
     .gloss-page-btn:disabled { opacity: 0.35; cursor: default; }
 
-    /* ── Resources ───────────────────────────────────────────────── */
+    /* â”€â”€ Resources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .resource-cards { display: flex; flex-direction: column; gap: 1rem; }
     .resource-card {
       border: 1px solid var(--color-border);
@@ -252,7 +252,7 @@
     .resource-details span { color: var(--color-text-muted); }
     .resource-details strong { color: var(--color-text); }
 
-    /* ── Contact form ────────────────────────────────────────────── */
+    /* â”€â”€ Contact form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .contact-form { display: flex; flex-direction: column; gap: 1rem; max-width: 540px; }
     .contact-form label { font-weight: 700; font-size: 0.88rem; display: block; margin-bottom: 0.3rem; }
     .contact-form select,
@@ -278,7 +278,6 @@
     .contact-form textarea { resize: vertical; min-height: 120px; }
     .contact-hint { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 0.2rem; }
     .contact-success {
-      display: none;
       padding: 0.9rem 1rem;
       background: #f0faf4;
       border: 1px solid #6bcb77;
@@ -286,9 +285,19 @@
       color: #1a5c2a;
       font-size: 0.92rem;
       font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    .contact-error {
+      padding: 0.8rem 0.9rem;
+      border: 1px solid #d47c95;
+      background: #fff5f8;
+      color: #8f2448;
+      border-radius: var(--radius-sm, 8px);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
     }
 
-    /* ── Shared ──────────────────────────────────────────────────── */
+    /* â”€â”€ Shared â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .section-intro {
       font-size: 0.92rem;
       color: var(--color-text-muted);
@@ -319,7 +328,7 @@
         <button type="button" class="help-tab"        data-tab="contact" role="tab" aria-selected="false">Contact</button>
       </nav>
 
-      <!-- ── How to Use ────────────────────────────────────────── -->
+      <!-- â”€â”€ How to Use â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
       <div class="help-panel active" id="tab-how" role="tabpanel">
         <p class="section-intro">Step-by-step guides for the most common actions in Bloom.</p>
 
@@ -372,7 +381,7 @@
         </div>
       </div>
 
-      <!-- ── FAQ ──────────────────────────────────────────────────── -->
+      <!-- â”€â”€ FAQ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
       <div class="help-panel" id="tab-faq" role="tabpanel">
         <p class="section-intro">Common questions about Bloom.</p>
 
@@ -427,13 +436,13 @@
         </div>
       </div>
 
-      <!-- ── Glossary ──────────────────────────────────────────────── -->
+      <!-- â”€â”€ Glossary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
       <div class="help-panel" id="tab-glossary" role="tabpanel">
         <p class="section-intro">Definitions for terms used in Bloom and reproductive health.</p>
 
         <div class="gloss-search-wrap">
-          <span class="gloss-search-icon">🔍</span>
-          <input class="gloss-search" id="gloss-search" type="search" placeholder="Search terms…" autocomplete="off" />
+          <span class="gloss-search-icon">&#128269;</span>
+          <input class="gloss-search" id="gloss-search" type="search" placeholder="Search terms..." autocomplete="off" />
         </div>
 
         <div class="gloss-alpha-bar" id="gloss-alpha-bar"></div>
@@ -443,7 +452,7 @@
         <div class="gloss-pagination" id="gloss-pagination"></div>
       </div>
 
-      <!-- ── Resources ─────────────────────────────────────────────── -->
+      <!-- â”€â”€ Resources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
       <div class="help-panel" id="tab-resources" role="tabpanel">
         <p class="section-intro">Trusted Jamaican and international reproductive health organisations.</p>
 
@@ -503,7 +512,7 @@
         </p>
       </div>
 
-      <!-- ── Contact ────────────────────────────────────────────────── -->
+      <!-- â”€â”€ Contact â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
       <div class="help-panel" id="tab-contact" role="tabpanel">
         <p class="section-intro">Have a question, report an issue, or send us feedback. We read every message.</p>
 
@@ -525,7 +534,7 @@
           <div>
             <label for="contact-subject">Subject</label>
             <select id="contact-subject" name="subject" required>
-              <option value="" disabled selected>Select a topic…</option>
+              <option value="" disabled selected>Select a topic...</option>
               <option value="bug">Something is not working</option>
               <option value="data">Question about my data</option>
               <option value="privacy">Privacy concern</option>
@@ -537,7 +546,7 @@
 
           <div>
             <label for="contact-message">Message</label>
-            <textarea id="contact-message" name="message" placeholder="Describe your question or issue…" required maxlength="1200"></textarea>
+            <textarea id="contact-message" name="message" placeholder="Describe your question or issue..." required maxlength="1200"></textarea>
             <p class="contact-hint">Max 1200 characters.</p>
           </div>
 
@@ -557,12 +566,13 @@
 
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
+    import { getIdToken, getCurrentUser } from "/js/auth.js";
     renderNav("help");
     renderFooter();
     renderBloomieFab();
     renderModeBanner(document.getElementById("banner-area"));
 
-    // ── Tabs ────────────────────────────────────────────────────────
+    // â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const tabs   = document.querySelectorAll(".help-tab");
     const panels = document.querySelectorAll(".help-panel");
 
@@ -581,14 +591,14 @@
     const hashTab = document.querySelector(`.help-tab[data-tab="${hash}"]`);
     if (hashTab) hashTab.click();
 
-    // ── FAQ accordion ────────────────────────────────────────────────
+    // â”€â”€ FAQ accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     document.querySelectorAll(".faq-item").forEach(item => {
       item.querySelector(".faq-q").addEventListener("click", () => {
         item.classList.toggle("open");
       });
     });
 
-    // ── Glossary ─────────────────────────────────────────────────────
+    // â”€â”€ Glossary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const GLOSS_TERMS = [
       { term: "Amenorrhea",                     def: "The absence of menstruation. Primary amenorrhea means a period has never started by age 16. Secondary amenorrhea means periods stopped for 3 or more months in someone who previously had them. Both can have many causes and are worth discussing with a doctor." },
       { term: "Anovulation",                    def: "When the ovaries do not release an egg during a cycle. It can cause irregular or absent periods and is a common reason why some cycles feel 'off'. It can be related to stress, hormonal imbalances, or conditions like PCOS." },
@@ -681,11 +691,11 @@
       resultsEl.innerHTML = html;
 
       // Pagination
-      let pHtml = `<button class="gloss-page-btn" id="gloss-prev" ${glossPage === 1 ? "disabled" : ""}>← Prev</button>`;
+      let pHtml = `<button class="gloss-page-btn" id="gloss-prev" ${glossPage === 1 ? "disabled" : ""}>&larr; Prev</button>`;
       for (let i = 1; i <= totalPages; i++) {
         pHtml += `<button class="gloss-page-btn ${i === glossPage ? "active" : ""}" data-page="${i}">${i}</button>`;
       }
-      pHtml += `<button class="gloss-page-btn" id="gloss-next" ${glossPage === totalPages ? "disabled" : ""}>Next →</button>`;
+      pHtml += `<button class="gloss-page-btn" id="gloss-next" ${glossPage === totalPages ? "disabled" : ""}>Next &rarr;</button>`;
       paginationEl.innerHTML = pHtml;
 
       paginationEl.querySelectorAll("[data-page]").forEach(btn => {
@@ -742,68 +752,69 @@
       glossRender();
     });
 
-    // ── Contact form ─────────────────────────────────────────────────
-    import { getIdToken, getCurrentUser } from "/js/auth.js";
-
+    // â”€â”€ Contact form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    
     const form      = document.getElementById("contact-form");
     const successEl = document.getElementById("contact-success");
     const errorEl   = document.getElementById("contact-error");
     const submitBtn = document.getElementById("contact-submit");
     const requestIdEl = document.getElementById("contact-request-id");
+    const sendAnotherBtn = document.getElementById("contact-send-another");
 
-    document.getElementById("contact-send-another").addEventListener("click", () => {
-      successEl.classList.add("hidden");
-      form.classList.remove("hidden");
-      form.reset();
-    });
+    if (form && successEl && errorEl && submitBtn && requestIdEl && sendAnotherBtn) {
+      sendAnotherBtn.addEventListener("click", () => {
+        successEl.classList.add("hidden");
+        errorEl.classList.add("hidden");
+        requestIdEl.textContent = "";
+        form.classList.remove("hidden");
+        form.reset();
+      });
 
-    form.addEventListener("submit", async e => {
-      e.preventDefault();
-      errorEl.classList.add("hidden");
+      form.addEventListener("submit", async e => {
+        e.preventDefault();
+        errorEl.classList.add("hidden");
 
-      const subject = document.getElementById("contact-subject").value;
-      const message = document.getElementById("contact-message").value.trim();
-      const email   = document.getElementById("contact-email").value.trim();
-      const name    = document.getElementById("contact-name").value.trim();
+        const subject = document.getElementById("contact-subject").value;
+        const message = document.getElementById("contact-message").value.trim();
+        const email   = document.getElementById("contact-email").value.trim();
+        const name    = document.getElementById("contact-name").value.trim();
 
-      if (!subject) { showError("Please select a subject."); return; }
-      if (!message) { showError("Please enter a message."); return; }
+        if (!subject) { showError("Please select a subject."); return; }
+        if (!message) { showError("Please enter a message."); return; }
 
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Sending…";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Sending...";
 
-      try {
-        const token  = await getIdToken().catch(() => null);
-        const userId = getCurrentUser()?.uid ?? null;
+        try {
+          const token  = await getIdToken().catch(() => null);
+          const userId = getCurrentUser()?.uid ?? null;
+          const payload = { subject, message, ...(email && { email }), ...(name && { name }), ...(userId && { userId }) };
+          const headers = { "Content-Type": "application/json" };
+          if (token) headers.Authorization = `Bearer ${token}`;
 
-        const payload = { subject, message, ...(email && { email }), ...(name && { name }), ...(userId && { userId }) };
+          const res = await fetch("/api/contact", {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          });
 
-        const res  = await fetch("/api/contact", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            showError(json.error || "We couldn't send your message right now. Please try again.");
+            return;
+          }
 
-        const json = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          showError(json.error || "We couldn't send your message right now. Please try again.");
-          return;
+          requestIdEl.textContent = json.requestId ? `Reference ID: ${json.requestId}` : "";
+          form.classList.add("hidden");
+          successEl.classList.remove("hidden");
+        } catch (_) {
+          showError("We couldn't send your message right now. Please try again.");
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Send message";
         }
-
-        if (json.requestId) {
-          requestIdEl.textContent = `Reference ID: ${json.requestId}`;
-        }
-        form.classList.add("hidden");
-        successEl.classList.remove("hidden");
-
-      } catch (_) {
-        showError("We couldn't send your message right now. Please try again.");
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Send message";
-      }
-    });
+      });
+    }
 
     function showError(msg) {
       errorEl.textContent = msg;
@@ -812,3 +823,4 @@
   </script>
 </body>
 </html>
+

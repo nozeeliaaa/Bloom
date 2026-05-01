@@ -557,7 +557,7 @@
       if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
       try {
         if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
-        const { deleteUser } = await import("firebase/auth");
+        const { deleteUser } = await import("https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js");
         await deleteUser(getFirebaseAuth().currentUser);
         localStorage.removeItem(LS_PROFILE);
         localStorage.removeItem(LS_AVATAR);

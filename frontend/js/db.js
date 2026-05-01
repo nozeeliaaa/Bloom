@@ -62,7 +62,11 @@ let _symptomCatalogCache = null;
 let _symptomCatalogFetchedAt = 0;
 let _symptomCatalogByCode = new Map();
 let _symptomCatalogByLabel = new Map();
+let _profileCache = null;
+let _profileCacheFetchedAt = 0;
+let _profileInFlight = null;
 const SYMPTOM_CATALOG_TTL_MS = 10 * 60 * 1000;
+const PROFILE_CACHE_TTL_MS = 3 * 60 * 1000;
 
 export function invalidateLogsCache() {
   _logsCache = null;
@@ -670,32 +674,56 @@ export async function saveBloomieMemory(memoryData) {
 // Load the authenticated user's profile (nickname) from the backend.
 // Returns { nickname: string | null }. Never throws.
 export async function loadUserProfile() {
-  try {
-    const headers = await authHeaders();
-    if (!headers) return { nickname: null };
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 3000)
-    );
-    const request = fetch(apiUrl("/api/user/profile"), { headers });
-    const res = await Promise.race([request, timeout]);
-    if (!res.ok) {
-      bloomieDiagnostic("profile_sync_failed", {
-        module: "db",
-        stage:  "loadUserProfile",
-        reason: `backend returned ${res.status}`,
-      });
-      return { nickname: null };
-    }
-    const data = await res.json();
-    return { nickname: data?.nickname ?? null };
-  } catch (err) {
-    bloomieDiagnostic("profile_sync_failed", {
-      module: "db",
-      stage:  "loadUserProfile",
-      reason: err?.message ?? "network error or timeout",
-    });
-    return { nickname: null };
+  const localProfile = readJSON("bloom_profile", {}) || {};
+  const localNickname =
+    typeof localProfile?.nickname === "string" && localProfile.nickname.trim()
+      ? localProfile.nickname.trim()
+      : null;
+  const localFallback = { nickname: localNickname };
+
+  if (!isAccountMode()) return localFallback;
+
+  const now = Date.now();
+  if (_profileCache && now - _profileCacheFetchedAt < PROFILE_CACHE_TTL_MS) {
+    return _profileCache;
   }
+  if (_profileInFlight) return _profileInFlight;
+
+  _profileInFlight = (async () => {
+    try {
+      const headers = await authHeaders();
+      if (!headers) return localFallback;
+
+      const res = await fetchWithTimeout(
+        apiUrl("/api/user/profile"),
+        { headers },
+        4500
+      );
+
+      if (!res.ok) return localFallback;
+
+      const data = await res.json().catch(() => ({}));
+      const nicknameRaw =
+        (typeof data?.nickname === "string" ? data.nickname : null) ??
+        (typeof data?.profile?.nickname === "string" ? data.profile.nickname : null) ??
+        localNickname;
+
+      const nickname = nicknameRaw && String(nicknameRaw).trim()
+        ? String(nicknameRaw).trim()
+        : null;
+
+      const resolved = { nickname };
+      _profileCache = resolved;
+      _profileCacheFetchedAt = Date.now();
+      return resolved;
+    } catch (_) {
+      return localFallback;
+    } finally {
+      _profileInFlight = null;
+    }
+  })();
+
+  return _profileInFlight;
 }
 
 export async function deleteAllLocalData() {
