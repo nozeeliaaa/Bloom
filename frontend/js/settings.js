@@ -202,12 +202,13 @@ Object.entries(els.themeBtns).forEach(([key, btn]) => {
 // ─── Save ──────────────────────────────────────────────────────────────────────
 els.save?.addEventListener("click", async () => {
   const prefs = {
-    hideSensitive:  els.hideSensitive?.checked  ?? false,
-    reminders:      els.reminders?.checked      ?? false,
+    theme: getTheme(),
+    hideSensitive: els.hideSensitive?.checked ?? false,
+    reminders: els.reminders?.checked ?? false,
     periodReminder: els.periodReminder?.checked ?? false,
-    fertileAlert:   els.fertileAlert?.checked   ?? false,
-    compact:        els.compact?.checked        ?? false,
-    discreetNotif:  els.discreetNotif?.checked  ?? false,
+    fertileAlert: els.fertileAlert?.checked ?? false,
+    compact: els.compact?.checked ?? false,
+    discreetNotif: els.discreetNotif?.checked ?? false,
   };
  
   setLocalPrefs(prefs);
@@ -241,6 +242,7 @@ els.save?.addEventListener("click", async () => {
 els.reset?.addEventListener("click", async () => {
   localStorage.removeItem(LOCAL_KEY);
   applyPrefsToUI({});
+  setTheme("system");
   // All toggles now off - unregister FCM
   if (isAccountMode()) await unregisterFCMToken();
   showStatus("Reset to defaults.");
