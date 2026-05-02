@@ -13,6 +13,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { computeCyclePhaseML } from "../../ml/inference/cyclePhaseEngine.js";
 import { db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
+import { ensureUserDocument } from "../utils/userDataPaths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -151,6 +152,16 @@ function calculateStdDev(arr) {
   return Math.sqrt(variance);
 }
 
+function isPlausibleCycleLength(length) {
+  return Number.isFinite(Number(length)) && Number(length) >= 15 && Number(length) <= 60;
+}
+
+function clampPredictedCycleLength(length, fallback = 28) {
+  const parsed = Number(length);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(15, Math.min(60, Math.round(parsed)));
+}
+
 // ── Firestore data fetcher ───────────────────────────────────
 // Reads all logs from Firestore for the given uid.
 // Returns { cycleLogs, symptomLogs, biometricLogs } as flat objects keyed by dateKey.
@@ -159,26 +170,31 @@ async function fetchUserLogs(uid, daysBack = 180, cycleLogsOverride = null) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
   const cutoffKey = cutoff.toISOString().slice(0, 10);
+  const userRef = db.collection('users').doc(uid);
 
   const hasCycleOverride =
     cycleLogsOverride &&
     typeof cycleLogsOverride === "object" &&
     Object.keys(cycleLogsOverride).length > 0;
 
-  const [cycleSnap, symptomSnap, biometricSnap] = await Promise.all([
+  const [cycleSnap, symptomSnap, biometricSnap, feedbackSnap] = await Promise.all([
     hasCycleOverride
       ? Promise.resolve(null)
-      : db.collection('cycleLogs').doc(uid).collection('entries')
+      : userRef.collection('cycleLogs')
         .where('dateKey', '>=', cutoffKey)
         .orderBy('dateKey', 'asc')
         .get(),
-    db.collection('symptomLogs').doc(uid).collection('entries')
+    userRef.collection('symptomLogs')
       .where('dateKey', '>=', cutoffKey)
       .orderBy('dateKey', 'asc')
       .get(),
-    db.collection('biometricLogs').doc(uid).collection('entries')
+    userRef.collection('biometricLogs')
       .where('dateKey', '>=', cutoffKey)
       .orderBy('dateKey', 'asc')
+      .get(),
+    userRef.collection('phaseFeedback')
+      .orderBy('createdAt', 'desc')
+      .limit(10)
       .get(),
   ]);
 
@@ -193,8 +209,22 @@ async function fetchUserLogs(uid, daysBack = 180, cycleLogsOverride = null) {
         flow: normalizeFlowValue(row.flowLevel, row.flow),
       };
     }
-  } else if (cycleSnap) {
+  } else if (cycleSnap && !cycleSnap.empty) {
     cycleSnap.forEach((doc) => {
+      const row = doc.data() || {};
+      const dateKey = row.dateKey;
+      if (!dateKey) return;
+      cycleLogs[dateKey] = {
+        ...row,
+        flow: normalizeFlowValue(row.flowLevel, row.flow),
+      };
+    });
+  } else if (!hasCycleOverride) {
+    const legacySnap = await db.collection('cycleLogs').doc(uid).collection('entries')
+      .where('dateKey', '>=', cutoffKey)
+      .orderBy('dateKey', 'asc')
+      .get();
+    legacySnap.forEach((doc) => {
       const row = doc.data() || {};
       const dateKey = row.dateKey;
       if (!dateKey) return;
@@ -206,12 +236,37 @@ async function fetchUserLogs(uid, daysBack = 180, cycleLogsOverride = null) {
   }
 
   const symptomLogs = {};
-  symptomSnap.forEach(doc => { symptomLogs[doc.data().dateKey] = doc.data(); });
+  if (!symptomSnap.empty) {
+    symptomSnap.forEach(doc => { symptomLogs[doc.data().dateKey] = doc.data(); });
+  } else {
+    const legacySnap = await db.collection('symptomLogs').doc(uid).collection('entries')
+      .where('dateKey', '>=', cutoffKey)
+      .orderBy('dateKey', 'asc')
+      .get();
+    legacySnap.forEach(doc => { symptomLogs[doc.data().dateKey] = doc.data(); });
+  }
 
   const biometricLogs = {};
-  biometricSnap.forEach(doc => { biometricLogs[doc.data().dateKey] = doc.data(); });
+  if (!biometricSnap.empty) {
+    biometricSnap.forEach(doc => { biometricLogs[doc.data().dateKey] = doc.data(); });
+  } else {
+    const legacySnap = await db.collection('biometricLogs').doc(uid).collection('entries')
+      .where('dateKey', '>=', cutoffKey)
+      .orderBy('dateKey', 'asc')
+      .get();
+    legacySnap.forEach(doc => { biometricLogs[doc.data().dateKey] = doc.data(); });
+  }
 
-  return { cycleLogs, symptomLogs, biometricLogs };
+  let phaseFeedback = feedbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  if (!phaseFeedback.length) {
+    const legacySnap = await db.collection('phaseFeedback').doc(uid).collection('entries')
+      .orderBy('createdAt', 'desc')
+      .limit(10)
+      .get();
+    phaseFeedback = legacySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  }
+
+  return { cycleLogs, symptomLogs, biometricLogs, phaseFeedback };
 }
 
 // ── Symptom phase support scorer ─────────────────────────────
@@ -332,7 +387,7 @@ function scoreBiometrics(biometricLogs, recentDays = 7) {
 // ── Signal fusion ─────────────────────────────────────────────
 // Combines cycle timing, symptoms, and biometrics into one result.
 
-function fuseSignals(phaseData, symptomScore, biometricScore) {
+function fuseSignals(phaseData, symptomScore, biometricScore, quality = {}) {
   const phases = ['menstrual', 'follicular', 'ovulation', 'luteal'];
 
   // Normalize cycle timing into a support object
@@ -345,8 +400,8 @@ function fuseSignals(phaseData, symptomScore, biometricScore) {
   }
 
   // Weighted fusion
-  const CYCLE_WEIGHT    = 0.5;
-  const SYMPTOM_WEIGHT  = 0.25;
+  const CYCLE_WEIGHT    = quality.lowHistory ? 0.35 : quality.irregularCycles ? 0.4 : 0.5;
+  const SYMPTOM_WEIGHT  = quality.lowHistory ? 0.35 : 0.25;
   const BIOMETRIC_WEIGHT = biometricScore.weightApplied;
   const remaining = 1 - CYCLE_WEIGHT - SYMPTOM_WEIGHT - BIOMETRIC_WEIGHT;
 
@@ -376,8 +431,13 @@ function fuseSignals(phaseData, symptomScore, biometricScore) {
   const finalPhase = winner === 'ovulation' ? 'ovulatory' : winner;
 
   // Confidence level
-  const confidenceLevel = score >= 0.5 ? 'high' : score >= 0.3 ? 'medium' : 'low';
-  const confidenceScore = Math.round(score * 100) / 100;
+  let confidenceScore = score;
+  if (quality.irregularCycles) confidenceScore -= 0.08;
+  if (quality.lowHistory) confidenceScore -= 0.12;
+  if (quality.extremeCycleLengths) confidenceScore -= 0.1;
+  confidenceScore = Math.max(0.12, Math.min(0.95, confidenceScore));
+  const confidenceLevel = confidenceScore >= 0.55 ? 'high' : confidenceScore >= 0.32 ? 'medium' : 'low';
+  confidenceScore = Math.round(confidenceScore * 100) / 100;
 
   return {
     estimatedPhase: finalPhase,
@@ -397,7 +457,7 @@ function fuseSignals(phaseData, symptomScore, biometricScore) {
 
 // ── Display message builder ───────────────────────────────────
 
-function buildDisplay(estimatedPhase, confidenceLevel, conflictDetected) {
+function buildDisplay(estimatedPhase, confidenceLevel, conflictDetected, quality = {}) {
   const phaseLabels = {
     menstrual: 'menstrual', follicular: 'follicular',
     ovulatory: 'ovulatory', luteal: 'luteal',
@@ -408,6 +468,18 @@ function buildDisplay(estimatedPhase, confidenceLevel, conflictDetected) {
     return {
       mode: 'soft',
       message: `Bloom is picking up mixed signals — you may be transitioning into your ${label} phase.`,
+    };
+  }
+  if (quality.lowHistory) {
+    return {
+      mode: 'soft',
+      message: `Bloom has a tentative ${label} phase estimate. Log more cycle days to improve confidence.`,
+    };
+  }
+  if (quality.irregularCycles) {
+    return {
+      mode: 'soft',
+      message: `Bloom thinks you may be in your ${label} phase, but your recent cycle lengths vary.`,
     };
   }
   if (confidenceLevel === 'high') {
@@ -424,7 +496,7 @@ function buildDisplay(estimatedPhase, confidenceLevel, conflictDetected) {
 
 // ── Explanation builder ───────────────────────────────────────
 
-function buildExplanation(phaseData, symptomScore, biometricScore, estimatedPhase) {
+function buildExplanation(phaseData, symptomScore, biometricScore, estimatedPhase, quality = {}) {
   const details = [];
 
   if (phaseData.dayInCycle) {
@@ -447,6 +519,16 @@ function buildExplanation(phaseData, symptomScore, biometricScore, estimatedPhas
 
   if (symptomScore.contradictions.length > 0) {
     details.push('Some conflicting signals were detected — logging more data will improve accuracy.');
+  }
+
+  if (quality.lowHistory) {
+    details.push('There is limited cycle history, so this estimate is intentionally cautious.');
+  }
+  if (quality.irregularCycles) {
+    details.push('Your recent cycle lengths are irregular, which lowers prediction confidence.');
+  }
+  if (quality.extremeCycleLengths) {
+    details.push('One or more logged cycle lengths were outside the usual range and excluded from prediction.');
   }
 
   return {
@@ -554,12 +636,44 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
   const allowML = options.allowML !== false;
 
   // 1 — Fetch all logs from Firestore
-  const { cycleLogs, symptomLogs, biometricLogs } = await fetchUserLogs(uid, 180, cycleLogsOverride);
+  const { cycleLogs, symptomLogs, biometricLogs, phaseFeedback } = await fetchUserLogs(uid, 180, cycleLogsOverride);
+  const userDoc = await db.collection('users').doc(uid).get();
+  const userData = userDoc.exists ? userDoc.data() || {} : {};
 
   // 2 — Derive period clusters from cycle logs
   const clusters = getPeriodClustersBackend(cycleLogs);
 
   if (!clusters.length) {
+  const symptomScore = scoreSymptoms(symptomLogs);
+  const biometricScore = scoreBiometrics(biometricLogs);
+  const phaseEstimation = {
+    estimatedPhase: 'unknown',
+    confidence: { level: 'low', score: 0.12 },
+    display: {
+      mode: 'soft',
+      message: 'Log your first period to see your current phase estimate.',
+    },
+    timingContext: {
+      cycleDay: null,
+      predictedCycleLength: userData.averageCycleLength ?? userData.healthProfile?.avgCycleLength ?? null,
+      predictedNextPeriodDate: null,
+      estimatedOvulationWindow: null,
+    },
+    signals: {
+      cycleTiming: { phaseSupport: { menstrual: 0, follicular: 0, ovulation: 0, luteal: 0 } },
+      symptoms: symptomScore,
+      biometricModel: biometricScore,
+      rules: { bleedingOverride: false, biologicallyPlausible: false },
+    },
+    agreement: { signalAgreementScore: 0, conflictDetected: false },
+    explanation: {
+      summary: 'There is not enough cycle history yet.',
+      details: ['Add at least one period start date so Bloom can estimate your cycle phase.'],
+    },
+    feedback: { prompt: false, options: ['yes', 'not_sure', 'no'] },
+    override: null,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
   return {
     state: {
       ready: false,
@@ -578,11 +692,12 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
       fertileStart: null,
       fertileEnd: null,
       cyclesLogged: 0,
+      cycleLengths: [],
       predictedPeriodDays: [],
       futureOvulationDates: [],
       allFertileDays: [],
       futureCycles: [],
-      phaseEstimation: null,
+      phaseEstimation,
       disclaimer: 'This is an educational estimate, not a medical prediction.',
     },
     lastStart: null,
@@ -595,15 +710,28 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
   const lastEnd       = lastCluster.end;
 
   // Cycle lengths from cluster intervals
-  const cycleLengths = [];
+  const rawCycleLengths = [];
   for (let i = 1; i < clusterStarts.length; i++) {
-    cycleLengths.push(Math.round(
+    rawCycleLengths.push(Math.round(
       (new Date(clusterStarts[i] + 'T00:00:00') - new Date(clusterStarts[i - 1] + 'T00:00:00')) / 86400000
     ));
   }
+  const cycleLengths = rawCycleLengths.filter(isPlausibleCycleLength);
+  const excludedCycleLengths = rawCycleLengths.filter((length) => !isPlausibleCycleLength(length));
+  const fallbackCycleLength = clampPredictedCycleLength(
+    userData.averageCycleLength ?? userData.healthProfile?.avgCycleLength ?? 28,
+    28
+  );
   const avgLen = cycleLengths.length
     ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
-    : 28;
+    : fallbackCycleLength;
+  const cycleStdDev = calculateStdDev(cycleLengths);
+  const quality = {
+    lowHistory: clusterStarts.length < 2 || cycleLengths.length < 1,
+    irregularCycles: cycleLengths.length >= 2 && cycleStdDev >= 7,
+    extremeCycleLengths: excludedCycleLengths.length > 0,
+    recentFeedbackCount: phaseFeedback.length,
+  };
 
   // 3 — ML-predicted cycle length
   let predictedCycleLength = avgLen;
@@ -616,15 +744,15 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
         cycleLengths[cycleLengths.length - 1], avgLen, 14,
         cycleVariability, clusterStarts.length, 28, 22, 0, 0,
       ], { timeoutMs: mlTimeoutMs });
-      predictedCycleLength = mlResult.predictedCycleLength ?? avgLen;
+      predictedCycleLength = clampPredictedCycleLength(mlResult.predictedCycleLength ?? avgLen, avgLen);
       predMethod = 'ml';
     } catch (mlErr) {
       console.warn('[cyclesML] ML failed, fallback:', mlErr.message);
-      predictedCycleLength = weightedAverageFallback(cycleLengths).predicted_cycle_length;
+      predictedCycleLength = clampPredictedCycleLength(weightedAverageFallback(cycleLengths, avgLen).predicted_cycle_length, avgLen);
       predMethod = 'weighted-avg';
     }
   } else if (cycleLengths.length > 0) {
-    predictedCycleLength = weightedAverageFallback(cycleLengths).predicted_cycle_length;
+    predictedCycleLength = clampPredictedCycleLength(weightedAverageFallback(cycleLengths, avgLen).predicted_cycle_length, avgLen);
     predMethod = 'weighted-avg';
   }
 
@@ -636,11 +764,11 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
   const biometricScore = scoreBiometrics(biometricLogs);
 
   // 6 — Fuse all signals
-  const fusion = fuseSignals(phaseData, symptomScore, biometricScore);
+  const fusion = fuseSignals(phaseData, symptomScore, biometricScore, quality);
 
   // 7 — Build display + explanation
-  const display     = buildDisplay(fusion.estimatedPhase, fusion.confidence.level, fusion.agreement.conflictDetected);
-  const explanation = buildExplanation(phaseData, symptomScore, biometricScore, fusion.estimatedPhase);
+  const display     = buildDisplay(fusion.estimatedPhase, fusion.confidence.level, fusion.agreement.conflictDetected, quality);
+  const explanation = buildExplanation(phaseData, symptomScore, biometricScore, fusion.estimatedPhase, quality);
 
   // 8 — Confidence + calendar overlays
   const periodDuration = Math.max(1,
@@ -666,6 +794,13 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
     signals:     fusion.signals,
     agreement:   fusion.agreement,
     explanation,
+    dataQuality: {
+      lowHistory: quality.lowHistory,
+      irregularCycles: quality.irregularCycles,
+      excludedCycleLengths,
+      predictionMethod: predMethod,
+      recentFeedbackCount: phaseFeedback.length,
+    },
     feedback:    { prompt: true, options: ['yes', 'not_sure', 'no'] },
     override:    null,
     updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
@@ -684,6 +819,7 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
     fertileStart:         phaseData.fertileStart,
     fertileEnd:           phaseData.fertileEnd,
     cyclesLogged:         clusterStarts.length,
+    cycleLengths,
     predictedPeriodDays:  overlays.predictedPeriodDays,
     futureOvulationDates: overlays.futureOvulationDates,
     allFertileDays:       overlays.allFertileDays,
@@ -750,10 +886,12 @@ router.post('/state', requireAuth, async (req, res) => {
     // Check cache
     const requestLogs = (req.body && typeof req.body === "object") ? (req.body.logs || {}) : {};
     const requestLastPeriodDay = getLastPeriodDayFromLogs(requestLogs);
+    await ensureUserDocument(uid);
     const userDoc = await db.collection('users').doc(uid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
     const lastPeriodDay =
       requestLastPeriodDay ??
+      userData?.lastPeriodStart ??
       userData?.phaseProfile?.lastPeriodStart ??
       'none';
 
@@ -785,6 +923,10 @@ router.post('/state', requireAuth, async (req, res) => {
       if (state.phaseEstimation) {
         db.collection('users').doc(uid).set(
           {
+            lastPeriodStart: lastStart ?? null,
+            averageCycleLength: state.avgCycleLength ?? null,
+            cycleLengths: state.cycleLengths ?? [],
+            phaseEstimation: state.phaseEstimation,
             phaseProfile: {
               lastPeriodStart: lastStart ?? null,
               phaseEstimation: state.phaseEstimation,
@@ -819,11 +961,10 @@ router.post('/feedback', requireAuth, async (req, res) => {
     }
 
     // 1 — Store feedback doc in phaseFeedback subcollection
-    const feedbackRef = db
-      .collection('phaseFeedback')
-      .doc(uid)
-      .collection('entries')
-      .doc();
+    await ensureUserDocument(uid);
+
+    const feedbackRef = db.collection('users').doc(uid).collection('phaseFeedback').doc();
+    const legacyFeedbackRef = db.collection('phaseFeedback').doc(uid).collection('entries').doc(feedbackRef.id);
 
     const feedbackDoc = {
       timestamp:  new Date().toISOString(),
@@ -833,10 +974,16 @@ router.post('/feedback', requireAuth, async (req, res) => {
         correctedPhase:    correction || null,
         bleedingConfirmed: correction === 'bleeding',
       },
+      context: {
+        cycleDay: body.cycleDay ?? null,
+        symptomsLogged: Array.isArray(body.symptomsLogged) ? body.symptomsLogged : [],
+        biometricUsed: !!body.biometricUsed,
+      },
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     await feedbackRef.set(feedbackDoc);
+    await legacyFeedbackRef.set(feedbackDoc);
 
     // 2 — If strong correction (bleeding confirmed or explicit phase given), re-estimate
     const isStrongCorrection = correction === 'bleeding' || (userResponse === 'no' && correction);
@@ -850,6 +997,7 @@ router.post('/feedback', requireAuth, async (req, res) => {
       const today = todayDateKey();
       await db.collection('users').doc(uid).set(
         {
+          lastPeriodStart: today,
           phaseProfile: { lastPeriodStart: today },
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
@@ -889,6 +1037,10 @@ router.post('/feedback', requireAuth, async (req, res) => {
       if (state.phaseEstimation) {
         db.collection('users').doc(uid).set(
           {
+            lastPeriodStart: lastStart ?? null,
+            averageCycleLength: state.avgCycleLength ?? null,
+            cycleLengths: state.cycleLengths ?? [],
+            phaseEstimation: state.phaseEstimation,
             phaseProfile: {
               lastPeriodStart: lastStart ?? null,
               phaseEstimation: state.phaseEstimation,

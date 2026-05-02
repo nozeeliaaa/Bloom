@@ -29,6 +29,18 @@ renderBloomieFab();
 renderModeBanner(document.getElementById("banner-area"));
  
 const API_BASE  = window.BLOOM_API_BASE || "";
+
+function isMinorProfile() {
+  try {
+    const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
+    if (profile.ageBand === "10-17") return true;
+    const year = Number(profile.yearOfBirth ?? profile.yob);
+    const currentYear = new Date().getFullYear();
+    return Number.isInteger(year) && currentYear - year < 18;
+  } catch {
+    return false;
+  }
+}
  
 // ─── DOM refs ──────────────────────────────────────────────────────────────────
 const els = {
@@ -87,7 +99,9 @@ async function saveToBackend(prefs) {
     if (!headers) return false;
  
     const payload = {
-      theme:    getTheme(),
+      theme:          getTheme(),
+      hideSensitive:  isMinorProfile() ? true : prefs.hideSensitive,
+      compact:        prefs.compact ?? false,
       reminders: {
         enabled:      prefs.reminders      ?? false,
         discreetCopy: prefs.discreetNotif ?? false,
@@ -146,6 +160,16 @@ function applyPrefsToUI(prefs) {
   const theme = prefs.theme || getTheme();
   updateThemeButtons(theme);
   setTheme(theme);
+
+  const minor = isMinorProfile() || prefs.sensitiveContentLocked === true;
+  if (els.hideSensitive) {
+    els.hideSensitive.checked = minor ? true : !!prefs.hideSensitive;
+    els.hideSensitive.disabled = minor;
+    els.hideSensitive.closest(".setting-row")?.classList.toggle("setting-row--locked", minor);
+  }
+  if (els.compact) {
+    els.compact.checked = !!prefs.compact;
+  }
 
   // Reminders - flatten from backend shape or local shape
   const remindersEnabled = prefs.reminders?.enabled ?? !!prefs.reminders;
@@ -207,7 +231,7 @@ Object.entries(els.themeBtns).forEach(([key, btn]) => {
 els.save?.addEventListener("click", async () => {
   const prefs = {
     theme: getTheme(),
-    hideSensitive: els.hideSensitive?.checked ?? false,
+    hideSensitive: isMinorProfile() ? true : (els.hideSensitive?.checked ?? false),
     reminders: els.reminders?.checked ?? false,
     periodReminder: els.periodReminder?.checked ?? false,
     fertileAlert: els.fertileAlert?.checked ?? false,

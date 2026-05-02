@@ -216,6 +216,7 @@
      * Sensitive pamphlets are hidden unless user enabled sensitive content in Settings.
      */
     import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
+    import { getIdToken } from '/js/auth.js';
 
     renderNav('pamphlets');
     renderFooter();
@@ -225,15 +226,40 @@
     let activeCategory = 'all';
     let searchQuery = '';
 
+    function getProfileAge() {
+      try {
+        const profile = JSON.parse(localStorage.getItem('bloom_profile') || '{}');
+        const year = Number(profile.yearOfBirth ?? profile.yob);
+        if (!Number.isInteger(year)) return null;
+        const age = new Date().getFullYear() - year;
+        return age >= 0 && age < 120 ? age : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function canShowSensitiveFromLocalProfile(prefs) {
+      const age = getProfileAge();
+      return (age === null || age >= 18) && !prefs.hideSensitive;
+    }
+
+    async function authFetchOptions() {
+      const token = await getIdToken().catch(() => null);
+      return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    }
+
     async function init() {
       const prefs = JSON.parse(localStorage.getItem('bloom_preferences') || '{}');
-      const sensitiveEnabled = !prefs.hideSensitive;
+      const sensitiveEnabled = canShowSensitiveFromLocalProfile(prefs);
 
       // Show spinner while loading
       document.getElementById('pamphlet-grid').innerHTML = '<div class="spinner"></div>';
 
       try {
-        const res = await fetch(`/catalog/pamphlets?sensitive=${sensitiveEnabled}`);
+        const res = await fetch(
+          `/catalog/pamphlets?sensitive=${sensitiveEnabled}`,
+          await authFetchOptions()
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const json = await res.json();

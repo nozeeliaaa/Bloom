@@ -36,6 +36,39 @@ service cloud.firestore {
         );
 
       allow delete: if false;
+
+      match /cycleLogs/{entryId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.dateKey == entryId;
+        allow delete: if isOwner(uid);
+      }
+
+      match /symptomLogs/{entryId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.dateKey == entryId;
+        allow delete: if isOwner(uid);
+      }
+
+      match /biometricLogs/{entryId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.dateKey == entryId;
+        allow delete: if isOwner(uid);
+      }
+
+      match /phaseFeedback/{entryId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
+
+      match /cycleState/{stateId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
+      }
     }
 
     // ─── preferences/{uid} ──────────────────────────────────────────────────

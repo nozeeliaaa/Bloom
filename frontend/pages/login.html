@@ -206,7 +206,11 @@
               setUserGoal(realGoal);
               const restored = {};
               if (profile.nickname)       restored.nickname       = profile.nickname;
-              if (profile.yearOfBirth)    restored.yob            = profile.yearOfBirth;
+              if (profile.yearOfBirth) {
+                restored.yob = profile.yearOfBirth;
+                restored.yearOfBirth = profile.yearOfBirth;
+              }
+              if (profile.ageBand) restored.ageBand = profile.ageBand;
               const avgCycleLength = healthProfile.avgCycleLength;
               const periodDuration = healthProfile.periodDuration;
               const sleepScore = biometricProfile.sleepScore ?? healthProfile.sleepScore ?? profile.sleepScore;

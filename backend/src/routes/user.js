@@ -99,14 +99,18 @@ router.post("/profile", requireAuth, async (req, res) => {
     const existingPhaseProfile = existing?.phaseProfile || {};
 
     const phaseProfile = {
-      lastPeriodStart: existingPhaseProfile.lastPeriodStart ?? null,
-      phaseEstimation: existingPhaseProfile.phaseEstimation ?? null,
+      lastPeriodStart: existing?.lastPeriodStart ?? existingPhaseProfile.lastPeriodStart ?? null,
+      phaseEstimation: existing?.phaseEstimation ?? existingPhaseProfile.phaseEstimation ?? null,
     };
 
     await userRef.set({
       profile,
       healthProfile,
       biometricProfile,
+      lastPeriodStart: phaseProfile.lastPeriodStart,
+      averageCycleLength: healthProfile.avgCycleLength,
+      cycleLengths: existing?.cycleLengths ?? [],
+      phaseEstimation: phaseProfile.phaseEstimation,
       phaseProfile,   
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),

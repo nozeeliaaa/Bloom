@@ -7,9 +7,9 @@
  * - GET    /api/logs
  * - PUT    /api/logs/:dateKey
  * - DELETE /api/logs/:dateKey
- * - GET    /api/symptoms
- * - PUT    /api/symptoms/:dateKey
- * - DELETE /api/symptoms/:dateKey
+ * - GET    /api/symptom-logs
+ * - PUT    /api/symptom-logs/:dateKey
+ * - DELETE /api/symptom-logs/:dateKey
  */
 
 import { getIdToken } from "./auth.js";
@@ -32,6 +32,7 @@ const ASSIST_KEY = "bloom_assistant_session";
 
 // Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → localhost:4000)
 const API_BASE = window.BLOOM_API_BASE || "";
+const SYMPTOM_LOGS_PATH = "/api/symptom-logs";
 const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
 
 // --------------------
@@ -392,7 +393,7 @@ export async function saveDailyLog(dateKey, log) {
           .filter((it) => it.text)
       : [];
 
-    if (symptomsArray.length > 0) {
+    if (symptomsArray.length > 0 || otherSymptomsArray.length > 0) {
       const symptomCodeMap = {};
       const items = symptomsArray.map((symptom) => ({
         code: (() => {
@@ -415,7 +416,7 @@ export async function saveDailyLog(dateKey, log) {
         writeJSON(LOGS_KEY, all);
       }
 
-      const symptomRes = await fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
+      const symptomRes = await fetch(apiUrl(`${SYMPTOM_LOGS_PATH}/${encodeURIComponent(dateKey)}`), {
         method: "PUT",
         headers,
         body: JSON.stringify({ items, otherSymptoms: otherSymptomsArray }),
@@ -428,7 +429,7 @@ export async function saveDailyLog(dateKey, log) {
     } else {
       // If user removed all symptoms for that day, delete backend symptom entry
       const symptomDeleteRes = await fetch(
-        apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`),
+        apiUrl(`${SYMPTOM_LOGS_PATH}/${encodeURIComponent(dateKey)}`),
         {
           method: "DELETE",
           headers,
@@ -478,7 +479,7 @@ export async function getAllLogs({ timeoutMs = 4500 } = {}) {
 
       const [cycleRes, symptomRes] = await Promise.all([
         fetchWithTimeout(apiUrl("/api/logs"), { headers }, timeoutMs),
-        fetchWithTimeout(apiUrl("/api/symptoms"), { headers }, timeoutMs),
+        fetchWithTimeout(apiUrl(SYMPTOM_LOGS_PATH), { headers }, timeoutMs),
       ]);
       await catalogPromise;
 
@@ -550,7 +551,7 @@ export async function deleteDailyLog(dateKey) {
         method: "DELETE",
         headers,
       }),
-      fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
+      fetch(apiUrl(`${SYMPTOM_LOGS_PATH}/${encodeURIComponent(dateKey)}`), {
         method: "DELETE",
         headers,
       }),
@@ -743,7 +744,7 @@ export async function clearAllLogs() {
 
     const [cycleRes, symptomRes] = await Promise.all([
       fetch(apiUrl("/api/logs"), { headers }),
-      fetch(apiUrl("/api/symptoms"), { headers }),
+      fetch(apiUrl(SYMPTOM_LOGS_PATH), { headers }),
     ]);
 
     if (cycleRes.ok) {
@@ -777,7 +778,7 @@ export async function clearAllLogs() {
         symptomItems
           .filter((entry) => entry?.dateKey)
           .map((entry) =>
-            fetch(apiUrl(`/api/symptoms/${encodeURIComponent(entry.dateKey)}`), {
+            fetch(apiUrl(`${SYMPTOM_LOGS_PATH}/${encodeURIComponent(entry.dateKey)}`), {
               method: "DELETE",
               headers,
             })

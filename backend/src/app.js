@@ -12,6 +12,7 @@ import symptomLogRoutes from "./routes/symptomLogs.js";
 import phaseFeedbackRoutes from "./routes/phaseFeedback.js";
 import consentRoutes from "./routes/consent.js";
 import catalogRoutes from "./routes/catalog.js";
+import clinicRoutes from "./routes/clinics.js";
 import userRoutes from "./routes/user.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
@@ -133,9 +134,11 @@ export function createApp({ serveFrontend = false } = {}) {
 
   app.use("/api/logs", cycleLogRoutes);
   app.use("/api/cycle", cycleLogRoutes);
+  app.use("/api/symptom-logs", symptomLogRoutes);
   app.use("/api/symptoms", symptomLogRoutes);
   app.use("/api/consent", consentRoutes);
   app.use("/api/auth", authRoutes);
+  app.use("/api/clinics", clinicRoutes);
   app.use("/catalog", catalogRoutes);
   app.use("/api/user", userRoutes);
   app.use("/api/admin", adminRoutes);
@@ -164,6 +167,17 @@ export async function runStartupChecks() {
     if (snap.empty) {
       console.warn(
         "WARNING: symptomCatalog is empty. Run scripts/seedSymptoms.js or symptom logging will fail."
+      );
+    }
+  } catch (_) {
+    // Ignore startup checks when Firestore is temporarily unavailable.
+  }
+
+  try {
+    const snap = await db.collection("clinicDirectory").limit(1).get();
+    if (snap.empty) {
+      console.warn(
+        "WARNING: clinicDirectory is empty. Run scripts/seedClinics.js or the clinic finder will fall back to local data."
       );
     }
   } catch (_) {

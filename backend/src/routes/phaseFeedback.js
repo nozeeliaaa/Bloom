@@ -2,6 +2,7 @@ import express from "express";
 import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
+import { ensureUserDocument } from "../utils/userDataPaths.js";
 
 const router = express.Router();
 
@@ -39,13 +40,25 @@ router.post("/", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid predictedPhase value." });
     }
 
-    const feedbackRef = db
-      .collection("phaseFeedback")
-      .doc(uid)
-      .collection("entries")
-      .doc();
+    await ensureUserDocument(uid);
 
-    await feedbackRef.set({
+    const feedbackRef = db.collection("users").doc(uid).collection("phaseFeedback").doc();
+    const legacyFeedbackRef = db.collection("phaseFeedback").doc(uid).collection("entries").doc(feedbackRef.id);
+
+    const feedbackDoc = {
+      timestamp: new Date().toISOString(),
+      prediction: {
+        phase: predictedPhase,
+        confidence,
+      },
+      userFeedback: {
+        response,
+        correctedPhase,
+        bleedingConfirmed: !!bleedingConfirmed,
+      },
+      context: {
+        cycleDay: cycleDay === null ? null : Number(cycleDay),
+      },
       uid,
       response,
       correctedPhase,
@@ -56,7 +69,10 @@ router.post("/", requireAuth, async (req, res) => {
       notes: notes ? String(notes).slice(0, 500) : null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+
+    await feedbackRef.set(feedbackDoc);
+    await legacyFeedbackRef.set(feedbackDoc);
 
     let phaseUpdate = null;
 
@@ -73,6 +89,10 @@ router.post("/", requireAuth, async (req, res) => {
             source: "user_feedback",
             reason: "bleeding_confirmed",
           },
+          display: {
+            mode: "strong",
+            message: "Bloom has updated your phase based on your input.",
+          },
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
       };
@@ -88,6 +108,10 @@ router.post("/", requireAuth, async (req, res) => {
             source: "user_feedback",
             reason: "phase_corrected",
           },
+          display: {
+            mode: "soft",
+            message: "Bloom has updated your phase based on your correction.",
+          },
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
       };
@@ -96,9 +120,10 @@ router.post("/", requireAuth, async (req, res) => {
     if (phaseUpdate) {
       await db.collection("users").doc(uid).set(
         {
+          lastPeriodStart: phaseUpdate.lastPeriodStart ?? admin.firestore.FieldValue.delete(),
+          phaseEstimation: phaseUpdate.phaseEstimation ?? null,
           phaseProfile: {
-            lastPeriodStart:
-              phaseUpdate.lastPeriodStart ?? admin.firestore.FieldValue.delete(),
+            lastPeriodStart: phaseUpdate.lastPeriodStart ?? admin.firestore.FieldValue.delete(),
             phaseEstimation: phaseUpdate.phaseEstimation ?? null,
           },
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -122,12 +147,21 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
 
-    const snap = await db
-      .collection("phaseFeedback")
+    let snap = await db
+      .collection("users")
       .doc(uid)
-      .collection("entries")
+      .collection("phaseFeedback")
       .orderBy("createdAt", "desc")
       .get();
+
+    if (snap.empty) {
+      snap = await db
+        .collection("phaseFeedback")
+        .doc(uid)
+        .collection("entries")
+        .orderBy("createdAt", "desc")
+        .get();
+    }
 
     const entries = snap.docs.map((doc) => ({
       id: doc.id,

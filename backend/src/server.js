@@ -32,6 +32,7 @@ import symptomLogRoutes from "./routes/symptomLogs.js";
 import phaseFeedbackRoutes from "./routes/phaseFeedback.js";
 import consentRoutes from "./routes/consent.js";
 import catalogRoutes from "./routes/catalog.js";
+import clinicRoutes from "./routes/clinics.js";
 import userRoutes from "./routes/user.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
@@ -112,9 +113,11 @@ app.use("/api/logs", cycleLogRoutes);
 // /api/cycle - legacy alias kept for backwards compat
 app.use("/api/cycle", cycleLogRoutes);
 
+app.use("/api/symptom-logs", symptomLogRoutes);
 app.use("/api/symptoms", symptomLogRoutes);
 app.use("/api/consent", consentRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/clinics", clinicRoutes);
 app.use("/catalog", catalogRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/admin", adminRoutes);
@@ -155,6 +158,12 @@ const PORT = process.env.PORT || 4000;
 db.collection("symptomCatalog").limit(1).get().then(snap => {
   if (snap.empty) {
     console.warn("⚠️  WARNING: symptomCatalog is empty. Run scripts/seedSymptoms.js or symptom logging will fail for all users.");
+  }
+}).catch(() => {});
+
+db.collection("clinicDirectory").limit(1).get().then(snap => {
+  if (snap.empty) {
+    console.warn("WARNING: clinicDirectory is empty. Run scripts/seedClinics.js or the clinic finder will fall back to local data.");
   }
 }).catch(() => {});
 

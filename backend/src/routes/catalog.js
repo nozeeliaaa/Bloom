@@ -1,9 +1,23 @@
 // src/routes/catalog.js
 import express from "express";
-import { db } from "../firebaseAdmin.js";
-import { requireAuth } from "../middleware/auth.js";
+import { auth, db } from "../firebaseAdmin.js";
+import { deriveAgeBand, requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
+
+async function getRequestUserAgeBand(req) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return null;
+
+  try {
+    const decoded = await auth.verifyIdToken(header.split(" ")[1]);
+    const snap = await db.collection("users").doc(decoded.uid).get();
+    const profile = snap.exists ? snap.data()?.profile || {} : {};
+    return deriveAgeBand(profile.yearOfBirth);
+  } catch (_) {
+    return null;
+  }
+}
 
 // ─── GET /catalog/clinics ────────────────────────────────────────────────────
 // Returns clinic directory, filterable by parish and type
@@ -121,7 +135,8 @@ router.get("/route", async (req, res) => {
 router.get("/pamphlets", async (req, res) => {
   try {
     const { category, q, sensitive } = req.query;
-    const showSensitive = sensitive === "true";
+    const ageBand = await getRequestUserAgeBand(req);
+    const showSensitive = sensitive === "true" && ageBand === "18+";
 
     // Fetch all docs without Firestore inequality filter = the != operator silently
     // excludes documents that don't have the 'sensitive' field at all, which caused
@@ -165,7 +180,13 @@ router.get("/pamphlets/:id", async (req, res) => {
       return res.status(404).json({ error: "Pamphlet not found" });
     }
 
-    return res.json({ ok: true, pamphlet: { id: doc.id, ...doc.data() } });
+    const pamphlet = doc.data();
+    const ageBand = await getRequestUserAgeBand(req);
+    if (pamphlet.sensitive === true && ageBand !== "18+") {
+      return res.status(404).json({ error: "Pamphlet not found" });
+    }
+
+    return res.json({ ok: true, pamphlet: { id: doc.id, ...pamphlet } });
   } catch (err) {
     console.error("GET /catalog/pamphlets/:id error:", err);
     return res.status(500).json({ error: "Failed to fetch pamphlet" });

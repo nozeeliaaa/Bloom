@@ -3,6 +3,7 @@ import express from "express";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateSymptomItem } from "../validators/validateSymptomLog.js";
+import { ensureUserDocument, serverTimestamp, userSubDoc } from "../utils/userDataPaths.js";
 
 const router = express.Router();
 
@@ -12,6 +13,7 @@ function isValidDateKey(dateKey) {
 }
 
 async function ensureSymptomLogsParent(uid) {
+  await ensureUserDocument(uid);
   const parentRef = db.collection("symptomLogs").doc(uid);
   const snap = await parentRef.get();
   if (!snap.exists) {
@@ -35,8 +37,39 @@ async function hasSensitiveConsent(uid) {
   return !!consent.scope?.sensitiveModules;
 }
 
-// Collection path: symptomLogs/{uid}/entries/{dateKey}
-// Each doc holds an items[] array - multiple symptoms per day
+function cleanOtherSymptom(item, dateKey) {
+  const text = typeof item?.text === "string" ? item.text.trim().slice(0, 80) : "";
+  if (!text) return null;
+
+  const normalizedText =
+    typeof item?.normalizedText === "string"
+      ? item.normalizedText.trim().toLowerCase().slice(0, 80)
+      : text.toLowerCase();
+  const severity = Number(item?.severity ?? 3);
+  const note = typeof item?.note === "string" ? item.note.trim().slice(0, 160) : "";
+  const createdAt = typeof item?.createdAt === "string" ? item.createdAt : new Date().toISOString();
+
+  return {
+    text,
+    normalizedText,
+    severity: Number.isInteger(severity) && severity >= 0 && severity <= 5 ? severity : 3,
+    note,
+    createdAt,
+    dateKey,
+  };
+}
+
+function canonicalSymptomLogRef(uid, dateKey) {
+  return userSubDoc(uid, "symptomLogs", dateKey);
+}
+
+function legacySymptomLogRef(uid, dateKey) {
+  return db.collection("symptomLogs").doc(uid).collection("entries").doc(dateKey);
+}
+
+// Canonical path: users/{uid}/symptomLogs/{dateKey}
+// Legacy mirror: symptomLogs/{uid}/entries/{dateKey}
+// Each doc holds an items[] array - multiple catalog symptoms per day.
 
 // Create/Update symptoms for a day
 router.put("/:dateKey", requireAuth, async (req, res) => {
@@ -50,15 +83,18 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
 
     const items = Array.isArray(req.body.items) ? req.body.items : [];
 
-    if (items.length === 0) {
-      return res.status(400).json({ error: "items array is required and cannot be empty" });
-    }
-
     if (items.length > 40) {
       return res.status(400).json({ error: "Too many symptom items for one day (max 40)" });
     }
 
     const cleaned = [];
+    const otherSymptoms = Array.isArray(req.body.otherSymptoms)
+      ? req.body.otherSymptoms.map((item) => cleanOtherSymptom(item, dateKey)).filter(Boolean).slice(0, 20)
+      : [];
+
+    if (items.length === 0 && otherSymptoms.length === 0) {
+      return res.status(400).json({ error: "items or otherSymptoms is required" });
+    }
 
     const teenHasSensitiveConsent =
         req.user.ageBand === "10-17"
@@ -85,28 +121,27 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       cleaned.push(normalized);
     }
 
-    const docRef = db
-      .collection("symptomLogs")
-      .doc(uid)
-      .collection("entries")
-      .doc(dateKey);
+    const docRef = canonicalSymptomLogRef(uid, dateKey);
 
     const payload = {
       dateKey,
       items: cleaned,
-      updatedAt: new Date(),
+      otherSymptoms,
+      updatedAt: serverTimestamp(),
     };
 
     const snap = await docRef.get();
-    if (!snap.exists) payload.createdAt = new Date();
+    if (!snap.exists) payload.createdAt = serverTimestamp();
 
     await ensureSymptomLogsParent(uid);
 
     await docRef.set(payload, { merge: true });
+    await legacySymptomLogRef(uid, dateKey).set(payload, { merge: true });
 
-    return res.json({ ok: true, entry: payload });
+    const saved = await docRef.get();
+    return res.json({ ok: true, entry: saved.data() });
   } catch (err) {
-    console.error("PUT /api/symptoms/:dateKey error:", err);
+    console.error("PUT /api/symptom-logs/:dateKey error:", err);
     return res.status(500).json({ error: "Failed to save symptom log" });
   }
 });
@@ -121,17 +156,13 @@ router.get("/:dateKey", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
     }
 
-    const doc = await db
-      .collection("symptomLogs")
-      .doc(uid)
-      .collection("entries")
-      .doc(dateKey)
-      .get();
+    let doc = await canonicalSymptomLogRef(uid, dateKey).get();
+    if (!doc.exists) doc = await legacySymptomLogRef(uid, dateKey).get();
 
     if (!doc.exists) return res.json(null);
     return res.json(doc.data());
   } catch (err) {
-    console.error("GET /api/symptoms/:dateKey error:", err);
+    console.error("GET /api/symptom-logs/:dateKey error:", err);
     return res.status(500).json({ error: "Failed to fetch symptom log" });
   }
 });
@@ -149,38 +180,37 @@ router.get("/", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid end date. Use YYYY-MM-DD" });
     }
 
-    let q = db
-      .collection("symptomLogs")
-      .doc(uid)
-      .collection("entries")
-      .orderBy("dateKey", "desc");
+    let q = db.collection("users").doc(uid).collection("symptomLogs").orderBy("dateKey", "desc");
 
     if (start) q = q.where("dateKey", ">=", start);
     if (end) q = q.where("dateKey", "<=", end);
 
     if (start || end) q = q.limit(3650);
 
-    const snap = await q.get();
-    const items = snap.docs.map((d) => d.data());
+    let snap = await q.get();
+    let items = snap.docs.map((d) => d.data());
+
+    if (items.length === 0) {
+      let legacy = db.collection("symptomLogs").doc(uid).collection("entries").orderBy("dateKey", "desc");
+      if (start) legacy = legacy.where("dateKey", ">=", start);
+      if (end) legacy = legacy.where("dateKey", "<=", end);
+      if (start || end) legacy = legacy.limit(3650);
+      snap = await legacy.get();
+      items = snap.docs.map((d) => d.data());
+    }
 
     return res.json({ ok: true, items });
   } catch (err) {
-    console.error("GET /api/symptoms error:", err);
+    console.error("GET /api/symptom-logs error:", err);
     return res.status(500).json({ error: "Failed to fetch symptom logs" });
   }
 });
 
-// DELETE /api/symptoms - bulk delete all symptom logs for user
+// DELETE /api/symptom-logs - bulk delete all symptom logs for user
 router.delete("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
-    const snap = await db
-      .collection("symptomLogs")
-      .doc(uid)
-      .collection("entries")
-      .get();
-
-    if (snap.empty) return res.json({ ok: true, deleted: 0 });
+    const snap = await db.collection("users").doc(uid).collection("symptomLogs").get();
 
     const BATCH_SIZE = 500;
     const docs = snap.docs;
@@ -193,9 +223,15 @@ router.delete("/", requireAuth, async (req, res) => {
       { updatedAt: new Date() },
       { merge: true }
     );
-    return res.json({ ok: true, deleted: docs.length });
+    const legacySnap = await db.collection("symptomLogs").doc(uid).collection("entries").get();
+    if (!legacySnap.empty) {
+      const batch = db.batch();
+      legacySnap.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+    return res.json({ ok: true, deleted: docs.length + legacySnap.docs.length });
   } catch (err) {
-    console.error("DELETE /api/symptoms error:", err);
+    console.error("DELETE /api/symptom-logs error:", err);
     return res.status(500).json({ error: "Failed to delete all symptom logs" });
   }
 });
@@ -210,12 +246,8 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid dateKey. Use YYYY-MM-DD" });
     }
 
-    await db
-      .collection("symptomLogs")
-      .doc(uid)
-      .collection("entries")
-      .doc(dateKey)
-      .delete();
+    await canonicalSymptomLogRef(uid, dateKey).delete();
+    await legacySymptomLogRef(uid, dateKey).delete();
 
     await db.collection("symptomLogs").doc(uid).set(
       { updatedAt: new Date() },
@@ -224,7 +256,7 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
 
     return res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /api/symptoms/:dateKey error:", err);
+    console.error("DELETE /api/symptom-logs/:dateKey error:", err);
     return res.status(500).json({ error: "Failed to delete symptom log" });
   }
 });

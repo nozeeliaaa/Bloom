@@ -2,6 +2,7 @@ import express from "express";
 import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
+import { ensureUserDocument, userSubDoc } from "../utils/userDataPaths.js";
 
 const router = express.Router();
 
@@ -17,6 +18,14 @@ function toScore(val) {
   if (val === null || val === undefined) return val;
   const n = Number(val);
   return Number.isInteger(n) ? n : val; // let validator catch non-integers
+}
+
+function canonicalBiometricLogRef(uid, dateKey) {
+  return userSubDoc(uid, "biometricLogs", dateKey);
+}
+
+function legacyBiometricLogRef(uid, dateKey) {
+  return db.collection("biometricLogs").doc(uid).collection("entries").doc(dateKey);
 }
 
 // PUT /api/biometric-logs/:dateKey
@@ -60,11 +69,9 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "No biometric fields provided." });
     }
 
-    const entryRef = db
-      .collection("biometricLogs")
-      .doc(uid)
-      .collection("entries")
-      .doc(dateKey);
+    await ensureUserDocument(uid);
+
+    const entryRef = canonicalBiometricLogRef(uid, dateKey);
 
     const existingEntrySnap = await entryRef.get();
     const userRef = db.collection("users").doc(uid);
@@ -73,6 +80,19 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
     const existingBiometricProfile = existingUser.biometricProfile || {};
 
     await entryRef.set(
+      {
+        uid,
+        dateKey,
+        ...update,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: existingEntrySnap.exists
+          ? existingEntrySnap.data()?.createdAt || admin.firestore.FieldValue.serverTimestamp()
+          : admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    await legacyBiometricLogRef(uid, dateKey).set(
       {
         uid,
         dateKey,
@@ -125,12 +145,8 @@ router.get("/:dateKey", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid dateKey format. Use YYYY-MM-DD." });
     }
 
-    const snap = await db
-      .collection("biometricLogs")
-      .doc(uid)
-      .collection("entries")
-      .doc(dateKey)
-      .get();
+    let snap = await canonicalBiometricLogRef(uid, dateKey).get();
+    if (!snap.exists) snap = await legacyBiometricLogRef(uid, dateKey).get();
 
     if (!snap.exists) {
       return res.json({ ok: true, biometricLog: null });
@@ -148,12 +164,21 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
 
-    const snap = await db
-      .collection("biometricLogs")
+    let snap = await db
+      .collection("users")
       .doc(uid)
-      .collection("entries")
+      .collection("biometricLogs")
       .orderBy("dateKey", "desc")
       .get();
+
+    if (snap.empty) {
+      snap = await db
+        .collection("biometricLogs")
+        .doc(uid)
+        .collection("entries")
+        .orderBy("dateKey", "desc")
+        .get();
+    }
 
     const biometricLogs = snap.docs.map((doc) => ({
       id: doc.id,
@@ -177,12 +202,8 @@ router.delete("/:dateKey", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid dateKey format. Use YYYY-MM-DD." });
     }
 
-    await db
-      .collection("biometricLogs")
-      .doc(uid)
-      .collection("entries")
-      .doc(dateKey)
-      .delete();
+    await canonicalBiometricLogRef(uid, dateKey).delete();
+    await legacyBiometricLogRef(uid, dateKey).delete();
 
     return res.json({ ok: true });
   } catch (err) {

@@ -708,7 +708,7 @@
 
       try {
         const apiBase = window.BLOOM_API_BASE ?? '';
-        const res = await fetch(`${apiBase}/catalog/clinics`);
+        const res = await fetch(`${apiBase}/api/clinics`);
 
         if (!res.ok) throw new Error(`Backend error: ${res.status}`);
 
@@ -727,7 +727,7 @@
         } catch (e2) {
           console.warn('Local fallback also failed:', e2);
           clinics = [];
-          setStatus('Clinic data is unavailable right now. Check /catalog/clinics or /data/clinics.json.', true);
+          setStatus('Clinic data is unavailable right now. Check /api/clinics or /data/clinics.json.', true);
         }
       }
 

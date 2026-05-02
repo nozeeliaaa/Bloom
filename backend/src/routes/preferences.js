@@ -8,13 +8,34 @@
 import express from "express";
 import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
-import { requireAuth } from "../middleware/auth.js";
+import { deriveAgeBand, requireAuth } from "../middleware/auth.js";
 import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
 
 const router = express.Router();
 
 const VALID_THEMES = ["light", "dark", "system"];
 const VALID_REMINDER_TYPES = ["PERIOD_SOON", "LOG_REMINDER", "CHECK_IN", "FERTILE_WINDOW"];
+
+async function getEffectiveAgeBand(req) {
+  if (req.user?.firestoreDegraded) return req.user?.ageBand ?? null;
+
+  try {
+    const snap = await db.collection("users").doc(req.user.uid).get();
+    const profile = snap.exists ? snap.data()?.profile || {} : {};
+    return deriveAgeBand(profile.yearOfBirth) || req.user?.ageBand || null;
+  } catch (_) {
+    return req.user?.ageBand ?? null;
+  }
+}
+
+function enforceMinorPreferences(ageBand, prefs = {}) {
+  if (ageBand !== "10-17") return prefs;
+  return {
+    ...prefs,
+    hideSensitive: true,
+    sensitiveContentLocked: true,
+  };
+}
 
 function isFirestoreQuotaError(err) {
   const msg = String(err?.message || "").toLowerCase();
@@ -33,13 +54,14 @@ router.get("/", requireAuth, async (req, res) => {
     }
 
     const uid = req.user.uid;
+    const ageBand = await getEffectiveAgeBand(req);
     const doc = await db.collection("preferences").doc(uid).get();
 
     if (!doc.exists) {
-      return res.json({ ok: true, preferences: null });
+      return res.json({ ok: true, preferences: enforceMinorPreferences(ageBand, {}) });
     }
 
-    return res.json({ ok: true, preferences: doc.data() });
+    return res.json({ ok: true, preferences: enforceMinorPreferences(ageBand, doc.data()) });
   } catch (err) {
     if (isFirestoreQuotaError(err)) {
       console.warn("GET /preferences quota exceeded; returning degraded preferences payload");
@@ -78,6 +100,7 @@ router.put("/", requireAuth, async (req, res) => {
     }
 
     const prefs = {};
+    const ageBand = await getEffectiveAgeBand(req);
 
     if (body.theme !== undefined) {
       if (!VALID_THEMES.includes(body.theme)) {
@@ -90,6 +113,10 @@ router.put("/", requireAuth, async (req, res) => {
     if (body.discreetMode  !== undefined) prefs.discreetMode  = body.discreetMode  === true;
     if (body.compact       !== undefined) prefs.compact       = body.compact       === true;
     if (body.hideSensitive !== undefined) prefs.hideSensitive = body.hideSensitive === true;
+    if (ageBand === "10-17") {
+      prefs.hideSensitive = true;
+      prefs.sensitiveContentLocked = true;
+    }
 
     if (body.reminders !== undefined) {
       const r = body.reminders;

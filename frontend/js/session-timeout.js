@@ -1,9 +1,9 @@
 import { isAccountMode } from "./mode.js";
-import { logout } from "./auth.js";
+import { logout, onAuthChange } from "./auth.js";
 
 const LAST_ACTIVITY_KEY = "bloom_last_activity_ts";
-const INACTIVITY_MS_DEFAULT = 12 * 60 * 1000; // 12 minutes
-const WARNING_GRACE_MS_DEFAULT = 60 * 1000;   // 1 minute
+const INACTIVITY_MS_DEFAULT = 4 * 60 * 1000; // warn after 4 minutes
+const WARNING_GRACE_MS_DEFAULT = 60 * 1000;  // log out at 5 minutes total idle
 
 let _started = false;
 let _warnTimer = null;
@@ -13,6 +13,7 @@ let _logoutAt = 0;
 let _warningVisible = false;
 let _logoutInFlight = false;
 let _fetchPatched = false;
+let _authWatchStarted = false;
 let _cleanupFns = [];
 
 function parseMs(value, fallback) {
@@ -22,14 +23,14 @@ function parseMs(value, fallback) {
 
 function getInactivityMs() {
   return parseMs(
-    window.BLOOM_INACTIVITY_MS ?? localStorage.getItem("bloom_inactivity_ms"),
+    window.BLOOM_INACTIVITY_MS,
     INACTIVITY_MS_DEFAULT
   );
 }
 
 function getWarningGraceMs() {
   return parseMs(
-    window.BLOOM_INACTIVITY_GRACE_MS ?? localStorage.getItem("bloom_inactivity_grace_ms"),
+    window.BLOOM_INACTIVITY_GRACE_MS,
     WARNING_GRACE_MS_DEFAULT
   );
 }
@@ -232,6 +233,19 @@ function handleActivity() {
   scheduleFromActivity(getLastActivityTs());
 }
 
+function activateAccountTimeoutGuard({ resetActivity = false } = {}) {
+  if (!isAccountMode()) {
+    clearTimers();
+    hideWarning();
+    return;
+  }
+
+  if (resetActivity || !localStorage.getItem(LAST_ACTIVITY_KEY)) {
+    setLastActivityTs(Date.now());
+  }
+  scheduleFromActivity(getLastActivityTs());
+}
+
 function shouldTreatAsExpiredSession(url, init, response) {
   if (!isAccountMode()) return false;
   if (!response) return false;
@@ -285,21 +299,17 @@ export async function forceSessionLogout(reason = "expired") {
 
 export function startSessionTimeoutGuard() {
   patchFetchForExpiry();
-  if (_started) return;
-  _started = true;
-
-  if (!isAccountMode()) return;
+  if (_started) {
+    activateAccountTimeoutGuard();
+    return;
+  }
 
   const activityEvents = [
     "click",
     "keydown",
     "input",
-    "scroll",
     "touchstart",
     "pointerdown",
-    "focus",
-    "popstate",
-    "hashchange",
   ];
 
   for (const ev of activityEvents) {
@@ -320,14 +330,29 @@ export function startSessionTimeoutGuard() {
   window.addEventListener("storage", storageListener);
   _cleanupFns.push(() => window.removeEventListener("storage", storageListener));
 
-  if (!localStorage.getItem(LAST_ACTIVITY_KEY)) {
-    setLastActivityTs(Date.now());
+  if (!_authWatchStarted) {
+    _authWatchStarted = true;
+    const unsubscribe = onAuthChange((user) => {
+      if (user) {
+        activateAccountTimeoutGuard({ resetActivity: true });
+      } else {
+        clearTimers();
+        hideWarning();
+        localStorage.removeItem(LAST_ACTIVITY_KEY);
+      }
+    });
+    _cleanupFns.push(() => {
+      try { unsubscribe?.(); } catch (_) {}
+    });
   }
-  scheduleFromActivity(getLastActivityTs());
+
+  _started = true;
+  activateAccountTimeoutGuard();
 }
 
 export function stopSessionTimeoutGuard() {
   _started = false;
+  _authWatchStarted = false;
   clearTimers();
   hideWarning();
   for (const fn of _cleanupFns.splice(0)) {
