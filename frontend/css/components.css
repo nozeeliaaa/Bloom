@@ -888,21 +888,25 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--color-primary-lightest);
   flex-shrink: 0;
   transition: background var(--transition);
 }
-.chip-icon-img {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-  display: block;
+.chip-icon-emoji {
+  font-size: 0.9rem;
+  background: transparent;
+  width: auto;
+  height: auto;
+  margin-right: 0.1rem;
 }
 .chip.selected .chip-icon-wrap {
   background: color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+.chip.selected .chip-icon-emoji {
+  background: transparent;
 }
 .severity-symptom-name {
   display: inline-flex;
@@ -1094,32 +1098,42 @@
   right: 18px;
   bottom: 90px;
   width: min(420px, calc(100vw - 36px));
-  height: 520px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  overflow:hidden;
-  box-shadow: 0 24px 60px rgba(0,0,0,.25);
+  height: min(78vh, 760px);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
   display:flex;
   flex-direction:column;
 }
 .bloomie-modal-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border);
+  display: none;
 }
 .bloomie-close{
-  border:none;
-  background: transparent;
-  font-size: 18px;
-  cursor:pointer;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  border: none;
+  background: rgba(0,0,0,0.15);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
 }
 .bloomie-frame{
   flex:1;
   width:100%;
+  height:100%;
   border:0;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .book-grid{

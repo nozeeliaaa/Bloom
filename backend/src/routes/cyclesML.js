@@ -17,21 +17,42 @@ import admin from "firebase-admin";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-const CYCLE_SCRIPT = path.join(__dirname, '../public/ml/inference/cycle_predict.py');
+const CYCLE_SCRIPT = path.join(__dirname, '../../ml/inference/cycle_predict.py');
+const PYTHON_CMD = process.env.PYTHON_CMD || (process.platform === "win32" ? "python" : "python3");
+const PYTHON_TIMEOUT_MS = Number(process.env.CYCLE_PY_TIMEOUT_MS || 5000);
 
 const router = express.Router();
 
 // ── Python runner ────────────────────────────────────────────
 
-function runPython(scriptPath, args) {
+function runPython(scriptPath, args, { timeoutMs = PYTHON_TIMEOUT_MS } = {}) {
   return new Promise((resolve, reject) => {
-    const python = spawn('python3', [scriptPath, ...args.map(String)]);
+    const python = spawn(PYTHON_CMD, [scriptPath, ...args.map(String)]);
     let output = '';
     let errorOutput = '';
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { python.kill(); } catch (_) {}
+      reject(new Error(`Python timed out after ${timeoutMs}ms (${PYTHON_CMD})`));
+    }, timeoutMs);
+
+    python.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error(`Failed to start Python (${PYTHON_CMD}): ${err.message}`));
+    });
+
     python.stdout.on('data', (data) => { output += data.toString(); });
     python.stderr.on('data', (data) => { errorOutput += data.toString(); });
     python.on('close', (code) => {
-      if (code !== 0) return reject(new Error(`Python failed: ${errorOutput}`));
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code !== 0) return reject(new Error(`Python failed: ${errorOutput || `exit code ${code}`}`));
       try {
         const result = JSON.parse(output.trim());
         if (result.error) return reject(new Error(result.error));
@@ -52,6 +73,9 @@ function _getCachedState(uid, lastPeriodDay) {
   if (!entry) return null;
   if (entry.lastPeriodDay !== lastPeriodDay) return null;
   if (Date.now() - entry.ts > _STATE_CACHE_TTL) return null;
+  // Never serve "not ready" cache entries - they can become stale quickly
+  // and block fresh estimation after new logs are added.
+  if (!entry.state?.ready) return null;
   return entry.state;
 }
 
@@ -61,6 +85,36 @@ function _setCachedState(uid, lastPeriodDay, state) {
 
 function _clearCache(uid) {
   _stateCache.delete(uid);
+}
+
+function normalizeFlowValue(rawFlowLevel, rawFlow) {
+  if (typeof rawFlow === "string" && rawFlow.trim()) {
+    const normalized = rawFlow.trim().toLowerCase();
+    if (normalized !== "none") return normalized;
+  }
+
+  const parsed = Number(rawFlowLevel);
+  if (!Number.isFinite(parsed)) return "none";
+  if (parsed <= 0) return "none";
+  if (parsed >= 3) return "heavy";
+  if (parsed >= 2) return "medium";
+  return "light";
+}
+
+function isPeriodDayEntry(entry) {
+  if (!entry || typeof entry !== "object") return false;
+  const flow = normalizeFlowValue(entry.flowLevel, entry.flow);
+  if (flow !== "none") return true;
+  if (typeof entry.flowLevel === "number" && entry.flowLevel > 0) return true;
+  if (Number.isFinite(Number(entry.periodDay)) && Number(entry.periodDay) > 0) return true;
+  return entry.periodDay === true;
+}
+
+function getLastPeriodDayFromLogs(logsObj = {}) {
+  return Object.keys(logsObj)
+    .filter((dateKey) => isPeriodDayEntry(logsObj[dateKey]))
+    .sort()
+    .pop() ?? null;
 }
 
 // ── Fallback: rule-based weighted average ────────────────────
@@ -101,16 +155,23 @@ function calculateStdDev(arr) {
 // Reads all logs from Firestore for the given uid.
 // Returns { cycleLogs, symptomLogs, biometricLogs } as flat objects keyed by dateKey.
 
-async function fetchUserLogs(uid, daysBack = 180) {
+async function fetchUserLogs(uid, daysBack = 180, cycleLogsOverride = null) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
   const cutoffKey = cutoff.toISOString().slice(0, 10);
 
+  const hasCycleOverride =
+    cycleLogsOverride &&
+    typeof cycleLogsOverride === "object" &&
+    Object.keys(cycleLogsOverride).length > 0;
+
   const [cycleSnap, symptomSnap, biometricSnap] = await Promise.all([
-    db.collection('cycleLogs').doc(uid).collection('entries')
-      .where('dateKey', '>=', cutoffKey)
-      .orderBy('dateKey', 'asc')
-      .get(),
+    hasCycleOverride
+      ? Promise.resolve(null)
+      : db.collection('cycleLogs').doc(uid).collection('entries')
+        .where('dateKey', '>=', cutoffKey)
+        .orderBy('dateKey', 'asc')
+        .get(),
     db.collection('symptomLogs').doc(uid).collection('entries')
       .where('dateKey', '>=', cutoffKey)
       .orderBy('dateKey', 'asc')
@@ -122,7 +183,27 @@ async function fetchUserLogs(uid, daysBack = 180) {
   ]);
 
   const cycleLogs = {};
-  cycleSnap.forEach(doc => { cycleLogs[doc.data().dateKey] = doc.data(); });
+  if (hasCycleOverride) {
+    for (const [dateKey, rowRaw] of Object.entries(cycleLogsOverride)) {
+      if (!dateKey) continue;
+      const row = rowRaw && typeof rowRaw === "object" ? rowRaw : {};
+      cycleLogs[dateKey] = {
+        ...row,
+        dateKey,
+        flow: normalizeFlowValue(row.flowLevel, row.flow),
+      };
+    }
+  } else if (cycleSnap) {
+    cycleSnap.forEach((doc) => {
+      const row = doc.data() || {};
+      const dateKey = row.dateKey;
+      if (!dateKey) return;
+      cycleLogs[dateKey] = {
+        ...row,
+        flow: normalizeFlowValue(row.flowLevel, row.flow),
+      };
+    });
+  }
 
   const symptomLogs = {};
   symptomSnap.forEach(doc => { symptomLogs[doc.data().dateKey] = doc.data(); });
@@ -388,7 +469,7 @@ function todayDateKey() {
 
 function getPeriodClustersBackend(logs) {
   const periodDays = Object.keys(logs)
-    .filter(k => { const l = logs[k]; return l && l.flow && l.flow !== 'none'; })
+    .filter((k) => isPeriodDayEntry(logs[k]))
     .sort();
   if (!periodDays.length) return [];
   const clusters = [];
@@ -468,9 +549,12 @@ function buildCalendarOverlays(futureCycles, clusterStarts) {
 // ── Core estimation function ──────────────────────────────────
 // Extracted so both /state and /feedback can call it.
 
-async function computeFullEstimation(uid) {
+async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}) {
+  const mlTimeoutMs = Number(options.mlTimeoutMs ?? Math.min(PYTHON_TIMEOUT_MS, 1200));
+  const allowML = options.allowML !== false;
+
   // 1 — Fetch all logs from Firestore
-  const { cycleLogs, symptomLogs, biometricLogs } = await fetchUserLogs(uid);
+  const { cycleLogs, symptomLogs, biometricLogs } = await fetchUserLogs(uid, 180, cycleLogsOverride);
 
   // 2 — Derive period clusters from cycle logs
   const clusters = getPeriodClustersBackend(cycleLogs);
@@ -525,13 +609,13 @@ async function computeFullEstimation(uid) {
   let predictedCycleLength = avgLen;
   let predMethod = 'avg';
 
-  if (cycleLengths.length >= 3) {
+  if (allowML && cycleLengths.length >= 3) {
     try {
       const cycleVariability = calculateStdDev(cycleLengths);
       const mlResult = await runPython(CYCLE_SCRIPT, [
         cycleLengths[cycleLengths.length - 1], avgLen, 14,
         cycleVariability, clusterStarts.length, 28, 22, 0, 0,
-      ]);
+      ], { timeoutMs: mlTimeoutMs });
       predictedCycleLength = mlResult.predictedCycleLength ?? avgLen;
       predMethod = 'ml';
     } catch (mlErr) {
@@ -664,9 +748,14 @@ router.post('/state', requireAuth, async (req, res) => {
     console.log(`[cyclesML/state] uid=${uid}`);
 
     // Check cache
+    const requestLogs = (req.body && typeof req.body === "object") ? (req.body.logs || {}) : {};
+    const requestLastPeriodDay = getLastPeriodDayFromLogs(requestLogs);
     const userDoc = await db.collection('users').doc(uid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
-    const lastPeriodDay = userData?.phaseProfile?.lastPeriodStart ?? 'none';
+    const lastPeriodDay =
+      requestLastPeriodDay ??
+      userData?.phaseProfile?.lastPeriodStart ??
+      'none';
 
     const cached = _getCachedState(uid, lastPeriodDay);
     if (cached) {
@@ -674,7 +763,13 @@ router.post('/state', requireAuth, async (req, res) => {
       return res.json({ ok: true, state: cached });
     }
 
-    const { state, lastStart } = await computeFullEstimation(uid);
+    const { state, lastStart } = await computeFullEstimation(uid, requestLogs, {
+      allowML: true,
+      mlTimeoutMs: Number(process.env.CYCLE_STATE_ML_TIMEOUT_MS || 1200),
+    });
+    console.log(
+      `[cyclesML/state] complete uid=${uid} ready=${state.ready} phase=${state.phase} len=${state.predictedCycleLength}`
+    );
 
     // Cache + persist to Firestore (non-blocking)
     _setCachedState(uid, lastStart ?? 'none', state);

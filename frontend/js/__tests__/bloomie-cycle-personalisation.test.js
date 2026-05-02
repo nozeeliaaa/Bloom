@@ -42,8 +42,10 @@ import { generateIntegratedSignals } from "../algorithms/bloom-symptom-engine.js
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 vi.mock("../db.js", () => ({
-  loadBloomieMemory: vi.fn().mockResolvedValue(null),
-  saveBloomieMemory: vi.fn().mockResolvedValue(),
+  loadBloomieMemory:      vi.fn().mockResolvedValue(null),
+  saveBloomieMemory:      vi.fn().mockResolvedValue(),
+  loadLocalBloomieMemory: vi.fn().mockReturnValue(null),
+  saveLocalBloomieMemory: vi.fn(),
 }));
 
 vi.mock("../auth.js", () => ({
@@ -51,10 +53,14 @@ vi.mock("../auth.js", () => ({
   getUser:     vi.fn().mockReturnValue(null),
 }));
 
-vi.mock("../bloomie-logger.js", () => ({
-  logSafetyEvent:    vi.fn(),
-  logAnalyticsEvent: vi.fn(),
-}));
+vi.mock("../bloomie-logger.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    logSafetyEvent:    vi.fn(),
+    logAnalyticsEvent: vi.fn(),
+  };
+});
 
 // Bypass Patois normalisation (non-iterable PHRASE_MAP in test env).
 vi.mock("../bloomie-patois.js", async (importOriginal) => {
@@ -274,6 +280,26 @@ describe("buildCyclePersonalisationLine - variability line in LATE_INTRO", () =>
   });
 });
 
+describe("shared cycle state consistency", () => {
+  it("uses the canonical nextPeriodDate from cycleData for overdue intro wording", () => {
+    vi.setSystemTime(new Date("2026-04-09T12:00:00"));
+
+    mountChat({
+      cycleData: {
+        lmp: "2026-01-13",
+        cycleLength: 71,
+        nextPeriodDate: "2026-03-23",
+        dayInCycle: 88,
+        phase: "late_luteal",
+        phaseLabel: "Late Luteal",
+      },
+      symptomHistory: STUB_HISTORY,
+    });
+
+    expect(getChatBoxText()).toMatch(/17 days overdue by estimate/i);
+  });
+});
+
 
 // ── 3. buildSymptomPatternLine - via MOOD_INTRO → MOOD_SAFETY_CHECK ──────────
 //
@@ -296,7 +322,7 @@ describe("buildSymptomPatternLine - pattern line in mood flow", () => {
     clickButton("mood");   // START → MOOD_INTRO (onEnter) → MOOD_SAFETY_CHECK
 
     expect(getChatBoxText()).toMatch(
-      /tend to experience|tends to come up|tend to log/i
+      /looking at your logs|from what you've logged|pattern your body follows|tend to experience|tends? to come up|tend to log/i
     );
   });
 

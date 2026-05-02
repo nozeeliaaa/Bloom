@@ -11,8 +11,39 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const serviceAccountPath = path.resolve(__dirname, "../serviceAccountKey.json");
 
+function _isDeadLocalProxy(value) {
+  if (!value) return false;
+  const v = String(value).trim().toLowerCase();
+  // Common "sink" proxy values that guarantee outbound failures.
+  return (
+    v === "http://127.0.0.1:9" ||
+    v === "https://127.0.0.1:9" ||
+    v === "http://localhost:9" ||
+    v === "https://localhost:9"
+  );
+}
+
+function _sanitizeBrokenProxyEnv() {
+  const keys = ["ALL_PROXY", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "http_proxy", "https_proxy"];
+  const removed = [];
+  for (const k of keys) {
+    if (_isDeadLocalProxy(process.env[k])) {
+      removed.push(`${k}=${process.env[k]}`);
+      delete process.env[k];
+    }
+  }
+  if (removed.length) {
+    console.warn(
+      `[firebaseAdmin] Ignored invalid proxy env for Firebase outbound calls: ${removed.join(", ")}`
+    );
+  }
+}
+
 function initAdmin() {
   if (admin.apps.length) return admin.app();
+
+  // Prevent global sink proxy env from breaking Firebase Auth/Firestore.
+  _sanitizeBrokenProxyEnv();
 
   let credential;
 

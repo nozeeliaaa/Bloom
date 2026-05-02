@@ -59,6 +59,21 @@
       flex-direction: column;
       gap: 0.85rem;
       min-height: 400px;
+      scrollbar-width: thin;
+      scrollbar-color: #f0a0c0 transparent;
+    }
+    .chat-box::-webkit-scrollbar {
+      width: 5px;
+    }
+    .chat-box::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .chat-box::-webkit-scrollbar-thumb {
+      background: #f0a0c0;
+      border-radius: 99px;
+    }
+    .chat-box::-webkit-scrollbar-thumb:hover {
+      background: #e46a94;
     }
 
     .msg {
@@ -205,6 +220,209 @@
 
     .chat-send-btn:active { transform: scale(0.96); }
 
+    .bloomie-chat-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      padding: 0.7rem 0.9rem;
+      border-bottom: 1px solid var(--color-border);
+      background: linear-gradient(180deg, rgba(255, 245, 249, 0.95) 0%, rgba(255, 255, 255, 1) 100%);
+    }
+
+    .bloomie-chat-topbar-title {
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: var(--color-text);
+    }
+
+    .bloomie-topbar-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
+
+    .offline-badge {
+      display: none;
+      align-items: center;
+      gap: 0.35rem;
+      border: 1px solid rgba(212, 116, 154, 0.35);
+      color: #9f3b63;
+      background: #fff3f8;
+      border-radius: 999px;
+      padding: 0.14rem 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .offline-badge.is-visible { display: inline-flex; }
+
+    .chat-settings-wrap {
+      position: relative;
+      margin-left: auto;
+    }
+
+    .chat-settings-btn {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      background: #fff;
+      color: #9b4b6e;
+      font-size: 1rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(212, 116, 154, 0.12);
+    }
+
+    .chat-settings-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 0.45rem);
+      min-width: 230px;
+      background: #fff;
+      border: 1px solid rgba(212, 116, 154, 0.22);
+      border-radius: 14px;
+      padding: 0.7rem;
+      box-shadow: 0 14px 28px rgba(58, 32, 46, 0.15);
+      z-index: 20;
+      display: none;
+    }
+
+    .chat-settings-panel.is-open { display: block; }
+
+    .chat-setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.42rem 0.3rem;
+      font-size: 0.84rem;
+      color: var(--color-text);
+    }
+
+    .chat-setting-row select {
+      min-width: 110px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 0.26rem 0.45rem;
+      font: inherit;
+      background: #fff;
+    }
+
+    .chat-setting-links {
+      margin-top: 0.35rem;
+      border-top: 1px dashed rgba(212, 116, 154, 0.24);
+      padding-top: 0.45rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.28rem;
+    }
+
+    .chat-setting-links a {
+      color: #a44e74;
+      font-size: 0.79rem;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .chat-setting-close {
+      margin-top: 0.45rem;
+      width: 100%;
+      border: 1px solid var(--color-border);
+      background: #fff;
+      border-radius: 9px;
+      padding: 0.36rem 0.45rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .chat-mic-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 1px solid rgba(212, 116, 154, 0.28);
+      background: #fff7fb;
+      color: #9d4d72;
+      cursor: pointer;
+      flex-shrink: 0;
+      font-size: 1rem;
+      position: relative;
+      transition: transform 0.16s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .chat-mic-btn:hover { transform: translateY(-1px); }
+    .chat-mic-btn:active { transform: scale(0.96); }
+    .chat-mic-btn:disabled { cursor: not-allowed; opacity: 0.7; }
+
+    .chat-mic-btn.is-listening {
+      background: #ffe0ec;
+      border-color: rgba(212, 116, 154, 0.48);
+      box-shadow: 0 0 0 3px rgba(212, 116, 154, 0.16);
+    }
+
+    .chat-mic-btn.is-listening::after {
+      content: "";
+      position: absolute;
+      inset: -5px;
+      border-radius: 50%;
+      border: 2px solid rgba(226, 126, 167, 0.45);
+      animation: micPulse 1.2s ease-out infinite;
+      pointer-events: none;
+    }
+
+    .chat-mic-btn.is-processing {
+      background: #fff2f7;
+      border-color: rgba(212, 116, 154, 0.4);
+      box-shadow: 0 0 0 2px rgba(212, 116, 154, 0.13);
+    }
+
+    .chat-mic-btn.is-ready {
+      background: #ffe8f1;
+      border-color: rgba(212, 116, 154, 0.55);
+      box-shadow: 0 0 0 2px rgba(212, 116, 154, 0.18);
+    }
+
+    .chat-mic-status {
+      min-height: 1.05rem;
+      margin-top: 0.35rem;
+      font-size: 0.74rem;
+      color: #8f5d77;
+      text-align: left;
+      padding-left: 0.1rem;
+    }
+
+    .chat-mic-status.is-error { color: #b33665; }
+    .chat-mic-status.is-listening { color: #9d4d72; font-weight: 700; }
+    .chat-mic-status.is-processing { color: #9d4d72; }
+    .chat-mic-status.is-ready { color: #8a4f73; }
+
+    @keyframes micPulse {
+      0% { transform: scale(0.95); opacity: 0.65; }
+      70% { transform: scale(1.15); opacity: 0; }
+      100% { transform: scale(1.2); opacity: 0; }
+    }
+
+    .chat-footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 0.7rem;
+      margin-top: 0.5rem;
+      font-size: 0.74rem;
+      opacity: 0.72;
+    }
+
+    .chat-footer-links a {
+      color: var(--color-text-muted);
+      text-decoration: none;
+    }
+
+    .chat-footer-links a:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+
     .tiny-note {
       font-size: 0.76rem;
       text-align: center;
@@ -229,6 +447,20 @@
       .bubble { max-width: 88%; }
       .bloomie-card { min-height: calc(100vh - 230px); }
       .msg-avatar { display: none; }
+      .chat-settings-panel { min-width: 205px; right: -0.2rem; }
+    }
+
+    /* Hide footer entirely on this page */
+    .footer { display: none; }
+
+    /* Navbar scroll-fade */
+    .navbar {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .navbar.scrolled-away {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px);
     }
   </style>
 </head>
@@ -238,12 +470,41 @@
 
   <main>
     <div class="bloomie-shell">
-      <div class="page-header">
-        <h1>Bloomie</h1>
-        <p class="text-muted">Your guided health education assistant</p>
-      </div>
-
       <section class="card bloomie-card">
+        <div class="bloomie-chat-topbar">
+          <div>
+            <div class="bloomie-chat-topbar-title">Bloomie Chat</div>
+            <div class="bloomie-topbar-meta">
+              <span>Private support</span>
+              <span class="offline-badge" id="offline-badge">Offline mode</span>
+            </div>
+          </div>
+          <div class="chat-settings-wrap" id="chat-settings-wrap">
+            <button class="chat-settings-btn" id="chat-settings-btn" type="button" aria-label="Chat settings">⋯</button>
+            <div class="chat-settings-panel" id="chat-settings-panel" role="dialog" aria-label="Chat settings">
+              <label class="chat-setting-row">
+                <span>Sound</span>
+                <input id="chat-setting-sound" type="checkbox" />
+              </label>
+              <label class="chat-setting-row">
+                <span>Voice playback</span>
+                <input id="chat-setting-voice" type="checkbox" />
+              </label>
+              <label class="chat-setting-row">
+                <span>Language</span>
+                <select id="chat-setting-language">
+                  <option value="en">English</option>
+                  <option value="en-jm">English (Jamaica)</option>
+                </select>
+              </label>
+              <div class="chat-setting-links">
+                <a href="/pages/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+                <a href="/pages/terms.html" target="_blank" rel="noopener">Terms of Use</a>
+              </div>
+              <button class="chat-setting-close" id="chat-setting-close" type="button">Close</button>
+            </div>
+          </div>
+        </div>
         <div class="chat-box" id="chat-box" aria-live="polite"></div>
 
         <div class="chat-input-area">
@@ -256,9 +517,15 @@
               autocomplete="off"
               maxlength="240"
             />
+            <button class="chat-mic-btn" id="chat-mic-btn" type="button" aria-label="Tap to speak" title="Tap to speak">🎙️</button>
             <button class="chat-send-btn chat-send-btn--text" type="submit" aria-label="Send message">Send</button>
           </form>
-          <p class="tiny-note">Bloomie provides educational information only. This is not medical advice. Always consult a healthcare provider for medical concerns.</p>
+          <div class="chat-mic-status" id="chat-mic-status" aria-live="polite">Tap to speak</div>
+          <div class="chat-footer-links" aria-label="Legal links">
+            <a href="/pages/privacy.html" target="_blank" rel="noopener">Privacy</a>
+            <span>·</span>
+            <a href="/pages/terms.html" target="_blank" rel="noopener">Terms</a>
+          </div>
         </div>
       </section>
     </div>
@@ -270,7 +537,16 @@
     import { getUserGoal } from '/js/goals.js';
     import { onAuthChange, getIdToken } from '/js/auth.js';
     import { mountChat } from '/js/assistant.js';
+    import { fetchCycleState } from '/js/cycle-state.js';
     import { isAnonMode } from '/js/mode.js';
+
+    function parseDateKey(dateKey) {
+      return new Date(`${dateKey}T00:00:00`);
+    }
+
+    function formatDateKey(dateObj) {
+      return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    }
 
     function computeCycleBase(logs) {
       const periodDays = Object.keys(logs)
@@ -279,52 +555,312 @@
       const starts = [];
       let prev = null;
       for (const d of periodDays) {
-        if (!prev || (new Date(d) - new Date(prev)) / 86400000 > 3) starts.push(d);
+        if (!prev || (parseDateKey(d) - parseDateKey(prev)) / 86400000 > 3) starts.push(d);
         prev = d;
       }
       const lengths = [];
-      for (let i = 1; i < starts.length; i++)
-        lengths.push((new Date(starts[i]) - new Date(starts[i-1])) / 86400000);
+      for (let i = 1; i < starts.length; i++) {
+        lengths.push(Math.round((parseDateKey(starts[i]) - parseDateKey(starts[i - 1])) / 86400000));
+      }
       const avg = lengths.length
         ? Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length)
         : 28;
       const last = starts.length ? starts[starts.length - 1] : null;
       const next = last
-        ? new Date(new Date(last).getTime() + avg * 86400000).toISOString().slice(0, 10)
+        ? (() => {
+            const d = parseDateKey(last);
+            d.setDate(d.getDate() + avg);
+            return formatDateKey(d);
+          })()
         : null;
-      return { cycleStarts: starts, avgCycleLength: avg, nextPeriodDate: next };
+      return { cycleStarts: starts, cycleLengths: lengths, avgCycleLength: avg, nextPeriodDate: next };
     }
 
     renderNav('assistant');
     renderFooter();
     renderModeBanner(document.getElementById('banner-area'));
 
-    if (isAnonMode()) {
-      document.getElementById('chat-container').innerHTML = `
-        <div style="text-align:center;padding:3rem 1.5rem;max-width:400px;margin:0 auto;">
-          <div style="font-size:2.5rem;margin-bottom:1rem;">🔒</div>
-          <h2 style="color:var(--color-primary-dark);margin-bottom:0.5rem;">Bloomie is for account holders</h2>
-          <p style="color:var(--color-text-muted);margin-bottom:1.5rem;">Create a free account to chat with Bloomie, get personalised cycle insights, and more.</p>
-          <a href="/pages/register.html" class="btn btn-primary">Create free account</a>
-          <p style="margin-top:1rem;font-size:0.88rem;color:var(--color-text-muted);">
-            Already have one? <a href="/pages/login.html" style="font-weight:700;">Log in</a>
-          </p>
-        </div>`;
-    } else {
+    const CHAT_PREFS_KEY = 'bloom_chat_prefs';
+
+    function loadChatPrefs() {
+      try {
+        return JSON.parse(localStorage.getItem(CHAT_PREFS_KEY) || '{}');
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveChatPrefs(next) {
+      const merged = { ...loadChatPrefs(), ...next };
+      localStorage.setItem(CHAT_PREFS_KEY, JSON.stringify(merged));
+      return merged;
+    }
+
+    function initChatSettingsUi() {
+      const wrap = document.getElementById('chat-settings-wrap');
+      const btn = document.getElementById('chat-settings-btn');
+      const panel = document.getElementById('chat-settings-panel');
+      const closeBtn = document.getElementById('chat-setting-close');
+      const soundToggle = document.getElementById('chat-setting-sound');
+      const voiceToggle = document.getElementById('chat-setting-voice');
+      const languageSelect = document.getElementById('chat-setting-language');
+
+      const prefs = loadChatPrefs();
+      soundToggle.checked = prefs.soundEnabled !== false;
+      voiceToggle.checked = prefs.voicePlaybackEnabled === true;
+      languageSelect.value = prefs.chatLanguage || 'en';
+
+      soundToggle.addEventListener('change', () => saveChatPrefs({ soundEnabled: soundToggle.checked }));
+      voiceToggle.addEventListener('change', () => saveChatPrefs({ voicePlaybackEnabled: voiceToggle.checked }));
+      languageSelect.addEventListener('change', () => saveChatPrefs({ chatLanguage: languageSelect.value }));
+
+      const close = () => panel.classList.remove('is-open');
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        panel.classList.toggle('is-open');
+      });
+      closeBtn.addEventListener('click', close);
+      document.addEventListener('click', (e) => {
+        if (!wrap.contains(e.target)) close();
+      });
+    }
+
+    function initOfflineBadge() {
+      const el = document.getElementById('offline-badge');
+      const paint = () => el.classList.toggle('is-visible', !navigator.onLine);
+      window.addEventListener('online', paint);
+      window.addEventListener('offline', paint);
+      paint();
+    }
+
+    function initVoiceInputUi() {
+      const micBtn = document.getElementById('chat-mic-btn');
+      const input = document.getElementById('chat-input');
+      const micStatus = document.getElementById('chat-mic-status');
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!micBtn || !input) return;
+      if (!SR) {
+        micBtn.style.display = 'none';
+        if (micStatus) {
+          micStatus.textContent = 'Voice input is not supported on this browser.';
+          micStatus.classList.add('is-error');
+        }
+        return;
+      }
+
+      let recognition = null;
+      let micState = 'idle'; // idle | listening | processing | ready
+      let finalTranscript = '';
+      let interimTranscript = '';
+      let endHandled = false;
+      let userStopped = false;
+      let lastFinalChunk = '';
+
+      function setMicState(state, statusText = '') {
+        micState = state;
+        micBtn.classList.remove('is-listening', 'is-processing', 'is-ready');
+        micBtn.disabled = false;
+        if (micStatus) micStatus.classList.remove('is-error', 'is-listening', 'is-processing', 'is-ready');
+
+        if (state === 'listening') {
+          micBtn.classList.add('is-listening');
+          micBtn.setAttribute('aria-label', 'Stop recording');
+          micBtn.setAttribute('title', 'Tap to stop');
+          if (micStatus) {
+            micStatus.textContent = statusText || 'Listening... tap again to stop';
+            micStatus.classList.add('is-listening');
+          }
+          return;
+        }
+        if (state === 'processing') {
+          micBtn.classList.add('is-processing');
+          micBtn.disabled = true;
+          micBtn.setAttribute('aria-label', 'Transcribing');
+          micBtn.setAttribute('title', 'Transcribing...');
+          if (micStatus) {
+            micStatus.textContent = statusText || 'Transcribing...';
+            micStatus.classList.add('is-processing');
+          }
+          return;
+        }
+        if (state === 'ready') {
+          micBtn.classList.add('is-ready');
+          micBtn.setAttribute('aria-label', 'Tap to speak again');
+          micBtn.setAttribute('title', 'Tap to speak');
+          if (micStatus) {
+            micStatus.textContent = statusText || 'Transcript ready. Review and send.';
+            micStatus.classList.add('is-ready');
+          }
+          return;
+        }
+
+        micBtn.setAttribute('aria-label', 'Tap to speak');
+        micBtn.setAttribute('title', 'Tap to speak');
+        if (micStatus) micStatus.textContent = statusText || 'Tap to speak';
+      }
+
+      function setMicError(text) {
+        setMicState('idle', text || 'Voice input unavailable right now.');
+        if (micStatus) micStatus.classList.add('is-error');
+      }
+
+      function startRecognition() {
+        if (micState === 'processing' || micState === 'listening') return;
+
+        finalTranscript = '';
+        interimTranscript = '';
+        endHandled = false;
+        userStopped = false;
+        lastFinalChunk = '';
+
+        recognition = new SR();
+        recognition.lang = (loadChatPrefs().chatLanguage === 'en-jm') ? 'en-JM' : 'en-US';
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        recognition.continuous = false;
+
+        recognition.onstart = () => setMicState('listening', 'Listening... tap again to stop');
+
+        recognition.onresult = (event) => {
+          if (!event?.results?.length) return;
+          let latestFinal = '';
+          let latestInterim = '';
+          for (let i = event.resultIndex; i < event.results.length; i += 1) {
+            const result = event.results[i];
+            const text = result?.[0]?.transcript?.trim() || '';
+            if (!text) continue;
+            if (result.isFinal) latestFinal += `${text} `;
+            else latestInterim += `${text} `;
+          }
+          const finalChunk = latestFinal.trim();
+          if (finalChunk && finalChunk !== lastFinalChunk) {
+            finalTranscript = `${finalTranscript} ${finalChunk}`.trim();
+            lastFinalChunk = finalChunk;
+          }
+          interimTranscript = latestInterim.trim();
+          if (micState === 'listening' && micStatus) {
+            micStatus.textContent = interimTranscript
+              ? `Listening... "${interimTranscript}" (tap again to stop)`
+              : 'Listening... tap again to stop';
+          }
+        };
+
+        recognition.onerror = (event) => {
+          const code = event?.error || '';
+          if (code === 'not-allowed' || code === 'service-not-allowed') {
+            setMicError('Microphone permission was denied.');
+          } else if (code === 'no-speech') {
+            setMicError('No speech detected. Try again.');
+          } else if (code === 'audio-capture') {
+            setMicError('No microphone was found.');
+          } else if (code === 'aborted' && userStopped) {
+            setMicState('processing', 'Transcribing...');
+          } else {
+            setMicError('Could not transcribe right now. Please try again.');
+          }
+        };
+
+        recognition.onend = () => {
+          if (endHandled) return;
+          endHandled = true;
+
+          const transcript = (finalTranscript || '').trim();
+          recognition = null;
+
+          if (!transcript) {
+            if (userStopped) setMicError('No transcript captured. Try speaking a little longer.');
+            else setMicError('No speech detected. Try again.');
+            return;
+          }
+
+          input.value = transcript;
+          input.focus();
+          setMicState('ready', 'Transcript ready. Edit if needed, then tap Send.');
+        };
+
+        try {
+          recognition.start();
+        } catch (_) {
+          setMicError('Voice input is busy. Please try again.');
+        }
+      }
+
+      micBtn.addEventListener('click', () => {
+        if (micState === 'processing') return;
+        if (micState === 'listening' && recognition) {
+          userStopped = true;
+          setMicState('processing', 'Transcribing...');
+          try { recognition.stop(); } catch (_) { setMicError('Could not stop recording cleanly.'); }
+          return;
+        }
+        startRecognition();
+      });
+
+      setMicState('idle', 'Tap to speak');
+    }
+
+    // Fade navbar out on scroll
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      if (navbar) navbar.classList.toggle('scrolled-away', window.scrollY > 40);
+    }, { passive: true });
+
+    function parseAgeFromProfile(profileLike = null) {
+      const p = profileLike || {};
+      const direct = Number(p?.age ?? p?.ageYears);
+      if (Number.isFinite(direct) && direct > 0 && direct < 120) return Math.floor(direct);
+      const yob = Number(p?.yearOfBirth ?? p?.yob);
+      if (Number.isFinite(yob) && yob >= 1900 && yob <= new Date().getFullYear()) {
+        return new Date().getFullYear() - yob;
+      }
+      const dobRaw = p?.dateOfBirth ?? p?.dob;
+      if (dobRaw) {
+        const dob = new Date(dobRaw);
+        if (!Number.isNaN(dob.getTime())) {
+          const now = new Date();
+          let age = now.getFullYear() - dob.getFullYear();
+          const m = now.getMonth() - dob.getMonth();
+          if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age -= 1;
+          if (age > 0 && age < 120) return age;
+        }
+      }
+      return null;
+    }
+
+    function readGuardianConsent(uid = null, profileLike = null) {
+      const statusUid = uid ? localStorage.getItem(`bloom_consent_status_${uid}`) : null;
+      const statusGlobal = localStorage.getItem('bloom_consent_status');
+      const profileStatus = String(profileLike?.consentStatus || profileLike?.guardianConsentStatus || '').toLowerCase();
+      return statusUid === 'approved' || statusGlobal === 'approved' || profileStatus === 'approved';
+    }
 
     async function init(user) {
+      const anonMode = isAnonMode();
+
       const logsByDate = await getAllLogs();
       const cycle = computeCycleBase(logsByDate);
+      const cycleState = await fetchCycleState(logsByDate).catch(() => null);
       const goal = getUserGoal();
 
       const lastLmp = cycle.cycleStarts?.length
         ? cycle.cycleStarts[cycle.cycleStarts.length - 1]
         : null;
 
+      const stateCycleLength = Number(cycleState?.predictedCycleLength ?? cycleState?.avgCycleLength);
+      const cycleLength = Number.isFinite(stateCycleLength) && stateCycleLength > 0
+        ? Math.round(stateCycleLength)
+        : (cycle.avgCycleLength || null);
+      const nextPeriodDate = cycleState?.nextPeriodDate || cycle.nextPeriodDate || null;
+
       const cycleData = {
         lmp: lastLmp,
-        cycleLength: cycle.avgCycleLength || null,
-        nextPeriodDate: cycle.nextPeriodDate || null,
+        cycleLength,
+        nextPeriodDate,
+        previousCycleLengths: cycle.cycleLengths,
+        cycleCount: cycle.cycleStarts.length,
+        phase: cycleState?.phase || null,
+        phaseLabel: cycleState?.phaseLabel || null,
+        confidence: cycleState?.confidence?.level || null,
         isTrackingPregnancy: goal === 'pregnancy',
         mode: goal === 'pregnancy' ? 'pregnancy_tracking'
             : goal === 'ttc'      ? 'trying_to_conceive'
@@ -343,8 +879,9 @@
           })),
         }));
 
-      // Fetch nickname from Firestore profile so Bloomie can address the user by name
+      // Fetch profile when signed in so Bloomie can use nickname and policy context.
       let enrichedUser = user;
+      let profilePayload = null;
       if (user) {
         try {
           const token = await getIdToken();
@@ -354,17 +891,40 @@
           });
           if (res.ok) {
             const data = await res.json();
-            const nickname = data?.profile?.nickname || '';
+            profilePayload = data?.profile || data || null;
+            const nickname = profilePayload?.nickname || '';
             if (nickname) enrichedUser = { ...user, nickname };
           }
         } catch (_) { /* fall back to user.displayName */ }
       }
 
-      await mountChat(enrichedUser, cycleData, symptomHistory.length ? symptomHistory : null);
+      const derivedAge = parseAgeFromProfile(profilePayload);
+      const ageGroup = typeof derivedAge === 'number'
+        ? (derivedAge <= 17 ? 'minor' : 'adult')
+        : 'unknown';
+      const hasGuardianConsent = anonMode ? false : readGuardianConsent(user?.uid || null, profilePayload);
+
+      await mountChat(
+        enrichedUser,
+        cycleData,
+        symptomHistory.length ? symptomHistory : null,
+        {
+          isAnon: anonMode,
+          isMinor: ageGroup === 'minor',
+          policySeed: {
+            age: derivedAge,
+            ageGroup,
+            hasGuardianConsent,
+            mode: anonMode ? 'anonymous' : 'registered',
+          },
+        }
+      );
     }
 
-      onAuthChange(user => { init(user); });
-    }
+    onAuthChange(user => { init(user); });
+    initChatSettingsUi();
+    initOfflineBadge();
+    initVoiceInputUi();
   </script>
 </body>
 </html>

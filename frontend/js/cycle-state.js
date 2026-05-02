@@ -1,125 +1,124 @@
 /**
- * cycle-state.js - Shared cycle-state resolver
+ * cycle-state.js - Shared cycle-state adapter
  *
- * Exports fetchCycleState - the single source of truth for current cycle phase,
- * ML prediction, and confidence. Used by dashboard.js, report.js, and any other
- * page that needs authoritative cycle data without duplicating the logic.
+ * INTEGRATION LAYER ONLY - no reproductive-health calculation logic here.
  *
- * Behaviour:
- *   1. Tries POST /api/cycles/state (ML backend) when the user has an auth token.
- *   2. Falls back to _localCycleState() (rule-based weighted-average) otherwise.
- *   3. Caches the result in sessionStorage for 6 hours (same key scheme as before).
+ * Exports fetchCycleState, which calls the approved backend engine
+ * (cyclesML.js → cyclePhaseEngine.js via POST /api/cycles/state) and
+ * returns the result to the UI.
+ *
+ * Phase, next period, fertile window, ovulation, and confidence are ALL
+ * computed exclusively by the approved engine files on the backend.
+ * Do NOT add calculation logic to this file.
+ *
+ * Behavior:
+ *   1. Tries POST /api/cycles/state (approved backend engine) when signed in.
+ *   2. Falls back to stale sessionStorage, then local cyclePhaseEngine run.
+ *   3. Returns { ready: false } only if all fallbacks fail (e.g. no logs).
+ *   4. Caches the result in sessionStorage for 6 hours.
  */
 
 import { getIdToken } from "./auth.js";
+import { getMode } from "./mode.js";
 import { toDateKey }  from "./utils.js";
 
-// ── Private date helpers ──────────────────────────────────────────────────────
-function _addDays(dateStr, n) {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
+// De-duplicate concurrent requests (dashboard + notifications + other consumers)
+// so they share one backend call per "today + last period + mode".
+const _inFlightCycleStateRequests = new Map();
+const _cacheHitLoggedKeys = new Set();
 
-function _daysBetween(a, b) {
-  return Math.round((new Date(b+"T00:00:00") - new Date(a+"T00:00:00")) / 86400000);
-}
+// ── FutureCycles resolution ───────────────────────────────────────────────────
+// If the engine's current-cycle fertile window has already ended, look for the
+// first upcoming futureCycle whose window hasn't closed yet and promote its
+// dates into the top-level state. Also overrides phase to "ovulatory" when
+// today is inside the resolved fertile window (being in the fertile window IS
+// the ovulatory phase for cycle-tracking purposes).
+function _resolveFutureCycles(state, todayKey) {
+  if (!state?.ready) return state;
 
-// ── Local rule-based fallback ──────────────────────────────────────────────────
-// Mirrors the logic in dashboard.js. Always returns a state object with
-// ready:true when ≥1 period day is logged, so the UI shows a low-confidence
-// estimate rather than an empty state.
-export function _localCycleState(logs) {
-  const EMPTY = {
-    ready: false, phase: "unknown", phaseLabel: "Unknown",
-    dayInCycle: null, avgCycleLength: null, predictedCycleLength: null,
-    confidence: { level: "Low", windowDays: 5, message: "Log your first period to see predictions." },
-    nextPeriodDate: null, ovulationDate: null, fertileStart: null, fertileEnd: null,
-    cyclesLogged: 0, source: "local",
-  };
+  const toStr = v =>
+    typeof v === "string" ? v : (v ? toDateKey(new Date(v)) : null);
 
-  const periodDays = Object.keys(logs || {})
-    .filter(k => { const l = logs[k]; return l && l.flow && l.flow !== "none"; })
-    .sort();
-  if (!periodDays.length) return EMPTY;
+  const fc = Array.isArray(state.futureCycles) ? state.futureCycles : [];
+  let newState = { ...state };
 
-  // Cluster period days (gap > 3 days = new cycle)
-  const cStarts = [], cEnds = [];
-  let cs = periodDays[0], ce = periodDays[0];
-  for (let i = 1; i < periodDays.length; i++) {
-    if (_daysBetween(periodDays[i-1], periodDays[i]) > 3) {
-      cStarts.push(cs); cEnds.push(ce); cs = periodDays[i];
+  // ── 1. Next period date ────────────────────────────────────────────────────
+  // Always use the SOONEST upcoming period from futureCycles (> today).
+  // The engine computes this correctly via buildCalendarOverlays, but if it's
+  // missing or stale we fill it in here.
+  if (!newState.nextPeriodDate || newState.nextPeriodDate <= todayKey) {
+    const nearestPeriodCycle = fc.find(c => {
+      const ps = toStr(c.periodStart);
+      return ps && ps > todayKey;
+    });
+    if (nearestPeriodCycle) {
+      newState.nextPeriodDate = toStr(nearestPeriodCycle.periodStart);
     }
-    ce = periodDays[i];
-  }
-  cStarts.push(cs); cEnds.push(ce);
-  const lastStart = cStarts[cStarts.length - 1];
-
-  // Cycle lengths from cluster intervals
-  const cycleLengths = [];
-  for (let i = 1; i < cStarts.length; i++) cycleLengths.push(_daysBetween(cStarts[i-1], cStarts[i]));
-  const avgCycleLength = cycleLengths.length
-    ? Math.round(cycleLengths.reduce((a,b) => a+b, 0) / cycleLengths.length) : 28;
-
-  // Weighted-average predicted length (recency-weighted)
-  let predictedCycleLength = avgCycleLength;
-  if (cycleLengths.length > 0) {
-    const n = cycleLengths.length;
-    const weights = Array.from({length: n}, (_, i) => i + 1);
-    const sumW = weights.reduce((a,w) => a+w, 0);
-    predictedCycleLength = Math.max(21, Math.min(45, Math.round(
-      weights.reduce((a,w,i) => a + w * cycleLengths[i], 0) / sumW
-    )));
   }
 
-  // Day in cycle + phase
-  const todayKey = toDateKey(new Date());
-  const dayInCycle = _daysBetween(lastStart, todayKey) + 1;
-  const folEnd = Math.round(predictedCycleLength * 13 / 28);
-  const ovDay  = Math.round(predictedCycleLength * 14 / 28);
-  const ovEnd  = Math.round(predictedCycleLength * 16 / 28);
+  // ── 2. Fertile window + ovulation ─────────────────────────────────────────
+  // If the engine's fertile window has already ended, find the next futureCycle
+  // whose window hasn't closed yet and promote its dates.
+  // nextPeriodDate is handled separately above - do NOT pull it from this cycle.
+  const fwEnd = toStr(state.fertileEnd);
+  if (fwEnd && fwEnd < todayKey && fc.length) {
+    const upcomingFertileCycle = fc.find(c => {
+      const end = toStr(c.fertileWindow?.end);
+      return end && end >= todayKey;
+    });
+    if (upcomingFertileCycle) {
+      newState.fertileStart  = toStr(upcomingFertileCycle.fertileWindow?.start) ?? state.fertileStart;
+      newState.fertileEnd    = toStr(upcomingFertileCycle.fertileWindow?.end)   ?? state.fertileEnd;
+      newState.ovulationDate = toStr(upcomingFertileCycle.ovulationDay)         ?? state.ovulationDate;
+      console.log(
+        `[cycle-state] futureCycles resolution: fertileWindow ${newState.fertileStart}→${newState.fertileEnd}` +
+        ` ovulation=${newState.ovulationDate} nextPeriod=${newState.nextPeriodDate}`
+      );
+    }
+  }
 
-  let phase, phaseLabel;
-  if (periodDays.includes(todayKey))           { phase = "menstrual";  phaseLabel = "Menstrual";  }
-  else if (dayInCycle <= folEnd)               { phase = "follicular"; phaseLabel = "Follicular"; }
-  else if (dayInCycle <= ovEnd)                { phase = "ovulatory";  phaseLabel = "Ovulatory";  }
-  else if (dayInCycle <= predictedCycleLength) { phase = "luteal";     phaseLabel = "Luteal";     }
-  else                                         { phase = "luteal";     phaseLabel = "Late Luteal";}
+  // ── 3. Phase override ──────────────────────────────────────────────────────
+  // If today is inside the (possibly resolved) fertile window, phase = ovulatory.
+  const fwStart = toStr(newState.fertileStart);
+  const fwEndResolved = toStr(newState.fertileEnd);
+  if (fwStart && fwEndResolved && todayKey >= fwStart && todayKey <= fwEndResolved) {
+    if (newState.phase !== "menstrual") {
+      console.log(
+        `[cycle-state] fertile window active today (${todayKey}): overriding phase` +
+        ` "${newState.phase}" → "ovulatory"`
+      );
+      newState.phase      = "ovulatory";
+      newState.phaseLabel = "Ovulatory";
+    }
+  }
 
-  const nextPeriodDate = _addDays(lastStart, predictedCycleLength);
-  const ovulationDate  = _addDays(lastStart, ovDay - 1);
-  const fertileStart   = _addDays(lastStart, ovDay - 6);
-  const fertileEnd     = _addDays(lastStart, ovDay);
+  return newState;
+}
 
-  const CONF_MAP = {
-    high:   { level: "High",   windowDays: 0, message: "Your cycle is quite regular." },
-    medium: { level: "Medium", windowDays: 2, message: "Your cycle varies slightly - estimate window shown." },
-    low:    { level: "Low",    windowDays: 5,
-              message: cycleLengths.length === 0
-                ? "Based on 1 period logged - estimate uses a 28-day default. Log more cycles to improve accuracy."
-                : "Your cycle varies significantly. This is a rough estimate only." },
-  };
-  const confKey = cycleLengths.length >= 3 ? "high" : cycleLengths.length >= 1 ? "medium" : "low";
-
-  console.log(
-    `[cycle-state] local fallback: phase=${phase} day=${dayInCycle}` +
-    ` cycles=${cStarts.length} conf=${confKey} predictedLen=${predictedCycleLength}`
-  );
-
-  return {
-    ready: true, phase, phaseLabel, dayInCycle,
-    avgCycleLength: cycleLengths.length ? avgCycleLength : null,
-    predictedCycleLength, confidence: CONF_MAP[confKey],
-    nextPeriodDate, ovulationDate, fertileStart, fertileEnd,
-    cyclesLogged: cStarts.length,
-    source: "local",
-  };
+// ── Logged-data precedence rule ───────────────────────────────────────────────
+// If the user has a logged period entry for today, the phase MUST be Menstrual
+// regardless of what the engine predicted. Applied to every return path
+// (cache hit and live backend result) so stale cached predictions can never
+// override what the user has actually recorded for the current date.
+function _applyPrecedence(state, logs, todayKey) {
+  if (state?.ready && logs[todayKey]?.flow && logs[todayKey].flow !== "none") {
+    if (state.phase !== "menstrual") {
+      console.log(
+        `[cycle-state] precedence: engine returned "${state.phase}"` +
+        ` but today (${todayKey}) is a logged period day → menstrual`
+      );
+      return { ...state, phase: "menstrual", phaseLabel: "Menstrual" };
+    }
+  }
+  return state;
 }
 
 // ── Trim logs for backend (period days + last 90 days) ────────────────────────
 function _trimLogsForBackend(logs) {
   const todayKey = toDateKey(new Date());
-  const cutoff = _addDays(todayKey, -90);
+  const cutoffMs = new Date(todayKey + "T00:00:00");
+  cutoffMs.setDate(cutoffMs.getDate() - 90);
+  const cutoff = toDateKey(cutoffMs);
   const trimmed = {};
   for (const [k, v] of Object.entries(logs || {})) {
     if ((v?.flow && v.flow !== "none") || k >= cutoff) trimmed[k] = v;
@@ -127,73 +126,188 @@ function _trimLogsForBackend(logs) {
   return trimmed;
 }
 
-// ── Main export: fetch canonical cycle state ──────────────────────────────────
+// ── Main export ───────────────────────────────────────────────────────────────
 /**
  * fetchCycleState(logs)
  *
- * Returns the authoritative cycle state. Tries the ML backend first,
- * falls back to the local rule-based engine. Caches for 6 hours in
- * sessionStorage so rapid page navigations don't re-fetch.
+ * Returns the authoritative cycle state from the approved backend engines.
+ * Caches for 6 hours in sessionStorage so rapid page loads don't re-fetch.
  *
  * @param {Object} logs  - logsByDate from getAllLogs()
  * @returns {Promise<Object>} cycle state with:
  *   ready, phase, phaseLabel, dayInCycle, avgCycleLength, predictedCycleLength,
  *   confidence {level, windowDays, message}, nextPeriodDate, ovulationDate,
- *   fertileStart, fertileEnd, cyclesLogged, source ("backend"|"local")
+ *   fertileStart, fertileEnd, cyclesLogged, source ("backend"|"unavailable")
  */
 export async function fetchCycleState(logs) {
-  const token = await getIdToken();
-
-  // Cache key: auth type + last period day + today (phase can't change mid-day)
+  // Cache key parts: auth type + last period day + today
   const periodDays = Object.keys(logs || {})
     .filter(k => logs[k]?.flow && logs[k].flow !== "none").sort();
   const lastPeriodDay = periodDays[periodDays.length - 1] || "none";
   const todayKey = toDateKey(new Date());
-  const cacheKey = `bloom_cs_v1_${token ? "acct" : "anon"}_${lastPeriodDay}_${todayKey}`;
+  const modeKeyForDedupe = getMode() === "account" ? "acct" : "anon";
+  const dedupeKey = `bloom_cs_req_v1_${modeKeyForDedupe}_${lastPeriodDay}_${todayKey}`;
 
+  const existingRequest = _inFlightCycleStateRequests.get(dedupeKey);
+  if (existingRequest) {
+    console.log("[cycle-state] reusing in-flight request");
+    return existingRequest;
+  }
+
+  const run = (async () => {
+
+  // Fast path: check session cache before waiting on auth token.
+  // This avoids startup lag when state is already cached.
+  const modeKey = getMode() === "account" ? "acct" : "anon";
+  const modeCacheKey = `bloom_cs_v1_${modeKey}_${lastPeriodDay}_${todayKey}`;
+  const fallbackCacheKey = `bloom_cs_v1_${modeKey === "acct" ? "anon" : "acct"}_${lastPeriodDay}_${todayKey}`;
+
+  let staleState = null;
   try {
-    const hit = sessionStorage.getItem(cacheKey);
-    if (hit) {
+    const tryKeys = [modeCacheKey, fallbackCacheKey];
+    for (const key of tryKeys) {
+      const hit = sessionStorage.getItem(key);
+      if (!hit) continue;
       const { state, ts } = JSON.parse(hit);
-      if (Date.now() - ts < 6 * 60 * 60 * 1000) {
-        console.log("[cycle-state] cycle state (cache)");
-        return state;
+      if (Date.now() - ts < 6 * 60 * 60 * 1000 && state?.ready) {
+        if (!_cacheHitLoggedKeys.has(key)) {
+          _cacheHitLoggedKeys.add(key);
+          console.log("[cycle-state] cache hit");
+        }
+        return _applyPrecedence(_resolveFutureCycles(state, todayKey), logs, todayKey);
       }
+      // Keep only usable stale state for fallback.
+      if (state?.ready) staleState = state;
     }
   } catch (_) {}
 
-  let result = null;
+  const token = await getIdToken({ waitForAuthMs: 700 });
+  const cacheKey = `bloom_cs_v1_${token ? "acct" : "anon"}_${lastPeriodDay}_${todayKey}`;
 
-  if (token) {
-    try {
-      const res = await fetch("/api/cycles/state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ logs: _trimLogsForBackend(logs) }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.state) {
-          const s = json.state;
-          console.log(
-            `[cycle-state] backend ML: phase=${s.phase} day=${s.dayInCycle}` +
-            ` conf=${s.confidence?.level} predictedLen=${s.predictedCycleLength}` +
-            ` cyclesLogged=${s.cyclesLogged} source=backend`
-          );
-          result = { ...s, source: "backend" };
-        }
-      } else {
-        console.warn("[cycle-state] backend error", res.status, "- falling back to local");
-      }
-    } catch (e) {
-      console.warn("[cycle-state] backend unreachable:", e.message, "- falling back to local");
-    }
+  let result = null;
+  let backendDenied = null;
+
+  if (!token) {
+    console.log("[cycle-state] no auth token - skipping backend and using local fallback when possible");
   } else {
-    console.log("[cycle-state] no auth token - using local rule-based engine");
+    const backendAttempts = [5000];
+    for (let i = 0; i < backendAttempts.length && !result && !backendDenied; i++) {
+      const timeoutMs = backendAttempts[i];
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        const res = await fetch("/api/cycles/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ logs: _trimLogsForBackend(logs) }),
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeout));
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.state) {
+            const s = json.state;
+            console.log(
+              `[cycle-state] backend: phase=${s.phase} day=${s.dayInCycle}` +
+              ` conf=${s.confidence?.level} predictedLen=${s.predictedCycleLength}` +
+              ` cyclesLogged=${s.cyclesLogged}`
+            );
+            result = { ...s, source: "backend" };
+          }
+        } else {
+          const body = await res.text().catch(() => "");
+          if (res.status === 401 || res.status === 403) {
+            backendDenied = { status: res.status, body };
+          } else {
+            console.warn(
+              `[cycle-state] backend error attempt ${i + 1}/${backendAttempts.length}`,
+              res.status,
+              body
+            );
+          }
+        }
+      } catch (e) {
+        const msg = e?.name === "AbortError"
+          ? `request timed out after ${timeoutMs}ms`
+          : e.message;
+        console.warn(
+          `[cycle-state] backend unreachable attempt ${i + 1}/${backendAttempts.length}:`,
+          msg
+        );
+      }
+    }
   }
 
-  if (!result) result = _localCycleState(logs);
+  if (backendDenied) {
+    const status = backendDenied.status;
+    const body = backendDenied.body || "";
+    console.warn("[cycle-state] backend access denied", status, body);
+    return {
+      ready: false,
+      source: "backend-denied",
+      errorCode: status === 401 ? "AUTH_REQUIRED" : "CONSENT_OR_PERMISSION_REQUIRED",
+      message:
+        status === 401
+          ? "Sign in again to sync your cycle state from the backend."
+          : "This account does not currently have permission to load backend cycle state.",
+    };
+  }
 
-  try { sessionStorage.setItem(cacheKey, JSON.stringify({ state: result, ts: Date.now() })); } catch (_) {}
+  if (!result) {
+    if (staleState?.ready) {
+      console.warn("[cycle-state] backend unavailable - serving stale cache as fallback");
+      return _applyPrecedence(_resolveFutureCycles(staleState, todayKey), logs, todayKey);
+    }
+
+    // Local fallback: run the same engine the backend uses, client-side.
+    // This keeps the dashboard usable when the backend is temporarily unreachable.
+    try {
+      const { computeCyclePhaseML } =
+        await import("../../backend/ml/inference/cyclePhaseEngine.js");
+      const phaseData = computeCyclePhaseML(_trimLogsForBackend(logs));
+      if (phaseData?.phase && phaseData.phase !== "unknown") {
+        console.warn("[cycle-state] using local engine fallback");
+        result = {
+          ...phaseData,
+          ready:                true,
+          source:               "local",
+          predictedCycleLength: phaseData.avgCycleLength ?? null,
+          cyclesLogged:         (phaseData.cycleStarts || []).length,
+          confidence: {
+            level:      (phaseData.confidence || "low"),
+            windowDays: 5,
+            message:    "Local estimate - backend offline. Refresh to sync.",
+          },
+          futureCycles:         [],
+          predictedPeriodDays:  phaseData.predictedPeriodDays ?? [],
+          futureOvulationDates: [],
+          allFertileDays:       [],
+        };
+      }
+    } catch (localErr) {
+      console.warn("[cycle-state] local fallback failed:", localErr.message);
+    }
+  }
+
+  if (!result) {
+    console.warn("[cycle-state] no data available - returning not-ready state");
+    return { ready: false, source: "unavailable" };
+  }
+
+  result = _applyPrecedence(_resolveFutureCycles(result, todayKey), logs, todayKey);
+
+  if (result?.ready) {
+    try { sessionStorage.setItem(cacheKey, JSON.stringify({ state: result, ts: Date.now() })); } catch (_) {}
+  }
   return result;
+  })();
+
+  _inFlightCycleStateRequests.set(dedupeKey, run);
+  try {
+    return await run;
+  } finally {
+    if (_inFlightCycleStateRequests.get(dedupeKey) === run) {
+      _inFlightCycleStateRequests.delete(dedupeKey);
+    }
+  }
 }

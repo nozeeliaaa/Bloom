@@ -1,21 +1,65 @@
-import { pick, scoreSignals, resolveSignals, detectOutOfScope } from "./bloomie-routing.js";
+import { pick, scoreSignals, resolveSignals, detectOutOfScope, normalizeText } from "./bloomie-routing.js";
 import { extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
 import { getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 
 export function createOOS(env) {
-  const { ctx, consent, getCurrentPhase, phaseNudge, insightFor, pickPriorityConcern } = env;
+  const {
+    ctx, consent, getCurrentPhase, phaseNudge, insightFor, pickPriorityConcern,
+    bloomieMemory, daysUntilNextPeriod, isLateContextActive,
+  } = env;
 
   const OOS_DEFAULT = [
-    () => pick([
-      "I'm not sure I caught that 🩷 I focus on period and cycle concerns - tap a button below or tell me what's going on.",
-      "Hmm, I'm not sure how to help with that one 🩷 I'm best with period, cycle, spotting, cramps, or mood changes.",
-      "That one's a bit outside my lane 🩷 What's going on with your cycle?",
-    ]),
+    () => {
+      // Soft two-tier fallback for unclear input:
+      // Tier 1: ask whether it's cycle/symptom related.
+      // Tier 2: ask for a bit more detail (after repeated unclear turns).
+      const oosCount = (bloomieMemory?.oosCount ?? 0) + (ctx.oosStreakCount ?? 0);
+      if (oosCount >= 5) {
+        return pick([
+          "I might be missing something - is this about your period, symptoms, or something else? 🩷",
+          "Tell me a little more about what's going on and I'll try to help 🩷",
+        ]);
+      }
+      if (oosCount >= 2) {
+        return pick([
+          "Tell me a little more about what's going on, and I'll try to help 🩷",
+          "I still want to help - can you share the main symptom in a few words? 🩷",
+        ]);
+      }
+      return pick([
+        "I might be missing something - is this about your period, symptoms, or something else? 🩷",
+        "I'm not fully catching you yet 🩷 Is this about your cycle, pain, spotting, discharge, or mood changes?",
+      ]);
+    },
   ];
 
   // looksLikeGibberish → imported from bloomie-routing.js
 
   const OOS = [
+    // ── About Bloom / Bloomie identity ───────────────────────────────────
+    // Catches questions about what the platform is and what the chatbot does.
+    // Must sit before app_help so "how do i use this" → ABOUT_BLOOM (identity)
+    // rather than APP_HELP (logging tutorial).
+    {
+      name: "about_bloom",
+      patterns: [
+        // "what is bloom" / "what is bloomie" / "what's bloomie"
+        /\b(what (is|are|'?s) bloom(?:ie)?|what does bloom(?:ie)? (do|mean|help with))\b/,
+        // "what can you help with" / "what can you do" / "what do you know about"
+        /\b(what can (you|bloomie?) (help (me |with)?|do|tell me|talk about|discuss))\b/,
+        /\b(what (are|do) you (good for|help with|know about|cover|handle))\b/,
+        // "how do i use this / the chat" (identity questions, not logging how-tos)
+        /\b(how (do i|to|can i) use (this|this chat|the chat|this app|bloomie?))\b/,
+        /\b(how does (this|this chat|bloomie?|it) work)\b/,
+        // "who are you" / "tell me about yourself / bloom / bloomie"
+        /\b(who are you|tell me about (yourself|bloomie?|bloom|this chat))\b/,
+        // "what is this" / "what am i using" / "who am i talking to"
+        /\b(what is this (app|chat|tool|bot|assistant)?|what am i (using|talking to)|who am i talking to)\b/,
+      ],
+      replies: [],
+      forceNext: "ABOUT_BLOOM",
+    },
+
     // ── App help / how to log ─────────────────────────────────────────────
     {
       name: "app_help",
@@ -35,18 +79,72 @@ export function createOOS(env) {
         /(should i (see|go to|visit|call) (a |my )?(doctor|physician|provider|gynecologist|gyno|ob|obgyn|specialist|nurse|clinic))/,
         /(do i need (a |to see )?(doctor|help|care|treatment|specialist))/,
         /(is this serious|is this normal|when (should|do) i (go|seek|get) (help|care|checked|medical))/,
-        /(worried about|should i be worried|how bad is this|how serious is)/,
+        /(worried about|should i be worried|how bad is this|how serious is|am i okay|am i ok)/,
       ],
       replies: [],
       forceNext: "SEE_DOCTOR_GUIDE",
+    },
+
+    // ── Educational: what is a period ─────────────────────────────────────
+    // Specific before broad - wins over symptom_education for identity questions.
+    {
+      name: "educ_what_period",
+      patterns: [
+        /\b(what is (a )?period|what are periods|what is menstruation|what happens during (a )?period)\b/,
+        /\b(why do (i|we|people|women|girls) (get|have) (a )?period|why does (a )?period happen|what causes (a )?period)\b/,
+        /\b(explain (what |a )?(a )?period|tell me (about |what is )(a )?period)\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_PERIOD",
+    },
+
+    // ── Educational: what is ovulation ────────────────────────────────────
+    {
+      name: "educ_what_ovulation",
+      patterns: [
+        /\b(what is ovulation|how does ovulation work|what happens during ovulation)\b/,
+        /\b(what is (the )?ovulation (phase|window|period|process))\b/,
+        /\b(explain ovulation|tell me about ovulation)\b/,
+        /\b(when does (the )?egg (drop|release|get released)|what is (an? )?egg release)\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_OVULATION",
+    },
+
+    // ── Educational: what is the menstrual cycle ──────────────────────────
+    {
+      name: "educ_what_cycle",
+      patterns: [
+        /\b(what is (the )?menstrual cycle|how (long|does) (a|the) (menstrual )?cycle (last|work))\b/,
+        /\b(explain (the )?menstrual cycle|tell me about (the )?menstrual cycle|how does (a|the) cycle work)\b/,
+        /\b(what are (the )?cycle phases|what is (the )?luteal phase|what is (the )?follicular phase|what are (the )?phases of (my |the )?cycle)\b/,
+        /\b(what is (a |the )?normal cycle|explain (the )?cycle phases|how does (the )?cycle (go|work|progress))\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_CYCLE_BASICS",
+    },
+
+    // ── Educational: broad / deep-dive requests → summary + learn link ────
+    // Catches "tell me everything about", "explain fully", "deep dive" etc.
+    // Gives a short summary then directs to pamphlets for depth.
+    {
+      name: "educ_broad",
+      patterns: [
+        /\b(tell me everything about|explain (everything about|fully|in detail|in depth|thoroughly)|give me (a )?full (explanation|overview|breakdown) of)\b/,
+        /\b(everything (about|on) (hormones?|fertility|reproduction|the (menstrual )?cycle|periods?|ovulation|reproductive health))\b/,
+        /\b(deep.?dive (into|on|about)|in.?depth (on|about|into)|comprehensive (guide|overview|explanation) (of|about|on))\b/,
+        /\b(all about (hormones?|fertility|periods?|ovulation|the cycle|my cycle|pcos|endometriosis|reproductive health))\b/,
+      ],
+      replies: [],
+      forceNext: "EDUC_BROAD",
     },
 
     // ── Symptom education ─────────────────────────────────────────────────
     {
       name: "symptom_education",
       patterns: [
-        /(what (is|are|does|can cause)|what (does|do).{0,30}mean|tell me about|explain|what causes|why (do|am|does)|what is (pcos|endometriosis|fibroids?|pms|pmdd|ovulation|luteal|follicular))/,
-        /(is it normal (to|for)|normal to have|supposed to (feel|have|be)|why (is my|am i)|why does my)/,
+        /\b(what (is|are|does|can cause)|what (does|do).{0,30}mean|tell me about|explain|what causes)\b.{0,40}\b(period|cycle|ovulation|pcos|endometriosis|fibroids?|pms|pmdd|luteal|follicular|spotting|cramps?|bleeding|discharge)\b/,
+        /\b(is it normal (to|for)|normal to have|supposed to (feel|have|be))\b.{0,40}\b(period|cycle|ovulation|pcos|endometriosis|fibroids?|pms|pmdd|luteal|follicular|spotting|cramps?|bleeding|discharge)\b/,
       ],
       replies: [],
       forceNext: "SYMPTOM_EDUCATION",
@@ -132,7 +230,15 @@ export function createOOS(env) {
     // ── Greetings ─────────────────────────────────────────────────────────
     {
       name: "greeting",
-      patterns: [/^(hi|hello|hey|yo|sup|hiya|morning|afternoon|evening)$/, /^\b(hi|hello|hey|yo|sup|hiya)\b\s*$/, /\b(wah gwaan|wagwaan|wha gwan|howdy)\b/],
+      patterns: [
+        /^(hi|hello|hey|yo|sup|hiya|morning|afternoon|evening)$/,
+        /^\b(hi|hello|hey|yo|sup|hiya)\b\s*$/,
+        /\b(wah gwaan|wagwaan|wha gwan|howdy)\b/,
+        /^h+i+[!.\s]*$/i,      // hii, hiii, hiiii…
+        /^h+e+y+[!.\s]*$/i,    // heyy, heyyy…
+        /^h+e+l+o+[!.\s]*$/i,  // helloo, helloooo…
+        /^y+o+[!.\s]*$/i,      // yoo, yooo…
+      ],
       replies: [
         () => ctx.greeted
           ? pick([
@@ -178,8 +284,19 @@ export function createOOS(env) {
     {
       name: "diagnosis_request",
       patterns: [
-        /\b(do i have|is this|could this be|might i have|am i developing|could i have)\b.{0,30}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|anemia|cancer|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // Direct diagnostic questions: "do i have pcos", "could this be endo"
+        /\b(do i have|is this|could this be|might i have|am i developing|could i have)\b.{0,35}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|anemia|cancer|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I think I have / I think I might have"
+        /\b(i think i (have|might have|could have)|i feel like i (have|might have))\b.{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I'm scared I have / what if I have / do you think I have"
+        /\b(i('m| am) scared (i|i might) have|what if i have|do you think i have|you think i have|could i possibly have)\b.{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|thyroid|cyst|ovarian|disorder|syndrome|condition)\b/,
+        // "I heard/read about X and think I have it / relate to it"
+        /\b(i (heard|read|learned|saw).{0,40}\b(pcos|endometriosis|fibroids?|adenomyosis|cyst).{0,50}\b(think i have|think i might|relate|sounds like me|could be me|similar|same))\b/,
+        // "[condition] sounds like me / sounds like what I have"
+        /\b(pcos|endometriosis|fibroids?|adenomyosis|cyst)\b.{0,50}\b(think i have|might have|sounds like me|sounds like (my situation|what i have)|relate to|could be me)\b/,
+        // Generic: diagnose me / what's wrong with me
         /\b(diagnose me|what is wrong with me|what condition|tell me what i have|is this normal or serious|what disease)\b/,
+        // Condition name + diagnosis-intent word
         /\b(pcos|endometriosis|adenomyosis|fibroids?)\b.{0,30}\b(do i|have i|test for|signs of|symptom)\b/,
       ],
       replies: [
@@ -373,7 +490,10 @@ export function createOOS(env) {
     // ── Pregnancy questions ────────────────────────────────────────────────
     {
       name: "pregnancy_confusion",
-      patterns: [/\b(pregnant|pregnancy|positive test|negative test|missed period and)\b/],
+      patterns: [
+        /\b(am i pregnant|could i be pregnant|might i be pregnant|pregnancy scare)\b/,
+        /\b(positive test|negative test|pregnancy test (positive|negative)|tested positive|tested negative)\b/,
+      ],
       replies: [
         () => "I can help with pregnancy-related guidance 🩷",
         () => "Tap **Late or missed period** to walk through the steps together.",
@@ -437,8 +557,10 @@ export function createOOS(env) {
     {
       name: "food",
       patterns: [
-        /\b(hungry|food|eat|eating|snack|cook|recipe|dinner|lunch|breakfast|meal)\b/,
+        /\b(hungry|food|eat|eating|snack|dinner|lunch|breakfast|meal)\b/,
         /\b(craving|cravings)\b/,
+        /\b(cook|recipe|what should i eat|what to eat|meal ideas?|food ideas?)\b/,
+        /\b(order food|food delivery|what should i cook)\b/,
         /\b(kfc|pizza|burger|patty|taco|fries|ice cream|chocolate)\b/,
       ],
       replies: [
@@ -546,7 +668,7 @@ export function createOOS(env) {
     // ── School / work ──────────────────────────────────────────────────────
     {
       name: "school",
-      patterns: [/\b(homework|assignment|exam|class|grades|deadline|study|school|university|college|work|job|boss|office)\b/],
+      patterns: [/\b(homework|assignment|exam|class|grades|deadline|study|school|university|college|semester|lecturer)\b/],
       replies: [
         () => pick([
           "I can't help with school or work stuff, but deadline stress is a known cycle disruptor 🩷 If your period's been off lately, let me know.",
@@ -562,7 +684,10 @@ export function createOOS(env) {
     // ── Tech / app issues ──────────────────────────────────────────────────
     {
       name: "tech_general",
-      patterns: [/\b(error|bug|crash|not working|broken|glitch|loading|frozen)\b/, /\b(app|button|page|screen)\b/],
+      patterns: [
+        /\b(error|bug|crash|not working|broken|glitch|loading|frozen)\b.{0,40}\b(app|button|page|screen|dashboard|chat)\b/,
+        /\b(app|button|page|screen|dashboard|chat)\b.{0,40}\b(error|bug|crash|not working|broken|glitch|loading|frozen)\b/,
+      ],
       replies: [
         () => "If something in the Bloom app isn't working, that's worth reporting - you can use the feedback option in the menu 🩷",
         () => "If you were actually trying to ask a health question, just type it out and I'll do my best to help.",
@@ -599,7 +724,7 @@ export function createOOS(env) {
     // ── Weight / body image ────────────────────────────────────────────────
     {
       name: "body_image",
-      patterns: [/\b(weight|fat|skinny|body|diet|calories|lose weight|gain weight|body image|bloated all the time)\b/],
+      patterns: [/\b(body image|diet|calories|lose weight|gain weight|fat|skinny)\b/],
       replies: [
         () => "Body changes can be connected to your cycle more than you'd think 🩷",
         (t) => {
@@ -635,6 +760,41 @@ export function createOOS(env) {
 
     // ── Confusion / frustration with Bloomie ──────────────────────────────
     {
+      name: "clarification_repair",
+      patterns: [
+        /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
+        /^\s*cho man\s*$/i,
+        /^\s*i am frustrated(?:\s+what)?\s*$/i,
+        /^\s*wait hold on\s*$/i,
+        /^\s*look yah(?:\s+nuh)?\s*$/i,
+        /^\s*seh wah\s*\??\s*$/i,
+        /^\s*(what|huh)\s*\??\s*$/i,
+        /\b(what do you mean|what are you saying|say that again|explain that again|explain simpler)\b/i,
+        /\b(you lost me|not what i mean)\b/i,
+        /\b(me|mi)\s+nuh\s+(understand|get it)\b/i,
+        /\b(me|mi)\s+(no|don'?t|do not)\s+(understand|get it)\b/i,
+        /\b(wah dat mean|wah yuh mean)\b/i,
+      ],
+      replies: [
+        () => "My bad 🩷 Let me say that more simply.",
+        () => {
+          const daysLeft = typeof daysUntilNextPeriod === "function" ? daysUntilNextPeriod() : null;
+          const inLateContext = (typeof isLateContextActive === "function" && isLateContextActive({ includePromptContext: true }))
+            || (typeof daysLeft === "number" && daysLeft < -1);
+          if (inLateContext) {
+            const days = typeof daysLeft === "number" && daysLeft < -1 ? Math.abs(daysLeft) : null;
+            return days
+              ? `I mean your logged dates suggest your period is later than expected - around ${days} day${days === 1 ? "" : "s"} late by estimate.`
+              : "I mean your logged dates suggest your period looks later than expected.";
+          }
+          return "I can rephrase anything - tell me which part felt confusing and I’ll make it clearer.";
+        },
+        () => "Do you want to focus on cramps, spotting, or pregnancy chance?",
+      ],
+      forceNext: "START_MENU",
+    },
+
+    {
       name: "confused_with_bloomie",
       patterns: [/\b(you don't understand|you're not helping|this isn't working|useless bot|not what i asked|wrong answer|bad answer)\b/],
       replies: [
@@ -652,12 +812,27 @@ export function createOOS(env) {
     // ── STIs / sexual health adjacent ─────────────────────────────────────
     {
       name: "sti_questions",
-      patterns: [/\b(std|sti|hiv|herpes|chlamydia|gonorrhea|syphilis|infection down there|burning when i pee|discharge that smells)\b/],
+      patterns: [
+        /\b(std|sti|hiv|herpes|chlamydia|gonorrhea|syphilis|infection down there|burning when i pee|discharge that smells)\b/,
+        /\b(bump|lump|sore|blister|rash)\b.{0,24}\b(after sex|down there|genital|private)\b/,
+      ],
       replies: [
         () => "STI symptoms can sometimes overlap with cycle symptoms, so I want to be careful here 🩷",
-        () => "I'm not equipped to help with STI diagnosis or treatment - but if you're noticing unusual discharge, pain, or changes, a healthcare provider can check properly.",
+        () => "I can't diagnose from chat, but testing is the safest next step, and clinics see this all the time without judgment.",
+        () => "At a clinic they usually ask a few questions, do an exam only if needed, and explain test options clearly.",
         () => "You can use the care map to find a clinic near you.",
       ],
+    },
+
+    // ── Minor support / trusted adult handoff ─────────────────────────────
+    {
+      name: "minor_trusted_support",
+      patterns: [
+        /\b(scared|afraid|fraid)\b.{0,30}\b(tell|talk)\b.{0,20}\b(mom|mum|mother|mama|parent|guardian)\b/,
+        /\b(don'?t want|do not want)\b.{0,30}\b(tell|talk)\b.{0,20}\b(mom|mum|mother|mama|parent|guardian)\b/,
+      ],
+      replies: [],
+      forceNext: "MINOR_TRUSTED_ADULT_SUPPORT",
     },
 
     // ── Contraception questions ────────────────────────────────────────────
@@ -724,8 +899,23 @@ export function createOOS(env) {
 
   // Health signals that should ALWAYS beat OOS pattern matches.
   // e.g. "me bleed thru me pants lol" has "lol" but the health signal wins.
+  //
+  // Pattern 1 - explicit clinical / menstrual keywords (original, unchanged).
+  // Patterns 2–4 - vague / indirect reproductive-health phrases that should
+  //   keep the user in-scope even when no clinical keyword is present.
+  //   These match the same phrasing added to HEALTH_GATE in bloomie-intent.js.
   const HEALTH_OVERRIDE_PATTERNS = [
-    /\b(bleed|bleeding|blood|period|cramp|pain|spot|spotting|late|missed|discharge|pregnant|pregnancy|nausea|dizzy|faint|heavy|clot|pelvic|mood|tired|fatigue|cycle|ovulat)\b/,
+    // Explicit clinical / menstrual keywords
+    /\b(bleed|bleeding|blood|period|cramp|pain|spot|spotting|late|missed|discharge|pregnant|pregnancy|nausea|dizzy|faint|heavy|clot|pelvic|mood|tired|fatigue|cycle|ovulat|sad|angry|mad|vex|frustrated|happy|excited|emotional|anxious|energy)\b/,
+    // Location anchors implying reproductive concern
+    /down there|down below|lady parts?|private parts?|feminine area|mi body/i,
+    // Wrongness / off signals that imply a body concern without clinical words
+    /something(?:'s)?\s+(?:wrong|off|not right|not normal|strange)|sumn\s+(?:wrong|off)/i,
+    /not feel(?:ing)?\s+right|feel(?:ing)?\s+(?:off|weird|strange)|nuh feel right|mi nuh feel|mi feel off/i,
+    /off lately|been off|not myself|not like myself|nuh feel like mi/i,
+    // Indirect cycle / timing hints
+    /hasn.?t come yet|not here yet|still waiting (?:for it|on it)/i,
+    /sumn wrong with (?:my|mi)\s+(?:cycle|body|period|flow)/i,
   ];
 
   // Cycle question patterns - checked FIRST before health override
@@ -738,15 +928,130 @@ export function createOOS(env) {
     /\b(when (should|can) i (take|do) a (pregnancy )?test|when (should|can) i test|best time to test|when to test|can i test (yet|now))\b/,
   ];
 
-  function routeUserText(t) {
-    t = String(t || "").toLowerCase();
+  // OOS categories that are intentional in-scope shortcuts and should run
+  // before generic OOS fallback handling.
+  const IN_SCOPE_SHORTCUT_NAMES = new Set([
+    "about_bloom", "app_help", "see_doctor_q",
+    "educ_what_period", "educ_what_ovulation", "educ_what_cycle", "educ_broad", "symptom_education",
+    "mode_confirmation_pregnant", "mode_confirmation_ttc", "mode_confirmation_postpartum",
+    "cycle_phase_q", "next_period_q", "last_period_q", "edd_q", "test_timing_q",
+    "postpartum_q", "ttc_q",
+  ]);
 
-    // ── Urgency: always first ──────────────────────────────────────────────
-    const urgentPhrases = [
-      "faint", "passed out", "cant breathe", "can't breathe",
-      "shortness of breath", "soaking through", "bleeding through",
+  // Category buckets that remain true OOS/safety/deflection behavior.
+  const TRUE_OOS_CATEGORIES = OOS.filter((cat) => !IN_SCOPE_SHORTCUT_NAMES.has(cat.name));
+  const IN_SCOPE_SHORTCUT_CATEGORIES = OOS.filter((cat) => IN_SCOPE_SHORTCUT_NAMES.has(cat.name));
+
+  function findCategory(categories, t) {
+    return categories.find((cat) => cat.patterns.some((rx) => rx.test(t))) || null;
+  }
+
+  function renderCategoryReply(cat, t) {
+    const lines = (cat.replies || OOS_DEFAULT)
+      .map((r) => (typeof r === "function" ? r(t) : r))
+      .filter(Boolean);
+    if (cat.name === "greeting") ctx.greeted = true;
+    ctx.lastOOS = cat.name;
+    return {
+      reply: lines.length ? lines : OOS_DEFAULT.map((r) => (typeof r === "function" ? r(t) : r)),
+      next: cat.forceNext || "START_MENU",
+      payload: { oos: cat.name },
+    };
+  }
+
+  function routeInScopeShortcut(t) {
+    const cat = findCategory(IN_SCOPE_SHORTCUT_CATEGORIES, t);
+    if (!cat) return null;
+    if (!cat.replies?.length) return { next: cat.forceNext || "START_MENU", payload: { oos: cat.name } };
+    return renderCategoryReply(cat, t);
+  }
+
+  function routeRepairClarifier(t) {
+    const repairCats = OOS.filter((cat) => cat.name === "clarification_repair" || cat.name === "confused_with_bloomie");
+    const cat = findCategory(repairCats, t);
+    if (!cat) return null;
+    return renderCategoryReply(cat, t);
+  }
+
+  function routeMinorSupport(t) {
+    if (
+      /\b(scared|afraid|fraid)\b.{0,30}\b(tell|talk)\b.{0,20}\b(mom|mum|mother|mama|parent|guardian)\b/.test(t) ||
+      /\b(don'?t want|do not want)\b.{0,30}\b(tell|talk)\b.{0,20}\b(mom|mum|mother|mama|parent|guardian)\b/.test(t) ||
+      /\bminor support\b/.test(t)
+    ) {
+      return { next: "MINOR_TRUSTED_ADULT_SUPPORT", payload: { oos: "minor_trusted_support" } };
+    }
+    return null;
+  }
+
+  function shouldSuppressOOSCategory(catName, t) {
+    // Keep reproductive-health phrasing in-scope even if a broad non-health
+    // keyword appears in the same sentence.
+    const hasReproLanguage = HEALTH_OVERRIDE_PATTERNS.some((rx) => rx.test(t));
+    if (!hasReproLanguage) return false;
+    return new Set(["school", "food", "body_image", "tech_general", "pregnancy_confusion"]).has(catName);
+  }
+
+  function routeTrueOOSFallback(t) {
+    const cat = detectOutOfScope(t, TRUE_OOS_CATEGORIES, HEALTH_OVERRIDE_PATTERNS);
+    if (cat) {
+      if (shouldSuppressOOSCategory(cat.name, t)) return null;
+      return renderCategoryReply(cat, t);
+    }
+    return null;
+  }
+
+  function routeSoftClarifier(t) {
+    // Soft clarification path before hard OOS fallback.
+    // Keeps uncertain/partial reproductive-health wording in conversation.
+    const SOFT_REPRO_CLARIFY_PATTERNS = [
+      /\b(what('?s| is) going on (with|wid) me|wah going on wid me|wah gwan wid me)\b/i,
+      /\b(my body|mi body).{0,24}\b(off|wrong|weird|strange|different|not right)\b/i,
+      /\b(i|mi)\s+(don'?t|do not|nuh)\s+(feel|know).{0,20}\b(right|normal|what('?s| is) wrong)\b/i,
+      /\b(is this normal|this normal|am i okay|am i ok|is this okay|not sure what('?s| is) happening)\b/i,
+      /\b(still no|not yet|nope|same thing|still same)\b/i,
     ];
-    if (urgentPhrases.some((p) => t.includes(p))) return { next: "HEAVY_URGENT" };
+    if (!SOFT_REPRO_CLARIFY_PATTERNS.some((rx) => rx.test(t))) return null;
+    return {
+      reply: [
+        pick([
+          "I might be missing part of what you mean 🩷",
+          "I hear you - let me make sure I understood 🩷",
+        ]),
+        "Is this about your cycle or a body symptom (like cramps, spotting, discharge, or mood changes)?",
+      ],
+      next: "ELSE_NOT_SURE_ROUTE",
+      payload: { reason: "soft_clarify" },
+    };
+  }
+
+  function routeUserText(rawText) {
+    // Defensive normalization so scoreSignals/regex routing never runs on raw
+    // input if this helper is called outside assistant.js.
+    const t = normalizeText(rawText);
+
+    // ── Safety redirects (highest priority) ────────────────────────────────
+    const urgentPattern = [
+      /\b(can'?t breathe|shortness of breath|trouble breathing|hard to breathe|difficulty breathing|can'?t get air)\b/,
+      /\b(passed out|passing out|fainted|fainting|almost fainted|nearly fainted|about to faint|feel like (i )?might faint)\b/,
+      /\b(chest pain|chest tight|chest is tight|chest hurts)\b/,
+      /\b(soaking (through|thru)|bleeding through)\b/,
+    ].some((rx) => rx.test(t));
+    if (urgentPattern) return { next: "EMERGENCY_REDIRECT" };
+
+    const severePelvicPattern = [
+      /\b(severe|unbearable|extreme)\s+(pelvic pain|cramps?)\b/,
+      /\b(worst pain (ever|i('| )?ve ever (felt|had)?))\b/,
+      /\b(one[- ]sided pain|sharp pain one side|stabbing pain)\b/,
+      /\bpain (is )?(unbearable|too bad|so bad)\b/,
+    ].some((rx) => rx.test(t));
+    if (severePelvicPattern) return { next: "PELVIC_URGENT" };
+
+    // ── Positive pregnancy test + pain or bleeding ─────────────────────────
+    // Possible ectopic / miscarriage concern - conservative redirect.
+    const posTestSignal = /positive test|tested positive|test (is|was|came back) positive|two lines|two line|pregnant and (have|got|feeling)|pregnancy test positive/.test(t);
+    const painOrBleedSignal = /\b(pain|cramp|bleed|bleeding|spotting|spot)\b/.test(t);
+    if (posTestSignal && painOrBleedSignal) return { next: "PELVIC_URGENT" };
 
     // ── Heavy bleeding multi-route detection (priority: C > A > B) ────────
     const heavyRouteC = [
@@ -772,9 +1077,46 @@ export function createOOS(env) {
     const isHeavyC = heavyRouteC.some((p) => t.includes(p)) || /\bweak\b/.test(t);
     const isHeavyA = heavyRouteA.some((p) => t.includes(p));
     const isHeavyB = heavyRouteB.some((p) => t.includes(p));
-    if (isHeavyC && (isHeavyA || isHeavyB || /\bbleed|\bperiod|\bblood|\bheavy\b/.test(t))) return { next: "HEAVY_ROUTE_C" };
+    if (isHeavyC && (isHeavyA || isHeavyB || /\bbleed|\bperiod|\bblood|\bheavy\b/.test(t))) return { next: "HEAVY_ROUTE_C_GATE" };
+    if (/\b(period|bleeding)\b.{0,20}\b(heavy like river|very heavy|flooding)\b/.test(t)) return { next: "HEAVY_INTRO" };
     if (isHeavyA) return { next: "HEAVY_INTRO" };
     if (isHeavyB) return { next: "HEAVY_ROUTE_B" };
+
+    // ── Postpartum mood concern ───────────────────────────────────────────
+    // Must run before generic postpartum shortcut so low-mood postpartum
+    // phrasing doesn't get flattened into a non-mood entry.
+    if (
+      /\b(postpartum|after baby|after birth|since i had (the )?baby|had a baby)\b/.test(t) &&
+      /\b(not happy|do not feel happy|don'?t feel happy|sad|low|empty|anxious|overwhelmed|can'?t cope)\b/.test(t)
+    ) return { next: "MOOD_SAFETY_CHECK", payload: { reason: "postpartum_mood" } };
+
+    // ── Minor support phrasing (direct route, bypass OOS suppression) ─────
+    const minorSupport = routeMinorSupport(t);
+    if (minorSupport) return minorSupport;
+
+    // ── In-scope shortcut routes (identity/help/education/cycle utility) ──
+    const inScopeShortcut = routeInScopeShortcut(t);
+    if (inScopeShortcut) return inScopeShortcut;
+
+    // ── Repair / clarification routes (always before OOS fallback) ────────
+    const repairRoute = routeRepairClarifier(t);
+    if (repairRoute) return repairRoute;
+
+    // ── High-risk symptom pair (dizzy + lightheaded) ──────────────────────
+    // Keep this conservative catch so multi-turn heavy-bleeding conversations
+    // do not fall through to generic paths.
+    if (/\bdizzy\b/.test(t) && /\blightheaded\b/.test(t)) {
+      return { next: "HEAVY_URGENT" };
+    }
+
+    // ── Medication shortcut route ──────────────────────────────────────────
+    // Assistant has a medication pre-check, but routeUserText keeps this as
+    // a safe fallback so dosage questions do not get hijacked by symptom words.
+    const medicationCat = OOS.find((cat) =>
+      cat.name === "medication_dosage" &&
+      cat.patterns.some((rx) => rx.test(t))
+    );
+    if (medicationCat) return renderCategoryReply(medicationCat, t);
 
     // ── Pregnancy test: already tested negative ───────────────────────────
     if (
@@ -790,8 +1132,16 @@ export function createOOS(env) {
       /had unprotected sex/.test(t) ||
       /unprotected sex recently/.test(t) ||
       /sex without (a )?condom/.test(t) ||
-      /forgot (the )?condom/.test(t)
+      /forgot (the )?condom/.test(t) ||
+      /condom.*(broke|burst|tear|tore|split|bruk|pop)/.test(t)
     ) return { next: "TEST_RECENT_SEX_INTRO" };
+
+    // ── TTC duration concern ──────────────────────────────────────────────
+    if (
+      /\b(trying|ttc|trying to conceive|trying for (a )?baby)\b/.test(t) &&
+      /\b([0-9]{1,2})\s*(month|months)\b/.test(t) &&
+      /\b(no baby|not pregnant|no pregnancy|nothing yet|no luck)\b/.test(t)
+    ) return { next: "TTC_INTRO", payload: { reason: "ttc_duration" } };
 
     // ── Session summary request ───────────────────────────────────────────────
     // Catches "what did you say", "remind me", Patois "wah we talk bout", etc.
@@ -825,9 +1175,16 @@ export function createOOS(env) {
 
     // Vague/indirect → not sure route
     if (/\b(something feels off|feel off|not feeling right|sumn wrong|something wrong with me)\b/.test(t)) return { next: "ELSE_NOT_SURE_ROUTE" };
-    if (/^is this normal\??\s*$/i.test(t))                                         return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/^(is this normal|this normal|am i okay|am i ok)\??\s*$/i.test(t))         return { next: "ELSE_NOT_SURE_ROUTE" };
     if (/\b(something is coming out|sumn a come out)\b/.test(t))                   return { next: "ELSE_DISCHARGE_ENTRY" };
     if (/\b(i don.t feel like myself|mi nuh feel like miself)\b/.test(t))          return { next: "MOOD_SAFETY_CHECK" };
+
+    // Additional vague-but-clearly-reproductive-health messages
+    if (/\b(my body feels weird|body feels strange|body feels different|feel weird in my body|body acting weird|body acting strange)\b/.test(t)) return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(i don.?t feel normal|i dont feel normal|not feeling normal|don.?t feel right)\b/.test(t))                                           return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(my cycle has changed|cycle is different|my period has changed|period is different now|period been different|period acting different|period acting up|period is acting)\b/.test(t)) return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(something (is )?wrong with my period|something wrong with my cycle|something off with my period|sumn wrong with my period|period nuh normal)\b/.test(t))                        return { next: "ELSE_NOT_SURE_ROUTE" };
+    if (/\b(i feel like something is wrong|feel like something wrong|something is off|something off with my body|body off)\b/.test(t))                                                     return { next: "ELSE_NOT_SURE_ROUTE" };
 
     // ── Condition education: PCOS ─────────────────────────────────────────
     // Explicit name, or "irregular period" paired with acne or hair symptoms.
@@ -913,7 +1270,7 @@ export function createOOS(env) {
       /belly (a )?hurting/.test(t) ||
       /waist a hurt/.test(t) ||
       /pain between mi legs/.test(t)
-    ) return { next: "PELVIC_SAFETY_CHECK" };
+    ) return { next: "PELVIC_SAFETY_GATE" };
 
     const { sig, has } = scoreSignals(t);
     const combo = resolveSignals(sig, has);
@@ -925,20 +1282,28 @@ export function createOOS(env) {
     const [bestIntent, bestScore] = best;
 
     if (bestScore < 2) {
-      // ── Deterministic OOS handling ───────────────────────────────
-      const cat = detectOutOfScope(t, OOS, HEALTH_OVERRIDE_PATTERNS);
-      if (cat) {
-        const lines = (cat.replies || OOS_DEFAULT)
-          .map((r) => typeof r === "function" ? r(t) : r)
-          .filter(Boolean);
-        if (cat.name === "greeting") ctx.greeted = true;
-        ctx.lastOOS = cat.name;
-        return {
-          reply: lines.length ? lines : OOS_DEFAULT.map((r) => (typeof r === "function" ? r(t) : r)),
-          next: cat.forceNext || "START_MENU",
-          payload: { oos: cat.name },
-        };
+      // ── "Valid but unclear" reproductive-health fallback ─────────
+      // Catches messages that are clearly cycle/body adjacent but score
+      // below the single-signal threshold - avoids sending them to the
+      // generic OOS reply.
+      const VAGUE_REPRO_PATTERNS = [
+        /\b(cycle|period|bleeding|ovulat|menstrual|hormones?|discharge|womb|uterus|cervix|vagina|reproductive)\b/,
+        /\b(something feels off|feel off|not feeling right|body feels|feel weird|feel strange|feel different)\b/,
+        /\b(something (is )?wrong|something off|not normal|not right|has changed|been different|acting up)\b/,
+      ];
+      if (VAGUE_REPRO_PATTERNS.some((rx) => rx.test(t))) {
+        return { next: "ELSE_NOT_SURE_ROUTE", payload: { reason: "vague_repro_health" } };
       }
+
+      // ── True OOS categories (weather, sports, etc.) ──────────────
+      const hardCategory = routeTrueOOSFallback(t);
+      if (hardCategory) return hardCategory;
+
+      // ── Soft clarification before default OOS fallback ───────────
+      const softClarifier = routeSoftClarifier(t);
+      if (softClarifier) return softClarifier;
+
+      // ── Warm default OOS fallback (final safety net) ─────────────
       return {
         reply: OOS_DEFAULT.map((r) => (typeof r === "function" ? r(t) : r)),
         next: "START_MENU",
@@ -954,7 +1319,7 @@ export function createOOS(env) {
     if (bestIntent === "pregnancy") return { next: "PREGNANCY_ENTRY" };
     if (bestIntent === "discharge") return { next: "ELSE_DISCHARGE" };
     if (bestIntent === "pelvic") {
-      return { next: "PELVIC_SAFETY_CHECK" };
+      return { next: "PELVIC_SAFETY_GATE" };
     }
 
     // Late check with cycle data

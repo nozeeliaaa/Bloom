@@ -45,7 +45,7 @@ export async function runAgeUpgradeJob() {
 
         // Update Firebase custom claim
         await auth.setCustomUserClaims(uid, {
-          role:    data.profile?.role    || "user",
+          role:    data.role || "user",
           ageBand: "18+",
         });
 

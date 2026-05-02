@@ -2,12 +2,12 @@
 
 :root{
   /* Key + Calendar must use the same colors = must match legend exactly */
-  --period-logged:    #e46a94;   /* Period   – solid pink            */
-  --period-predicted: #f5b4c8;   /* Predicted period – pink stripe   */
-  --ovulation:        #0d9488;   /* Ovulation – dark teal            */
-  --fertility:        #2dd4bf;   /* Fertile window – teal            */
-  --follicular-color: #60a5fa;   /* Follicular – periwinkle blue     */
-  --luteal-color:     #f59e0b;   /* Luteal – amber/gold              */
+  --period-logged:    #e46a94;   /* Period   - solid pink            */
+  --period-predicted: #f5b4c8;   /* Predicted period - pink stripe   */
+  --ovulation:        #1A8080;   /* Ovulation - dark teal            */
+  --fertility:        #2dd4bf;   /* Fertile window - teal            */
+  --follicular-color: #60a5fa;   /* Follicular - periwinkle blue     */
+  --luteal-color:     var(--phase-luteal);   /* Luteal - purple          */
 }
 
 /* Wrapper */
@@ -105,11 +105,8 @@
   border: 2px solid var(--period-logged);
 }
 
-/* Optional “strike” to indicate predicted (you had this) */
 .calendar-cell.predicted-period .day-number {
-  text-decoration: line-through;
-  text-decoration-color: var(--period-logged);
-  text-decoration-thickness: 2px;
+  text-decoration: none;
 }
 
 /* ===== Fertile window (SOLID TEAL) ===== */
@@ -272,6 +269,12 @@
   border-color: var(--fertility);
 }
 
+/* Follicular = SOLID PERIWINKLE BLUE */
+.legend-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 40%, white);
+  border-color: var(--follicular-color);
+}
+
 /* Ovulation = TEAL STRIPES */
 .legend-ovulation {
   border-color: var(--ovulation);
@@ -302,6 +305,11 @@
     transparent 6px,
     transparent 12px
   );
+}
+
+[data-theme="dark"] .legend-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 25%, transparent);
+  border-color: var(--follicular-color);
 }
 
 /* ===== Modal symptoms scroll ===== */
@@ -361,4 +369,8 @@
 .swatch-fertile {
   background: var(--fertility);
   border-color: var(--fertility);
+}
+.swatch-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 40%, white);
+  border-color: var(--follicular-color);
 }

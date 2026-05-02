@@ -16,6 +16,11 @@ const router = express.Router();
 const VALID_THEMES = ["light", "dark", "system"];
 const VALID_REMINDER_TYPES = ["PERIOD_SOON", "LOG_REMINDER", "CHECK_IN", "FERTILE_WINDOW"];
 
+function isFirestoreQuotaError(err) {
+  const msg = String(err?.message || "").toLowerCase();
+  return err?.code === 8 || msg.includes("resource_exhausted") || msg.includes("quota exceeded");
+}
+
 function isValidTime(str) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(str);
 }
@@ -23,6 +28,10 @@ function isValidTime(str) {
 // ─── GET /preferences ────────────────────────────────────────────────────────
 router.get("/", requireAuth, async (req, res) => {
   try {
+    if (req.user?.firestoreDegraded) {
+      return res.json({ ok: true, preferences: null, degraded: true });
+    }
+
     const uid = req.user.uid;
     const doc = await db.collection("preferences").doc(uid).get();
 
@@ -32,7 +41,12 @@ router.get("/", requireAuth, async (req, res) => {
 
     return res.json({ ok: true, preferences: doc.data() });
   } catch (err) {
-    console.error("GET /preferences error:", err);
+    if (isFirestoreQuotaError(err)) {
+      console.warn("GET /preferences quota exceeded; returning degraded preferences payload");
+      return res.json({ ok: true, preferences: null, degraded: true });
+    }
+
+    console.error("GET /preferences error:", err?.message ?? err);
     return res.status(500).json({ error: "Failed to load preferences" });
   }
 });

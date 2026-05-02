@@ -17,26 +17,33 @@ import { getTheme, setTheme }                    from "./theme-manager.js";
 import { isAccountMode }                         from "./mode.js";
 import { getIdToken }                            from "./auth.js";
 import { registerFCMToken, unregisterFCMToken }  from "./notifications.js";
+import {
+  loadBloomPreferencesLocal,
+  saveBloomPreferencesLocal,
+  clearBloomPreferencesLocal,
+} from "./bloom-storage.js";
  
 renderNav("settings");
 renderFooter();
 renderBloomieFab();
 renderModeBanner(document.getElementById("banner-area"));
  
-const LOCAL_KEY = "bloom_preferences";
 const API_BASE  = window.BLOOM_API_BASE || "";
  
 // ─── DOM refs ──────────────────────────────────────────────────────────────────
 const els = {
   hideSensitive:  document.getElementById("pref-hide-sensitive"),
+  compact:        document.getElementById("pref-compact"),
+
   reminders:      document.getElementById("pref-reminders"),
   periodReminder: document.getElementById("pref-period-reminder"),
   fertileAlert:   document.getElementById("pref-fertile-alert"),
-  compact:        document.getElementById("pref-compact"),
   discreetNotif:  document.getElementById("pref-discreet-notif"),
+
   save:           document.getElementById("save-prefs"),
   reset:          document.getElementById("reset-prefs"),
   status:         document.getElementById("prefs-status"),
+
   themeBtns: {
     light:  document.getElementById("theme-light"),
     dark:   document.getElementById("theme-dark"),
@@ -46,12 +53,11 @@ const els = {
  
 // ─── Local helpers ─────────────────────────────────────────────────────────────
 function getLocalPrefs() {
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {}; }
-  catch { return {}; }
+  return loadBloomPreferencesLocal();
 }
  
 function setLocalPrefs(prefs) {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(prefs));
+  saveBloomPreferencesLocal(prefs || {});
 }
  
 // ─── Backend helpers ───────────────────────────────────────────────────────────
@@ -81,9 +87,7 @@ async function saveToBackend(prefs) {
     if (!headers) return false;
  
     const payload = {
-      theme:         getTheme(),
-      hideSensitive: prefs.hideSensitive  ?? false,
-      compact:       prefs.compact        ?? false,
+      theme:    getTheme(),
       reminders: {
         enabled:      prefs.reminders      ?? false,
         discreetCopy: prefs.discreetNotif ?? false,
@@ -143,9 +147,6 @@ function applyPrefsToUI(prefs) {
   updateThemeButtons(theme);
   setTheme(theme);
 
-  if (els.hideSensitive)  els.hideSensitive.checked  = !!prefs.hideSensitive;
-  if (els.compact)        els.compact.checked        = !!prefs.compact;
-
   // Reminders - flatten from backend shape or local shape
   const remindersEnabled = prefs.reminders?.enabled ?? !!prefs.reminders;
   if (els.reminders) els.reminders.checked = remindersEnabled;
@@ -173,11 +174,14 @@ async function init() {
   let prefs = getLocalPrefs();
  
   if (isAccountMode()) {
+    showStatus("Loading saved preferences…");
     const cloudPrefs = await loadFromBackend();
     if (cloudPrefs) {
       // Cloud is source of truth - merge into local cache
       prefs = { ...prefs, ...cloudPrefs };
       setLocalPrefs(prefs);
+    } else {
+      showStatus("Using local settings for now.");
     }
   }
  
@@ -240,7 +244,7 @@ els.save?.addEventListener("click", async () => {
  
 // ─── Reset ─────────────────────────────────────────────────────────────────────
 els.reset?.addEventListener("click", async () => {
-  localStorage.removeItem(LOCAL_KEY);
+  clearBloomPreferencesLocal();
   applyPrefsToUI({});
   setTheme("system");
   // All toggles now off - unregister FCM

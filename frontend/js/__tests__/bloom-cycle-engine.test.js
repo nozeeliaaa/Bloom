@@ -21,6 +21,7 @@ import {
   detectSuspiciousEntrySignal,
   detectSymptomWithoutCycleData,
   detectLongBleedingEntry,
+  generateAdvancedInsights,
 } from "../algorithms/bloom-cycle-engine.js";
 
 // ── Date utilities ───────────────────────────────────────────────────────────
@@ -415,5 +416,63 @@ describe("detectCycleTrendSignal - sparse data guard", () => {
   it("3 logged cycles (< minCycles=4) → trend signal suppressed", () => {
     const s = detectCycleTrendSignal({ cycleLengths: [28, 30, 32] });
     expect(s.show).toBe(false);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PART 9 - Advanced bleeding-pattern insights
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("generateAdvancedInsights - recurring bleeding realities", () => {
+  it("surfaces a recurring heavy + clotting pattern from period logs", () => {
+    const result = generateAdvancedInsights({
+      cycleLengths: [28, 29, 30],
+      lastPeriodStart: daysAgo(12),
+      today: TODAY,
+      periodEntries: [
+        { durationDays: 5, flowLevel: "heavy", flowScore: 4, hadLargeClots: true },
+        { durationDays: 6, flowLevel: "heavy", flowScore: 4, hadLargeClots: true },
+        { durationDays: 5, flowLevel: "medium", flowScore: 3, hadLargeClots: false },
+      ],
+      unscheduledBleedingDates: [],
+    });
+
+    expect(result.signals.some((s) => s.code === "HEAVY_CLOTTING_PATTERN")).toBe(true);
+    const signal = result.signals.find((s) => s.code === "HEAVY_CLOTTING_PATTERN");
+    expect(signal.message).toMatch(/heavier bleeding together with clotting/i);
+  });
+
+  it("surfaces repeated off-window bleeding from recurring unscheduled logs", () => {
+    const result = generateAdvancedInsights({
+      cycleLengths: [28, 30, 29],
+      lastPeriodStart: daysAgo(12),
+      today: TODAY,
+      periodEntries: [],
+      unscheduledBleedingDates: ["2026-02-05", "2026-02-24", "2026-03-11"],
+    });
+
+    expect(result.signals.some((s) => s.code === "METRORRHAGIA_PATTERN")).toBe(true);
+    const signal = result.signals.find((s) => s.code === "METRORRHAGIA_PATTERN");
+    expect(signal.message).toMatch(/outside your expected period timing/i);
+  });
+
+  it("prefers one combined heavy + irregular bleeding insight when both patterns recur", () => {
+    const result = generateAdvancedInsights({
+      cycleLengths: [31, 33, 35],
+      lastPeriodStart: daysAgo(14),
+      today: TODAY,
+      periodEntries: [
+        { durationDays: 8, flowLevel: "heavy", flowScore: 4, hadLargeClots: true },
+        { durationDays: 9, flowLevel: "heavy", flowScore: 4, hadLargeClots: true },
+        { durationDays: 7, flowLevel: "medium", flowScore: 3, hadLargeClots: false },
+      ],
+      unscheduledBleedingDates: ["2026-02-10", "2026-02-25"],
+    });
+
+    const codes = result.signals.map((s) => s.code);
+    expect(codes).toContain("MENOMETRORRHAGIA_PATTERN");
+    expect(codes).not.toContain("MENORRHAGIA_PATTERN");
+    expect(codes).not.toContain("HEAVY_CLOTTING_PATTERN");
+    expect(codes).not.toContain("METRORRHAGIA_PATTERN");
   });
 });

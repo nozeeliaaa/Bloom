@@ -465,6 +465,9 @@
     }
 
     function showGoalModal(goal, leavingPregnancy) {
+      const DASHBOARD_URL = "/pages/dashboard.html";
+      let redirectTimer = null;
+
       // Build modal markup
       const el = document.createElement("div");
       el.innerHTML = `
@@ -545,11 +548,21 @@
         card.style.transform = "translateY(0)";
       });
 
+      function completeGoalSwitch({ clearPregnancyData = false } = {}) {
+        if (clearPregnancyData) localStorage.removeItem("bloom_lmp");
+        setUserGoal(goal.id);
+        syncGoalToBackend(goal.id);
+        renderGoals();
+        updateMeta();
+        showSuccessAndRedirect();
+      }
+
       function showConfirm() {
         titleEl.textContent = `Switch to "${goal.title}"?`;
         bodyEl.textContent  = "Your dashboard and tools will update, but your logs are always kept.";
+        warnEl.textContent = "";
         if (leavingPregnancy) {
-          warnEl.textContent = "Note: Switching away from the pregnancy goal will clear your saved LMP date.";
+          warnEl.textContent = "You will be asked to confirm whether this pregnancy has ended before we switch goals.";
         }
         actionsEl.innerHTML = "";
 
@@ -557,12 +570,11 @@
         confirmBtn.textContent = "Yes, switch goal";
         confirmBtn.style.cssText = "padding:0.75rem 1rem;border-radius:10px;border:none;background:#d85a98;color:#fff;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;";
         confirmBtn.onclick = () => {
-          if (leavingPregnancy) localStorage.removeItem("bloom_lmp");
-          setUserGoal(goal.id);
-          syncGoalToBackend(goal.id);
-          renderGoals();
-          updateMeta();
-          showSuccess();
+          if (leavingPregnancy) {
+            showPregnancyEndedCheck();
+            return;
+          }
+          completeGoalSwitch();
         };
 
         const cancelBtn = document.createElement("button");
@@ -574,9 +586,35 @@
         actionsEl.appendChild(cancelBtn);
       }
 
-      function showSuccess() {
+      function showPregnancyEndedCheck() {
+        titleEl.textContent = "Has your pregnancy ended?";
+        bodyEl.textContent = "Before switching away from pregnancy tracking, please confirm this.";
+        warnEl.textContent = "If yes, we will clear the saved LMP pregnancy date for safety.";
+        actionsEl.innerHTML = "";
+
+        const yesEndedBtn = document.createElement("button");
+        yesEndedBtn.textContent = "Yes, pregnancy has ended";
+        yesEndedBtn.style.cssText = "padding:0.75rem 1rem;border-radius:10px;border:none;background:#d85a98;color:#fff;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;";
+        yesEndedBtn.onclick = () => completeGoalSwitch({ clearPregnancyData: true });
+
+        const keepBtn = document.createElement("button");
+        keepBtn.textContent = "No, keep pregnancy goal";
+        keepBtn.style.cssText = "padding:0.72rem 1rem;border-radius:10px;border:2px solid #ddd;background:transparent;color:#555;font-weight:700;font-size:1rem;cursor:pointer;font-family:inherit;";
+        keepBtn.onclick = close;
+
+        const backBtn = document.createElement("button");
+        backBtn.textContent = "Back";
+        backBtn.style.cssText = "padding:0.72rem 1rem;border-radius:10px;border:2px solid #ddd;background:transparent;color:#555;font-weight:700;font-size:1rem;cursor:pointer;font-family:inherit;";
+        backBtn.onclick = showConfirm;
+
+        actionsEl.appendChild(yesEndedBtn);
+        actionsEl.appendChild(keepBtn);
+        actionsEl.appendChild(backBtn);
+      }
+
+      function showSuccessAndRedirect() {
         titleEl.textContent = `Dashboard ready for "${goal.title}"`;
-        bodyEl.textContent  = "Your view has been updated. Tap below whenever you're ready.";
+        bodyEl.textContent  = "Your goal is updated. Taking you to your dashboard now...";
         warnEl.textContent  = "";
 
         // Swap icon to checkmark
@@ -590,20 +628,20 @@
         actionsEl.innerHTML = "";
 
         const dashBtn = document.createElement("a");
-        dashBtn.href = "/pages/dashboard.html";
-        dashBtn.textContent = "Go to Dashboard";
+        dashBtn.href = DASHBOARD_URL;
+        dashBtn.textContent = "Go now";
         dashBtn.style.cssText = "padding:0.75rem 1rem;border-radius:10px;background:#d85a98;color:#fff;font-weight:800;font-size:1rem;text-align:center;text-decoration:none;display:block;";
 
-        const stayBtn = document.createElement("button");
-        stayBtn.textContent = "Stay on Profile";
-        stayBtn.style.cssText = "padding:0.72rem 1rem;border-radius:10px;border:2px solid #ddd;background:transparent;color:#555;font-weight:700;font-size:1rem;cursor:pointer;font-family:inherit;";
-        stayBtn.onclick = close;
+        actionsEl.appendChild(dashBtn);
 
-        actions.appendChild(dashBtn);
-        actions.appendChild(stayBtn);
+        clearTimeout(redirectTimer);
+        redirectTimer = setTimeout(() => {
+          window.location.href = DASHBOARD_URL;
+        }, 900);
       }
 
       function close() {
+        clearTimeout(redirectTimer);
         overlay.style.opacity = "0";
         card.style.transform = "translateY(14px)";
         overlay.addEventListener("transitionend", () => overlay.remove(), { once: true });

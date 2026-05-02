@@ -360,6 +360,47 @@ describe("normalizePatois - frustration, agreement, and conversational phrases",
     expect(normalizePatois("help mi")).toMatch(/help me/i);
   });
 
+  it("normalizes 'kmt' to frustration signal", () => {
+    expect(normalizePatois("kmt")).toMatch(/frustrated/i);
+  });
+
+  it("normalizes 'look yah nuh' as a pause/hold signal", () => {
+    expect(normalizePatois("look yah nuh")).toMatch(/wait hold on/i);
+  });
+
+  it("normalizes 'wah going on wid me' to concern framing", () => {
+    expect(normalizePatois("wah going on wid me")).toMatch(/what is going on with me/i);
+    expect(normalizePatois("wah going on wid me")).toMatch(/feel off|unwell/i);
+  });
+
+  it("normalizes 'it nuh come yet' to late-period phrasing", () => {
+    expect(normalizePatois("it nuh come yet")).toMatch(/period has not come yet/i);
+  });
+
+  it("normalizes 'cho man' as frustration marker", () => {
+    expect(normalizePatois("cho man")).toMatch(/frustrated/i);
+  });
+
+  it("normalizes 'condom bruk' to unprotected-sex signal", () => {
+    expect(normalizePatois("condom bruk")).toMatch(/condom broke unprotected sex/i);
+  });
+
+  it("normalizes 'mi nuh feel right' robustly", () => {
+    expect(normalizePatois("mi nuh feel right")).toMatch(/do not feel right/i);
+  });
+
+  it("normalizes heavy-flow metaphor phrasing", () => {
+    expect(normalizePatois("mi period heavy like river")).toMatch(/very heavy bleeding/i);
+  });
+
+  it("normalizes minor support fear phrasing", () => {
+    expect(normalizePatois("mi scared fi tell mi mama")).toMatch(/scared to tell my mom/i);
+  });
+
+  it("normalizes postpartum low mood phrasing", () => {
+    expect(normalizePatois("mi nuh feel happy after baby")).toMatch(/postpartum low mood/i);
+  });
+
   it("normalizes 'mi vex' → 'i'm angry'", () => {
     expect(normalizePatois("mi vex")).toMatch(/i'm angry/i);
   });

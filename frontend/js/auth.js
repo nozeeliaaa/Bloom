@@ -15,10 +15,10 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut,
-} from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { getFirebaseAuth, getFirebaseDB } from "./firebase.js";
-import { setMode } from "./mode.js";
+import { getMode, setMode } from "./mode.js";
 
 /** Local storage keys */
 const ROLE_KEY = "bloom_user_role";
@@ -38,10 +38,38 @@ export function getUser() {
 export const getCurrentUser = getUser;
 
 /** Get the Firebase ID token (for backend calls) */
-export async function getIdToken() {
-  const user = getUser();
+export async function getIdToken({ waitForAuthMs = 1200 } = {}) {
+  let user = getUser();
+
+  // On first page load there is a short window where currentUser is still null
+  // even though an account session exists. Wait briefly in account mode so
+  // backend calls don't incorrectly fall back to local/anon paths.
+  if (!user && getMode() === "account" && waitForAuthMs > 0) {
+    const a = auth();
+    if (a) {
+      user = await new Promise((resolve) => {
+        let settled = false;
+        let unsub = () => {};
+        let timer = null;
+        const finish = (u) => {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          try { unsub(); } catch (_) {}
+          resolve(u ?? null);
+        };
+        timer = setTimeout(() => finish(a.currentUser ?? null), waitForAuthMs);
+        unsub = onAuthStateChanged(a, (u) => finish(u));
+      });
+    }
+  }
+
   if (!user) return null;
-  return await user.getIdToken();
+  try {
+    return await user.getIdToken();
+  } catch (_) {
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────
@@ -97,7 +125,9 @@ async function syncUserRole(user) {
     const ref = doc(db, "users", user.uid);
     const snap = await getDoc(ref);
 
-    const role = snap.exists() ? snap.data()?.role : null;
+    // Backend schema: role is top-level users/{uid}.role
+    // Keep nested fallback for older docs.
+    const role = snap.exists() ? (snap.data()?.role ?? snap.data()?.profile?.role) : null;
 
     localStorage.setItem(ROLE_KEY, role || "user");
     localStorage.setItem(IS_ADMIN_KEY, role === "admin" ? "1" : "0");
@@ -167,6 +197,7 @@ export function onAuthChange(callback) {
       await syncUserRole(user);
     } else {
       clearCachedRole();
+      setMode("anon");
     }
     if (typeof callback === "function") callback(user);
   });
@@ -261,6 +292,8 @@ export async function resendVerificationEmail(email, password) {
 const USER_LOCAL_KEYS = [
   "bloom_daily_logs",
   "bloom_assistant_session",
+  "bloomie_state_v2",
+  "bloomieMemory",
   "bloom_bloomie_memory",
   "bloom_avatar",
   "bloom_goal",
@@ -273,11 +306,27 @@ const USER_LOCAL_KEYS = [
   "bloom_notified",
   "bloom_preferences",
   "bloom_show_mode_banner_once",
+  "bloom_last_activity_ts",
 ];
 
-export async function logout() {
+export function clearLocalSessionData() {
   clearCachedRole();
-  USER_LOCAL_KEYS.forEach(key => localStorage.removeItem(key));
+  USER_LOCAL_KEYS.forEach((key) => localStorage.removeItem(key));
+
+  // Remove cycle-state caches persisted in localStorage by older builds.
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith("bloom_cs_v1_") || key.startsWith("bloom_biometric_cs_v1_")) {
+      localStorage.removeItem(key);
+    }
+  }
+
+  try {
+    sessionStorage.clear();
+  } catch (_) {}
+}
+
+export async function logout() {
+  clearLocalSessionData();
   setMode("anon");
   await signOut(auth());
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cycle Details – Bloom</title>
+  <title>Cycle Details - Bloom</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css" />
@@ -56,7 +56,7 @@
     .detail-dot.dot-fertile    { background: #7EC8C8; }
     .detail-dot.dot-ovulation  { background: #1A8080; }
     .detail-dot.dot-follicular { background: #A8C8E8; }
-    .detail-dot.dot-luteal     { background: #E8B86D; }
+    .detail-dot.dot-luteal     { background: var(--phase-luteal); }
 
     .detail-legend {
       display: flex;
@@ -294,7 +294,7 @@
       }
 
       // Range header
-      const rangeLabel = `${fmtShort(startKey)} – ${isCurrent ? 'present' : fmtShort(cycleEndKey)}`;
+      const rangeLabel = `${fmtShort(startKey)} - ${isCurrent ? 'present' : fmtShort(cycleEndKey)}`;
 
       // Cycle length card
       const cycleLenCard = cycleLen ? `
@@ -311,7 +311,7 @@
           <hr class="detail-divider">
           <p class="detail-stat-note">
             ${cycleLenNormal
-              ? 'This cycle was within the <strong>normal</strong> range (21–35 days).'
+              ? 'This cycle was within the <strong>normal</strong> range (21-35 days).'
               : cycleLen < 21
                 ? 'This cycle was <strong>short</strong> (under 21 days).'
                 : 'This cycle was <strong>long</strong> (36 days or more).'}
@@ -333,7 +333,7 @@
           <hr class="detail-divider">
           <p class="detail-stat-note">
             ${periodLenNormal
-              ? 'The length of this period was within the <strong>normal</strong> range (2–7 days).'
+              ? 'The length of this period was within the <strong>normal</strong> range (2-7 days).'
               : periodLen < 2
                 ? 'This period was <strong>shorter than usual</strong> (under 2 days).'
                 : 'This period was <strong>longer than usual</strong> (more than 7 days).'}
@@ -383,6 +383,7 @@
           <span class="detail-legend-item"><span class="detail-dot dot-period" style="display:inline-block"></span>Period</span>
           <span class="detail-legend-item"><span class="detail-dot dot-fertile" style="display:inline-block"></span>Fertile</span>
           <span class="detail-legend-item"><span class="detail-dot dot-ovulation" style="display:inline-block"></span>Ovulation</span>
+          <span class="detail-legend-item"><span class="detail-dot dot-follicular" style="display:inline-block"></span>Follicular</span>
           <span class="detail-legend-item"><span class="detail-dot dot-luteal" style="display:inline-block"></span>Luteal</span>
         </div>
         ${cycleLenCard}

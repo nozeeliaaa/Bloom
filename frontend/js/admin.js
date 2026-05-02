@@ -105,8 +105,6 @@ async function loadOverview() {
 
     setText("stat-users", stats.totalUsers ?? "-");
     setText("stat-new-users", stats.newUsersThisWeek ?? "-");
-    setText("stat-cycle-logs", stats.totalCycleLogs ?? "-");
-    setText("stat-symptom-logs", stats.totalSymptomLogs ?? "-");
 
     // Pamphlet + clinic counts come from their own endpoints
     api("GET", "/pamphlets")
@@ -116,26 +114,12 @@ async function loadOverview() {
     api("GET", "/clinics")
       .then((d) => setText("stat-clinics", d.clinics?.length ?? "-"))
       .catch(() => setText("stat-clinics", "-"));
-
-    const distEl = document.getElementById("goal-distribution");
-    const dist = stats.goalDistribution || {};
-    const entries = Object.entries(dist);
-    if (entries.length) {
-      distEl.innerHTML = entries
-        .sort((a, b) => b[1] - a[1])
-        .map(([goal, count]) => `
-          <div class="admin-item">
-            <div class="admin-item-top">
-              <strong>${goalName(goal)}</strong>
-              <span class="admin-badge">${count}</span>
-            </div>
-          </div>
-        `).join("");
-    } else {
-      distEl.innerHTML = `<p class="text-muted">No goal data yet.</p>`;
-    }
   } catch (err) {
-    showError("goal-distribution", err.message);
+    setText("stat-users", "-");
+    setText("stat-new-users", "-");
+    setText("stat-pamphlets", "-");
+    setText("stat-clinics", "-");
+    console.error("[admin] overview load failed:", err);
   }
 }
 
@@ -586,17 +570,94 @@ function escHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-function goalName(id) {
-  const map = {
-    period: "Track my period",
-    ttc: "Get pregnant",
-    no_period: "No period / skip predictions",
-    pregnancy: "Track pregnancy",
-    perimenopause: "Perimenopause / menopause",
-    symptoms: "Track symptoms only",
-    unknown: "Unknown / not set",
-  };
-  return map[id] || id;
+function escAttr(str) {
+  return escHtml(str).replace(/'/g, "&#039;");
+}
+
+// ─────────────────────────────────────────
+// BLOOMIE ANALYTICS
+// ─────────────────────────────────────────
+async function loadBloomieAnalytics() {
+  const statusEl = document.getElementById("ba-status");
+  if (statusEl) { statusEl.textContent = "Loading…"; statusEl.hidden = false; }
+
+  try {
+    const { summary } = await api("GET", "/bloomie-analytics/summary");
+
+    if (statusEl) statusEl.hidden = true;
+
+    // KPIs
+    setText("ba-fallbacks", summary.fallbackCount ?? 0);
+    setText("ba-no-match",  summary.noMatchCount  ?? 0);
+    setText("ba-urgency",   summary.urgencyEscalationCount ?? 0);
+    setText("ba-oos",       summary.oosEventCount ?? 0);
+    setText("ba-avg-depth", summary.avgSessionDepth ?? 0);
+
+    // Confidence tiers
+    const tiers = summary.confidenceTierDistribution || {};
+    setText("ba-confidence-high",   tiers.HIGH   ?? 0);
+    setText("ba-confidence-medium", tiers.MEDIUM ?? 0);
+    setText("ba-confidence-low",    tiers.LOW    ?? 0);
+
+    // Route distribution (top 10)
+    const routeEl = document.getElementById("ba-route-list");
+    if (routeEl) {
+      const routes = Object.entries(summary.routeDistribution || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      routeEl.innerHTML = routes.length
+        ? routes.map(([route, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <code style="font-size:.82rem;">${escHtml(route)}</code>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Tone distribution
+    const toneEl = document.getElementById("ba-tone-list");
+    if (toneEl) {
+      const tones = Object.entries(summary.toneDistribution || {})
+        .sort((a, b) => b[1] - a[1]);
+      toneEl.innerHTML = tones.length
+        ? tones.map(([tone, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.88rem;">${escHtml(tone)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Emotion source distribution
+    const sourceEl = document.getElementById("ba-source-list");
+    if (sourceEl) {
+      const sources = Object.entries(summary.emotionSourceDistribution || {})
+        .sort((a, b) => b[1] - a[1]);
+      sourceEl.innerHTML = sources.length
+        ? sources.map(([src, count]) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.88rem;">${escHtml(src)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+    // Top no-match phrases
+    const phraseEl = document.getElementById("ba-no-match-phrases");
+    if (phraseEl) {
+      const phrases = summary.topNoMatchPhrases || [];
+      phraseEl.innerHTML = phrases.length
+        ? phrases.map(({ phrase, count }) => `
+            <div class="admin-item" style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;">
+              <span style="font-size:.82rem;word-break:break-word;max-width:160px;">${escHtml(phrase)}</span>
+              <span class="admin-badge admin-badge--neutral">${count}</span>
+            </div>`).join("")
+        : `<p class="text-muted" style="font-size:.85rem;">No data yet.</p>`;
+    }
+
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = `Failed to load: ${err.message}`; statusEl.hidden = false; }
+  }
 }
 
 // ─────────────────────────────────────────
@@ -604,57 +665,102 @@ function goalName(id) {
 // ─────────────────────────────────────────
 
 const STATUS_LABELS = { new: "New", open: "Open", resolved: "Resolved" };
-const STATUS_COLOURS = {
-  new:      "background:#fff3cd;color:#856404;",
-  open:     "background:#cfe2ff;color:#084298;",
-  resolved: "background:#d1e7dd;color:#0a3622;",
+const STATUS_BADGE_CLASSES = {
+  new: "support-card-badge--new",
+  open: "support-card-badge--open",
+  resolved: "support-card-badge--resolved",
+};
+const SUBJECT_LABELS = {
+  bug: "Something is not working",
+  data: "Question about my data",
+  privacy: "Privacy concern",
+  feedback: "General feedback",
+  accessibility: "Accessibility issue",
+  other: "Other",
 };
 
 async function loadSupportMessages() {
   const list   = document.getElementById("support-list");
   const filter = document.getElementById("support-status-filter").value;
+  const summaryWrap = document.getElementById("support-summary");
   list.innerHTML = "<p class='text-muted'>Loading…</p>";
+  if (summaryWrap) summaryWrap.hidden = true;
 
   try {
-    const url = "/api/admin/contact-messages" + (filter ? `?status=${filter}` : "");
-    const { messages } = await api("GET", url.replace("/api/admin", ""));
+    const { messages } = await api("GET", "/contact-messages");
 
-    if (!messages.length) {
+    const counts = { new: 0, open: 0, resolved: 0 };
+    messages.forEach((m) => {
+      if (Object.prototype.hasOwnProperty.call(counts, m.status)) counts[m.status] += 1;
+    });
+    setText("support-count-new", counts.new);
+    setText("support-count-open", counts.open);
+    setText("support-count-resolved", counts.resolved);
+    if (summaryWrap) summaryWrap.hidden = false;
+
+    const filtered = filter ? messages.filter((m) => m.status === filter) : messages;
+
+    if (!filtered.length) {
       list.innerHTML = "<p class='text-muted'>No support requests found.</p>";
       return;
     }
 
-    list.innerHTML = messages.map(m => {
-      const date    = m.createdAt ? new Date(m.createdAt).toLocaleString() : "=";
-      const badge   = `<span style="padding:2px 8px;border-radius:999px;font-size:0.78rem;font-weight:700;${STATUS_COLOURS[m.status] || ""}">${STATUS_LABELS[m.status] || m.status}</span>`;
+    list.innerHTML = filtered.map((m) => {
+      const date = m.createdAt ? new Date(m.createdAt).toLocaleString() : "-";
+      const statusClass = STATUS_BADGE_CLASSES[m.status] || "support-card-badge--new";
+      const statusLabel = STATUS_LABELS[m.status] || (m.status || "-");
+      const subjectLabel = SUBJECT_LABELS[m.subject] || m.subject || "-";
+      const hasReply = Boolean(m.replyEmail);
+      const mailHref = hasReply
+        ? `mailto:${escAttr(m.replyEmail)}?subject=${encodeURIComponent(`Re: Bloom support ${m.requestId || ""}`)}`
+        : "";
       const options = ["new", "open", "resolved"]
-        .map(s => `<option value="${s}"${m.status === s ? " selected" : ""}>${STATUS_LABELS[s]}</option>`)
+        .map((s) => `<option value="${s}"${m.status === s ? " selected" : ""}>${STATUS_LABELS[s]}</option>`)
         .join("");
 
       return `
-        <div class="admin-list-item" style="flex-direction:column;align-items:flex-start;gap:0.4rem;">
-          <div class="admin-row" style="width:100%;">
+        <article class="support-card">
+          <div class="support-card-header">
             <div>
-              <strong>${m.requestId || "="}</strong>
-              <span class="text-muted" style="margin-left:0.5rem;font-size:0.85rem;">${date}</span>
-              ${badge}
+              <div class="support-card-id">${escHtml(m.requestId || "-")}</div>
+              <div class="support-card-date">${escHtml(date)}</div>
             </div>
-            <select class="admin-select" data-id="${m.id}" data-action="status" style="width:auto;">
-              ${options}
-            </select>
+            <span class="support-card-badge ${statusClass}">${escHtml(statusLabel)}</span>
           </div>
-          <div style="font-size:0.88rem;"><strong>Subject:</strong> ${m.subject || "="}</div>
-          ${m.name    ? `<div style="font-size:0.88rem;"><strong>Name:</strong> ${m.name}</div>` : ""}
-          ${m.replyEmail ? `<div style="font-size:0.88rem;"><strong>Reply-to:</strong> ${m.replyEmail}</div>` : ""}
-          <div style="font-size:0.88rem;white-space:pre-wrap;background:var(--color-bg-soft,#f5f0f3);padding:0.5rem 0.75rem;border-radius:8px;width:100%;box-sizing:border-box;">${m.message || ""}</div>
-        </div>`;
+
+          <div class="support-card-meta">
+            <div class="support-meta-row"><strong>Subject:</strong> ${escHtml(subjectLabel)}</div>
+            ${m.name ? `<div class="support-meta-row"><strong>Name:</strong> ${escHtml(m.name)}</div>` : ""}
+            ${m.replyEmail ? `<div class="support-meta-row"><strong>Reply-to:</strong> ${escHtml(m.replyEmail)}</div>` : ""}
+            ${m.userId ? `<div class="support-meta-row"><strong>User ID:</strong> ${escHtml(m.userId)}</div>` : ""}
+          </div>
+
+          <div class="support-card-message">${escHtml(m.message || "-")}</div>
+
+          <div class="support-card-footer">
+            <div>
+              ${
+                hasReply
+                  ? `<a class="btn btn-outline btn-sm" href="${mailHref}">Reply by Email</a>`
+                  : `<span class="text-muted" style="font-size:0.84rem;">No reply email provided</span>`
+              }
+            </div>
+            <label class="support-status-group">
+              <span>Status</span>
+              <select class="admin-select" data-id="${escAttr(m.id)}" data-action="status">
+                ${options}
+              </select>
+            </label>
+          </div>
+        </article>`;
     }).join("");
 
     // Status change handlers
-    list.querySelectorAll("select[data-action='status']").forEach(sel => {
+    list.querySelectorAll("select[data-action='status']").forEach((sel) => {
       sel.addEventListener("change", async () => {
         try {
           await api("PATCH", `/contact-messages/${sel.dataset.id}/status`, { status: sel.value });
+          await loadSupportMessages();
         } catch (err) {
           alert("Could not update status: " + err.message);
         }
@@ -663,6 +769,7 @@ async function loadSupportMessages() {
 
   } catch (err) {
     list.innerHTML = `<p class="text-muted">Failed to load: ${err.message}</p>`;
+    if (summaryWrap) summaryWrap.hidden = true;
   }
 }
 

@@ -2799,8 +2799,8 @@ export const cases = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  EDGE CASES - input quality, normalization, single-word routing (EC001–EC025)
-  //  Parts 1–7 of the comprehensive edge case spec.
+  //  EDGE CASES - input quality, normalization, single-word routing (EC001-EC025)
+  //  Parts 1-7 of the comprehensive edge case spec.
   // ══════════════════════════════════════════════════════════════════════════
 
   // 1. Blank input → looksLikeGibberish (empty string)

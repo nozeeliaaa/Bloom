@@ -62,6 +62,8 @@ export function createCtx() {
     history:            [],
     answers:            [],
     multiDraft:         null,
+    inlineChoices:      null,       // one-off quick replies injected via say(..., { choices })
+    inlineQuestion:     null,       // optional question label paired with inlineChoices
     locked:             false,
     timers:             new Set(),
     capture:            null,
@@ -88,20 +90,48 @@ export function createCtx() {
     cycleVariability:   null,       // range (max–min) across last 3 logged cycle lengths, null if unknown
     currentTone:        null,       // tone resolved for the current message ('distressed'|'angry'|…|'neutral')
     previousTone:       null,       // tone from the prior turn - used for session stability blending
+    toneRequestId:      0,          // monotonic token for in-flight async tone resolution; stale promises must not mutate ctx
     usedOpeners:        new Set(),  // opener strings already shown - prevents repetition within a session
     symptomSignals:     null,       // pre-computed SymptomSignal[] from bloom-symptom-engine, or null
+    aiSignals:          null,       // ExtractedSignals from bloomie-extract.js, or null when unavailable.
+                                    // Advisory only - never used to override rule-based urgent routing.
+                                    // Shape: { symptoms, timing, severity, tone, repair,
+                                    //          pregnancySignals, redFlags, confidence }
     cumulativeRiskFlags:      new Set(),  // accumulates risk signal flags across conversation
     pendingAmbiguityContext:  null,        // stored when ambiguity question was asked
+    isMinor:                  false,
+    isAnon:                   false,
+    ageGroup:                 "unknown",   // "adult" | "minor" | "unknown" (policy-derived)
+    hasGuardianConsent:       false,       // consent gate for minors
+    policySeed:               null,        // seed provided by assistant page/profile context
+    policyContext:            null,        // per-turn policy context object
+    policyAnonDisclosureShown: false,      // one-time anonymous disclosure guard
+    policyTrustedAdultNudgePending: false, // set by policy when minor medium/high risk
+    userNickname:             null,
+    lastNicknameUsedAtDepth:  null,
+    preEndChatState:          null,   // state to restore if user cancels END_CHAT_CONFIRM
+    resolutionStatus:         null,   // "resolved" | "unresolved" | "skipped" - set by RESOLUTION_CHECK
+    closeIntentDetected:      false,  // true when user typed a goodbye phrase (END_CHAT_PATTERN fired)
+    closeConfirmationPending: false,  // true while END_CHAT_CONFIRM node is visible
+    pendingUnresolvedTopic:   null,   // unresolved topic currently being confirmed at close-time
+    closeSkipUnresolvedPrompt: false, // one-shot bypass so "_no, done" can reach CLOSE without re-prompt loop
     pendingContradictionContext: null,     // stored when contradiction was detected
     pendingContextProbe:      null,        // stored when missing-context probe was asked
+    pendingQuestion:          null,        // { type: "yes_no"|"severity"|"timing"|"duration"|"test_result"|"choice", nodeState: string }
+                                          // set whenever Bloomie renders a node with choices; cleared after exactly
+                                          // one user message so extended answer matching is strictly turn-bound.
     recentInputs:         [],              // rolling array of last 5 raw user inputs for loop detection
     pendingConcerns:      [],              // overload handler: remaining concerns after user picks first
     resolvedContradictions: [],            // contradictions and concerns already surfaced this session
 
     // ── Confidence-tier routing (Prompt 1) ─────────────────────────────────
-    routeConfidence:      null,            // last computeRouteConfidence() result
-    pendingRoute:         null,            // { next, payload } set when MEDIUM tier asks confirmation
-    narrowingCandidates:  null,            // [{ id, label, next }] for LOW tier NARROWING
+    routeConfidence:        null,          // last computeRouteConfidence() result
+    pendingRoute:           null,          // { next, payload } set when MEDIUM tier asks confirmation
+    narrowingCandidates:    null,          // [{ id, label, next }] for LOW tier NARROWING
+    lastConfidence:         null,          // last full ConfidenceResult (including route/competitors/ambiguous)
+    confidenceFallbackCount: 0,            // how many times CONFIDENCE_FALLBACK has been shown this session
+    narrowingAttemptCount:  0,             // consecutive disambiguation attempts (NARROWING/CONFIDENCE_FALLBACK)
+    lastNarrowingPrompt:    null,          // fingerprint of last narrowing prompt variant used
 
     // ── Conversation intelligence (Prompt 2) ───────────────────────────────
     conversationProfile: {
@@ -116,5 +146,24 @@ export function createCtx() {
     sessionSymptoms:      new Set(),       // all symptom entity keys detected across the session
     verbosity:            "normal",        // "concise" | "normal" | "detailed"
     oosStreakCount:        0,              // consecutive OOS responses (for conversational repair)
+    isRetryAttempt:       false,          // true when user has sent same message twice (second repeat handling)
+    loggingGapPending:    false,          // true when a symptom-logging-gap nudge is queued for next response
+    bloomieAnomalyCtx:    null,           // computed at mount: { cycleAnomaly, severitySpike, level }
+    moodMentions:         [],             // [{ depth, tone, intent }] - appended each time mood is detected
+
+    // ── Reported (user-confirmed) conditions ──────────────────────────────
+    reportedConditions:    [],     // condition keys stated as existing diagnoses this session,
+                                   // e.g. ["pcos", "anemia"]; seeded from bloomieMemory at mount
+    activeReportedCondition: null, // conditionKey from the most-recent detectReportedCondition hit;
+                                   // read by REPORTED_CONDITION_ACK.say()
+
+    // ── Anti-repetition ────────────────────────────────────────────────────
+    nodeHistory:           [],            // ordered list of visited node keys (capped at NODE_HISTORY_MAX)
+    contentSuggestionsShown: new Set(),   // content IDs shown this session; seeded from bloomieMemory at mount
+    declinedSuggestions:   new Set(),     // content IDs the user declined; seeded from bloomieMemory at mount
+    lastUsedGreeting:      null,          // first line of buildIntro() used this session; flushed to memory on save
+    lastClarifierFingerprint: null,       // fingerprint of last clarifying follow-up question emitted
+    lastClarifierTurn:       -1,          // flowId when clarifying follow-up was last emitted
+    lastBotLineFingerprint:  null,        // fingerprint of most recently emitted bot line (live generation only)
   };
 }

@@ -1,3 +1,5 @@
+import { softenEscalationLine } from "./bloomie-response-layers.js";
+
 /**
  * bloomie-templates.js
  * ─────────────────────────────────────────────────────────────────────────────
@@ -345,7 +347,7 @@ const REASON_TO_SCENARIO = {
 // Scenarios where tone-wording adjustments must NEVER be applied (emergency/safety).
 const SAFETY_SCENARIOS = new Set(["urgent", "heavy_with_dizziness", "heavy_long"]);
 
-export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx = null, tone = null) {
+export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx = null, tone = null, extraFooter = []) {
   const scenario = resolveScenario(entities, inferredReason);
   if (!scenario) return null;
 
@@ -363,16 +365,28 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
   // natural, and supportive - no clinical section headers.
   const lines = [];
 
+  // ── Normalise tone aliases so callers can pass detectUserTone() values directly
+  // irritable → angry (same calming, non-judgmental framing)
+  // anxious   → exhausted (grounding + trimmed, don't overwhelm)
+  const effectiveTone = tone === "irritable" ? "angry"
+    : tone === "anxious"   ? "exhausted"
+    : tone;
+
   // ── Tone: distressed - grounding reassurance before guidance ─────────────
   // Added before the situation line so the user feels held before receiving info.
   // Never applied to emergency/safety nodes.
-  if (tone === "distressed" && !isSafetyNode) {
-    lines.push("You're in the right place, and we'll work through this together.");
+  if (effectiveTone === "distressed" && !isSafetyNode) {
+    lines.push("I'm really glad you told me 🩷 We can take this one step at a time together.");
+  }
+
+  // ── Tone: exhausted/anxious - brief orienting frame before content ────────
+  if (effectiveTone === "exhausted" && !isSafetyNode) {
+    lines.push("I'll keep this simple - just focus on what matters most right now.");
   }
 
   // Line 1: Situation + meaning merged into one fluid opener.
   // If both exist, join them with a space (they're complementary sentences).
-  // Tone: frustrated - prefix with a direct validating acknowledgement.
+  // Tone: frustrated/angry/irritable - prefix with direct validating acknowledgement.
   let combinedLine = "";
   if (situation && meaning) {
     combinedLine = `${situation} ${meaning}`;
@@ -383,7 +397,7 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
   }
 
   if (combinedLine) {
-    if (tone === "frustrated" && !isSafetyNode) {
+    if ((effectiveTone === "frustrated" || effectiveTone === "angry") && !isSafetyNode) {
       lines.push(`You deserve clear answers. ${combinedLine}`);
     } else {
       lines.push(combinedLine);
@@ -391,12 +405,12 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
   }
 
   // Line 2: Practical next step - phrased as a natural suggestion, not a header.
-  // Tone: exhausted - trim to max 2 sentences and soften the lead-in.
+  // Tone: exhausted/anxious - trim to max 2 sentences and soften the lead-in.
   if (nextSteps) {
     let stepsText = nextSteps;
 
-    if (tone === "exhausted" && !isSafetyNode) {
-      // Reduce to first 2 action sentences - don't overwhelm someone who's drained
+    if (effectiveTone === "exhausted" && !isSafetyNode) {
+      // Reduce to first 2 action sentences - don't overwhelm someone who's drained/anxious
       const sentences = stepsText.split(/\.\s+/).filter(Boolean);
       stepsText = sentences.slice(0, 2).join(". ").trim();
       if (!stepsText.endsWith(".")) stepsText += ".";
@@ -425,15 +439,28 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
     }
   }
 
-  // Line 4: Short, friendly disclaimer - no "Remember:" prefix.
-  // Tone: angry - strip any exclamation marks from all lines (calm, steady tone).
+  // Lines 4–5: Optional cycle personalisation - appended after main content,
+  // before the disclaimer, only when callers supply them via cycleCtx.
+  const cycleLine   = cycleCtx?.cycleLine   || null;
+  const patternLine = cycleCtx?.patternLine || null;
+  if (cycleLine)   lines.push(cycleLine);
+  if (patternLine) lines.push(patternLine);
+
+  // Line (last): Short, friendly disclaimer - no "Remember:" prefix.
+  // Tone: angry/irritable - strip any exclamation marks from all lines (calm, steady).
   lines.push("This is educational info, not a diagnosis - you know your body best 🩷");
 
-  if (tone === "angry" && !isSafetyNode) {
+  if (effectiveTone === "angry" && !isSafetyNode) {
     for (let i = 0; i < lines.length; i++) {
       lines[i] = lines[i].replace(/!/g, ".");
     }
   }
+
+  for (let i = 0; i < lines.length; i++) {
+    lines[i] = softenEscalationLine(lines[i]);
+  }
+
+  if (extraFooter.length) lines.push(...extraFooter);
 
   return {
     scenario,
@@ -562,6 +589,25 @@ const TONE_OPENER_POOLS = {
     "Let's figure this out together -",
     "Say less, I got you 🩷",
   ],
+  // ── Tone aliases - separate pools so callers can pass these directly ─────
+  // anxious: grounding and structured; keep sentences short and concrete.
+  anxious: [
+    "Take a breath - I'm here and we'll work through this together 🩷",
+    "You're in the right place. Let's take this one small step at a time 🩷",
+    "I've got you. Let's just focus on one thing at a time 🩷",
+    "It's okay to feel uncertain right now. Let me help you think through this 🩷",
+    "You don't have to figure this all out at once - let's start with what feels most pressing 🩷",
+    "Let's slow this down and go through it together 🩷",
+  ],
+  // irritable: calming and non-judgmental; validate without matching the energy.
+  irritable: [
+    "That edge you're feeling is real - I'm not here to make it worse 🩷",
+    "I hear you. Let's focus on what's actually going on with your body right now 🩷",
+    "You don't have to have it together to talk to me - let's just look at what's happening 🩷",
+    "Whatever's fueling that feeling, you came to the right place 🩷",
+    "I'm not going to push back - let's just work through this 🩷",
+    "That frustration is telling you something. Let's figure out what 🩷",
+  ],
 };
 
 /**
@@ -581,7 +627,7 @@ const TONE_OPENER_POOLS = {
  * When all options in the pool have been used, the Set resets so the cycle
  * can begin again.
  *
- * @param  {'distressed'|'frustrated'|'exhausted'|'angry'|'casual'|'neutral'} tone
+ * @param  {'distressed'|'frustrated'|'exhausted'|'angry'|'anxious'|'irritable'|'casual'|'neutral'} tone
  * @param  {object|null} ctx  - Session context (needs ctx.usedOpeners Set), or null
  * @param  {string|null} text - Raw user message for medical seriousness check, or null
  * @returns {string}

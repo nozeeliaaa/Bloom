@@ -727,11 +727,17 @@
         } catch (e2) {
           console.warn('Local fallback also failed:', e2);
           clinics = [];
+          setStatus('Clinic data is unavailable right now. Check /catalog/clinics or /data/clinics.json.', true);
         }
       }
 
       populateFilters();
       renderClinics();
+
+      // Auto-request location when navigated from the chat "Find care near me" button
+      if (new URLSearchParams(window.location.search).get("autolocate") === "true") {
+        requestUserLocation();
+      }
     }
 
     init();

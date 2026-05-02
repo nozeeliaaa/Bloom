@@ -52,6 +52,10 @@ export function sortByFrequencyDesc(freqMap) {
   return Object.entries(freqMap).sort(([, a], [, b]) => b - a);
 }
 
+function normalizeCustomSymptomText(text) {
+  return String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 // ── Date helpers (module-private) ─────────────────────────────────────────────
 
 function daysBetween(isoA, isoB) {
@@ -165,6 +169,21 @@ function buildSymptomFrequency(logsByDate) {
   return freq;
 }
 
+function buildCustomSymptomFrequency(logsByDate) {
+  const freq = {};
+  for (const log of Object.values(logsByDate || {})) {
+    for (const item of log?.otherSymptoms || []) {
+      const key = normalizeCustomSymptomText(item?.text);
+      if (!key) continue;
+      if (!freq[key]) freq[key] = { label: item?.text || key, count: 0 };
+      freq[key].count += 1;
+    }
+  }
+  return Object.values(freq)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .map((row) => [row.label, row.count]);
+}
+
 // ── Narrative summary ─────────────────────────────────────────────────────────
 
 function buildNarrative(d) {
@@ -192,7 +211,7 @@ function buildNarrative(d) {
         parts.push("Your cycle has been very consistent - your period tends to arrive on a predictable schedule.");
       } else {
         parts.push(
-          "Your cycle is highly consistent and follows a reliable pattern - it falls outside the typical 21–35 day range, " +
+          "Your cycle is highly consistent and follows a reliable pattern - it falls outside the typical 21-35 day range, " +
           "but its consistency means it is predictable for you specifically."
         );
       }
@@ -201,7 +220,7 @@ function buildNarrative(d) {
         parts.push(`Your cycle lengths have varied by up to ${range} days, which is within a normal range for most people.`);
       } else {
         parts.push(
-          `Your cycle falls outside the typical 21–35 day range and shows some variation (${min}–${max} days). ` +
+          `Your cycle falls outside the typical 21-35 day range and shows some variation (${min}-${max} days). ` +
           `Tracking over time will help clarify whether this is a stable pattern for you.`
         );
       }
@@ -256,7 +275,7 @@ function buildAlerts({ completedCycles, nextPeriodDate }) {
     alerts.push({
       title: "Cycle length outside typical range",
       body:
-        `${outliers.length} of your logged cycle${outliers.length !== 1 ? "s" : ""} fell outside the typical 21–35 day range. ` +
+        `${outliers.length} of your logged cycle${outliers.length !== 1 ? "s" : ""} fell outside the typical 21-35 day range. ` +
         `This is worth mentioning to your healthcare provider, especially if it is a recurring pattern.`,
     });
   }
@@ -278,7 +297,7 @@ function buildAlerts({ completedCycles, nextPeriodDate }) {
 }
 
 // ── "What This Means For You" interpretation ─────────────────────────────────
-// 3–4 sentences interpreting consistency, length context, and notable patterns.
+// 3-4 sentences interpreting consistency, length context, and notable patterns.
 
 function buildInterpretation(d) {
   if (!d.cyclesTracked) return null;
@@ -293,7 +312,7 @@ function buildInterpretation(d) {
       );
     } else if (avgCycleLength > 35) {
       parts.push(
-        `Your cycle runs longer than the typical 21–35 day range, but it is highly consistent - it follows a reliable rhythm that is your own normal, even if it differs from textbook timing.`
+        `Your cycle runs longer than the typical 21-35 day range, but it is highly consistent - it follows a reliable rhythm that is your own normal, even if it differs from textbook timing.`
       );
     } else {
       parts.push(
@@ -303,7 +322,7 @@ function buildInterpretation(d) {
   } else if (regularity?.tier === "moderate") {
     if (regularity.inTypicalRange) {
       parts.push(
-        "Your cycle falls within the typical 21–35 day range with some natural month-to-month variation - this is a common and healthy pattern."
+        "Your cycle falls within the typical 21-35 day range with some natural month-to-month variation - this is a common and healthy pattern."
       );
     } else {
       parts.push(
@@ -381,7 +400,7 @@ function buildPatternInsight(d) {
   // moderate
   if (!regularity.inTypicalRange) {
     return (
-      "Your cycle is outside the typical 21–35 day range but shows reasonable consistency - with more data, a clearer personal pattern will emerge."
+      "Your cycle is outside the typical 21-35 day range but shows reasonable consistency - with more data, a clearer personal pattern will emerge."
     );
   }
   return (
@@ -421,7 +440,7 @@ export function formatDateMed(isoDate) {
  *   confidence {level, windowDays, message}, nextPeriodDate, ovulationDate,
  *   fertileStart, fertileEnd, cyclesLogged, source ("backend"|"local")
  *
- * @param {Object}  logsByDate  - { "YYYY-MM-DD": { date, flow, notes, symptoms[], symptomSeverity } }
+ * @param {Object}  logsByDate  - { "YYYY-MM-DD": { date, flow, notes, symptoms[], symptomSeverity, otherSymptoms[] } }
  * @param {Object}  cycleState  - result of fetchCycleState(logs) from cycle-state.js
  * @param {string}  [userName]  - optional display name
  * @returns {Object}
@@ -479,10 +498,11 @@ export function buildReportData(logsByDate, cycleState, userName = null) {
   // ── Symptom log: most recent first ───────────────────────────────────────
   const symptomLog = sortRecordsDesc(
     Object.entries(logsByDate)
-      .filter(([, log]) => log.symptoms?.length > 0 || log.notes)
+      .filter(([, log]) => log.symptoms?.length > 0 || log.otherSymptoms?.length > 0 || log.notes)
       .map(([date, log]) => ({
         date,
         symptoms: log.symptoms || [],
+        customSymptoms: (log.otherSymptoms || []).map((item) => item.text).filter(Boolean),
         notes:    log.notes    || "",
         severity: log.symptomSeverity || {},
       })),
@@ -491,6 +511,7 @@ export function buildReportData(logsByDate, cycleState, userName = null) {
 
   // ── Symptom frequency: descending by count ────────────────────────────────
   const topSymptoms = sortByFrequencyDesc(buildSymptomFrequency(logsByDate));
+  const topCustomSymptoms = buildCustomSymptomFrequency(logsByDate);
 
   // ── Phase & prediction values from cycleState ────────────────────────────
   const currentPhase        = cyclePhase?.phase              ?? "unknown";
@@ -563,6 +584,7 @@ export function buildReportData(logsByDate, cycleState, userName = null) {
     cyclesNewestFirst,   // history table  - most recent first
     symptomLog,          // symptom table  - most recent first
     topSymptoms,         // trends section - highest frequency first
+    topCustomSymptoms,   // trends section - recurring free-text symptoms
 
     // Prose
     narrativeSummary,

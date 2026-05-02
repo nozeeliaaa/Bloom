@@ -3,14 +3,45 @@
  */
 import { isAccountMode, isAnonMode } from "./mode.js";
 import { getUser } from "./auth.js";
-import symptoms from '../data/symptoms.json';
+import { startSessionTimeoutGuard } from "./session-timeout.js";
 import { initTheme } from "./theme-manager.js";
 
-// ✅ Single source of truth for this key
+// Single source of truth for this key
 export const MODE_BANNER_ONCE_KEY = "bloom_show_mode_banner_once";
 
 // Initialize theme on every page load (prevents flash of wrong theme)
 initTheme();
+
+// Load symptom catalog at runtime so static hosting (Firebase web.app) does
+// not try to execute JSON as a JavaScript module.
+const SYMPTOM_DATA_CACHE_KEY = "bloom_symptom_catalog_v1";
+const SYMPTOM_DATA_URL = "/data/symptoms.json";
+
+async function loadSymptomCatalog() {
+  try {
+    const cached = sessionStorage.getItem(SYMPTOM_DATA_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch (_) {
+    // Ignore cache parse errors and fall through to network fetch.
+  }
+
+  try {
+    const res = await fetch(SYMPTOM_DATA_URL, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [];
+    try { sessionStorage.setItem(SYMPTOM_DATA_CACHE_KEY, JSON.stringify(list)); } catch (_) {}
+    return list;
+  } catch (err) {
+    console.warn("[utils] Failed to load symptoms.json:", err?.message || err);
+    return [];
+  }
+}
+
+const symptoms = await loadSymptomCatalog();
 
 /* ===== ICONS (inline SVG) ===== */
 export const ICONS = {
@@ -35,6 +66,8 @@ export function icon(name, size = 18) {
 
 /* ===== NAVIGATION ===== */
 export function renderNav(activePage = "") {
+  startSessionTimeoutGuard();
+
   const nav = document.createElement("nav");
   nav.className = "navbar";
   nav.setAttribute("role", "navigation");
@@ -105,6 +138,36 @@ export function renderNav(activePage = "") {
 
   document.body.prepend(nav);
 
+  const brandLink = nav.querySelector(".navbar-brand");
+  brandLink?.addEventListener("click", (e) => {
+    // Keep standard browser behavior for modified/middle clicks.
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+      return;
+    }
+
+    const homeHref = "/index.html";
+    let referrer = null;
+    try {
+      referrer = document.referrer ? new URL(document.referrer) : null;
+    } catch (_) {
+      referrer = null;
+    }
+    const current = window.location.href;
+    const sameOriginReferrer =
+      !!referrer &&
+      referrer.origin === window.location.origin &&
+      referrer.href !== current;
+
+    e.preventDefault();
+
+    if (sameOriginReferrer && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    window.location.href = homeHref;
+  });
+
   const toggle = nav.querySelector(".nav-toggle");
   const linkContainer = nav.querySelector(".navbar-links");
 
@@ -114,7 +177,22 @@ export function renderNav(activePage = "") {
   });
 
   linkContainer.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => linkContainer.classList.remove("open"));
+    a.addEventListener("click", () => {
+      linkContainer.classList.remove("open");
+      // Optional perf trace: records nav click timing for next page.
+      const perfOn =
+        localStorage.getItem("bloom_perf_debug") === "1" ||
+        new URLSearchParams(window.location.search).get("perf") === "1";
+      if (perfOn) {
+        try {
+          sessionStorage.setItem("bloom_nav_perf", JSON.stringify({
+            from: activePage || "unknown",
+            to: a.getAttribute("href") || "",
+            ts: Date.now(),
+          }));
+        } catch (_) {}
+      }
+    });
   });
 
   // ── Back button (inject for non-primary pages) ───────────────────────────
@@ -315,82 +393,236 @@ export const SYMPTOM_CATEGORIES = symptoms.reduce((acc, symptom) => {
   return acc;
 }, {});
 
-/** Health-icons path for each symptom label (resolvetosavelives/healthicons) */
-const _HI = 'https://raw.githubusercontent.com/resolvetosavelives/healthicons/main/public/icons/svg/filled';
+/** Emoji icon for each symptom label - no external dependency */
 export const SYMPTOM_ICONS = {
   // Bleeding
-  "Vaginal bleeding":      `${_HI}/body/blood-drop.svg`,
-  "Spotting":              `${_HI}/body/blood-drop.svg`,
-  "Heavy flow":            `${_HI}/body/blood-drop.svg`,
-  "Large clots":           `${_HI}/body/blood-cells.svg`,
+  "Vaginal bleeding":           "🩸",
+  "Spotting":                   "🩷",
+  "Heavy flow":                 "🔴",
+  "Large clots":                "🩸",
+  // Blood Colour - coloured circles to match the actual shade
+  "Bright red blood":           "🔴",
+  "Dark red blood":             "🟥",
+  "Light red blood":            "🩷",
+  "Pink blood":                 "🩷",
+  "Brown blood":                "🟤",
+  "Black blood":                "⚫",
+  "Orange-tinged blood":        "🟠",
+  "Gray blood":                 "🩶",
   // Pain
-  "Cramps":                `${_HI}/conditions/intestinal-pain.svg`,
-  "Pelvic pain":           `${_HI}/conditions/intestinal-pain.svg`,
-  "Ovulation pain":        `${_HI}/body/female-reproductive_system.svg`,
-  "Headache":              `${_HI}/conditions/headache.svg`,
-  "Joint or muscle pain":  `${_HI}/body/joints.svg`,
-  "Breast tenderness":     `${_HI}/body/breasts.svg`,
-  // Digestive
-  "Bloating":              `${_HI}/body/stomach.svg`,
-  "Gassy":                 `${_HI}/body/intestine.svg`,
-  "Heartburn":             `${_HI}/body/stomach.svg`,
-  "Nausea":                `${_HI}/conditions/nausea.svg`,
-  "Constipation":          `${_HI}/body/intestine.svg`,
-  "Diarrhea":              `${_HI}/conditions/diarrhea.svg`,
+  "Cramps":                     "😣",
+  "Pelvic pain":                "😣",
+  "Lower abdominal cramps":     "😣",
+  "Sharp pelvic pain":          "😣",
+  "Dull pelvic ache":           "😣",
+  "Lower back pain":            "🦴",
+  "Leg pain":                   "🦵",
+  "Ovulation pain":             "🌸",
+  "Headache":                   "🤕",
+  "Migraine":                   "🤕",
+  "Joint or muscle pain":       "💪",
+  "Stabbing pain":              "😣",
+  "Throbbing pain":             "😣",
+  "Radiating pain":             "😣",
+  "Pain on one side":           "😣",
+  "Pain worsens with movement": "😣",
+  "Pain during bowel movement": "😣",
+  "Pain during urination":      "😣",
+  "Breast tenderness":          "💗",
+  "Breast pain":                "💗",
+  "Nipple sensitivity":         "💗",
+  // Digestion
+  "Bloating":                   "🫃",
+  "Gassy":                      "💨",
+  "Heartburn":                  "🔥",
+  "Acid reflux":                "🔥",
+  "Indigestion":                "🔥",
+  "Nausea":                     "🤢",
+  "Vomiting":                   "🤮",
+  "Constipation":               "😖",
+  "Diarrhea":                   "🚽",
+  "Stomach cramps":             "😣",
+  "Excessive burping":          "💨",
+  "Abdominal pressure":         "😣",
+  "Early fullness":             "🫃",
+  "Loss of appetite":           "🙅",
   // Discharge
-  "No discharge":          `${_HI}/body/vagina.svg`,
-  "Sticky discharge":      `${_HI}/body/vagina.svg`,
-  "Creamy discharge":      `${_HI}/body/vagina.svg`,
-  "Egg-white discharge":   `${_HI}/body/vagina-alt.svg`,
-  "Unusual discharge":     `${_HI}/conditions/sti.svg`,
-  // Energy & Sleep
-  "Fatigue":               `${_HI}/emotions/sleepy.svg`,
-  "Insomnia":              `${_HI}/emotions/woozy.svg`,
-  "Brain fog":             `${_HI}/emotions/dizzy.svg`,
-  "Forgetfulness":         `${_HI}/body/neurology.svg`,
-  "Poor concentration":    `${_HI}/body/neurology.svg`,
+  "No discharge":               "💧",
+  "Sticky discharge":           "💧",
+  "Creamy discharge":           "🤍",
+  "Egg-white discharge":        "💦",
+  "Watery discharge":           "💦",
+  "Unusual discharge":          "⚠️",
+  "Thick or clumpy discharge":  "🤍",
+  "Yellow discharge":           "🟡",
+  "Green discharge":            "🟢",
+  "Gray discharge":             "🩶",
+  "Brown discharge":            "🟤",
+  "Blood-tinged discharge":     "🩸",
+  "Foul-smelling discharge":    "⚠️",
+  "Increased discharge volume": "💧",
+  "Decreased discharge volume": "💧",
+  // Energy
+  "Fatigue":                    "😴",
+  "Very low energy":            "😴",
+  "Low energy":                 "😴",
+  "Normal energy":              "⚡",
+  "High energy":                "⚡",
+  "Burst of energy":            "⚡",
+  "Energy crash":               "💤",
+  "Fatigue after meals":        "😴",
+  // Sleep
+  "Insomnia":                   "🌙",
+  "Difficulty falling asleep":  "🌙",
+  "Frequent waking":            "🌙",
+  "Oversleeping":               "😴",
+  "Restless sleep":             "😖",
+  "Vivid dreams":               "💭",
+  "Waking at same time":        "⏰",
+  "Difficulty staying asleep":  "🌙",
+  "Nightmares":                 "😱",
+  "Hormonal insomnia":          "🌙",
+  // Mind
+  "Brain fog":                  "🌫️",
+  "Forgetfulness":              "🧠",
+  "Poor concentration":         "🧠",
+  "Anxious thoughts":           "😰",
+  "Overwhelmed":                "😵",
+  "Irritable":                  "😠",
+  "Emotionally sensitive":      "💗",
+  "Unmotivated":                "😑",
+  "Restless":                   "😤",
+  "Mentally focused":           "💡",
+  "Distracted":                 "🌀",
+  "Intrusive thoughts":         "💭",
+  "Panic feelings":             "😱",
+  "Emotional numbness":         "😶",
+  "Hypersensitivity":           "💔",
+  "Self-critical":              "😞",
+  // Focus
+  "Highly productive":          "✅",
+  "Low productivity":           "📉",
+  "Procrastinating":            "⏰",
+  "Mentally clear":             "💡",
+  "Overwhelmed with tasks":     "😵",
+  "Decision fatigue":           "🤯",
   // Mood
-  "Mood swings":           `${_HI}/emotions/woozy.svg`,
-  "Irritability":          `${_HI}/emotions/angry.svg`,
-  "Anxiety":               `${_HI}/emotions/nervous.svg`,
-  "Low mood":              `${_HI}/emotions/sad.svg`,
-  "Crying spells":         `${_HI}/emotions/crying.svg`,
-  "Calm":                  `${_HI}/emotions/calm.svg`,
-  "Stressed":              `${_HI}/emotions/not-ok.svg`,
-  // Skin & Hair
-  "Acne":                  `${_HI}/conditions/allergies.svg`,
-  "Dry skin":              `${_HI}/conditions/dry-eyes.svg`,
-  "Hair thinning":         `${_HI}/body/head.svg`,
+  "Mood swings":                "🎭",
+  "Irritability":               "😠",
+  "Anxiety":                    "😰",
+  "Low mood":                   "😔",
+  "Crying spells":              "😢",
+  "Calm":                       "😌",
+  "Stressed":                   "😤",
+  // Skin
+  "Acne":                       "🔴",
+  "Dry skin":                   "🏜️",
+  "Oily skin":                  "✨",
+  "Glowing skin":               "✨",
+  "Skin sensitivity":           "🔴",
+  "Skin rash":                  "🔴",
+  "Cystic acne":                "🔴",
+  "Hormonal breakouts":         "🔴",
+  "Dull skin":                  "😶",
+  // Hair
+  "Hair thinning":              "🪮",
+  "Hair shedding":              "🪮",
+  "Oily hair":                  "💦",
+  "Dry hair":                   "🏜️",
   // Temperature
-  "Hot flashes":           `${_HI}/emotions/sweating.svg`,
-  "Night sweats":          `${_HI}/emotions/sweating.svg`,
-  "Cold flashes":          `${_HI}/conditions/chills.svg`,
-  "Basal temp shift":      `${_HI}/emotions/fever.svg`,
+  "Hot flashes":                "🥵",
+  "Night sweats":               "💦",
+  "Cold flashes":               "🥶",
+  "Basal temp shift":           "🌡️",
+  "Elevated BBT":               "🌡️",
+  "Lower than normal BBT":      "🌡️",
+  "Feeling hot":                "🥵",
+  "Feeling cold":               "🥶",
+  "Chills":                     "🥶",
+  // Heart & Body
+  "Heart racing":               "💓",
+  "Palpitations":               "💓",
+  "Chest tightness":            "😮‍💨",
+  "Shortness of breath":        "😮‍💨",
+  "Dizziness":                  "😵‍💫",
+  "Lightheaded":                "😵‍💫",
+  "Faint feeling":              "😵",
+  // Hormonal
+  "Breast swelling":            "💗",
+  "Breast fullness":            "💗",
+  "Nipple discharge":           "💧",
+  "Increased sweating":         "💦",
+  "Body temperature change":    "🌡️",
+  "Facial puffiness":           "😶",
+  // Illness
+  "Sore throat":                "🤒",
+  "Fever":                      "🌡️",
+  "Chills with illness":        "🥶",
+  "Runny nose":                 "🤧",
+  "Cough":                      "😷",
+  "Feeling sick":               "🤒",
+  "Recovering from illness":    "💊",
   // Cravings
-  "Sweet cravings":        `${_HI}/nutrition/sugar.svg`,
-  "Salty cravings":        `${_HI}/nutrition/nutrition.svg`,
-  "Greasy food cravings":  `${_HI}/nutrition/unhealthy-food.svg`,
-  "Spicy food cravings":   `${_HI}/nutrition/hot-meal.svg`,
-  "Increased appetite":    `${_HI}/nutrition/nutrition.svg`,
-  "Decreased appetite":    `${_HI}/nutrition/nutrition.svg`,
+  "Sweet cravings":             "🍰",
+  "Salty cravings":             "🧂",
+  "Greasy food cravings":       "🍟",
+  "Spicy food cravings":        "🌶️",
+  "Increased appetite":         "🍽️",
+  "Decreased appetite":         "🙅",
+  "Chocolate cravings":         "🍫",
+  "Carb cravings":              "🍞",
+  "Dairy cravings":             "🥛",
+  "Cold food cravings":         "🧊",
+  "Warm food cravings":         "♨️",
+  "Caffeine craving":           "☕",
+  "No cravings":                "🚫",
+  "Random cravings":            "🎲",
   // Physical
-  "Fluid retention":       `${_HI}/body/kidneys.svg`,
-  "Frequent urination":    `${_HI}/body/bladder.svg`,
-  "Smell sensitivity":     `${_HI}/body/nose.svg`,
-  "Nasal congestion":      `${_HI}/body/nose.svg`,
-  "Weight change":         `${_HI}/conditions/overweight.svg`,
+  "Fluid retention":            "💧",
+  "Frequent urination":         "🚿",
+  "Smell sensitivity":          "👃",
+  "Nasal congestion":           "🤧",
+  "Weight change":              "⚖️",
+  // Urinary
+  "Urinary urgency":            "🚿",
+  "Burning urination":          "🔥",
+  "Urinary leakage":            "💧",
+  // Weight
+  "Weight gain":                "⚖️",
+  "Weight loss":                "⚖️",
+  "Water retention":            "💧",
+  "Feeling puffy":              "🫃",
+  // Stool
+  "Hard stool":                 "😖",
+  "Loose stool":                "🚽",
+  "Frequent bowel movements":   "🚽",
+  "Incomplete evacuation":      "😖",
+  "Painful bowel movement":     "😣",
+  "Mucus in stool":             "🤢",
+  "Urgency to go":              "🚽",
+  "Dark stool":                 "⚫",
+  "Light stool":                "🟡",
   // Social
-  "Sociable":              `${_HI}/emotions/happy.svg`,
-  "Withdrawn":             `${_HI}/emotions/neutral.svg`,
+  "Sociable":                   "🤝",
+  "Withdrawn":                  "🚶",
+  "Clingy":                     "🤗",
+  "Seeking reassurance":        "🤗",
+  "Easily annoyed":             "😠",
+  "Conflict avoidant":          "🚶",
+  "Low social energy":          "😔",
+  "High social energy":         "🤝",
+  "Feeling isolated":           "😔",
+  "Affectionate":               "💕",
+  "Distant":                    "🚶",
   // Cycle
-  "Missed period":         `${_HI}/body/female-reproductive_system.svg`,
-  "Irregular period":      `${_HI}/body/female-reproductive_system.svg`,
+  "Missed period":              "📅",
+  "Irregular period":           "📆",
   // Fertility
-  "Increased libido":      `${_HI}/emotions/happy.svg`,
-  "Decreased libido":      `${_HI}/emotions/sad.svg`,
-  "Cervical mucus change": `${_HI}/body/vagina-alt.svg`,
-  "Vaginal dryness":       `${_HI}/conditions/dry-mouth.svg`,
-  "Pain during sex":       `${_HI}/conditions/pain.svg`,
+  "Increased libido":           "💕",
+  "Decreased libido":           "💔",
+  "Cervical mucus change":      "💧",
+  "Vaginal dryness":            "🌵",
+  "Pain during sex":            "😟",
 };
 
 export const SYMPTOMS = Object.values(SYMPTOM_CATEGORIES).flat();
@@ -472,10 +704,7 @@ export function renderBloomieFab() {
   modal.innerHTML = `
     <div class="bloomie-modal-backdrop" data-close="1"></div>
     <div class="bloomie-modal-panel" role="dialog" aria-modal="true">
-      <div class="bloomie-modal-header">
-        <strong>Bloomie</strong>
-        <button class="bloomie-close" data-close="1" aria-label="Close">✕</button>
-      </div>
+      <button class="bloomie-close" data-close="1" aria-label="Close">✕</button>
       <iframe class="bloomie-frame" src="/pages/assistant.html" title="Bloomie chat"></iframe>
     </div>
   `;
