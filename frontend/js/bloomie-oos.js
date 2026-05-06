@@ -1,4 +1,4 @@
-import { pick, scoreSignals, resolveSignals, detectOutOfScope, normalizeText } from "./bloomie-routing.js";
+import { pick, scoreSignals, resolveSignals, detectOutOfScope, normalizeText, detectCriticalRiskDetail } from "./bloomie-routing.js";
 import { handleRepairClarification } from "./bloomie-repair.js";
 import { buildRepairClarificationCopy, buildSoftClarifierCopy } from "./bloomie-clarifier.js";
 import { extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS } from "./bloomie-inference.js";
@@ -1034,6 +1034,13 @@ export function createOOS(env) {
     // Defensive normalization so scoreSignals/regex routing never runs on raw
     // input if this helper is called outside assistant.js.
     const t = normalizeText(rawText);
+
+    // ── HARD critical-risk override ────────────────────────────────────────
+    // Standalone routeUserText callers do not have extracted entities, so use
+    // text-only critical patterns here. In assistant.js, the entity-aware
+    // override runs even earlier and skips this whole normal routing path.
+    const critical = detectCriticalRiskDetail(null, t);
+    if (critical.critical) return { next: critical.route, payload: { reason: critical.reason, criticalRiskOverride: true } };
 
     // ── Safety redirects (highest priority) ────────────────────────────────
     const urgentPattern = [

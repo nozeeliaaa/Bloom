@@ -164,6 +164,9 @@ function sanitizeAnalytics(payload) {
   if (typeof payload.source        === "string") out.source        = payload.source.slice(0, 40);
   if (typeof payload.type          === "string") out.type          = payload.type.slice(0, 40);
   if (typeof payload.primaryIntent === "string") out.primaryIntent = payload.primaryIntent.slice(0, 40);
+  if (typeof payload.finalRoute    === "string") out.finalRoute    = payload.finalRoute.slice(0, 80);
+  if (typeof payload.confidenceScore === "number") out.confidenceScore = payload.confidenceScore;
+  if (typeof payload.rawScore      === "number") out.rawScore      = payload.rawScore;
   if (typeof payload.fallbackCount === "number") out.fallbackCount = payload.fallbackCount;
   if (typeof payload.streak        === "number") out.streak        = payload.streak;
   if (typeof payload.sessionDepth  === "number") out.sessionDepth  = payload.sessionDepth;

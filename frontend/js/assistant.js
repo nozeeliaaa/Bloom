@@ -3,7 +3,7 @@ import { resolveTone, applyToneToLines, applyToneToChoices } from "./bloomie-ton
 import { extractEntities, inferRoute, summarizeEntities, extractUrgency, SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS, detectDownplaying, detectAmbiguousInputDetail, detectContradictionDetail, detectMissingContextDetail, checkCumulativeRisk } from "./bloomie-inference.js";
 import { buildGuidanceResponse, getStructuredSummary, getToneOpener, getPhaseInsight, CONCERN_PRIORITY } from "./bloomie-templates.js";
 import { loadBloomieMemory, saveBloomieMemory, loadLocalBloomieMemory, saveLocalBloomieMemory, loadUserProfile } from "./db.js";
-import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion, detectReportedCondition, detectConditionManagementQuestion, detectConditionSymptomQuestion, CONDITION_META, CONDITION_ALIASES, extractConditionKey, normalizeText, scoreVagueHealth } from "./bloomie-routing.js";
+import { pick, detectOutOfScope, resolveOOSFollowUp, scoreSignals, resolveSignals, computeRouteConfidence, resolveChoiceByIntent, classifyNodeQuestion, detectReportedCondition, detectConditionManagementQuestion, detectConditionSymptomQuestion, CONDITION_META, CONDITION_ALIASES, extractConditionKey, normalizeText, scoreVagueHealth, detectCriticalRiskDetail } from "./bloomie-routing.js";
 import { resolveIntentAssist, classifyRepairClarification, extractMultiIntentTags } from "./bloomie-intent.js";
 import { extractSignalsAI }   from "./bloomie-extract.js";
 import { createCtx } from "./bloomie-session.js";
@@ -1794,17 +1794,28 @@ export function initBloomieChat({
         {
           const captureUrgent = extractUrgency(normalizePatois(text).toLowerCase());
           if (captureUrgent) {
+            const critical = detectCriticalRiskDetail(null, text);
+            const urgentRoute = critical.critical ? critical.route : "HEAVY_URGENT";
+            const urgentReason = critical.reason || "urgent_during_date_capture";
             pushMsg("user", text);
             ctx.urgency = true;
             logSafetyEvent("urgent_trigger", {
               input:  text,
-              route:  "HEAVY_URGENT",
-              reason: "urgent_during_date_capture",
+              route:  urgentRoute,
+              reason: urgentReason,
               topic:  ctx.topic,
             });
+            if (critical.critical) {
+              logAnalyticsEvent("urgency_escalation", {
+                route:  urgentRoute,
+                reason: urgentReason,
+                source: "critical_risk_override",
+              }, ctx);
+              bloomieDebug("safety_override", { route: urgentRoute, reason: urgentReason });
+            }
             ctx.capture = null;
             ctx.captureReturnTo = null;
-            transition("HEAVY_URGENT");
+            transition(urgentRoute);
             return;
           }
         }
@@ -2072,15 +2083,26 @@ export function initBloomieChat({
         const _safetyNorm = normalizePatois(_safetyRaw);
         const urgentNow   = extractUrgency(_safetyRaw) || extractUrgency(_safetyNorm);
         if (urgentNow) {
+          const critical = detectCriticalRiskDetail(null, _safetyNorm || _safetyRaw);
+          const urgentRoute = critical.critical ? critical.route : "HEAVY_URGENT";
+          const urgentReason = critical.reason || "persistent_recheck";
           ctx.urgency = true;
           logSafetyEvent("urgent_trigger", {
             input:     effectiveInput,
-            route:     "HEAVY_URGENT",
-            reason:    "persistent_recheck",
+            route:     urgentRoute,
+            reason:    urgentReason,
             topic:     ctx.topic,
             riskLevel: ctx.riskLevel,
           });
-          transition("HEAVY_URGENT");
+          if (critical.critical) {
+            logAnalyticsEvent("urgency_escalation", {
+              route:  urgentRoute,
+              reason: urgentReason,
+              source: "critical_risk_override",
+            }, ctx);
+            bloomieDebug("safety_override", { route: urgentRoute, reason: urgentReason });
+          }
+          transition(urgentRoute);
           return;
         }
       }
@@ -2359,6 +2381,37 @@ export function initBloomieChat({
         entities.symptoms.implicit_late = true;
       }
 
+      // ── HARD critical-risk override ──────────────────────────────────────
+      // This must run after entity extraction but before any route selection,
+      // confidence scoring, fallback, clarifiers, or normal response generation.
+      // When it fires, urgent escalation wins regardless of AI/rule confidence.
+      {
+        const critical = detectCriticalRiskDetail(entities, normalizedText);
+        if (critical.critical) {
+          ctx.urgency = true;
+          logSafetyEvent("urgent_trigger", {
+            input:       normalizedText,
+            route:       critical.route,
+            reason:      critical.reason,
+            symptoms:    Object.entries(entities.symptoms || {}).filter(([,v]) => v).map(([k]) => k),
+            urgencyFlag: entities.urgent,
+            topic:       ctx.topic,
+            riskLevel:   ctx.riskLevel,
+          });
+          logAnalyticsEvent("urgency_escalation", {
+            route:  critical.route,
+            reason: critical.reason,
+            source: "critical_risk_override",
+          }, ctx);
+          bloomieDebug("safety_override", {
+            route:  critical.route,
+            reason: critical.reason,
+          });
+          transition(critical.route, { entities, reason: critical.reason, criticalRiskOverride: true });
+          return;
+        }
+      }
+
       // ── Vague-input triage router ───────────────────────────────────────
       // Keeps "sumn off / mi nuh feel right" inside support flow rather than fallback.
       if (isVagueTriageTrigger(normalizedText, entities)) {
@@ -2613,6 +2666,37 @@ export function initBloomieChat({
       ctx.turnFocus = mergedTurnFocus;
 
       console.log("[Bloomie inference]", summarizeEntities(mergedEntities));
+
+      // ── HARD critical-risk override after continuity merge ───────────────
+      // A user may downplay in the current turn while serious symptoms were
+      // established one or two turns earlier. Re-check merged signals before
+      // confidence, fallback, inference, or response templates can run.
+      {
+        const critical = detectCriticalRiskDetail(mergedEntities, normalizedText);
+        if (critical.critical) {
+          ctx.urgency = true;
+          logSafetyEvent("urgent_trigger", {
+            input:       normalizedText,
+            route:       critical.route,
+            reason:      critical.reason,
+            symptoms:    Object.entries(mergedEntities.symptoms || {}).filter(([,v]) => v).map(([k]) => k),
+            urgencyFlag: mergedEntities.urgent,
+            topic:       ctx.topic,
+            riskLevel:   ctx.riskLevel,
+          });
+          logAnalyticsEvent("urgency_escalation", {
+            route:  critical.route,
+            reason: critical.reason,
+            source: "critical_risk_override",
+          }, ctx);
+          bloomieDebug("safety_override", {
+            route:  critical.route,
+            reason: critical.reason,
+          });
+          transition(critical.route, { entities: mergedEntities, reason: critical.reason, criticalRiskOverride: true });
+          return;
+        }
+      }
 
       // ── Policy context + decision layer (centralized guardrails) ─────────
       // Uses canonical normalized text + merged entities + constrained tags.
@@ -2951,8 +3035,7 @@ export function initBloomieChat({
         return;
       }
 
-      const inferred   = inferRoute(mergedEntities);
-
+      let inferred = null;
       const routed = routeUserText(normalizedText);
 
       {
@@ -2963,7 +3046,9 @@ export function initBloomieChat({
           tier:          ctx.routeConfidence.tier,
           primaryIntent: ctx.routeConfidence.primaryIntent ?? null,
           score:         ctx.routeConfidence.score,
+          rawScore:      ctx.routeConfidence.rawScore ?? null,
           ambiguous:     ctx.routeConfidence.ambiguous,
+          thresholds:    ctx.routeConfidence.thresholds,
         });
         if (routed?.next && routed.next !== "START_MENU" && !routed?.payload?.oos) {
           bloomieDebug("route", {
@@ -2971,6 +3056,30 @@ export function initBloomieChat({
             source: "keyword_router",
           });
         }
+      }
+
+      const CONFIDENCE_GATED_NODES = new Set([
+        "LATE_INTRO", "LATE_PERIOD_CHECK", "HEAVY_INTRO", "HEAVY_ROUTE_B",
+        "HEAVY_ROUTE_C", "HEAVY_ROUTE_C_GATE", "SPOT_INTRO", "SPOT_PROVIDER_SOON",
+        "SPOT_PREG_INFO", "MOOD_SAFETY_CHECK", "MOOD_INTRO", "PELVIC_INTRO",
+        "PELVIC_SAFETY_GATE", "PELVIC_SAFETY_CHECK", "PREGNANCY_ENTRY",
+        "TEST_INTRO", "TEST_RECENT_SEX_INTRO", "TEST_NEGATIVE_INTRO",
+        "ELSE_DISCHARGE", "ELSE_DISCHARGE_ENTRY",
+      ]);
+      const confidenceGatesRoutedNode = !!(routed?.next && CONFIDENCE_GATED_NODES.has(routed.next));
+      const confidenceAllowsNormalRouting = ctx.routeConfidence?.tier !== "low";
+      if (confidenceAllowsNormalRouting) {
+        inferred = inferRoute(mergedEntities);
+      } else {
+        // LOW confidence is a hard stop for normal routing/guidance. We still
+        // keep routeUserText's OOS/repair paths available below, but health
+        // guesses from weak partial matches must go to clarification/fallback.
+        bloomieDebug("route_decision", {
+          decision: "clarification",
+          reason:   "low_confidence",
+          score:    ctx.routeConfidence?.score ?? 0,
+          route:    "NARROWING",
+        });
       }
 
       const CLARIFICATION_PAIRS = new Set([
@@ -2988,6 +3097,7 @@ export function initBloomieChat({
         !routed?.payload?.oos &&
         !inferred?.next &&
         !!routed?.next &&
+        confidenceGatesRoutedNode &&
         (
           ctx.routeConfidence?.tier === "high" ||
           ctx.routeConfidence?.tier === "low" ||
@@ -3070,7 +3180,7 @@ export function initBloomieChat({
       const preemptiveOOSCategory = !Object.values(mergedEntities?.symptoms || {}).some(Boolean) && !mergedEntities?.urgent
         ? detectOutOfScope(normalizedText, OOS, HEALTH_OVERRIDE_PATTERNS)
         : null;
-      const guidance = preemptiveOOSCategory
+      const guidance = (!confidenceAllowsNormalRouting || preemptiveOOSCategory)
         ? null
         : buildGuidanceResponse(guidanceEntities, inferred?.payload?.reason, cycleCtx, ctx.currentTone, minorSafeFooter());
 
@@ -3329,12 +3439,22 @@ export function initBloomieChat({
         const _pairKey    = _primary && _firstComp ? _primary + "+" + _firstComp : null;
         const _isPair     = _pairKey ? CLARIFICATION_PAIRS.has(_pairKey) : false;
 
-        if (conf && conf.tier === "low") {
+        if (conf && conf.tier === "low" && confidenceGatesRoutedNode) {
           // LOW: rule layer couldn't resolve a clear route.
           // Safety valve: loop-prevention always takes priority.
           if (ctx.confidenceFallbackCount >= 2) {
             ctx.confidenceFallbackCount++;
-            logAnalyticsEvent("route_fallback", { fallbackCount: ctx.confidenceFallbackCount }, ctx);
+            logAnalyticsEvent("route_fallback", {
+              fallbackCount: ctx.confidenceFallbackCount,
+              confidenceScore: conf.score,
+              finalRoute: "CONFIDENCE_FALLBACK",
+              reason: "low_confidence_repeat",
+            }, ctx);
+            bloomieDebug("route_decision", {
+              decision: "fallback",
+              route: "CONFIDENCE_FALLBACK",
+              confidenceScore: conf.score,
+            });
             transition("CONFIDENCE_FALLBACK");
           } else {
             // Build candidate buttons from the rule-layer competitors.
@@ -3358,7 +3478,20 @@ export function initBloomieChat({
             // user feels heard rather than redirected.
             ctx.narrowingVague = !candidates.length && scoreVagueHealth(normalizedText) > 0;
             ctx.confidenceFallbackCount++;
-            logAnalyticsEvent("route_no_match", { input: normalizedText, primaryIntent: conf.primaryIntent }, ctx);
+            logAnalyticsEvent("route_no_match", {
+              input: normalizedText,
+              primaryIntent: conf.primaryIntent,
+              confidenceScore: conf.score,
+              rawScore: conf.rawScore,
+              finalRoute: "NARROWING",
+              reason: "low_confidence",
+            }, ctx);
+            bloomieDebug("route_decision", {
+              decision: "clarification",
+              route: "NARROWING",
+              confidenceScore: conf.score,
+              primaryIntent: conf.primaryIntent ?? null,
+            });
             // Give AI assist a brief chance to resolve before rendering NARROWING.
             // This avoids "NARROWING flash then redirect" UX when AI returns quickly.
             const assistFlowId = ctx.flowId;
@@ -3389,21 +3522,10 @@ export function initBloomieChat({
               const aiCandidate = INTENT_TO_CANDIDATE[_aiIntent.intent];
               if (!aiCandidate) return;
 
-              if (_aiIntent.confidence === "high" && _aiIntent.route) {
-                // High-confidence AI arrived within grace window: route directly.
-                finalized = true;
-                clearTimeout(graceTimerId);
-                ctx.confidenceFallbackCount = 0;
-                ctx.lastIntent = _aiIntent.route;
-                logAnalyticsEvent("route_matched", {
-                  route:  _aiIntent.route,
-                  reason: "ai_primary",
-                }, ctx);
-                transition(_aiIntent.route, {});
-                return;
-              }
-
-              if (_aiIntent.confidence === "medium") {
+              if (_aiIntent.confidence === "high" || _aiIntent.confidence === "medium") {
+                // LOW rule confidence still never routes directly. AI can only
+                // improve the clarification candidates so the user validates
+                // the intent before Bloomie gives topic-specific guidance.
                 const existing = ctx.narrowingCandidates ?? [];
                 if (!existing.some(c => c.id === aiCandidate.id)) {
                   ctx.narrowingCandidates = [aiCandidate, ...existing].slice(0, 3);
@@ -3415,13 +3537,36 @@ export function initBloomieChat({
         } else if (conf && (conf.tier === "medium" || _isPair)) {
           // MEDIUM (or a clarification pair at HIGH): ask soft confirmation
           ctx.pendingRoute = { next: conf.route || routed.next, payload: routed.payload || {} };
-          logAnalyticsEvent("route_clarification", { route: conf.route || routed.next }, ctx);
+          logAnalyticsEvent("route_clarification", {
+            route: conf.route || routed.next,
+            confidenceScore: conf.score,
+            rawScore: conf.rawScore,
+            finalRoute: "MEDIUM_CONFIRM",
+            reason: _isPair ? "clarification_pair" : "medium_confidence",
+          }, ctx);
+          bloomieDebug("route_decision", {
+            decision: "validation",
+            route: "MEDIUM_CONFIRM",
+            pendingRoute: conf.route || routed.next,
+            confidenceScore: conf.score,
+          });
           transition("MEDIUM_CONFIRM");
         } else {
           // HIGH (or no confidence data): route directly - reset struggle streak.
           ctx.confidenceFallbackCount = 0;
           ctx.lastIntent = routed.next;
-          logAnalyticsEvent("route_matched", { route: routed.next, reason: routed.payload?.reason }, ctx);
+          logAnalyticsEvent("route_matched", {
+            route: routed.next,
+            reason: routed.payload?.reason,
+            confidenceScore: conf?.score ?? null,
+            rawScore: conf?.rawScore ?? null,
+            finalRoute: routed.next,
+          }, ctx);
+          bloomieDebug("route_decision", {
+            decision: "route",
+            route: routed.next,
+            confidenceScore: conf?.score ?? null,
+          });
           transition(routed.next, routed.payload || {});
         }
       } else {

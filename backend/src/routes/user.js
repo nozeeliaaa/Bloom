@@ -98,6 +98,12 @@ router.post("/profile", requireAuth, async (req, res) => {
       phaseEstimation: existingPhaseProfile.phaseEstimation ?? null,
     };
 
+    console.log(`[profile] writing users/${uid}.profile`, {
+      nickname: profile.nickname,
+      avatar: profile.avatar,
+      yearOfBirth: profile.yearOfBirth,
+    });
+
     await userRef.set({
       profile,
       healthProfile,
@@ -106,6 +112,8 @@ router.post("/profile", requireAuth, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+
+    console.log(`[profile] Firestore write success uid=${uid}`);
 
     const changedFields = Object.keys(req.body).filter((k) => k !== "role");
 
