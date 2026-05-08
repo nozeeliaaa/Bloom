@@ -89,7 +89,7 @@ router.get("/route", async (req, res) => {
   }
 
   try {
-    const url = `https://api.openrouteservice.org/v2/directions/${mode}/geojson`;
+    const url = `https://api.heigit.org/openrouteservice/v2/directions/${mode}/geojson`;
 
     const orsRes = await fetch(url, {
       method: "POST",
