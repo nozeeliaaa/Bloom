@@ -229,7 +229,7 @@ function extractSymptoms(t) {
       /\bnothing yet\b/.test(t) ||
       /\b(i didn'?t|i did not|didn'?t)\s+(get it|get mine|see it)\b/.test(t)
     ),
-    heavy:          /\b(heavy|heavy flow|heavily|soaking|soaked|bleed.*bad|bleed.*nuff|bleed.*out.*bad|bleeding.*bad|bleeding.*lot|bleed.*lot|flooding|clot|clots|bleed through|so much blood|so much bleeding)\b/.test(t),
+    heavy:          /\b(heavy|heavy flow|heavily|soaking|soaked|bleed.*nuff|bleed.*out.*bad|bleeding.*lot|bleed.*lot|flooding|bleed through|so much blood|so much bleeding)\b/.test(t),
     spotting:       /\b(spot|spotting|pink|brown.*discharge|blood.*between|between.*period)\b/.test(t),
     pelvic:         /\b(cramp|cramps|pelvic|lower.*abdomen|stomach.*pain|stomach.*hurt|belly.*hurt|belly.*pain|waist.*hurt|bottom.*belly|one.sided.*pain|one.side.*hurt|one side.*hurt|lower.*abdominal.*pain|side.*hurts|sharp.*pelvic|back.*hurting|my back hurting)\b/.test(t),
     mood:           /\b(mood|sad|anxious|irritable|tired|fatigue|drained|weak|overwhelm|exhaust|low energy|emotional|cry|tearful|can't cope|cant cope|cannot cope|breaking down|i'm losing it|losing it|feel empty|feeling empty|feel nothing|feeling nothing|i'm breaking down|i'm losing it|feel.*low|so low|feel low|feeling low|angry|anger|mad|vex|frustrated|frustration|annoyed|snappy|happy|happier|good mood|excited|calm|overwhelmed|don't feel like myself|dont feel like myself|not like myself)\b/.test(t),
@@ -238,6 +238,7 @@ function extractSymptoms(t) {
     dizziness:      /\b(dizzy|dizziness|lightheaded|faint|head.*spin|head.*swim)\b/.test(t),
 
     // ── BLEEDING ─────────────────────────────────────────────────────────────
+    clots:          /\b(clots?|clotting)\b/.test(t),
     large_clots:    /\b(large clot|big clot|clot.*size|liver.*clot|quarter.*size|golf.*clot|passing clots|pass clots)\b/.test(t),
 
     // ── PAIN ─────────────────────────────────────────────────────────────────
@@ -344,6 +345,7 @@ export const SYMPTOM_TO_CATALOG_KEYS = {
   late:               ["MISSED_PERIOD"],
   implicit_late:      ["MISSED_PERIOD"],
   heavy:              ["HEAVY_FLOW", "VAGINAL_BLEEDING"],
+  clots:              ["LARGE_CLOTS"],
   spotting:           ["SPOTTING"],
   pelvic:             ["CRAMPS", "PELVIC_PAIN"],
   mood:               ["MOOD_SWINGS", "FATIGUE"],
@@ -509,14 +511,23 @@ function extractDuration(t) {
 
 // ── 1c. Severity ──────────────────────────────────────────────────────────────
 function extractSeverity(t) {
-  if (/\b(severe|very bad|really bad|really painful|awful|terrible|horrible|excruciating|unbearable|kill.*me|kill.*mi|murder.*mi|cannot.*function|can't.*function|10\/10|worst|bleed.*out.*bad|bleeding bad)\b/.test(t)) {
+  if (
+    /\b(severe|really painful|awful|terrible|horrible|excruciating|unbearable|kill.*me|kill.*mi|murder.*mi|cannot.*function|can't.*function|10\/10|worst|bleed.*out.*bad)\b/.test(t) ||
+    /\b(?:very bad|really bad)\s+(?:cramps?|pelvic pain|pain|heavy bleeding|bleeding|heavy flow|flow|headache|migraine|nausea)\b/.test(t) ||
+    /\b(?:cramps?|pelvic pain|pain|bleeding|flow|headache|migraine|nausea)\s+(?:is|are|feels?|felt|was|were)?\s*(?:very bad|really bad)\b/.test(t)
+  ) {
     return "severe";
   }
   // Medication failure or movement-limiting pain also signals severe intensity
   if (/\b(nothing.*helps?|nothing.*working|pain.*not.*going|can'?t.*move|medication.*didn'?t|medicine.*not.*working|ibuprofen.*didn'?t|painkiller.*not|tried.*pain.*still|pain.*meds.*not|pills.*not.*helping)\b/.test(t)) {
     return "severe";
   }
-  if (/\b(bad|moderate|pretty bad|affecting|interfering|hard to|difficult|bad bad)\b/.test(t)) {
+  if (
+    /\b(pretty bad|moderate|affecting|interfering|bad bad)\b/.test(t) ||
+    /\b(?:bad|difficult)\s+(?:cramps?|pain|bleeding|flow|headache|migraine|nausea)\b/.test(t) ||
+    /\b(?:cramps?|pain|bleeding|flow|headache|migraine|nausea)\s+(?:is|are|feels?|felt|was|were)?\s*(?:bad|difficult)\b/.test(t) ||
+    /\bhard to\s+(?:stand|walk|move|sleep|work|focus|function)\b/.test(t)
+  ) {
     return "moderate";
   }
   if (/\b(mild|little|likkle|not bad|manageable|okay|bearable|slight|a bit|a likkle)\b/.test(t)) {

@@ -3,12 +3,14 @@ function normalizeWhitespace(text) {
 }
 
 const DOMAIN_SYMPTOM_KEYS = {
-  bleeding: ["heavy", "large_clots", "spotting", "bleeding_through", "flow_change", "light"],
-  discharge: ["discharge", "unusual_discharge", "discharge_eggwhite", "discharge_creamy", "discharge_sticky", "odor"],
+  bleeding: ["heavy", "clots", "large_clots", "spotting", "bleeding_through", "flow_change", "light"],
+  discharge: ["discharge", "unusual_discharge", "discharge_eggwhite", "discharge_creamy", "discharge_sticky", "odor", "discharge_foul_smell"],
   pain: ["pelvic", "ovulation_pain", "pain_during_sex", "one_sided_pain", "cramps", "headache", "joint_pain", "breast_tender"],
   late: ["late", "implicit_late", "irregular"],
-  mood: ["mood", "anxiety", "depression", "irritability", "fatigue", "night_sweats", "cold_flashes", "brain_fog", "poor_concentration"],
+  mood: ["mood", "anxiety", "depression", "irritability", "fatigue", "night_sweats", "cold_flashes", "brain_fog", "poor_concentration", "forgetful", "crying_spells", "insomnia"],
   digestive: ["nausea", "bloating", "gassy", "heartburn", "constipation", "diarrhea"],
+  urinary: ["frequent_urination", "urinary_burning", "urinary_urgency"],
+  temperature: ["fever", "chills", "hot_flashes"],
 };
 
 const DOMAIN_BASE_SCORES = {
@@ -19,10 +21,13 @@ const DOMAIN_BASE_SCORES = {
   mood: 26,
   digestive: 24,
   pregnancy: 42,
+  urinary: 28,
+  temperature: 34,
 };
 
 const SYMPTOM_META = {
   large_clots: { domain: "bleeding", weight: 26, label: "the clots", patterns: [/\bclots?\b/] },
+  clots: { domain: "bleeding", weight: 18, label: "the clots", patterns: [/\bclots?\b/] },
   heavy: { domain: "bleeding", weight: 22, label: "the bleeding", patterns: [/\bheavy\b/, /\bbleeding\b/] },
   spotting: { domain: "bleeding", weight: 16, label: "the spotting", patterns: [/\bspotting\b/, /\bspot\b/] },
   discharge: { domain: "discharge", weight: 14, label: "the discharge change", patterns: [/\bdischarge\b/] },
@@ -35,6 +40,11 @@ const SYMPTOM_META = {
   mood: { domain: "mood", weight: 11, label: "the mood shift", patterns: [/\bmood\b/, /\banxious\b/, /\bsad\b/] },
   fatigue: { domain: "mood", weight: 11, label: "the low energy", patterns: [/\btired\b/, /\bfatigue\b/, /\bdrained\b/, /\blow energy\b/] },
   brain_fog: { domain: "mood", weight: 15, label: "the brain fog", patterns: [/\bbrain fog\b/, /\bfoggy\b/, /\bcan'?t think\b/] },
+  fever: { domain: "temperature", weight: 24, label: "the fever", patterns: [/\bfever\b/, /\bfeverish\b/] },
+  chills: { domain: "temperature", weight: 18, label: "the chills", patterns: [/\bchills\b/, /\bshivering\b/] },
+  urinary_burning: { domain: "urinary", weight: 19, label: "the burning when you pee", patterns: [/\bburning.*pee\b/, /\bpee.*burn\b/] },
+  bleeding_after_sex: { domain: "bleeding", weight: 20, label: "the bleeding after sex", patterns: [/\bbleed.*after.*sex\b/, /\bspotting.*after.*sex\b/] },
+  discharge_foul_smell: { domain: "discharge", weight: 24, label: "the discharge smell", patterns: [/\bfishy\b/, /\bfoul\b/, /\bsmell\b/] },
 };
 
 function getActiveSymptomKeys(entities = {}) {
@@ -123,9 +133,25 @@ function buildPrimaryEntities(entities = {}, leadDomain = null) {
     if (entities?.symptoms?.[key]) nextSymptoms[key] = true;
   }
 
+  const activeDomains = new Set(
+    getActiveSymptomKeys(entities)
+      .map((key) => SYMPTOM_META[key]?.domain)
+      .filter(Boolean)
+  );
+  if (entities?.pregnancy?.chance || entities?.pregnancy?.result || entities?.pregnancy?.testedYet) {
+    activeDomains.add("pregnancy");
+  }
+  const hasCompetingDomains = activeDomains.size > 1;
+  const keepGlobalContext = !hasCompetingDomains;
+  const keepPregnancyContext = leadDomain === "pregnancy" || leadDomain === "late";
+
   return {
     ...entities,
     symptoms: nextSymptoms,
+    severity: keepGlobalContext ? entities.severity : null,
+    timing: keepGlobalContext ? entities.timing : null,
+    duration: keepGlobalContext ? entities.duration : null,
+    pregnancy: keepPregnancyContext ? entities.pregnancy : {},
   };
 }
 

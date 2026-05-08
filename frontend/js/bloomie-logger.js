@@ -3,7 +3,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Fire-and-forget safety + analytics event loggers.
  *
- * logSafetyEvent   - writes to POST /api/bloomie-safety-log (auth required)
+ * logSafetyEvent   - writes to POST /api/bloomie-safety-log (auth optional)
  *   Three safety event types:
  *     urgent_trigger  - inferRoute / keyword router resolved to HEAVY_URGENT
  *     oos_fallback    - user input fell to OOS handler (no health route matched)
@@ -26,8 +26,6 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { getIdToken } from "./auth.js";
-import { isAccountMode } from "./mode.js";
 import { isBloomieDebugEnabled } from "./bloom-storage.js";
 
 const API_BASE = (typeof window !== "undefined" && window.BLOOM_API_BASE) || "";
@@ -36,6 +34,18 @@ const API_BASE = (typeof window !== "undefined" && window.BLOOM_API_BASE) || "";
 // Safety log is given a slightly longer window; analytics is capped tighter.
 const SAFETY_LOG_TIMEOUT_MS  = 5000;
 const ANALYTICS_TIMEOUT_MS   = 2000;
+
+async function getOptionalAccountToken() {
+  try {
+    if (typeof window === "undefined" || typeof localStorage === "undefined") return null;
+    const { isAccountMode } = await import("./mode.js");
+    if (!isAccountMode()) return null;
+    const { getIdToken } = await import("./auth.js");
+    return await getIdToken().catch(() => null);
+  } catch {
+    return null;
+  }
+}
 
 // ── fetchWithTimeout ──────────────────────────────────────────────────────────
 //
@@ -75,30 +85,25 @@ function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 export function logSafetyEvent(type, payload = {}) {
-  // Skip logging for anonymous users - no account, no record
-  if (!isAccountMode()) return;
-
   // Kick off async without awaiting or propagating errors
   _send(type, payload).catch(() => {});
 }
 
 async function _send(type, payload) {
-  const token = await getIdToken();
-  if (!token) return;
+  const token = await getOptionalAccountToken();
 
   const body = {
     type,
     ...sanitize(payload),
   };
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   await fetchWithTimeout(
     `${API_BASE}/api/bloomie-safety-log`,
     {
       method:  "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization:  `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(body),
     },
     SAFETY_LOG_TIMEOUT_MS,
@@ -305,7 +310,7 @@ async function _sendAnalytics(eventType, payload, ctx) {
     ts:      Date.now(),
   };
 
-  const token = isAccountMode() ? await getIdToken().catch(() => null) : null;
+  const token = await getOptionalAccountToken();
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 

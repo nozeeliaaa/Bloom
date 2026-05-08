@@ -182,6 +182,17 @@ describe("extractEntities - severity", () => {
     expect(e.severity).toBe("moderate");
   });
 
+  it("does not treat general worry wording as symptom severity", () => {
+    const e = extractEntities("is brown blood bad?");
+    expect(e.severity).toBeNull();
+  });
+
+  it("does not treat any clot mention as heavy flow", () => {
+    const e = extractEntities("i noticed small clots today");
+    expect(e.symptoms.large_clots).toBe(false);
+    expect(e.symptoms.heavy).toBe(false);
+  });
+
   it("extracts severe from 'bleed out bad' phrasing", () => {
     const e = extractEntities("me bleed out bad");
     expect(e.severity).toBe("severe");

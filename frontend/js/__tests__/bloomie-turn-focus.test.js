@@ -38,4 +38,15 @@ describe("rankTurnFocus", () => {
     expect(focus.leadSymptom).toBe("nausea");
     expect(focus.secondaryLabels.join(" ")).toMatch(/bloating/i);
   });
+
+  it("drops ambiguous global metadata from a multi-domain primary focus", () => {
+    const text = "severe cramps and yellow discharge, and i might be pregnant";
+    const focus = rankTurnFocus(extractEntities(text), text);
+
+    expect(focus.leadDomain).toBe("discharge");
+    expect(focus.primaryEntities.symptoms.unusual_discharge).toBe(true);
+    expect(focus.primaryEntities.symptoms.pelvic).toBe(false);
+    expect(focus.primaryEntities.severity).toBeNull();
+    expect(focus.primaryEntities.pregnancy).toEqual({});
+  });
 });
