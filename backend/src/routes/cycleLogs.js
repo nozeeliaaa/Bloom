@@ -12,10 +12,6 @@ function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 }
 
-function toBool(val) {
-  return val === true || val === "true";
-}
-
 const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
 
 function normalizeBiometricLevel(value) {
@@ -95,8 +91,6 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       sleepScore: normalizeSleepScore(req.body.sleepScore),
       stressLevel: normalizeBiometricLevel(req.body.stressLevel),
       activityLevel: normalizeBiometricLevel(req.body.activityLevel),
-      hadSex: toBool(req.body.hadSex),
-      contraceptionUsed: toBool(req.body.contraceptionUsed),
       notes:
         typeof req.body.notes === "string"
           ? req.body.notes.trim().slice(0, 500)

@@ -71,15 +71,6 @@ export function validateCycleLog(body) {
     }
   }
 
-  // --- booleans ---
-  if (body.hadSex !== undefined && typeof body.hadSex !== "boolean") {
-    return { valid: false, error: "hadSex must be a boolean" };
-  }
-
-  if (body.contraceptionUsed !== undefined && typeof body.contraceptionUsed !== "boolean") {
-    return { valid: false, error: "contraceptionUsed must be a boolean" };
-  }
-
   // --- notes: string, max 500 chars ---
   if (body.notes !== undefined) {
     if (typeof body.notes !== "string") {
