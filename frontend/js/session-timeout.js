@@ -246,7 +246,7 @@ function activateAccountTimeoutGuard({ resetActivity = false } = {}) {
   scheduleFromActivity(getLastActivityTs());
 }
 
-function shouldTreatAsExpiredSession(url, init, response) {
+async function shouldTreatAsExpiredSession(url, init, response) {
   if (!isAccountMode()) return false;
   if (!response) return false;
   if (response.status !== 401 && response.status !== 403) return false;
@@ -259,7 +259,23 @@ function shouldTreatAsExpiredSession(url, init, response) {
     init?.headers || (typeof Request !== "undefined" && url instanceof Request ? url.headers : undefined)
   );
   const hasAuthHeader = Boolean(headers.get("authorization"));
-  if (response.status === 401 && hasAuthHeader) return true;
+  if (response.status === 401 && hasAuthHeader) {
+    let body = null;
+    try {
+      body = await response.clone().json();
+    } catch (_) {}
+
+    const error = String(body?.error || "").toLowerCase();
+    const code = String(body?.code || "").toLowerCase();
+    return (
+      error === "missing token" ||
+      error === "invalid token" ||
+      code === "auth/id-token-expired" ||
+      code === "auth/id-token-revoked" ||
+      code === "auth/argument-error" ||
+      code === "auth/invalid-token"
+    );
+  }
 
   return false;
 }
@@ -272,7 +288,7 @@ function patchFetchForExpiry() {
   window.fetch = async (input, init) => {
     const res = await baseFetch(input, init);
     const reqUrl = typeof input === "string" ? input : input?.url;
-    if (shouldTreatAsExpiredSession(reqUrl, init, res)) {
+    if (await shouldTreatAsExpiredSession(reqUrl, init, res)) {
       // Fire-and-forget so callers still receive their original response.
       void forceSessionLogout("expired");
     }

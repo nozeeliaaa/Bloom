@@ -13,7 +13,9 @@
  *   answers         - structured Q&A pairs for PDF export
  *   multiDraft      - pending multi-select node data
  *   locked          - UI is locked (during async transitions)
- *   timers          - Set of active setTimeout IDs (cleared on transition)
+ *   timers          - Set of active one-shot setTimeout IDs (cleared on transition)
+ *   backgroundIntervals - Set of long-lived setInterval IDs that should survive
+ *                     normal node transitions (for example reminder polling)
  *   capture         - active date/value capture descriptor
  *   captureData     - accumulated capture values for the current sequence
  *   captureReturnTo - node to resume after capture sequence completes
@@ -66,6 +68,7 @@ export function createCtx() {
     inlineQuestion:     null,       // optional question label paired with inlineChoices
     locked:             false,
     timers:             new Set(),
+    backgroundIntervals: new Set(),
     capture:            null,
     captureData:        {},
     captureReturnTo:    null,
@@ -97,8 +100,11 @@ export function createCtx() {
                                     // Advisory only - never used to override rule-based urgent routing.
                                     // Shape: { symptoms, timing, severity, tone, repair,
                                     //          pregnancySignals, redFlags, confidence }
+    turnFocus:          null,       // ranked lead-vs-secondary symptom snapshot for the current turn
     cumulativeRiskFlags:      new Set(),  // accumulates risk signal flags across conversation
     pendingAmbiguityContext:  null,        // stored when ambiguity question was asked
+    pendingClarification:     null,        // structured pending clarifier metadata
+    declinedClarificationKeys: new Set(),  // clarifiers the user explicitly dismissed
     isMinor:                  false,
     isAnon:                   false,
     ageGroup:                 "unknown",   // "adult" | "minor" | "unknown" (policy-derived)
@@ -144,6 +150,22 @@ export function createCtx() {
       returnedTopic:        null,          // topic code if user returned to a resolved topic
     },
     sessionSymptoms:      new Set(),       // all symptom entity keys detected across the session
+    conversationState: {
+      symptoms: {
+        clots:             undefined,
+        clotsLarge:        undefined,
+        heavyFlow:         undefined,
+        cramps:            undefined,
+        symptomatic:       undefined,
+        possiblePregnancy: undefined,
+      },
+      asked: {
+        clotsSize:      false,
+        heavyFlowCheck: false,
+        symptomCheck:   false,
+        pregnancyCheck: false,
+      },
+    },
     verbosity:            "normal",        // "concise" | "normal" | "detailed"
     oosStreakCount:        0,              // consecutive OOS responses (for conversational repair)
     isRetryAttempt:       false,          // true when user has sent same message twice (second repeat handling)
@@ -165,5 +187,7 @@ export function createCtx() {
     lastClarifierFingerprint: null,       // fingerprint of last clarifying follow-up question emitted
     lastClarifierTurn:       -1,          // flowId when clarifying follow-up was last emitted
     lastBotLineFingerprint:  null,        // fingerprint of most recently emitted bot line (live generation only)
+    askedFollowUpKeys:       new Set(),   // generated follow-up prompts already asked this session
+    activeInputDomains:      [],          // dominant symptom domains from the latest explicit user turn
   };
 }

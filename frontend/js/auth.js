@@ -23,6 +23,7 @@ import { getMode, setMode } from "./mode.js";
 /** Local storage keys */
 const ROLE_KEY = "bloom_user_role";
 const IS_ADMIN_KEY = "bloom_is_admin";
+const ROLE_SYNC_TIMEOUT_MS = 1800;
 
 /** Returns current Firebase Auth instance */
 export function auth() {
@@ -120,10 +121,32 @@ export function getPasswordStrength(password) {
 // ─────────────────────────────────────────
 
 async function syncUserRole(user) {
+  const cachedRole = localStorage.getItem(ROLE_KEY);
+  const cachedIsAdmin = localStorage.getItem(IS_ADMIN_KEY);
+
   try {
+    const tokenResult = await user.getIdTokenResult().catch(() => null);
+    const claimRole = tokenResult?.claims?.role;
+    if (claimRole === "admin") {
+      localStorage.setItem(ROLE_KEY, "admin");
+      localStorage.setItem(IS_ADMIN_KEY, "1");
+      return true;
+    }
+
     const db = getFirebaseDB();
+    if (!db) {
+      localStorage.setItem(ROLE_KEY, cachedRole || "user");
+      localStorage.setItem(IS_ADMIN_KEY, cachedIsAdmin === "1" ? "1" : "0");
+      return cachedIsAdmin === "1";
+    }
+
     const ref = doc(db, "users", user.uid);
-    const snap = await getDoc(ref);
+    const snap = await Promise.race([
+      getDoc(ref),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("role sync timeout")), ROLE_SYNC_TIMEOUT_MS)
+      ),
+    ]);
 
     // Backend schema: role is top-level users/{uid}.role
     // Keep nested fallback for older docs.
@@ -134,10 +157,10 @@ async function syncUserRole(user) {
 
     return role === "admin";
   } catch (e) {
-    localStorage.setItem(ROLE_KEY, "user");
-    localStorage.setItem(IS_ADMIN_KEY, "0");
+    localStorage.setItem(ROLE_KEY, cachedRole || "user");
+    localStorage.setItem(IS_ADMIN_KEY, cachedIsAdmin === "1" ? "1" : "0");
     console.warn("[auth] Could not sync role:", e);
-    return false;
+    return cachedIsAdmin === "1";
   }
 }
 

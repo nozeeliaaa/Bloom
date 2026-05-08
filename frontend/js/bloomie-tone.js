@@ -36,11 +36,15 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { normalizePatois } from "./bloomie-patois.js";
+import { normalizeBloomieText } from "./bloomie-normalize.js";
 import { bloomieDiagnostic } from "./bloomie-logger.js";
 
+function normalizeToneInput(text) {
+  return normalizeBloomieText(text);
+}
+
 // ── Known vocabulary ──────────────────────────────────────────────────────────
-// After normalizePatois() all Patois is mapped to English.  Any remaining token
+// After the same frontend-safe normalization used by routing, any remaining token
 // longer than 2 chars that is NOT in this set is flagged as hasUnknownTokens,
 // driving confidence to "low" so the AI layer can interpret it instead.
 const KNOWN_VOCAB = new Set([
@@ -98,7 +102,6 @@ const KNOWN_VOCAB = new Set([
   "during","while","twice","once","usually","sometimes","often","always","never",
   "within","until","already","yet","soon","eventually","recently","probably",
 
-  // Words appended by INTENT_BOOSTERS in normalizePatois (always safe, internal)
   "stain","soaking","irritable","lightheaded","amenorrhea","missing","absent",
   "ttc","conceive","fertile","postpartum","breastfeeding","lifestyle","change",
   "weight","exercise","birth","control","pill","contraception","distress",
@@ -181,8 +184,7 @@ export function detectToneWithConfidence(text) {
     return { tone: "neutral", confidence: "low", signals: {}, hasUnknownTokens: false };
   }
 
-  const normalized = normalizePatois(text);
-  const t = normalized.toLowerCase();
+  const t = normalizeToneInput(text);
 
   // Unknown-token check: after normalization, flag tokens > 2 chars not in KNOWN_VOCAB.
   // Strip apostrophes first so contractions ("don't" → "dont") match the vocab.
@@ -263,8 +265,20 @@ export async function classifyEmotionAI(rawInput, ruleResult) {
     }
 
     const parsed = await resp.json();
+    const payload =
+      parsed && typeof parsed.confirms === "boolean" && typeof parsed.tone === "string"
+        ? parsed
+        : (() => {
+            const raw = parsed?.content?.[0]?.text;
+            if (typeof raw !== "string") return null;
+            try {
+              return JSON.parse(raw);
+            } catch {
+              return null;
+            }
+          })();
 
-    if (typeof parsed.confirms !== "boolean" || typeof parsed.tone !== "string") {
+    if (typeof payload?.confirms !== "boolean" || typeof payload?.tone !== "string") {
       bloomieDiagnostic("ai_invalid_response", {
         module:         "bloomie-tone",
         stage:          "classifyEmotionAI",
@@ -275,10 +289,10 @@ export async function classifyEmotionAI(rawInput, ruleResult) {
     }
 
     return {
-      confirms:  Boolean(parsed.confirms),
-      tone:      String(parsed.tone),
-      intensity: String(parsed.intensity ?? "medium"),
-      subtext:   String(parsed.subtext   ?? "none"),
+      confirms:  Boolean(payload.confirms),
+      tone:      String(payload.tone),
+      intensity: String(payload.intensity ?? "medium"),
+      subtext:   String(payload.subtext   ?? "none"),
     };
   } catch (err) {
     clearTimeout(timeoutId);

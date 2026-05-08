@@ -11,7 +11,7 @@
  * Document ID: auto-generated
  * Fields:
  *   type        - "urgent_trigger" | "oos_fallback" | "escalation"
- *   uid         - Firebase UID of the user (from auth token)
+ *   uid         - Firebase UID of the user, or "anonymous" when no token exists
  *   ts          - server timestamp
  *   input       - truncated normalised user text (max 300 chars)
  *   route       - the resolved route node (urgent_trigger / escalation)
@@ -26,17 +26,18 @@
 
 import express                       from "express";
 import { db, admin }                 from "../firebaseAdmin.js";
+import { auth }                      from "../firebaseAdmin.js";
 
 const FieldValue = admin.firestore.FieldValue;
-import { requireAuth }               from "../middleware/auth.js";
 
 const router = express.Router();
 
-const VALID_TYPES = new Set(["urgent_trigger", "oos_fallback", "escalation"]);
+const VALID_TYPES      = new Set(["urgent_trigger", "oos_fallback", "escalation"]);
+const VALID_RISK_LEVELS = new Set(["low", "moderate", "high"]);
 
 const VALID_SYMPTOM_KEYS = new Set([
   "late","heavy","spotting","pelvic","mood","discharge","nausea","dizziness",
-  "large_clots","ovulation_pain","headache","joint_pain","breast_tender",
+  "clots","large_clots","ovulation_pain","headache","joint_pain","breast_tender",
   "bloating","gassy","heartburn","constipation","diarrhea",
   "discharge_eggwhite","discharge_creamy","discharge_sticky","unusual_discharge",
   "acne","dry_skin","hair_thinning","hot_flashes","night_sweats","cold_flashes",
@@ -45,16 +46,29 @@ const VALID_SYMPTOM_KEYS = new Set([
   "craving_greasy","craving_spicy","appetite_increase","appetite_decrease",
   "libido_high","libido_low","cervical_mucus","vaginal_dryness","pain_during_sex",
   "irregular","fluid_retention","frequent_urination","weight_change",
-  "smell_sensitivity","nasal_congestion",
+  "smell_sensitivity","nasal_congestion","fever","chills","bleeding_after_sex",
+  "discharge_foul_smell","urinary_burning","urinary_urgency",
 ]);
 
+async function resolveUid(req) {
+  try {
+    const header = req.headers.authorization;
+    if (!header?.startsWith("Bearer ")) return "anonymous";
+    const token = header.split(" ")[1];
+    const decoded = await auth.verifyIdToken(token);
+    return decoded.uid || "anonymous";
+  } catch {
+    return "anonymous";
+  }
+}
+
 // POST /api/bloomie-safety-log
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const {
       type, input, route, reason,
       category, fromNode, urgencyFlag, symptoms,
-      containsHealthKeywords,
+      containsHealthKeywords, topic, riskLevel,
     } = req.body;
 
     // Validate type
@@ -62,10 +76,12 @@ router.post("/", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid event type" });
     }
 
+    const uid = await resolveUid(req);
+
     // Build the log document - whitelist every field
     const doc = {
       type,
-      uid:         req.user.uid,
+      uid,
       ts:          FieldValue.serverTimestamp(),
       reviewed:    false,
     };
@@ -77,6 +93,8 @@ router.post("/", requireAuth, async (req, res) => {
     if (typeof fromNode === "string") doc.fromNode = fromNode.slice(0, 80);
     if (urgencyFlag              !== undefined) doc.urgencyFlag              = !!urgencyFlag;
     if (containsHealthKeywords   !== undefined) doc.containsHealthKeywords   = !!containsHealthKeywords;
+    if (typeof topic    === "string") doc.topic    = topic.slice(0, 80);
+    if (typeof riskLevel === "string" && VALID_RISK_LEVELS.has(riskLevel)) doc.riskLevel = riskLevel;
 
     if (Array.isArray(symptoms)) {
       doc.symptoms = symptoms

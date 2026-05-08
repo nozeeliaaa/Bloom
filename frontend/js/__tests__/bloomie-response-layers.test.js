@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   buildEmotionalFollowUp,
+  getFollowUpKey,
   buildFollowUpQuestion,
   buildMiniReplay,
   buildSoftContinuePrompt,
   buildTinyWinLine,
+  composeResponseLayers,
   detectReasoningSpiral,
   detectTinyWin,
   maybeBuildRealityCheckPrefix,
@@ -25,6 +27,8 @@ function makeContext(overrides = {}) {
     sessionDepth: overrides.sessionDepth ?? 1,
     isShortFollowUp: overrides.isShortFollowUp ?? false,
     hasPendingClarifier: overrides.hasPendingClarifier ?? false,
+    askedFollowUpKeys: overrides.askedFollowUpKeys ?? new Set(),
+    primaryFocusApplied: overrides.primaryFocusApplied ?? false,
     entities: {
       symptoms: {
         late: false,
@@ -73,6 +77,46 @@ describe("silent clue detection", () => {
       symptoms: { spotting: true },
     });
     expect(buildFollowUpQuestion(ctx)).toMatch(/light spotting|more like bleeding/i);
+  });
+
+  it("does not repeat the same generated follow-up once its key is tracked", () => {
+    const base = makeContext({
+      text: "mi period late",
+      normalizedText: "mi period late",
+      inferredReason: "late+short_duration",
+      symptoms: { late: true },
+    });
+    const key = getFollowUpKey(base);
+    const ctx = makeContext({
+      text: "mi period late",
+      normalizedText: "mi period late",
+      inferredReason: "late+short_duration",
+      symptoms: { late: true },
+      askedFollowUpKeys: new Set([key]),
+    });
+    expect(shouldAskFollowUp(ctx)).toBe(false);
+  });
+
+  it("can ask one focused follow-up for a multi-symptom turn when primary focus is applied", () => {
+    const ctx = makeContext({
+      text: "clots and cramps",
+      normalizedText: "clots and cramps",
+      symptoms: { heavy: true, large_clots: true, pelvic: true },
+      primaryFocusApplied: true,
+    });
+    expect(shouldAskFollowUp(ctx)).toBe(true);
+    expect(buildFollowUpQuestion(ctx)).toMatch(/soaking through a pad|dizzy|clots|one-sided/i);
+    expect(buildFollowUpQuestion(ctx)).not.toMatch(/heavier than usual but still manageable/i);
+  });
+
+  it("does not ask explicit heavy flow to re-classify bleeding amount", () => {
+    const ctx = makeContext({
+      text: "my flow is so heavy",
+      normalizedText: "my flow is so heavy",
+      symptoms: { heavy: true },
+    });
+    expect(buildFollowUpQuestion(ctx)).toMatch(/How long has the heavier bleeding/i);
+    expect(buildFollowUpQuestion(ctx)).not.toMatch(/light spotting|normal period|heavier than usual/i);
   });
 });
 
@@ -162,5 +206,35 @@ describe("tiny wins and gentle warnings", () => {
   it("softens harsh escalation wording", () => {
     const line = softenEscalationLine("Please seek medical care as soon as possible 🩷");
     expect(line).toMatch(/good idea to get medical care soon/i);
+  });
+});
+
+describe("response orchestration", () => {
+  it("keeps a short layered response without stacking every helper", () => {
+    const composed = composeResponseLayers(
+      makeContext({
+        text: "is brown blood bad?",
+        normalizedText: "is brown blood bad?",
+        inferredReason: "spotting+mid_cycle",
+        sessionDepth: 2,
+        symptoms: { spotting: true },
+      }),
+      {
+        guidance: {
+          scenario: "spotting_info",
+          lines: ["Brown blood can happen when blood moves more slowly or is older."],
+        },
+        guidanceOpener: "I can help with that 🩷",
+        secondaryAcknowledgement: "I'm also noting the cramps 🩷",
+        patternLine: "I'm noticing this has come up more than once 🩷",
+        alreadyShown: {
+          tinyWins: new Set(),
+          softContinue: false,
+        },
+      }
+    );
+
+    expect(composed.lines.length).toBeLessThanOrEqual(4);
+    expect(composed.lines.join(" ")).toMatch(/brown blood|worr|cramps/i);
   });
 });

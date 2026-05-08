@@ -103,6 +103,12 @@ router.post("/profile", requireAuth, async (req, res) => {
       phaseEstimation: existing?.phaseEstimation ?? existingPhaseProfile.phaseEstimation ?? null,
     };
 
+    console.log(`[profile] writing users/${uid}.profile`, {
+      nickname: profile.nickname,
+      avatar: profile.avatar,
+      yearOfBirth: profile.yearOfBirth,
+    });
+
     await userRef.set({
       profile,
       healthProfile,
@@ -115,6 +121,8 @@ router.post("/profile", requireAuth, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+
+    console.log(`[profile] Firestore write success uid=${uid}`);
 
     const changedFields = Object.keys(req.body).filter((k) => k !== "role");
 
@@ -149,8 +157,21 @@ router.post("/profile", requireAuth, async (req, res) => {
       });
     }
 
-    const savedDoc = await userRef.get();
-    const savedData = savedDoc.data();
+    let savedData = {
+      ...(existing || {}),
+      profile,
+      healthProfile,
+      biometricProfile,
+      phaseProfile,
+    };
+    try {
+      const savedDoc = await userRef.get();
+      if (savedDoc?.exists && typeof savedDoc.data === "function") {
+        savedData = savedDoc.data();
+      }
+    } catch (readErr) {
+      console.warn(`[profile] post-save read skipped uid=${uid}:`, readErr?.message || readErr);
+    }
 
     console.log(`[profile] saved uid=${uid}`, JSON.stringify(savedData));
     return res.json({

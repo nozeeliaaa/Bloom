@@ -14,7 +14,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { normalizePatois, fuzzyCorrect, collapseRepeatedLetters, expandShorthand } from "./bloomie-patois.js";
+import { normalizePatois } from "./bloomie-patois.js";
+import { normalizeBloomieText } from "./bloomie-normalize.js";
 
 
 // ─── 1. STRING UTILITIES ──────────────────────────────────────────────────────
@@ -24,15 +25,7 @@ export function pick(arr) {
 }
 
 export function normalizeText(s) {
-  const patoisNorm = normalizePatois(String(s || ""));
-  const fuzzyNorm = fuzzyCorrect(patoisNorm) ?? patoisNorm;
-  const collapsed = collapseRepeatedLetters(fuzzyNorm);
-  const expanded = expandShorthand(collapsed);
-  return String(expanded || "")
-    .toLowerCase()
-    .replace(/[^\w\s'']/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeBloomieText(s, { stripSpecialChars: true });
 }
 
 export function safeEcho(s, max = 52) {
@@ -547,6 +540,101 @@ export function scoreVagueHealth(text) {
   return _VAGUE_HEALTH_PATTERNS.filter(rx => rx.test(t)).length;
 }
 
+// ─── 2d. HARD CRITICAL-RISK OVERRIDE ─────────────────────────────────────────
+//
+// This is deliberately separate from confidence scoring. Critical symptoms
+// must force urgent escalation even when the normal router is unsure or another
+// route has a higher score.
+
+const CRITICAL_EMERGENCY_PATTERNS = [
+  {
+    reason: "critical breathing symptom detected",
+    route: "EMERGENCY_REDIRECT",
+    rx: /\b(can'?t breathe|can t breathe|cant breathe|cannot breathe|difficulty breathing|trouble breathing|hard to breathe|shortness of breath|can'?t get air|can t get air)\b/,
+  },
+  {
+    reason: "critical chest symptom detected",
+    route: "EMERGENCY_REDIRECT",
+    rx: /\b(chest pain|chest tight(?:ness)?|chest is tight|chest hurts|pressure in (?:my )?chest)\b/,
+  },
+  {
+    reason: "critical fainting symptom detected",
+    route: "HEAVY_URGENT",
+    rx: /\b(fainted|fainting|passed out|passing out|about to pass out|about to faint|feel like (?:i )?(?:might )?(?:pass out|faint)|nearly fainted|almost fainted|collapsed?)\b/,
+  },
+];
+
+const CRITICAL_URGENT_PATTERNS = [
+  {
+    reason: "critical bleeding symptom detected",
+    route: "HEAVY_URGENT",
+    rx: /\b(bleeding heavily|bleed(?:ing)? heavily|bleed(?:ing)? heavy|bleeding so much|so much blood|flooding|soaking through|soaking thru|bleeding through|bleed through|changing (?:a )?(?:pad|tampon).*hour|blood everywhere)\b/,
+  },
+  {
+    reason: "strong urgency language detected",
+    route: "HEAVY_URGENT",
+    rx: /\b(severe pain|severe cramps?|unbearable pain|pain is unbearable|worst pain|excruciating pain|extreme pain|10\/10 pain|can'?t stand|can t stand|cant stand|too weak)\b/,
+  },
+];
+
+const CRITICAL_DOWNPLAYING_PATTERNS = [
+  /\b(just a little|only a bit|not that bad|kinda|sort of|i think i'?m okay|i think i m okay|i think im okay|probably nothing|might be nothing|don'?t want to overreact|don t want to overreact|dont want to overreact|maybe i'?m being dramatic|maybe i m being dramatic|maybe im being dramatic|not sure if it'?s serious|not sure if it s serious)\b/,
+  /\b(likkle bit|nuh too bad|mi aight|a nuh nutten|a no nutten|probably nutten|mi probably fine)\b/,
+];
+
+function hasSeriousSymptomSignal(signals, text) {
+  const sym = signals?.symptoms || {};
+  const t = String(text || signals?.raw || "").toLowerCase();
+  return !!(
+    signals?.urgent ||
+    signals?.severity === "severe" ||
+    sym.dizziness ||
+    (sym.heavy && (sym.large_clots || /\b(heavy|soaking|flooding|bleeding|blood)\b/.test(t))) ||
+    (sym.pelvic && signals?.severity === "severe") ||
+    CRITICAL_EMERGENCY_PATTERNS.some(({ rx }) => rx.test(t)) ||
+    CRITICAL_URGENT_PATTERNS.some(({ rx }) => rx.test(t))
+  );
+}
+
+/**
+ * detectCriticalRiskDetail(signals, text) -> { critical, route, reason }
+ *
+ * Hard safety override used by the assistant pipeline. Call this immediately
+ * after signal/entity extraction and before confidence, fallback, or ordinary
+ * response generation. When critical=true, callers should transition directly
+ * to the returned urgent route.
+ */
+export function detectCriticalRiskDetail(signals = {}, text = "") {
+  const t = normalizeText(text || signals?.raw || "");
+
+  for (const pattern of CRITICAL_EMERGENCY_PATTERNS) {
+    if (pattern.rx.test(t)) return { critical: true, route: pattern.route, reason: pattern.reason };
+  }
+
+  for (const pattern of CRITICAL_URGENT_PATTERNS) {
+    if (pattern.rx.test(t)) return { critical: true, route: pattern.route, reason: pattern.reason };
+  }
+
+  if (signals?.urgent) {
+    return { critical: true, route: "HEAVY_URGENT", reason: "critical urgency flag detected" };
+  }
+
+  if (hasSeriousSymptomSignal(signals, t) && CRITICAL_DOWNPLAYING_PATTERNS.some((rx) => rx.test(t))) {
+    return { critical: true, route: "HEAVY_URGENT", reason: "downplaying with serious symptom detected" };
+  }
+
+  return { critical: false, route: null, reason: null };
+}
+
+/**
+ * detectCriticalRisk(signals, text) -> boolean
+ *
+ * Public boolean wrapper required by the routing pipeline and tests.
+ */
+export function detectCriticalRisk(signals = {}, text = "") {
+  return detectCriticalRiskDetail(signals, text).critical;
+}
+
 // ─── 3. SIGNAL SCORING ────────────────────────────────────────────────────────
 
 /**
@@ -777,6 +865,11 @@ const INTENT_LABELS = {
   red_flag:   "urgent care concern",
 };
 
+export const ROUTE_CONFIDENCE_THRESHOLDS = {
+  high: 0.75,
+  medium: 0.4,
+};
+
 /**
  * INTENT_TO_NODE - maps a resolved intent key to its entry node
  */
@@ -801,34 +894,50 @@ export const INTENT_TO_NODE = {
  * context for the chat engine to decide whether to route directly, ask a
  * soft confirmation, or fall back to NARROWING.
  *
- * Tiers:
- *   "high"   -- route directly, no clarifying question
- *   "medium" -- prepend soft confirmation before routing
- *   "low"    -- do not route directly; surface NARROWING with top candidates
+ * Tiers use normalized confidence, not raw regex hit counts:
+ *   high   >= 0.75 -> route directly
+ *   medium 0.40-0.74 -> ask validation / use cautious response
+ *   low    < 0.40 -> never expose a normal route; ask clarification/fallback
  *
- * Rules (evaluated in order):
- *   1. urgency flag always HIGH (safety overrides everything)
- *   2. top score < 4 AND no urgency -> LOW
- *   3. 3+ signals all within 2 points of each other -> LOW (genuine ambiguity)
- *   4. top >= 4 AND second score within 2 of top -> MEDIUM (two competing signals)
- *   5. top >= 7 AND both pelvic AND late are present -> MEDIUM (entity ambiguity)
- *   6. top >= 7 AND second < top / 2 -> HIGH (clear dominant winner)
- *   7. top >= 4, no close competitor -> HIGH (single dominant, no real competition)
+ * The score combines signal strength and separation from competitors. This
+ * prevents weak partial matches from becoming strong conclusions just because
+ * they were the only match.
  */
 export function computeRouteConfidence(sig, entities) {
   // Helper: build the full result shape
-  function result(tier, score, primaryIntent, competingIntents, confidenceNote) {
-    const route      = INTENT_TO_NODE[primaryIntent] || null;
+  function result(tier, score, rawScore, primaryIntent, competingIntents, confidenceNote, routeOverride) {
+    const route      = routeOverride === undefined ? (INTENT_TO_NODE[primaryIntent] || null) : routeOverride;
     const competitors = competingIntents
       .map(function(i) { return INTENT_TO_NODE[i] || null; })
       .filter(Boolean);
     const ambiguous  = tier !== "high";
-    return { tier, score, primaryIntent, competingIntents, confidenceNote, route, competitors, ambiguous };
+    return {
+      tier,
+      score,
+      rawScore,
+      primaryIntent,
+      competingIntents,
+      confidenceNote,
+      route,
+      competitors,
+      ambiguous,
+      thresholds: ROUTE_CONFIDENCE_THRESHOLDS,
+    };
+  }
+
+  function clamp01(n) {
+    return Math.max(0, Math.min(1, n));
+  }
+
+  function tierFor(score) {
+    if (score >= ROUTE_CONFIDENCE_THRESHOLDS.high) return "high";
+    if (score >= ROUTE_CONFIDENCE_THRESHOLDS.medium) return "medium";
+    return "low";
   }
 
   // Rule 1 -- urgency always HIGH
   if (entities && entities.urgent) {
-    return result("high", 10, "urgent_care", [], null);
+    return result("high", 1, 10, "urgent_care", [], null);
   }
 
   // Build sorted list of signals with a positive score
@@ -837,7 +946,7 @@ export function computeRouteConfidence(sig, entities) {
     .sort(function(a, b) { return b[1] - a[1]; });
 
   if (scored.length === 0) {
-    return result("low", 0, null, [], null);
+    return result("low", 0, 0, null, [], null, null);
   }
 
   const topScore    = scored[0][1];
@@ -861,40 +970,53 @@ export function computeRouteConfidence(sig, entities) {
   // Build the confidenceNote for MEDIUM tier
   function medNote(intent) {
     const label = INTENT_LABELS[intent] || intent.replace(/_/g, " ");
-    return "It sounds like this might be about " + label + " -- is that right?";
+    return "I'm not fully certain yet, but this might be about " + label + " -- is that right?";
   }
 
   // Special: late period + confirmed positive test → unambiguous positive result
   if (entities?.symptoms?.late && entities?.pregnancy?.result === "positive") {
-    return result("high", topScore, "late", [], null);
+    return result("high", 0.9, topScore, "late", [], null);
   }
 
-  // Rule 2 -- low score
-  if (topScore < 3) {
-    return result("low", topScore, primaryIntent, competingIntents, null);
-  }
-
-  // Rule 3 -- 3+ signals within 2 points of each other
+  // Strength is capped by the strongest signal; separation penalizes partial
+  // matches when another intent is close behind. Multiple close signals are
+  // treated as ambiguity, not confidence.
+  const strengthScore = clamp01(topScore / 6);
+  const separationScore = scored.length === 1
+    ? 0.8
+    : clamp01((topScore - secondScore) / Math.max(topScore, 1));
+  let confidenceScore = clamp01((strengthScore * 0.75) + (separationScore * 0.25));
   const closeSignals = scored.filter(function(pair) { return topScore - pair[1] <= 2; });
+
   if (closeSignals.length >= 3) {
-    return result("low", topScore, primaryIntent, competingIntents, null);
+    confidenceScore = Math.min(confidenceScore, 0.39);
   }
 
-  // Rule 4 -- two competing signals
+  if (topScore < 3) {
+    confidenceScore = Math.min(confidenceScore, 0.39);
+  }
+
   if (secondScore >= topScore - 2) {
-    return result("medium", topScore, primaryIntent, competingIntents, medNote(primaryIntent));
+    confidenceScore = Math.min(confidenceScore, 0.74);
   }
 
-  // Rule 5 -- moderate+ score but pelvic AND late both present (competing entities)
   if (topScore >= 4 && (sig.pelvic || 0) > 0 && (sig.late || 0) > 0) {
-    return result("medium", topScore, primaryIntent, competingIntents, medNote(primaryIntent));
+    confidenceScore = Math.min(confidenceScore, 0.74);
   }
 
-  // Rule 6 -- clear dominant winner at high score
-  if (topScore >= 7 && secondScore < topScore / 2) {
-    return result("high", topScore, primaryIntent, competingIntents, null);
+  const tier = tierFor(confidenceScore);
+  if (tier === "low") {
+    // Low confidence intentionally has no route. Callers may use
+    // primaryIntent/competitors to build clarification buttons only.
+    return result("low", confidenceScore, topScore, primaryIntent, competingIntents, null, null);
   }
 
-  // Rule 7 -- dominant signal, no close competitor
-  return result("high", topScore, primaryIntent, competingIntents, null);
+  return result(
+    tier,
+    confidenceScore,
+    topScore,
+    primaryIntent,
+    competingIntents,
+    tier === "medium" ? medNote(primaryIntent) : null
+  );
 }

@@ -5,22 +5,22 @@
  *
  * PREPROCESSING PIPELINE (4 stages):
  *
- *   Stage 1 - Phrase-level exact matching
+ *   Stage 1 — Phrase-level exact matching
  *             Multi-word Patois phrases → English equivalents.
  *             Processed first so idioms ("belly a kill mi") aren't broken up.
  *
- *   Stage 2 - Word-level exact matching
+ *   Stage 2 — Word-level exact matching
  *             Single Patois tokens → English equivalents (whole-word only).
  *
- *   Stage 3 - Fuzzy matching (Levenshtein distance)
+ *   Stage 3 — Fuzzy matching (Levenshtein distance)
  *             Catches near-misses: misspellings, regional spelling variation,
  *             elongation ("baad"), dropped letters ("bleedin"), transpositions
  *             ("peroid"). Uses dynamic threshold: distance ≤ 1 for short words
  *             (≤5 chars), distance ≤ 2 for longer words.
  *             This is the key answer to "what if her Patois doesn't match your
- *             dictionary exactly?" - it doesn't have to.
+ *             dictionary exactly?" — it doesn't have to.
  *
- *   Stage 4 - Intent boosters
+ *   Stage 4 — Intent boosters
  *             Appends extra scoring keywords for patterns that survive all three
  *             stages but still need a stronger signal in the scorer.
  *
@@ -30,7 +30,7 @@
  *   - Lalla & D'Costa's "Language in Exile" linguistic corpus
  *   - The JamCreole academic wordlist
  *   - Iterative testing with Jamaican users and community review
- *   It is not claimed to be exhaustive - Patois is a living language.
+ *   It is not claimed to be exhaustive — Patois is a living language.
  *   Fuzzy matching (Stage 3) is specifically designed to handle the variation
  *   that a fixed dictionary cannot.
  *
@@ -609,7 +609,7 @@ const WORD_MAP = [
   ["likkle",    "little"],
   ["lil",       "little"],
   ["nuff",      "a lot of"],
-  // FIX #1 & #3: Removed ["bad", "badly"] - it mapped "bad" universally,
+  // FIX #1 & #3: Removed ["bad", "badly"] — it mapped "bad" universally,
   // breaking severity patterns like "bleed bad", "cramp bad", "hurt bad"
   // in both extractSymptoms and extractSeverity after normalization.
   // Severity signals are handled by phrase-level maps ("cramp bad" → "severe cramps")
@@ -721,23 +721,23 @@ const WORD_MAP = [
 // ─── 3. FUZZY MATCHING (Damerau-Levenshtein + phonetic variants) ──────────────
 //
 // Pipeline for each user message token:
-//   1. PHONETIC_VARIANTS lookup  - fast O(1), catches known Jamaican/Caribbean
+//   1. PHONETIC_VARIANTS lookup  — fast O(1), catches known Jamaican/Caribbean
 //      spelling patterns that Levenshtein alone won't handle within threshold.
-//   2. Exact-match check against FUZZY_DICTIONARY - skip correction if already correct.
-//   3. Damerau-Levenshtein (OSA) - handles insertions, deletions, substitutions,
+//   2. Exact-match check against FUZZY_DICTIONARY — skip correction if already correct.
+//   3. Damerau-Levenshtein (OSA) — handles insertions, deletions, substitutions,
 //      and adjacent transpositions. Threshold based on max(token, dictWord) length:
-//        1–4 chars  → distance 0 (no fuzzy - "pad" must not match "pain")
+//        1–4 chars  → distance 0 (no fuzzy — "pad" must not match "pain")
 //        5–7 chars  → distance ≤ 1
 //        8–11 chars → distance ≤ 2
 //        12+ chars  → distance ≤ 3
-//   4. PROTECTED_TOKENS - valid Patois words, never corrected.
-//   5. Correction cache - Map keyed on token, avoids re-running Levenshtein.
+//   4. PROTECTED_TOKENS — valid Patois words, never corrected.
+//   5. Correction cache — Map keyed on token, avoids re-running Levenshtein.
 //
 // fuzzyCorrect() is exported and handles both single-token and full-sentence input.
 // When given a sentence (contains whitespace), it corrects each token independently
 // and rejoins. Called explicitly AFTER normalizePatois() in the pipeline.
 
-// ── Phonetic variants - run FIRST before Levenshtein ─────────────────────────
+// ── Phonetic variants — run FIRST before Levenshtein ─────────────────────────
 const PHONETIC_VARIANTS = {
   // Pregnancy
   "pregnat":        "pregnant",
@@ -855,7 +855,7 @@ const PHONETIC_VARIANTS = {
   "ectoppic":       "ectopic",
 };
 
-// ── Fuzzy dictionary - organized by category ──────────────────────────────────
+// ── Fuzzy dictionary — organized by category ──────────────────────────────────
 const FUZZY_DICTIONARY = {
   reproductive_core: [
     "spotting", "bleeding", "pregnant", "pregnancy", "period", "periods",
@@ -912,13 +912,13 @@ const FUZZY_DICTIONARY = {
 const ALL_FUZZY_TERMS_ARRAY = [...new Set(Object.values(FUZZY_DICTIONARY).flat())];
 const ALL_FUZZY_TERMS = new Set(ALL_FUZZY_TERMS_ARRAY);
 
-// ── Protected Patois tokens - must never be fuzzy-corrected ───────────────────
+// ── Protected Patois tokens — must never be fuzzy-corrected ───────────────────
 const PROTECTED_TOKENS = new Set([
   "mi", "di", "fi", "nuh", "wah", "yuh", "dem", "seh", "deh", "ting",
   "man", "gal", "bad", "good", "real",
 ]);
 
-// ── Correction cache - avoids re-running Levenshtein for repeated tokens ──────
+// ── Correction cache — avoids re-running Levenshtein for repeated tokens ──────
 const _correctionCache = new Map();
 let _cacheHits = 0;
 
@@ -930,7 +930,7 @@ export function _getFuzzyCacheHits() { return _cacheHits; }
 
 // ── Damerau-Levenshtein distance (Optimal String Alignment) ───────────────────
 // Handles insertions, deletions, substitutions, and adjacent transpositions.
-// Transpositions cost 1 - this is why "peroid" → "period" now works (dist 1).
+// Transpositions cost 1 — this is why "peroid" → "period" now works (dist 1).
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, (_, i) =>
@@ -954,7 +954,7 @@ function levenshtein(a, b) {
 
 // ── Threshold by max(token, dictWord) length ───────────────────────────────────
 function getThreshold(maxLen) {
-  if (maxLen <= 4)  return 0;  // no fuzzy - "pad" must not match "pain"
+  if (maxLen <= 4)  return 0;  // no fuzzy — "pad" must not match "pain"
   if (maxLen <= 7)  return 1;
   if (maxLen <= 11) return 2;
   return 3;
@@ -969,10 +969,10 @@ function _correctToken(token) {
     return phonetic;
   }
 
-  // 2. Exact match in dictionary - already correct, no change needed
+  // 2. Exact match in dictionary — already correct, no change needed
   if (ALL_FUZZY_TERMS.has(token)) return token;
 
-  // 3. Levenshtein - only for tokens ≥ 5 chars (short words too collision-prone)
+  // 3. Levenshtein — only for tokens ≥ 5 chars (short words too collision-prone)
   if (token.length < 5) return null;
 
   let bestMatch = null;
@@ -987,7 +987,7 @@ function _correctToken(token) {
     const threshold = getThreshold(maxLen);
     if (threshold === 0) continue;
 
-    // Length-difference filter - eliminates most comparisons immediately
+    // Length-difference filter — eliminates most comparisons immediately
     if (Math.abs(token.length - term.length) > threshold) continue;
 
     const dist = levenshtein(token, term);
@@ -1050,91 +1050,15 @@ export function fuzzyCorrect(input) {
   return result;
 }
 
-// ─── 4. INTENT BOOSTERS ───────────────────────────────────────────────────────
-// After normalization, append extra scoring keywords for patterns that are
-// hard to capture with word-swaps alone.
-
-const INTENT_BOOSTERS = [
-  {
-    // NOTE: boost uses "late period" not "late missed period". "missed period"
-    // in boosted text activates scoreSignals' pregnancy signal via
-    // /unprotected|missed.*period/ → false PREGNANCY_ENTRY on pure-late inputs.
-    patterns: [/period.*not.*come|period.*late|missed.*period|\bno\b.*period/i],
-    boost: " late period",
-  },
-  {
-    // NOTE: boost must NOT include "pain" - combined with "severe" it triggers
-    // extractUrgency's severe.*pain pattern causing false escalation.
-    patterns: [/cramp|pelvic pain|stomach pain|belly pain|lower abdom/i],
-    boost: " cramp pelvic",
-  },
-  {
-    patterns: [/spotting|light bleed|brown discharge|pink discharge/i],
-    boost: " spotting light stain",
-  },
-  {
-    // NOTE: "missed period" removed from boost - it activated sym.late prematurely,
-    // causing the late+pregnancy combo rule to fire before spotting+pregnancy rules.
-    patterns: [/pregnant|pregnancy|positive test|might be pregnant/i],
-    boost: " pregnant pregnancy",
-  },
-  {
-    patterns: [/heavy bleed|soaking through|bleed through|passing clots/i],
-    boost: " heavy bleeding soaking",
-  },
-  {
-    patterns: [/mood|irritable|anxious|sad|overwhelmed|low mood|cry/i],
-    boost: " mood anxious sad irritable",
-  },
-  {
-    // NOTE: boost must NOT include "faint" - it is in extractUrgency's regex and
-    // causes false escalation when the user only mentions weakness (not fainting).
-    // "dizziness" and "lightheaded" are NOT urgency keywords so they are safe.
-    patterns: [/faint|dizzy|lightheaded|pass out/i],
-    boost: " dizzy lightheaded",
-  },
-  {
-    // Amenorrhea - periods missing for extended time
-    patterns: [/amenorrhea|period.*months|months.*period|period.*stopped|period.*absent|not.*had.*period|missed.*more.*period|period.*gone/i],
-    boost: " amenorrhea missing period months absent",
-  },
-  {
-    // TTC - trying to conceive context
-    patterns: [/trying to conceive|ttc|trying to get pregnant|want.*pregnant|fertile days|ovulation.*test/i],
-    boost: " ttc trying to conceive ovulation fertile",
-  },
-  {
-    // Postpartum context
-    patterns: [/postpartum|gave birth|had.*baby|after.*baby|breastfeeding|period.*return/i],
-    boost: " postpartum after birth breastfeeding",
-  },
-  {
-    // Lifestyle change signals that delay periods
-    patterns: [/stressed|stress|lost weight|gained weight|exercise.*intense|intensely|been sick|illness|travel|sleep.*poor|not sleeping/i],
-    boost: " lifestyle change stress weight exercise",
-  },
-  {
-    // Birth control context
-    patterns: [/birth control|on the pill|started pill|stopped pill|iud|implant|coil|bc/i],
-    boost: " birth control pill contraception",
-  },
-  {
-    // Emotional distress / fear
-    patterns: [/scared|afraid|worried|ashamed|embarrassed|frightened|fear|nervous.*about.*health/i],
-    boost: " scared worried emotional distress",
-  },
-];
-
-// ─── 5. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
+// ─── 4. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
 
 /**
  * normalizePatois(rawText) → String
  *
- * Full 4-stage preprocessing pipeline:
+ * Full preprocessing pipeline:
  *   Stage 1: Phrase-level exact matching
  *   Stage 2: Word-level exact matching
  *   Stage 3: Fuzzy matching (Levenshtein) for near-miss Patois tokens
- *   Stage 4: Intent boosters
  *
  * @param  {string} rawText  - Raw text from the chat input
  * @returns {string}          - Normalized English text
@@ -1182,14 +1106,7 @@ export function normalizePatois(rawText) {
   // canonical pipeline order (normalizePatois → fuzzyCorrect → extractEntities).
   text = fuzzyCorrect(text) ?? text;
 
-  // ── Stage 4: intent boosters ──────────────────────────────────────────────
-  for (const booster of INTENT_BOOSTERS) {
-    if (booster.patterns.some((rx) => rx.test(text))) {
-      text += booster.boost;
-    }
-  }
-
-  return text;
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -1216,7 +1133,7 @@ export function detectPatois(rawText) {
   return PATOIS_SIGNALS.some((rx) => rx.test(t));
 }
 
-// ── Tone pattern arrays - each entry is one detectable signal ─────────────────
+// ── Tone pattern arrays — each entry is one detectable signal ─────────────────
 // Checking arrays (not a single combined regex) lets us COUNT how many signals
 // are present per category. The priority resolver then picks the highest-priority
 // category that has at least one match, resolving overlaps cleanly.
@@ -1256,7 +1173,7 @@ const EXHAUSTED_PATTERNS = [
   /\b(feel(?:ing)? like giving up|running on empty)\b/,
   /\b(burnt? out|nuh have no energy)\b/,
   /\b(feel(?:ing)? weak|body tired|mi body tired)\b/,
-  // "mi done" = exhausted; "mi done wid dis" = frustrated - negative lookahead separates them
+  // "mi done" = exhausted; "mi done wid dis" = frustrated — negative lookahead separates them
   /\bmi done(?!\s+wid)\b/,
 ];
 
@@ -1296,7 +1213,7 @@ const CASUAL_PATTERNS = [
  *
  * confidence = true when resolved tone has 2+ phrase matches, OR when a single
  * strong distressed/angry/exhausted/frustrated signal fires (serious tones are
- * always considered confident - a single "scared" or "vex" is unambiguous).
+ * always considered confident — a single "scared" or "vex" is unambiguous).
  *
  * @param  {string} text - Raw user input
  * @returns {{ tone: string, scores: object, confidence: boolean }}
@@ -1305,7 +1222,7 @@ export function detectUserToneWithScores(text) {
   if (!text) return { tone: "neutral", scores: {}, confidence: false };
 
   const t = text.toLowerCase();
-  // Normalize for mixed Patois/English support - checked alongside raw text
+  // Normalize for mixed Patois/English support — checked alongside raw text
   const tn = normalizePatois(text).toLowerCase();
 
   // Test a pattern against both raw and normalized text
@@ -1320,7 +1237,7 @@ export function detectUserToneWithScores(text) {
   };
 
   // Priority: distressed > angry > exhausted > frustrated > casual > neutral.
-  // A single match is enough for any serious tone - "lol I'm scared" → distressed.
+  // A single match is enough for any serious tone — "lol I'm scared" → distressed.
   const SERIOUS = ["distressed", "angry", "exhausted", "frustrated"];
   for (const tone of SERIOUS) {
     if (scores[tone] >= 1) {
@@ -1328,7 +1245,7 @@ export function detectUserToneWithScores(text) {
     }
   }
 
-  // Casual: keyword match OR short message length - but ONLY when no serious
+  // Casual: keyword match OR short message length — but ONLY when no serious
   // tones were detected anywhere in the message. Fixes: "help me" (short but
   // distressed), short urgent messages under 40 chars staying distressed.
   const hasShortLength = t.trim().length <= 40;
@@ -1348,7 +1265,7 @@ export function detectUserToneWithScores(text) {
  *
  * Priority: distressed > angry > exhausted > frustrated > casual > neutral.
  * Runs normalizePatois() internally so mixed Patois/English messages are handled.
- * Short message length is a weak casual signal only - it never overrides a
+ * Short message length is a weak casual signal only — it never overrides a
  * distressed, angry, exhausted, or frustrated match.
  *
  * @param  {string} text  - Raw user input
@@ -1377,7 +1294,7 @@ export function updateSessionTone(ctx, text) {
   ctx.previousTone = ctx.currentTone;
 
   if (tone === "neutral" || (!confidence && tone === "casual")) {
-    // Ambiguous turn - hold the previous tone if one exists
+    // Ambiguous turn — hold the previous tone if one exists
     ctx.currentTone = ctx.previousTone || tone;
   } else {
     ctx.currentTone = tone;

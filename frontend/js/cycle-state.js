@@ -102,15 +102,58 @@ function _resolveFutureCycles(state, todayKey) {
 // override what the user has actually recorded for the current date.
 function _applyPrecedence(state, logs, todayKey) {
   if (state?.ready && logs[todayKey]?.flow && logs[todayKey].flow !== "none") {
+    const loggedPeriodDay = _deriveLoggedPeriodDay(logs, todayKey);
+    const override = {
+      ...state,
+      phase: "menstrual",
+      phaseLabel: "Menstrual",
+      dayInCycle: loggedPeriodDay ?? state.dayInCycle,
+    };
     if (state.phase !== "menstrual") {
       console.log(
         `[cycle-state] precedence: engine returned "${state.phase}"` +
         ` but today (${todayKey}) is a logged period day → menstrual`
       );
-      return { ...state, phase: "menstrual", phaseLabel: "Menstrual" };
     }
+    if (loggedPeriodDay && state.dayInCycle !== loggedPeriodDay) {
+      console.log(
+        `[cycle-state] precedence: engine returned day ${state.dayInCycle}` +
+        ` but logged period streak says day ${loggedPeriodDay}`
+      );
+    }
+    return override;
   }
   return state;
+}
+
+function _isLoggedPeriodDay(entry) {
+  if (!entry) return false;
+  if (entry.flow && entry.flow !== "none") return true;
+  if (typeof entry.flowLevel === "number" && entry.flowLevel > 0) return true;
+  if (Number.isFinite(Number(entry.periodDay)) && Number(entry.periodDay) > 0) return true;
+  return entry.periodDay === true;
+}
+
+function _addDays(dateKey, n) {
+  const d = new Date(dateKey + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return toDateKey(d);
+}
+
+function _deriveLoggedPeriodDay(logs, todayKey) {
+  const explicit = Number(logs?.[todayKey]?.periodDay);
+  if (Number.isInteger(explicit) && explicit > 0) return explicit;
+  if (!_isLoggedPeriodDay(logs?.[todayKey])) return null;
+
+  let start = todayKey;
+  while (_isLoggedPeriodDay(logs?.[_addDays(start, -1)])) {
+    start = _addDays(start, -1);
+  }
+
+  return Math.max(
+    1,
+    Math.round((new Date(todayKey + "T00:00:00") - new Date(start + "T00:00:00")) / 86400000) + 1
+  );
 }
 
 // ── Trim logs for backend (period days + last 90 days) ────────────────────────

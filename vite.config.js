@@ -17,6 +17,7 @@ const pageInputs = Object.fromEntries(
 export default defineConfig({
   root: "frontend",
   publicDir: false,
+  base: "./",
   server: {
     host: true,
     port: 5173,
@@ -63,7 +64,7 @@ export default defineConfig({
         // or -general here - those are statically imported and must be present
         // before the first user interaction.
         manualChunks(id) {
-          if (id.includes("bloomie-nodes-education"))    return "bloomie-educ";
+          if (id.includes("bloomie-nodes-education")) return "bloomie-educ";
           if (id.includes("bloomie-nodes-perimenopause")) return "bloomie-peri";
         },
       },

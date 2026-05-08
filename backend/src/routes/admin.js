@@ -575,6 +575,17 @@ router.get("/safety-logs", async (req, res) => {
 
     if (!includeReviewed) logs = logs.filter((l) => l.reviewed === false);
 
+    // Drop low-signal oos_fallback rows: no health keywords AND no elevated risk.
+    // urgent_trigger and escalation events are always kept.
+    const noiseFilter = req.query.noise !== "include";
+    if (noiseFilter) {
+      logs = logs.filter((l) => {
+        if (l.type !== "oos_fallback") return true;
+        return l.containsHealthKeywords === true
+          || (l.riskLevel && l.riskLevel !== "low");
+      });
+    }
+
     // Sort by ts descending in JS
     logs.sort((a, b) => (b.ts ?? "").localeCompare(a.ts ?? ""));
     logs = logs.slice(0, limit);
