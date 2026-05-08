@@ -2839,7 +2839,7 @@ export function initBloomieChat({
       if (ctx.integratedSignals?.symptomSignals?.length) {
         const sCtx = getBloomieSymptomContext(ctx.integratedSignals.symptomSignals);
         if (sCtx.safetyEscalationNeeded) {
-          logSafetyEvent("symptom_engine_escalation", {
+          logSafetyEvent("urgent_trigger", {
             input:     normalizedText,
             route:     "HEAVY_URGENT",
             reason:    "symptom_engine_seek_urgent_care",
