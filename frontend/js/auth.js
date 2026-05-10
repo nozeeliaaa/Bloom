@@ -5,7 +5,7 @@
  * - Password reset flow
  * - Password strength validation
  * - Supplies ID token for backend API calls in account mode
- * - Fetches Firestore user role (admin/user) and stores in localStorage
+ * - Fetches backend user role (admin/user) and stores in localStorage
  */
 
 import {
@@ -16,14 +16,15 @@ import {
   sendPasswordResetEmail,
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-import { getFirebaseAuth, getFirebaseDB } from "./firebase.js";
+import { getFirebaseAuth } from "./firebase.js";
 import { getMode, setMode } from "./mode.js";
 
 /** Local storage keys */
 const ROLE_KEY = "bloom_user_role";
 const IS_ADMIN_KEY = "bloom_is_admin";
-const ROLE_SYNC_TIMEOUT_MS = 1800;
+const ROLE_SYNCED_AT_KEY = "bloom_role_synced_at";
+const ROLE_SYNC_TTL_MS = 10 * 60 * 1000;
+const API_BASE = (typeof window !== "undefined" && window.BLOOM_API_BASE) || "";
 
 /** Returns current Firebase Auth instance */
 export function auth() {
@@ -121,52 +122,60 @@ export function getPasswordStrength(password) {
 // ─────────────────────────────────────────
 
 async function syncUserRole(user) {
-  const cachedRole = localStorage.getItem(ROLE_KEY);
-  const cachedIsAdmin = localStorage.getItem(IS_ADMIN_KEY);
+  const cached = localStorage.getItem(IS_ADMIN_KEY);
 
   try {
-    const tokenResult = await user.getIdTokenResult().catch(() => null);
-    const claimRole = tokenResult?.claims?.role;
-    if (claimRole === "admin") {
-      localStorage.setItem(ROLE_KEY, "admin");
-      localStorage.setItem(IS_ADMIN_KEY, "1");
-      return true;
+    const token = await user.getIdToken();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    let res;
+
+    try {
+      res = await fetch(`${API_BASE}/api/user/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
     }
 
-    const db = getFirebaseDB();
-    if (!db) {
-      localStorage.setItem(ROLE_KEY, cachedRole || "user");
-      localStorage.setItem(IS_ADMIN_KEY, cachedIsAdmin === "1" ? "1" : "0");
-      return cachedIsAdmin === "1";
-    }
+    if (!res.ok) throw new Error(`Role sync failed with status ${res.status}`);
 
-    const ref = doc(db, "users", user.uid);
-    const snap = await Promise.race([
-      getDoc(ref),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("role sync timeout")), ROLE_SYNC_TIMEOUT_MS)
-      ),
-    ]);
+    const data = await res.json().catch(() => ({}));
 
     // Backend schema: role is top-level users/{uid}.role
     // Keep nested fallback for older docs.
-    const role = snap.exists() ? (snap.data()?.role ?? snap.data()?.profile?.role) : null;
+    const role = data?.role ?? data?.profile?.role ?? "user";
 
     localStorage.setItem(ROLE_KEY, role || "user");
     localStorage.setItem(IS_ADMIN_KEY, role === "admin" ? "1" : "0");
+    localStorage.setItem(ROLE_SYNCED_AT_KEY, String(Date.now()));
 
     return role === "admin";
   } catch (e) {
-    localStorage.setItem(ROLE_KEY, cachedRole || "user");
-    localStorage.setItem(IS_ADMIN_KEY, cachedIsAdmin === "1" ? "1" : "0");
-    console.warn("[auth] Could not sync role:", e);
-    return cachedIsAdmin === "1";
+    // Do not downgrade an existing cached admin flag just because the network
+    // hiccupped. The backend still enforces admin access on every admin route.
+    if (cached !== "1" && cached !== "0") {
+      localStorage.setItem(ROLE_KEY, "user");
+      localStorage.setItem(IS_ADMIN_KEY, "0");
+    }
+    console.info("[auth] Role sync skipped; using cached role.");
+    return cached === "1";
   }
+}
+
+function syncUserRoleInBackground(user) {
+  if (!user) return;
+  const lastSync = Number(localStorage.getItem(ROLE_SYNCED_AT_KEY) || 0);
+  if (Date.now() - lastSync < ROLE_SYNC_TTL_MS) return;
+  // Role sync is useful for admin UI, but it should not block login or page load.
+  void syncUserRole(user);
 }
 
 function clearCachedRole() {
   localStorage.removeItem(ROLE_KEY);
   localStorage.removeItem(IS_ADMIN_KEY);
+  localStorage.removeItem(ROLE_SYNCED_AT_KEY);
 }
 
 export function isAdminCached() {
@@ -194,10 +203,10 @@ export function initAuthListener(onChange = null) {
     if (typeof onChange === "function") onChange(null);
     return;
   }
-  onAuthStateChanged(a, async (user) => {
+  onAuthStateChanged(a, (user) => {
     if (user) {
       setMode("account");
-      await syncUserRole(user);
+      syncUserRoleInBackground(user);
     } else {
       clearCachedRole();
     }
@@ -214,10 +223,10 @@ export function onAuthChange(callback) {
     if (typeof callback === "function") callback(null);
     return () => {};
   }
-  return onAuthStateChanged(a, async (user) => {
+  return onAuthStateChanged(a, (user) => {
     if (user) {
       setMode("account");
-      await syncUserRole(user);
+      syncUserRoleInBackground(user);
     } else {
       clearCachedRole();
       setMode("anon");
@@ -249,7 +258,7 @@ export async function register(email, password) {
   await sendEmailVerification(res.user);
 
   setMode("account");
-  await syncUserRole(res.user);
+  syncUserRoleInBackground(res.user);
   return res.user;
 }
 
@@ -276,7 +285,9 @@ export async function login(email, password) {
   }
 
   setMode("account");
-  await syncUserRole(res.user);
+  // Role lookup uses Firestore and can be slow/quota-limited; it should not
+  // block a successful login. The nav/admin link will update when it resolves.
+  syncUserRoleInBackground(res.user);
   return res.user;
 }
 
@@ -338,7 +349,11 @@ export function clearLocalSessionData() {
 
   // Remove cycle-state caches persisted in localStorage by older builds.
   for (const key of Object.keys(localStorage)) {
-    if (key.startsWith("bloom_cs_v1_") || key.startsWith("bloom_biometric_cs_v1_")) {
+    if (
+      key.startsWith("bloom_cs_v1_") ||
+      key.startsWith("bloom_cs_v2_") ||
+      key.startsWith("bloom_biometric_cs_v1_")
+    ) {
       localStorage.removeItem(key);
     }
   }

@@ -21,6 +21,7 @@ import { loadBloomPreferencesLocal } from "./bloom-storage.js";
 const NOTIFIED_KEY = "bloom_notified";
 const INBOX_KEY    = "bloom_notification_inbox";
 const INBOX_MAX    = 50;
+const FCM_DENIED_LOG_KEY = "bloom_fcm_permission_denied_logged";
 const VAPID_KEY    = "BCHfN9IVHQe4ZxOkm5O0AuEVI4VYO056HwDvTL65I7HwfeQE7y7Qj5XFO-mkpOg9SvN0yzjVUlba9RDvbzvDH_o";
 const API_BASE     = window.BLOOM_API_BASE || "";
  
@@ -94,6 +95,43 @@ function friendlyDate(dateKey) {
 function diffDays(a, b) {
   return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
 }
+
+function upcomingDate(dateKey, today = todayKey()) {
+  return dateKey && dateKey >= today ? dateKey : null;
+}
+
+function pickNextPeriodDate(cycle, today) {
+  const direct = upcomingDate(cycle.nextPeriodDate, today);
+  if (direct) return direct;
+  return (Array.isArray(cycle.futureCycles) ? cycle.futureCycles : [])
+    .map((c) => c?.periodStart)
+    .filter((d) => d && d >= today)
+    .sort()[0] || null;
+}
+
+function pickRelevantFertileWindow(cycle, today) {
+  const windows = [];
+  if (cycle.fertileStart && cycle.fertileEnd) {
+    windows.push({ start: cycle.fertileStart, end: cycle.fertileEnd });
+  }
+  for (const c of Array.isArray(cycle.futureCycles) ? cycle.futureCycles : []) {
+    if (c?.fertileWindow?.start && c?.fertileWindow?.end) {
+      windows.push({ start: c.fertileWindow.start, end: c.fertileWindow.end });
+    }
+  }
+  return windows
+    .filter((w) => w.end >= today)
+    .sort((a, b) => a.start.localeCompare(b.start))[0] || null;
+}
+
+function pickNextOvulationDate(cycle, today) {
+  const direct = upcomingDate(cycle.ovulationDate, today);
+  if (direct) return direct;
+  return (Array.isArray(cycle.futureCycles) ? cycle.futureCycles : [])
+    .map((c) => c?.ovulationDay)
+    .filter((d) => d && d >= today)
+    .sort()[0] || null;
+}
  
 async function requestPermission() {
   if (!("Notification" in window)) return false;
@@ -120,7 +158,10 @@ export async function registerFCMToken() {
   try {
     const granted = await requestPermission();
     if (!granted) {
-      console.warn("[Bloom FCM] Notification permission denied.");
+      if (!sessionStorage.getItem(FCM_DENIED_LOG_KEY)) {
+        sessionStorage.setItem(FCM_DENIED_LOG_KEY, "1");
+        console.info("[Bloom FCM] Notifications are disabled in browser settings.");
+      }
       return null;
     }
  
@@ -205,23 +246,54 @@ export async function triggerNotifications(cycle, logsByDate) {
  
   const prefs = getPrefs();
  
-  if (!prefs.periodReminder && !prefs.reminders && !prefs.fertileAlert) return;
+  const dailyReminderEnabled = !!prefs.reminders;
+  const periodReminderEnabled = !!prefs.periodReminder;
+  const fertileAlertEnabled = !!prefs.fertileAlert;
+
+  if (!periodReminderEnabled && !dailyReminderEnabled && !fertileAlertEnabled) return;
  
   await requestPermission();
 
   const notified  = getNotified();
   const today     = todayKey();
-  const discreet  = !!(prefs.reminders?.discreetCopy ?? prefs.discreetNotif);
+  const discreet  = !!prefs.discreetNotif;
+  const nextPeriodDate = pickNextPeriodDate(cycle, today);
+  const fertileWindow = pickRelevantFertileWindow(cycle, today);
+  const ovulationDate = pickNextOvulationDate(cycle, today);
 
   // ─── Period Reminder ──────────────────────────────────────────────────────
-  if (prefs.periodReminder && cycle.nextPeriodDate) {
-    const daysUntil = diffDays(today, cycle.nextPeriodDate);
-    const id        = `period-${cycle.nextPeriodDate}`;
+  const todayHasFlow = !!(logsByDate[today]?.flow && logsByDate[today].flow !== "none");
+  const todayHasPeriodDay = Number.isFinite(Number(logsByDate[today]?.periodDay)) && Number(logsByDate[today]?.periodDay) > 0;
+  const phaseKey = String(cycle.phase || cycle.currentPhase || "").toLowerCase();
+  const cycleDay = Number(cycle.dayInCycle);
+  if (
+    (periodReminderEnabled || dailyReminderEnabled) &&
+    phaseKey === "menstrual" &&
+    Number.isFinite(cycleDay) &&
+    cycleDay >= 2 &&
+    cycleDay <= 8 &&
+    !todayHasFlow &&
+    !todayHasPeriodDay
+  ) {
+    const id = `period-check-${today}`;
+    if (!hasNotifiedToday(notified, id)) {
+      const title = discreet ? "Bloom reminder" : "Still seeing your period?";
+      const body = discreet
+        ? "You have a reminder in Bloom. Open the app to view details."
+        : "Bloom is keeping you in menstrual phase based on your recent period start. Open Bloom to log whether flow is still present.";
+      sendNotification(title, body, id);
+      markNotified(notified, id);
+    }
+  }
+
+  if (periodReminderEnabled && nextPeriodDate) {
+    const daysUntil = diffDays(today, nextPeriodDate);
+    const id        = `period-${nextPeriodDate}`;
  
     if (daysUntil >= 0 && daysUntil <= 3 && !hasNotifiedToday(notified, id)) {
       const body = daysUntil === 0
-        ? `Your period may start today (${friendlyDate(cycle.nextPeriodDate)}). Take care of yourself.`
-        : `Your period is expected in ${daysUntil} day${daysUntil !== 1 ? "s" : ""} on ${friendlyDate(cycle.nextPeriodDate)}.`;
+        ? `Your period may start today (${friendlyDate(nextPeriodDate)}). Take care of yourself.`
+        : `Your period is expected in ${daysUntil} day${daysUntil !== 1 ? "s" : ""} on ${friendlyDate(nextPeriodDate)}.`;
 
       sendNotification("Period coming up", body, id);
       markNotified(notified, id);
@@ -229,7 +301,7 @@ export async function triggerNotifications(cycle, logsByDate) {
   }
  
   // ─── Daily Logging Reminder ─────────────────────────────────────────────────
-  if (prefs.reminders) {
+  if (dailyReminderEnabled) {
     const id             = `log-${today}`;
     const hasLoggedToday = !!(logsByDate[today]?.flow || logsByDate[today]?.symptoms?.length);
 
@@ -246,10 +318,10 @@ export async function triggerNotifications(cycle, logsByDate) {
 
   // ─── Period Started? Log it ───────────────────────────────────────────────
   // Fires when the expected period date has arrived or just passed and no flow logged
-  if (prefs.periodReminder && cycle.nextPeriodDate) {
-    const daysOverdue = diffDays(cycle.nextPeriodDate, today);
+  if (periodReminderEnabled && nextPeriodDate) {
+    const daysOverdue = diffDays(nextPeriodDate, today);
     const hasLoggedToday = !!(logsByDate[today]?.flow && logsByDate[today].flow !== "none");
-    const id = `log-period-${cycle.nextPeriodDate}`;
+    const id = `log-period-${nextPeriodDate}`;
 
     if (daysOverdue >= 0 && daysOverdue <= 5 && !hasLoggedToday && !hasNotifiedToday(notified, id)) {
       const title = discreet ? "Bloom reminder" : "Did your period start?";
@@ -265,16 +337,31 @@ export async function triggerNotifications(cycle, logsByDate) {
   }
  
   // ─── Fertile Window Alert ───────────────────────────────────────────────────
-  if (prefs.fertileAlert && cycle.fertileStart && cycle.fertileEnd) {
-    const daysToFertile = diffDays(today, cycle.fertileStart);
-    const id            = `fertile-${cycle.fertileStart}`;
+  if (fertileAlertEnabled && fertileWindow?.start && fertileWindow?.end) {
+    const daysToFertile = diffDays(today, fertileWindow.start);
+    const id            = `fertile-${fertileWindow.start}`;
  
-    if (daysToFertile >= 0 && daysToFertile <= 1 && !hasNotifiedToday(notified, id)) {
-      const body = daysToFertile === 0
-        ? `Your fertile window starts today! It runs until ${friendlyDate(cycle.fertileEnd)}.`
-        : `Your fertile window begins tomorrow (${friendlyDate(cycle.fertileStart)}).`;
+    if (daysToFertile <= 1 && today <= fertileWindow.end && !hasNotifiedToday(notified, id)) {
+      const body = daysToFertile <= 0
+        ? `Your fertile window is active. It runs until ${friendlyDate(fertileWindow.end)}.`
+        : `Your fertile window begins tomorrow (${friendlyDate(fertileWindow.start)}).`;
 
       sendNotification("Fertile window", body, id);
+      markNotified(notified, id);
+    }
+  }
+
+  // Ovulation-day alert - paired with fertile alerts because it is part of the same prediction set.
+  if (fertileAlertEnabled && ovulationDate) {
+    const daysToOvulation = diffDays(today, ovulationDate);
+    const id = `ovulation-${ovulationDate}`;
+
+    if (daysToOvulation >= 0 && daysToOvulation <= 1 && !hasNotifiedToday(notified, id)) {
+      const body = daysToOvulation === 0
+        ? "Estimated ovulation is today. Predictions can shift if your cycle changes."
+        : `Estimated ovulation is tomorrow (${friendlyDate(ovulationDate)}).`;
+
+      sendNotification("Ovulation estimate", body, id);
       markNotified(notified, id);
     }
   }

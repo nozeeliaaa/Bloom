@@ -4,7 +4,7 @@
  * INTEGRATION LAYER ONLY - no reproductive-health calculation logic here.
  *
  * Exports fetchBiometricCycleState, which calls the approved backend engine
- * (cyclesML.js → biometric_phase.py + phase_fusion_engine.js via
+ * (cyclesML.js -> biometric_phase.py + phase_fusion_engine.js via
  * POST /api/cycles/biometric-state) and returns the result to the UI.
  *
  * Phase is computed by the biometric backend engines. Calendar overlays are
@@ -19,19 +19,25 @@
  */
 
 import { getIdToken } from "./auth.js";
-import { toDateKey }  from "./utils.js";
+import { toDateKey } from "./utils.js";
+
+const API_BASE = (typeof window !== "undefined" && typeof window.BLOOM_API_BASE === "string")
+  ? window.BLOOM_API_BASE.trim().replace(/\/+$/, "")
+  : "";
+const BIOMETRIC_STATE_ENDPOINT = `${API_BASE}/api/cycles/biometric-state`;
 
 function _resolveFutureCycles(state, todayKey) {
   if (!state?.ready) return state;
 
-  const toStr = v =>
+  const toStr = (v) =>
     typeof v === "string" ? v : (v ? toDateKey(new Date(v)) : null);
 
   const fc = Array.isArray(state.futureCycles) ? state.futureCycles : [];
+  const sourceKey = String(state?.source || "").toLowerCase();
   let newState = { ...state };
 
   if (!newState.nextPeriodDate || newState.nextPeriodDate <= todayKey) {
-    const nearestPeriodCycle = fc.find(c => {
+    const nearestPeriodCycle = fc.find((c) => {
       const ps = toStr(c.periodStart);
       return ps && ps > todayKey;
     });
@@ -42,7 +48,7 @@ function _resolveFutureCycles(state, todayKey) {
 
   const fwEnd = toStr(state.fertileEnd);
   if (fwEnd && fwEnd < todayKey && fc.length) {
-    const upcomingFertileCycle = fc.find(c => {
+    const upcomingFertileCycle = fc.find((c) => {
       const end = toStr(c.fertileWindow?.end);
       return end && end >= todayKey;
     });
@@ -51,22 +57,25 @@ function _resolveFutureCycles(state, todayKey) {
       newState.fertileEnd = toStr(upcomingFertileCycle.fertileWindow?.end) ?? state.fertileEnd;
       newState.ovulationDate = toStr(upcomingFertileCycle.ovulationDay) ?? state.ovulationDate;
       console.log(
-        `[cycle-state-biometric] futureCycles resolution: fertileWindow ${newState.fertileStart}→${newState.fertileEnd}` +
+        `[cycle-state-biometric] futureCycles resolution: fertileWindow ${newState.fertileStart}->${newState.fertileEnd}` +
         ` ovulation=${newState.ovulationDate} nextPeriod=${newState.nextPeriodDate}`
       );
     }
   }
 
-  const fwStart = toStr(newState.fertileStart);
-  const fwEndResolved = toStr(newState.fertileEnd);
-  if (fwStart && fwEndResolved && todayKey >= fwStart && todayKey <= fwEndResolved) {
-    if (newState.phase !== "menstrual") {
-      console.log(
-        `[cycle-state-biometric] fertile window active today (${todayKey}): overriding phase` +
-        ` "${newState.phase}" → "ovulatory"`
-      );
-      newState.phase = "ovulatory";
-      newState.phaseLabel = "Ovulatory";
+  // Keep backend phase authoritative to avoid cross-page phase flips.
+  if (sourceKey !== "biometric-backend") {
+    const fwStart = toStr(newState.fertileStart);
+    const fwEndResolved = toStr(newState.fertileEnd);
+    if (fwStart && fwEndResolved && todayKey >= fwStart && todayKey <= fwEndResolved) {
+      if (newState.phase !== "menstrual") {
+        console.log(
+          `[cycle-state-biometric] fertile window active today (${todayKey}): overriding phase` +
+          ` "${newState.phase}" -> "ovulatory"`
+        );
+        newState.phase = "ovulatory";
+        newState.phaseLabel = "Ovulatory";
+      }
     }
   }
 
@@ -78,7 +87,7 @@ function _applyPrecedence(state, logs, todayKey) {
     if (state.phase !== "menstrual") {
       console.log(
         `[cycle-state-biometric] precedence: engine returned "${state.phase}"` +
-        ` but today (${todayKey}) is a logged period day → menstrual`
+        ` but today (${todayKey}) is a logged period day -> menstrual`
       );
       return { ...state, phase: "menstrual", phaseLabel: "Menstrual" };
     }
@@ -114,7 +123,7 @@ export async function fetchBiometricCycleState(logs) {
   const token = await getIdToken();
 
   const periodDays = Object.keys(logs || {})
-    .filter(k => logs[k]?.flow && logs[k].flow !== "none").sort();
+    .filter((k) => logs[k]?.flow && logs[k].flow !== "none").sort();
   const lastPeriodDay = periodDays[periodDays.length - 1] || "none";
   const todayKey = toDateKey(new Date());
   const cacheKey = `bloom_biometric_cs_v1_${token ? "acct" : "anon"}_${lastPeriodDay}_${todayKey}`;
@@ -138,7 +147,7 @@ export async function fetchBiometricCycleState(logs) {
     console.log("[cycle-state-biometric] no auth token - skipping biometric backend");
   } else {
     try {
-      const res = await fetch("/api/cycles/biometric-state", {
+      const res = await fetch(BIOMETRIC_STATE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ logs: _trimLogsForBackend(logs) }),

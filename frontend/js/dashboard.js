@@ -1,4 +1,4 @@
-/**
+﻿/**
  * dashboard.js - Goal-based dashboard
  * One screen, content adapts to selected goal + cycle phase.
  *
@@ -8,11 +8,11 @@
  * calculation logic (phase, next period, fertile window, ovulation, etc.).
  *
  * Approved engines used:
- *   - cyclesML.js + cyclePhaseEngine.js  → via fetchCycleState()
- *   - bloom-cycle-engine.js              → advanced insights
- *   - bloom-anomaly-engine.js            → advanced insights
- *   - bloom-symptom-engine.js            → advanced insights
- *   - pregnancyAlgorithm.js              → pregnancy/TTC goal only
+ *   - cyclesML.js + cyclePhaseEngine.js  â†’ via fetchCycleState()
+ *   - bloom-cycle-engine.js              â†’ advanced insights
+ *   - bloom-anomaly-engine.js            â†’ advanced insights
+ *   - bloom-symptom-engine.js            â†’ advanced insights
+ *   - pregnancyAlgorithm.js              â†’ pregnancy/TTC goal only
  */
 
 import {
@@ -22,9 +22,10 @@ import {
   renderBloomieFab,
   formatDate,
   toDateKey,
+  showToast,
 } from "./utils.js";
 import { getAllLogs } from "./db.js";
-import { onAuthChange } from "./auth.js";
+import { onAuthChange, getIdToken } from "./auth.js";
 import { isAnonMode } from "./mode.js";
 import { getUserGoal, goalLabel, goalDesc, isGoalAgeLocked } from "./goals.js";
 import { triggerNotifications } from "./notifications.js";
@@ -56,7 +57,7 @@ mountSyncStatusBanner(document.getElementById("banner-area"), {
   message: "Cloud sync is having trouble. Your dashboard is showing saved local data until it reconnects.",
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function diffDays(a, b) {
   return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
@@ -108,8 +109,30 @@ function isLoggedPeriodDay(entry) {
   if (!entry) return false;
   if (entry.flow && entry.flow !== "none") return true;
   if (typeof entry.flowLevel === "number" && entry.flowLevel > 0) return true;
+  if (Number.isFinite(Number(entry.periodDay)) && Number(entry.periodDay) > 0) return true;
   if (entry.periodDay === true) return true;
   return false;
+}
+
+function expandLoggedPeriodDays(logsByDate = {}) {
+  const days = new Set();
+
+  for (const [dateKey, entry] of Object.entries(logsByDate || {})) {
+    if (!isLoggedPeriodDay(entry)) continue;
+
+    const explicitPeriodDay = Number(entry.periodDay);
+    if (Number.isInteger(explicitPeriodDay) && explicitPeriodDay > 1 && explicitPeriodDay <= 10) {
+      const start = addDaysStr(dateKey, -(explicitPeriodDay - 1));
+      for (let i = 0; i < explicitPeriodDay; i++) {
+        days.add(addDaysStr(start, i));
+      }
+      continue;
+    }
+
+    days.add(dateKey);
+  }
+
+  return [...days].sort();
 }
 
 function buildCustomSymptomInsight(logsByDate, days = 30) {
@@ -234,9 +257,7 @@ function buildPeriodInsightInputs(logsByDate) {
  * Do NOT add calculation logic here.
  */
 function buildCycleBase(logsByDate) {
-  const periodDays = Object.keys(logsByDate)
-    .filter(k => isLoggedPeriodDay(logsByDate[k]))
-    .sort();
+  const periodDays = expandLoggedPeriodDays(logsByDate);
 
   const cycleStarts = [];
   let prevDate = null;
@@ -275,9 +296,17 @@ function ensureLogsPromise() {
   const mode = isAnonMode() ? "anon" : "account";
   if (!_logsPromise || _logsPromiseMode !== mode) {
     _logsPromiseMode = mode;
-    _logsPromise = getAllLogs({ timeoutMs: 2500 });
+    // Cloud Run/Firestore can be slow immediately after login or cold start.
+    // A short timeout makes the dashboard look empty even when data exists.
+    _logsPromise = getAllLogs({ timeoutMs: 10000 });
   }
   return _logsPromise;
+}
+
+function resetDashboardDataPromises() {
+  _logsPromise = null;
+  _logsPromiseMode = null;
+  _cycleStatePromise = null;
 }
 
 function afterFirstPaint(fn) {
@@ -308,7 +337,7 @@ function ensurePlotlyLoaded() {
   return _plotlyLoadPromise;
 }
 
-// ─── Phase-based insights ─────────────────────────────────────────────────────
+// â”€â”€â”€ Phase-based insights â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Phase insights are now provided by phase-education.js (getTodaysPhaseInsight)
 
@@ -334,7 +363,12 @@ function getGoalTip(goal, phase) {
   return g[phase] ?? g.default ?? null;
 }
 
-const PHASE_FEEDBACK_STORAGE_KEY = "bloom_phase_feedback_by_date_v1";
+const PHASE_FEEDBACK_STORAGE_KEY = "bloom_phase_feedback_v2";
+const PHASE_FEEDBACK_STORAGE_KEY_LEGACY = "bloom_phase_feedback_by_date_v1";
+const API_BASE = (typeof window !== "undefined" && typeof window.BLOOM_API_BASE === "string")
+  ? window.BLOOM_API_BASE.trim().replace(/\/+$/, "")
+  : "";
+const PHASE_FEEDBACK_ENDPOINT = `${API_BASE}/api/phase-feedback`;
 const PHASE_CSS_MAP = {
   menstrual: "menstrual",
   follicular: "follicular",
@@ -381,41 +415,127 @@ function writePhaseFeedbackStore(store) {
   } catch (_) {}
 }
 
-function getTodayPhaseFeedback() {
-  const todayKey = toDateKey(new Date());
-  const store = readPhaseFeedbackStore();
-  return store[todayKey] || null;
+function normalizePhaseKeyForFeedback(phaseKey) {
+  const normalized = String(phaseKey || "").trim().toLowerCase();
+  if (!normalized) return "unknown";
+  if (normalized === "ovulation" || normalized === "ovulatory") return "ovulatory";
+  return normalized;
 }
 
-function setTodayPhaseFeedback(feedback) {
-  const todayKey = toDateKey(new Date());
-  const store = readPhaseFeedbackStore();
-  if (!feedback) {
-    delete store[todayKey];
-  } else {
-    store[todayKey] = {
-      ...feedback,
-      updatedAt: new Date().toISOString(),
-    };
+function getCurrentCycleStartKey(cycle) {
+  const starts = Array.isArray(cycle?.cycleStarts) ? cycle.cycleStarts : [];
+  return starts.length ? String(starts[starts.length - 1]) : "unknown";
+}
+
+function buildPhaseFeedbackSignature(cycle, phaseKey) {
+  const cycleStart = getCurrentCycleStartKey(cycle);
+  const normalizedPhase = normalizePhaseKeyForFeedback(phaseKey);
+  return `${cycleStart}|${normalizedPhase}`;
+}
+
+function readLegacyPhaseFeedbackForToday() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PHASE_FEEDBACK_STORAGE_KEY_LEGACY) || "{}");
+    if (!parsed || typeof parsed !== "object") return null;
+    const todayKey = toDateKey(new Date());
+    const entry = parsed[todayKey];
+    return entry && typeof entry === "object" ? entry : null;
+  } catch {
+    return null;
   }
-  writePhaseFeedbackStore(store);
+}
+
+function getStoredPhaseFeedbackForSignature(signature, expectedPhaseKey = null) {
+  const store = readPhaseFeedbackStore();
+  if (store?.phaseSignature === signature) return store;
+
+  // One-time compatibility fallback from older per-day storage.
+  const legacy = readLegacyPhaseFeedbackForToday();
+  if (!legacy) return null;
+  if (expectedPhaseKey && normalizePhaseKeyForFeedback(legacy.phaseKey) !== normalizePhaseKeyForFeedback(expectedPhaseKey)) {
+    return null;
+  }
+
+  const migrated = {
+    ...legacy,
+    phaseSignature: signature,
+    updatedAt: new Date().toISOString(),
+  };
+  writePhaseFeedbackStore(migrated);
+  return migrated;
+}
+
+function setStoredPhaseFeedbackForSignature(signature, feedback) {
+  if (!feedback || typeof feedback !== "object") {
+    writePhaseFeedbackStore({});
+    return;
+  }
+
+  writePhaseFeedbackStore({
+    ...feedback,
+    phaseSignature: signature,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function normalizePhaseKeyForBackend(phaseKey) {
+  const normalized = normalizePhaseKeyForFeedback(phaseKey);
+  if (normalized === "ovulatory") return "ovulation";
+  if (normalized === "late_luteal") return "luteal";
+  if (normalized === "menstrual" || normalized === "follicular" || normalized === "ovulation" || normalized === "luteal") {
+    return normalized;
+  }
+  return null;
+}
+
+function hasSubmittedFeedbackForPhase(feedback, phaseKey, phaseSignature = null) {
+  if (!feedback || typeof feedback !== "object") return false;
+  const response = String(feedback.response || "").trim().toLowerCase();
+  if (!["yes", "no", "not_sure"].includes(response)) return false;
+  if (phaseSignature && String(feedback.phaseSignature || "").trim() !== String(phaseSignature)) return false;
+  return normalizePhaseKeyForFeedback(feedback.phaseKey) === normalizePhaseKeyForFeedback(phaseKey);
+}
+
+async function persistPhaseFeedbackToBackend({ response, phaseKey, cycle }) {
+  const normalizedResponse = String(response || "").trim().toLowerCase();
+  if (!["yes", "no", "not_sure"].includes(normalizedResponse)) return;
+
+  const token = await getIdToken({ waitForAuthMs: 1200 });
+  if (!token) return;
+
+  const predictedPhase = normalizePhaseKeyForBackend(phaseKey);
+  const payload = {
+    response: normalizedResponse,
+    predictedPhase,
+    cycleDay: Number.isFinite(Number(cycle?.dayInCycle)) ? Number(cycle.dayInCycle) : null,
+    confidence: normalizeConfidenceLevel(cycle?.confidence),
+  };
+
+  const res = await fetch(PHASE_FEEDBACK_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
 }
 
 
 function getDisplayPhaseFromCycle(cycle, feedback = null) {
   const rawPhase = cycle?.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
   const inferredKey = cycle?.phaseLabel === "Late Luteal" ? "late_luteal" : rawPhase;
-  const correctedKey =
-    feedback?.response === "no" && feedback?.updatedPhase ? feedback.updatedPhase : inferredKey;
-  const correctedLabel =
-    feedback?.response === "no" && feedback?.updatedPhaseLabel
-      ? feedback.updatedPhaseLabel
-      : (PHASE_LABELS[correctedKey] ?? cycle?.phaseLabel ?? "Calculating");
-  const cssKey = PHASE_CSS_MAP[correctedKey] ?? "unknown";
+  const displayKey = inferredKey;
+  const displayLabel = PHASE_LABELS[displayKey] ?? cycle?.phaseLabel ?? "Calculating";
+  const cssKey = PHASE_CSS_MAP[displayKey] ?? "unknown";
 
   return {
-    key: correctedKey,
-    label: correctedLabel,
+    key: displayKey,
+    label: displayLabel,
     cssKey,
     rawPhase,
   };
@@ -448,19 +568,18 @@ function setTodayInsights(phaseKey, goal, phaseLabel, loggedSymptoms = []) {
     </div>`).join("");
 }
 
-// ─── Phase card with colour badge ────────────────────────────────────────────
+// â”€â”€â”€ Phase card with colour badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderPhaseCard(cycle, onFeedbackChange = null) {
   const el = document.getElementById("cycle-phase");
   if (!el) return;
 
-  const feedback = getTodayPhaseFeedback();
+  const phaseSignature = buildPhaseFeedbackSignature(cycle, cycle?.phaseLabel === "Late Luteal" ? "late_luteal" : cycle?.phase);
+  const feedback = getStoredPhaseFeedbackForSignature(phaseSignature, cycle?.phase);
   const phase = getDisplayPhaseFromCycle(cycle, feedback);
   const confidenceLevel = normalizeConfidenceLevel(cycle?.confidence);
   const confidenceLabel = `${confidenceLevel.charAt(0).toUpperCase()}${confidenceLevel.slice(1)} confidence`;
-
-  // Show correction sub-buttons only while awaiting a correction pick (No tapped, no correction yet)
-  const pendingNo = feedback?.response === "no" && !feedback?.correction;
+  const feedbackSubmittedForCurrentPhase = hasSubmittedFeedbackForPhase(feedback, phase.key, phaseSignature);
 
   el.style.display = "flex";
   el.style.flexDirection = "column";
@@ -475,22 +594,13 @@ function renderPhaseCard(cycle, onFeedbackChange = null) {
         <div class="phase-meta-row">
           <span class="phase-confidence-dot phase-confidence-dot--${confidenceLevel}"></span>
           <span class="phase-confidence-text">${confidenceLabel}</span>
-          <span class="phase-feedback-divider">·</span>
-          <span class="phase-feedback-label">Accurate?</span>
-          <button type="button" class="phase-thumb-btn" data-phase-feedback="yes" title="Yes">👍</button>
-          <button type="button" class="phase-thumb-btn" data-phase-feedback="no" title="No">👎</button>
+          ${feedbackSubmittedForCurrentPhase ? "" : `
+            <span class="phase-feedback-divider">|</span>
+            <span class="phase-feedback-label">Accurate?</span>
+            <button type="button" class="phase-thumb-btn" data-phase-feedback="yes" title="Yes">👍</button>
+            <button type="button" class="phase-thumb-btn" data-phase-feedback="no" title="No">👎</button>
+          `}
         </div>
-        ${pendingNo ? `
-          <div class="phase-correction-wrap">
-            <span class="phase-feedback-label">What feels closer?</span>
-            <div class="phase-feedback-row">
-              <button type="button" class="phase-feedback-btn" data-phase-correction="bleeding">I'm bleeding</button>
-              <button type="button" class="phase-feedback-btn" data-phase-correction="ovulation_signs">Ovulation signs</button>
-              <button type="button" class="phase-feedback-btn" data-phase-correction="pms_pre_period">PMS / pre-period</button>
-              <button type="button" class="phase-feedback-btn" data-phase-correction="not_sure">Not sure</button>
-            </div>
-          </div>` : ""}
-        <p class="phase-feedback-note" id="phase-feedback-flash" style="display:none;"></p>
       </div>
     `;
   } else {
@@ -503,48 +613,31 @@ function renderPhaseCard(cycle, onFeedbackChange = null) {
     return;
   }
 
-  function flashNote(text) {
-    const note = el.querySelector("#phase-feedback-flash");
-    if (!note) return;
-    note.textContent = text;
-    note.style.display = "block";
-    setTimeout(() => { note.style.display = "none"; }, 2000);
-  }
-
   el.querySelectorAll("[data-phase-feedback]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const response = btn.dataset.phaseFeedback;
       if (!response) return;
-      const existing = getTodayPhaseFeedback() || {};
+
+      const existing = getStoredPhaseFeedbackForSignature(phaseSignature, phase.key) || {};
+      const phaseKey = normalizePhaseKeyForFeedback(phase.key);
       const next = {
         ...existing,
-        response,
-        correction: response === "no" ? (existing.correction || null) : null,
-        updatedPhase: response === "no" ? (existing.updatedPhase || null) : null,
-        updatedPhaseLabel: response === "no" ? (existing.updatedPhaseLabel || null) : null,
+        response: String(response).toLowerCase(),
+        phaseKey,
+        phaseLabel: phase.label,
+        phaseSignature,
       };
-      setTodayPhaseFeedback(next);
-      if (typeof onFeedbackChange === "function") onFeedbackChange(next);
-      if (response === "no") {
-        // Reveal correction sub-buttons
-        renderPhaseCard(cycle, onFeedbackChange);
-      } else {
-        flashNote(response === "yes" ? "Got it ✓" : "Noted.");
-      }
-    });
-  });
 
-  el.querySelectorAll("[data-phase-correction]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const correction = btn.dataset.phaseCorrection;
-      if (!correction) return;
-      const mapped = PHASE_FEEDBACK_CORRECTIONS[correction] || PHASE_FEEDBACK_CORRECTIONS.not_sure;
-      const next = { response: "no", correction, updatedPhase: mapped.phase, updatedPhaseLabel: mapped.label };
-      setTodayPhaseFeedback(next);
+      setStoredPhaseFeedbackForSignature(phaseSignature, next);
       if (typeof onFeedbackChange === "function") onFeedbackChange(next);
-      // Collapse sub-buttons then flash
+
+      // Hide feedback controls immediately for this phase.
       renderPhaseCard(cycle, onFeedbackChange);
-      setTimeout(() => flashNote("Recorded — thanks for the correction."), 0);
+
+      persistPhaseFeedbackToBackend({ response: next.response, phaseKey, cycle })
+        .catch((err) => {
+          console.warn("[phase-feedback] backend save failed:", err?.message || err);
+        });
     });
   });
 }
@@ -579,7 +672,7 @@ function renderGoalToolCard(goal, cycle) {
     let windowBadge = "";
     let windowDates = "";
     if (fertileStart && fertileEnd) {
-      windowDates = `<p class="ttc-window-dates">${formatDate(fertileStart)} → ${formatDate(fertileEnd)}</p>`;
+      windowDates = `<p class="ttc-window-dates">${formatDate(fertileStart)} to ${formatDate(fertileEnd)}</p>`;
       if (todayKey >= fertileStart && todayKey <= fertileEnd) {
         windowBadge = `<span class="ttc-window-badge ttc-window--active">Fertile window active</span>`;
       } else if (todayKey < fertileStart) {
@@ -604,7 +697,7 @@ function renderGoalToolCard(goal, cycle) {
         if (r.currentWeek) {
           el.innerHTML = `
             <div class="stat-number" style="font-size:1.3rem;">Week ${r.currentWeek}</div>
-            <p class="text-muted" style="margin-top:0.25rem;">${r.trimesterLabel} · EDD ${formatDate(toDateKey(r.eddAdjusted))}</p>
+            <p class="text-muted" style="margin-top:0.25rem;">${r.trimesterLabel} | EDD ${formatDate(toDateKey(r.eddAdjusted))}</p>
           `;
           return;
         }
@@ -619,11 +712,22 @@ function renderGoalToolCard(goal, cycle) {
   }
 
   // Default: next period
+  if (cycle.periodPrediction?.status === "overdue") {
+    const lateDays = Number(cycle.periodPrediction.daysLate) || 0;
+    const start = cycle.periodPrediction.predictedStart;
+    const end = cycle.periodPrediction.predictedEnd;
+    el.innerHTML = `
+      <div class="stat-number">Late by ${lateDays} day${lateDays === 1 ? "" : "s"}</div>
+      <p class="text-muted" style="margin-top:0.25rem;">Expected around ${start ? formatDate(start) : "your predicted date"}${end && end !== start ? ` - ${formatDate(end)}` : ""}</p>
+    `;
+    return;
+  }
+
   if (cycle.nextPeriodDate) {
     const d = diffDays(todayKey, cycle.nextPeriodDate);
     el.innerHTML = `
       <div class="stat-number">${formatDate(cycle.nextPeriodDate)}</div>
-      <p class="text-muted" style="margin-top:0.25rem;">Next expected period${d >= 0 ? ` · in ${d} day${d !== 1 ? "s" : ""}` : " · may have started"}</p>
+      <p class="text-muted" style="margin-top:0.25rem;">Next expected period${d >= 0 ? ` - in ${d} day${d !== 1 ? "s" : ""}` : " - may have started"}</p>
     `;
   } else {
     el.innerHTML = `
@@ -633,7 +737,7 @@ function renderGoalToolCard(goal, cycle) {
   }
 }
 
-// ─── Try to Conceive fertility guidance card ──────────────────────────────────
+// â”€â”€â”€ Try to Conceive fertility guidance card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderTtcTools(goal, cycle, logsByDate) {
   // The whole zone is shown/hidden as one block - individual cards inside don't need show()
@@ -648,7 +752,7 @@ function renderTtcTools(goal, cycle, logsByDate) {
   const todayKey = toDateKey(new Date());
   const isPostOv = cycle.ovulationDate && todayKey > cycle.ovulationDate;
 
-  // ── LEFT CARD: "Fertility Insights" ─────────────────────────────────────────
+  // â”€â”€ LEFT CARD: "Fertility Insights" â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fertileStart = cycle.fertileStart ?? null;
   const fertileEnd   = cycle.fertileEnd   ?? null;
   const ovDate       = cycle.ovulationDate ?? null;
@@ -660,7 +764,7 @@ function renderTtcTools(goal, cycle, logsByDate) {
     let windowLine = "";
     if (fertileStart && fertileEnd) {
       if (todayKey >= fertileStart && todayKey <= fertileEnd) {
-        windowLine = `Your fertile window is <strong>active today</strong> (${formatDate(fertileStart)} → ${formatDate(fertileEnd)}).`;
+        windowLine = `Your fertile window is <strong>active today</strong> (${formatDate(fertileStart)} to ${formatDate(fertileEnd)}).`;
       } else if (todayKey < fertileStart) {
         const dTo = diffDays(todayKey, fertileStart);
         windowLine = `Your fertile window opens in <strong>${dTo} day${dTo !== 1 ? "s" : ""}</strong>. Track cervical mucus and BBT for additional confirmation.`;
@@ -696,7 +800,7 @@ function renderTtcTools(goal, cycle, logsByDate) {
     body.innerHTML = dateSummary + insightHtml;
   }
 
-  // ── CURRENT CYCLE SNIPPET (row 2, right card) ────────────────────────────────
+  // â”€â”€ CURRENT CYCLE SNIPPET (row 2, right card) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const currentCycleBody = document.getElementById("ttc-current-cycle-body");
   if (currentCycleBody) {
     const cycleStarts = cycle.cycleStarts || [];
@@ -708,14 +812,14 @@ function renderTtcTools(goal, cycle, logsByDate) {
       const cards = buildCycleCards(cycleStarts, localLengths, logsByDate || {});
       currentCycleBody.innerHTML = (cards[0] || "") + `
         <a href="/pages/cycle-history.html" class="btn btn-outline ttc-history-btn">
-          View entire cycle history →
+          View entire cycle history ->
         </a>`;
     } else {
       currentCycleBody.innerHTML = `<p class="text-muted">Log a period day to see your cycle history.</p>`;
     }
   }
 
-  // ── WHEN TO TEST CARD (row 1, right card) ────────────────────────────────────
+  // â”€â”€ WHEN TO TEST CARD (row 1, right card) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const testBody = document.getElementById("ttc-test-body");
   if (testBody) {
     const ovDateStr = cycle.ovulationDate ?? null;
@@ -723,7 +827,15 @@ function renderTtcTools(goal, cycle, logsByDate) {
       ? `<p class="ttc-insight-body" style="margin-top:0.5rem;">Ovulation estimated: ${formatDate(ovDateStr)}</p>`
       : "";
 
-    if (isPostOv && algoPregnancy && ovDateStr && cycle.nextPeriodDate) {
+    if (cycle.periodPrediction?.status === "overdue") {
+      const lateDays = Number(cycle.periodPrediction.daysLate) || 0;
+      const start = cycle.periodPrediction.predictedStart;
+      const end = cycle.periodPrediction.predictedEnd;
+      testBody.innerHTML = `
+        <p class="ttc-test-headline">Period is late by ${lateDays} day${lateDays === 1 ? "" : "s"}</p>
+        <p class="ttc-insight-body">Expected around <strong>${start ? formatDate(start) : "your predicted date"}${end && end !== start ? ` - ${formatDate(end)}` : ""}</strong></p>
+        ${ovLine}`;
+    } else if (isPostOv && algoPregnancy && ovDateStr && cycle.nextPeriodDate) {
       // Post-ovulation: show TWW + full test guidance
       try {
         const r = algoPregnancy.whenToTest(
@@ -733,7 +845,7 @@ function renderTtcTools(goal, cycle, logsByDate) {
         const dpo = diffDays(ovDateStr, todayKey);
         const pct = Math.min(Math.round((dpo / 14) * 100), 100);
         const twwLine = dpo >= 1 && dpo <= 20
-          ? `<p class="ttc-test-tww">Two-week wait · Day ${dpo}</p>
+          ? `<p class="ttc-test-tww">Two-week wait | Day ${dpo}</p>
              <div class="tww-bar" style="margin-bottom:0.6rem;"><div class="tww-bar__fill" style="width:${pct}%;"></div></div>`
           : "";
         const earlyLine = r.earlyTestDate
@@ -755,7 +867,7 @@ function renderTtcTools(goal, cycle, logsByDate) {
       const d = diffDays(todayKey, cycle.nextPeriodDate);
       testBody.innerHTML = `
         <p class="ttc-test-headline">Test after a missed period</p>
-        <p class="ttc-insight-body">Next expected period: <strong>${formatDate(cycle.nextPeriodDate)}</strong>${d >= 0 ? ` · in ${d} day${d !== 1 ? "s" : ""}` : ""}</p>
+        <p class="ttc-insight-body">Next expected period: <strong>${formatDate(cycle.nextPeriodDate)}</strong>${d >= 0 ? ` - in ${d} day${d !== 1 ? "s" : ""}` : ""}</p>
         ${ovLine}`;
     } else {
       testBody.innerHTML = `<p class="text-muted">Log period days to estimate when to test.</p>`;
@@ -763,7 +875,7 @@ function renderTtcTools(goal, cycle, logsByDate) {
   }
 }
 
-// ─── Rotating fertility facts slideshow ───────────────────────────────────────
+// â”€â”€â”€ Rotating fertility facts slideshow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const _FERTILITY_FACTS = [
   { text: "Your fertile window is roughly the five days before ovulation plus ovulation day itself." },
@@ -836,7 +948,7 @@ function renderFactsSlideshow(goal) {
   resetTimer();
 }
 
-// ─── Pregnancy section ────────────────────────────────────────────────────────
+// â”€â”€â”€ Pregnancy section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Twemoji SVG images via jsDelivr CDN - renders consistently on all platforms
 const _TW = (cp) => `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${cp}.svg`;
@@ -869,46 +981,46 @@ const PAPAYA_SVG = _SVG(`
 
 const BABY_SIZES = [
   null, null, null, null,
-  { label: "sweet pea",        img: _TW("1f331") }, // 4  🌱
-  { label: "sesame seed",      img: _TW("1f331") }, // 5  🌱
-  { label: "sweet pea",        img: _TW("1fad9") }, // 6  🫛
-  { label: "blueberry",        img: _TW("1fad0") }, // 7  🫐
-  { label: "kidney bean",      img: _TW("1fad8") }, // 8  🫘
-  { label: "grape",            img: _TW("1f347") }, // 9  🍇
-  { label: "small orange",     img: _TW("1f34a") }, // 10 🍊
-  { label: "fig",              img: _TW("1f34b") }, // 11 🍋
-  { label: "lime",             img: _TW("1f34b") }, // 12 🍋
-  { label: "lemon",            img: _TW("1f34b") }, // 13 🍋
-  { label: "peach",            img: _TW("1f351") }, // 14 🍑
-  { label: "apple",            img: _TW("1f34e") }, // 15 🍎
-  { label: "avocado",          img: _TW("1f951") }, // 16 🥑
-  { label: "pear",             img: _TW("1f350") }, // 17 🍐
-  { label: "bell pepper",      img: _TW("1fad1") }, // 18 🫑
-  { label: "mango",            img: _TW("1f96d") }, // 19 🥭
-  { label: "banana",           img: _TW("1f34c") }, // 20 🍌
-  { label: "carrot",           img: _TW("1f955") }, // 21 🥕
+  { label: "sweet pea",        img: _TW("1f331") }, // 4  ðŸŒ±
+  { label: "sesame seed",      img: _TW("1f331") }, // 5  ðŸŒ±
+  { label: "sweet pea",        img: _TW("1fad9") }, // 6  ðŸ«›
+  { label: "blueberry",        img: _TW("1fad0") }, // 7  ðŸ«
+  { label: "kidney bean",      img: _TW("1fad8") }, // 8  ðŸ«˜
+  { label: "grape",            img: _TW("1f347") }, // 9  ðŸ‡
+  { label: "small orange",     img: _TW("1f34a") }, // 10 ðŸŠ
+  { label: "fig",              img: _TW("1f34b") }, // 11 ðŸ‹
+  { label: "lime",             img: _TW("1f34b") }, // 12 ðŸ‹
+  { label: "lemon",            img: _TW("1f34b") }, // 13 ðŸ‹
+  { label: "peach",            img: _TW("1f351") }, // 14 ðŸ‘
+  { label: "apple",            img: _TW("1f34e") }, // 15 ðŸŽ
+  { label: "avocado",          img: _TW("1f951") }, // 16 ðŸ¥‘
+  { label: "pear",             img: _TW("1f350") }, // 17 ðŸ
+  { label: "bell pepper",      img: _TW("1fad1") }, // 18 ðŸ«‘
+  { label: "mango",            img: _TW("1f96d") }, // 19 ðŸ¥­
+  { label: "banana",           img: _TW("1f34c") }, // 20 ðŸŒ
+  { label: "carrot",           img: _TW("1f955") }, // 21 ðŸ¥•
   { label: "papaya",           img: PAPAYA_SVG },   // 22 custom papaya
-  { label: "large mango",      img: _TW("1f96d") }, // 23 🥭
-  { label: "corn",             img: _TW("1f33d") }, // 24 🌽
-  { label: "cauliflower",      img: _TW("1f966") }, // 25 🥦
-  { label: "lettuce",          img: _TW("1f96c") }, // 26 🥬
-  { label: "head of lettuce",  img: _TW("1f96c") }, // 27 🥬
-  { label: "eggplant",         img: _TW("1f346") }, // 28 🍆
-  { label: "pumpkin",          img: _TW("1f383") }, // 29 🎃
-  { label: "cabbage",          img: _TW("1f96c") }, // 30 🥬
-  { label: "coconut",          img: _TW("1f965") }, // 31 🥥
-  { label: "large pumpkin",    img: _TW("1f383") }, // 32 🎃
-  { label: "pineapple",        img: _TW("1f34d") }, // 33 🍍
-  { label: "cantaloupe",       img: _TW("1f348") }, // 34 🍈
-  { label: "honeydew melon",   img: _TW("1f348") }, // 35 🍈
-  { label: "large coconut",    img: _TW("1f965") }, // 36 🥥
-  { label: "Swiss chard",      img: _TW("1f96c") }, // 37 🥬
-  { label: "leek",             img: _TW("1f955") }, // 38 🥕
-  { label: "small watermelon", img: _TW("1f349") }, // 39 🍉
-  { label: "watermelon",       img: _TW("1f349") }, // 40 🍉
+  { label: "large mango",      img: _TW("1f96d") }, // 23 ðŸ¥­
+  { label: "corn",             img: _TW("1f33d") }, // 24 ðŸŒ½
+  { label: "cauliflower",      img: _TW("1f966") }, // 25 ðŸ¥¦
+  { label: "lettuce",          img: _TW("1f96c") }, // 26 ðŸ¥¬
+  { label: "head of lettuce",  img: _TW("1f96c") }, // 27 ðŸ¥¬
+  { label: "eggplant",         img: _TW("1f346") }, // 28 ðŸ†
+  { label: "pumpkin",          img: _TW("1f383") }, // 29 ðŸŽƒ
+  { label: "cabbage",          img: _TW("1f96c") }, // 30 ðŸ¥¬
+  { label: "coconut",          img: _TW("1f965") }, // 31 ðŸ¥¥
+  { label: "large pumpkin",    img: _TW("1f383") }, // 32 ðŸŽƒ
+  { label: "pineapple",        img: _TW("1f34d") }, // 33 ðŸ
+  { label: "cantaloupe",       img: _TW("1f348") }, // 34 ðŸˆ
+  { label: "honeydew melon",   img: _TW("1f348") }, // 35 ðŸˆ
+  { label: "large coconut",    img: _TW("1f965") }, // 36 ðŸ¥¥
+  { label: "Swiss chard",      img: _TW("1f96c") }, // 37 ðŸ¥¬
+  { label: "leek",             img: _TW("1f955") }, // 38 ðŸ¥•
+  { label: "small watermelon", img: _TW("1f349") }, // 39 ðŸ‰
+  { label: "watermelon",       img: _TW("1f349") }, // 40 ðŸ‰
 ];
 
-// ── Pregnancy week tips ───────────────────────────────────────────────────────
+// â”€â”€ Pregnancy week tips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Educational tips by trimester/week range. Not medical advice.
 const PREGNANCY_WEEK_TIPS = [
   { weeks: [4,  8],  tips: [
@@ -949,7 +1061,7 @@ function getPregnancyWeekTips(week) {
   return match ? match.tips : [{ t: "Stay in touch with your provider", d: "Regular antenatal visits are important throughout pregnancy. Track any new symptoms and share them at your appointments." }];
 }
 
-// ── Pregnancy symptom insights (uses logged symptoms) ────────────────────────
+// â”€â”€ Pregnancy symptom insights (uses logged symptoms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PREGNANCY_SYMPTOM_MAP = {
   // Bleeding
   VAGINAL_BLEEDING:     { label: "Bleeding", note: "Any vaginal bleeding in pregnancy should be reported to your provider promptly, even if light." },
@@ -1102,20 +1214,39 @@ function renderPregnancyTools(goal, logsByDate) {
     const cycleLen = Number(profile.avgCycleLength) || 28;
     // Parse LMP as local midnight to avoid UTC-offset shifting the date
     const lmpDate = new Date(lmp + "T00:00:00");
-    console.log(`[pregnancy] LMP stored: ${lmp} → parsed: ${lmpDate.toDateString()} → daysAgo: ${Math.floor((Date.now() - lmpDate) / 86400000)}`);
+    console.log(`[pregnancy] LMP stored: ${lmp} -> parsed: ${lmpDate.toDateString()} -> daysAgo: ${Math.floor((Date.now() - lmpDate) / 86400000)}`);
     const r = algoPregnancy.estimatedDueDate(lmpDate, cycleLen);
     week = r.currentWeek;
-    const size = week >= 4 && week <= 40 ? BABY_SIZES[week] : null;
+    const babySizeWeek = Number.isFinite(week) && week >= 4 ? Math.min(40, week) : null;
+    const size = babySizeWeek ? BABY_SIZES[babySizeWeek] : null;
+    const isPostDue = Number.isFinite(week) && week > 40;
+    const overdueWeeks = isPostDue ? week - 40 : 0;
+    const weekLabel = Number.isFinite(week) ? week : "-";
+    const weeksRemainingLabel = Number.isFinite(r.weeksRemaining)
+      ? r.weeksRemaining
+      : (isPostDue ? 0 : "-");
+    const overdueBanner = isPostDue
+      ? `
+        <div class="preg-overdue-banner" role="status" aria-live="polite">
+          <span class="preg-overdue-title">Past due date</span>
+          <p class="preg-overdue-body">
+            You are about ${overdueWeeks} week${overdueWeeks === 1 ? "" : "s"} past your EDD.
+            Stay in close contact with your provider for ongoing monitoring.
+          </p>
+        </div>
+      `
+      : "";
 
     body.innerHTML = `
+      ${overdueBanner}
       ${size ? `
         <div class="baby-size-display">
           <img class="baby-size-img" src="${size.img}" alt="${size.label}" />
           <div class="baby-size-label">Your baby is the size of a ${size.label}</div>
-          <div class="baby-size-week">Week ${week}</div>
+          <div class="baby-size-week">Week ${weekLabel}${isPostDue ? " (post-due)" : ""}</div>
         </div>` : ""}
       <div class="insight-item"><strong>EDD:</strong> ${formatDate(toDateKey(r.eddAdjusted))}${cycleLen !== 28 ? ` <span class="text-muted">(adjusted for ${cycleLen}-day cycle)</span>` : ""}</div>
-      <div class="insight-item"><strong>Trimester:</strong> ${r.trimesterLabel ?? "-"} &bull; <strong>Week:</strong> ${week ?? "-"} &bull; <strong>Weeks remaining:</strong> ${r.weeksRemaining ?? "-"}</div>
+      <div class="insight-item"><strong>Trimester:</strong> ${r.trimesterLabel ?? "-"} &bull; <strong>Week:</strong> ${weekLabel} &bull; <strong>Weeks remaining:</strong> ${weeksRemainingLabel}${isPostDue ? ` <span class="text-muted">(${overdueWeeks} week${overdueWeeks === 1 ? "" : "s"} past EDD)</span>` : ""}</div>
       `;
   } catch (_) {
     body.innerHTML = `<p class="text-muted">Could not calculate due date. Check your LMP date in your profile.</p>`;
@@ -1137,7 +1268,7 @@ function renderPregnancyTools(goal, logsByDate) {
   renderPregnancySymptomInsights(logsByDate ?? {}, week, lmp);
 }
 
-// ─── Symptom section ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Symptom section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function renderSymptomTools(goal, logsByDate, cycle) {
   const card = document.getElementById("symptom-tools");
@@ -1159,7 +1290,7 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
     try {
       const { computeCyclePhaseML } = await import("../../backend/ml/inference/cyclePhaseEngine.js");
       const trimLogs = Object.fromEntries(
-        Object.entries(logsByDate).filter(([, v]) => v?.flow && v.flow !== "none")
+        Object.entries(logsByDate).filter(([, v]) => isLoggedPeriodDay(v))
       );
       const result = computeCyclePhaseML(trimLogs);
       if (result?.phase && result.phase !== "unknown") {
@@ -1172,7 +1303,7 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   const displayPhaseLabel = phaseLabel ?? (phase ? phase.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase()) : null);
   if (subtitle) {
     subtitle.textContent = phase
-      ? `Based on your logs · ${displayPhaseLabel} Phase`
+      ? `Based on your logs | ${displayPhaseLabel} Phase`
       : "Based on your recent logs";
   }
 
@@ -1428,10 +1559,10 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
   body.innerHTML = items.join("") + customHtml;
 }
 
-// ─── Cycle history + trend chart ──────────────────────────────────────────────
+// â”€â”€â”€ Cycle history + trend chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Returns an array of card HTML strings (most recent first)
-function buildCycleCards(cycleStarts, cycleLengths, logsByDate) {
+function buildCycleCards(cycleStarts, cycleLengths, logsByDate, currentCycleState = null) {
   const todayKey = toDateKey(new Date());
 
   return [...cycleStarts].reverse().map((start, revIdx) => {
@@ -1441,10 +1572,25 @@ function buildCycleCards(cycleStarts, cycleLengths, logsByDate) {
     const nextStart = isCurrent ? null : cycleStarts[i + 1];
     const cycleEndKey = nextStart ? addDaysStr(nextStart, -1) : todayKey;
 
-    // Compute phase boundaries for this cycle
-    const ovulationKey    = nextStart ? addDaysStr(nextStart, -14) : null;
-    const fertileStartKey = nextStart ? addDaysStr(nextStart, -19) : null;
-    const fertileEndKey   = nextStart ? addDaysStr(nextStart, -13) : null;
+    // Compute phase boundaries for this cycle.
+    // For historical (closed) cycles we infer from next period start.
+    // For current cycle we use authoritative state from fetchCycleState().
+    let ovulationKey = isCurrent
+      ? (currentCycleState?.ovulationDate ?? null)
+      : (nextStart ? addDaysStr(nextStart, -14) : null);
+    let fertileStartKey = isCurrent
+      ? (currentCycleState?.fertileStart ?? null)
+      : (nextStart ? addDaysStr(nextStart, -19) : null);
+    let fertileEndKey = isCurrent
+      ? (currentCycleState?.fertileEnd ?? null)
+      : (nextStart ? addDaysStr(nextStart, -13) : null);
+    const currentPhaseKey = String(currentCycleState?.phase || "").toLowerCase();
+    const currentPhaseIsLuteal = isCurrent && (currentPhaseKey === "luteal" || currentPhaseKey === "late_luteal");
+    if (currentPhaseIsLuteal && (!ovulationKey || ovulationKey >= todayKey)) {
+      ovulationKey = addDaysStr(todayKey, -1);
+      fertileEndKey = ovulationKey;
+      fertileStartKey = addDaysStr(ovulationKey, -5);
+    }
 
     // Build dot array (cap at 40 for display)
     const displayLen = Math.min(cycleLen ?? (diffDays(start, todayKey) + 1), 40);
@@ -1478,7 +1624,7 @@ function buildCycleCards(cycleStarts, cycleLengths, logsByDate) {
         <span class="cycle-card-title">${title}</span>
         <span class="cycle-card-subtitle">${subtitle}</span>
         <div class="cycle-dot-row">${dots.join("")}</div>
-        <span class="cycle-card-arrow">›</span>
+        <span class="cycle-card-arrow">&rsaquo;</span>
       </div>`;
   });
 }
@@ -1495,7 +1641,7 @@ async function renderCycleHistoryAndChart(cycle, logsByDate) {
     cycleLengths.push(diffDays(cycleStarts[i - 1], cycleStarts[i]));
   }
 
-  // ── Dot-based cycle history ──
+  // â”€â”€ Dot-based cycle history â”€â”€
   if (dotsEl) {
     if (!cycleStarts.length) {
       dotsEl.innerHTML = `<p class="text-muted" style="font-size:0.9rem;">No periods logged. Open Calendar to begin tracking.</p>`;
@@ -1510,7 +1656,7 @@ async function renderCycleHistoryAndChart(cycle, logsByDate) {
         </div>`;
 
       const INITIAL_SHOW = 4;
-      const cardHTMLs = buildCycleCards(cycleStarts, cycleLengths, logsByDate);
+      const cardHTMLs = buildCycleCards(cycleStarts, cycleLengths, logsByDate, cycle);
       const visible = cardHTMLs.slice(0, INITIAL_SHOW);
       const extra   = cardHTMLs.slice(INITIAL_SHOW);
 
@@ -1534,7 +1680,7 @@ async function renderCycleHistoryAndChart(cycle, logsByDate) {
     }
   }
 
-  // ── Trend chart (Plotly) ──
+  // â”€â”€ Trend chart (Plotly) â”€â”€
   if (!canvas) return;
 
   const chartLengths = [...cycleLengths];
@@ -1580,7 +1726,7 @@ async function renderCycleHistoryAndChart(cycle, logsByDate) {
   }
 
   plotly.newPlot(canvas, [
-    // ── Typical range ribbon (21-35 days) ──
+    // â”€â”€ Typical range ribbon (21-35 days) â”€â”€
     {
       x: chartLabels,
       y: Array(chartLabels.length).fill(35),
@@ -1599,7 +1745,7 @@ async function renderCycleHistoryAndChart(cycle, logsByDate) {
       name: "Typical range (21-35d)",
       hoverinfo: "skip",
     },
-    // ── Average line ──
+    // â”€â”€ Average line â”€â”€
     {
       x: chartLabels,
       y: Array(chartLengths.length).fill(avg),
@@ -1609,7 +1755,7 @@ async function renderCycleHistoryAndChart(cycle, logsByDate) {
       line: { color: "#B85C82", dash: "dot", width: 1.8 },
       hoverinfo: "skip",
     },
-    // ── Cycle length line ──
+    // â”€â”€ Cycle length line â”€â”€
     {
       x: chartLabels,
       y: chartLengths,
@@ -1669,11 +1815,11 @@ async function renderCycleHistoryAndChart(cycle, logsByDate) {
   });
 }
 
-// ─── PDF export ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ PDF export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Full report generation lives in report.js / pdf-report-data.js.
 // The dashboard button navigates there so all PDF logic stays in one place.
 
-// ─── Algorithm-powered advanced insights ─────────────────────────────────────
+// â”€â”€â”€ Algorithm-powered advanced insights â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function signalLabel(code) {
   return {
@@ -1705,6 +1851,12 @@ function signalLabel(code) {
     PERIMENOPAUSE_PATTERN:        "Perimenopause pattern",
     PREGNANCY_TEST_TIMING_RELEVANT: "Pregnancy test timing relevant",
     HORMONAL_PATTERN_POSSIBLE:    "Hormonal pattern possible",
+    SYMPTOM_FORECAST:             "Symptom forecast from your logs",
+    PERSONAL_CURRENT_SYMPTOM_CONTEXT: "Your symptoms in context",
+    PERSONAL_SYMPTOM_FORECAST:    "What may come next",
+    BIOMETRIC_STRESS_SLEEP_LOAD:  "Stress and sleep pattern",
+    BIOMETRIC_LOW_RECOVERY_LOAD:  "Recovery pattern",
+    BIOMETRIC_ACTIVITY_STRESS_SHIFT: "Activity and stress pattern",
   }[code] || code.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase());
 }
 
@@ -1716,13 +1868,74 @@ function friendlySymptomNameFromCode(code) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function buildPersonalizedSymptomSignals({ symptomHistory = [], today = new Date() } = {}) {
+const SYMPTOM_PHRASE_OVERRIDES = {
+  CRAVING_SWEET: "sweet cravings",
+  SWEET_CRAVINGS: "sweet cravings",
+  IRRITABLE_MIND: "irritability",
+  IRRITABILITY: "irritability",
+  FAINT_FEELING: "feeling faint",
+  FEELING_FAINT: "feeling faint",
+  FACIAL_PUFFINESS: "facial puffiness",
+};
+
+function symptomPhraseFromCode(code) {
+  const key = String(code || "").trim().toUpperCase();
+  return SYMPTOM_PHRASE_OVERRIDES[key] || friendlySymptomNameFromCode(key).toLowerCase();
+}
+
+function sentenceCase(value) {
+  const text = String(value || "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+function severityLabel(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "unrated";
+  if (n >= 4.5) return "very high";
+  if (n >= 3.5) return "high";
+  if (n >= 2.5) return "moderate";
+  if (n >= 1.5) return "mild";
+  return "light";
+}
+
+function averageSeverity(items = []) {
+  const values = items
+    .map((item) => Number(item?.severity))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function symptomStatCountBefore(stat, dateKey) {
+  return Array.isArray(stat?.dates)
+    ? stat.dates.filter((d) => d && d !== dateKey && d < dateKey).length
+    : 0;
+}
+
+function formatSymptomLogDate(dateKey, todayKey) {
+  if (!dateKey) return "recently";
+  if (dateKey === todayKey) return "today";
+  return formatDate(dateKey);
+}
+
+function buildPersonalizedSymptomSignals({
+  symptomHistory = [],
+  today = new Date(),
+  currentEntry = null,
+  phase = null,
+  dayOfCycle = null,
+} = {}) {
   if (!Array.isArray(symptomHistory) || symptomHistory.length < 1) return [];
 
   const todayKey = toDateKey(today);
   const recent30Start = addDaysStr(todayKey, -29);
   const prev30Start = addDaysStr(todayKey, -59);
   const prev30End = addDaysStr(todayKey, -30);
+  const selectedCurrentEntry =
+    currentEntry ||
+    symptomHistory.find((entry) => entry?.dateKey === todayKey) ||
+    symptomHistory[symptomHistory.length - 1] ||
+    null;
 
   const byCode = new Map();
   const recentSymptomDays = new Set();
@@ -1742,9 +1955,18 @@ function buildPersonalizedSymptomSignals({ symptomHistory = [], today = new Date
         code,
         recent30: 0,
         prev30: 0,
+        total: 0,
+        dates: [],
+        severitySum: 0,
+        severityCount: 0,
         recentSevSum: 0,
         recentSevCount: 0,
       };
+
+      stat.total += 1;
+      stat.dates.push(dateKey);
+      stat.severitySum += Number.isFinite(sev) ? sev : 3;
+      stat.severityCount += 1;
 
       if (isRecent30) {
         stat.recent30 += 1;
@@ -1767,7 +1989,112 @@ function buildPersonalizedSymptomSignals({ symptomHistory = [], today = new Date
   const signals = [];
   const top = ranked[0];
   const topLabel = friendlySymptomNameFromCode(top.code);
+  const topPhrase = symptomPhraseFromCode(top.code);
   const topAvgSeverity = top.recentSevCount ? top.recentSevSum / top.recentSevCount : 0;
+  const currentItems = Array.isArray(selectedCurrentEntry?.items)
+    ? [...selectedCurrentEntry.items]
+        .filter((item) => item?.code)
+        .sort((a, b) => Number(b?.severity ?? 0) - Number(a?.severity ?? 0))
+        .slice(0, 4)
+    : [];
+  const currentAgeDays = selectedCurrentEntry?.dateKey
+    ? diffDays(selectedCurrentEntry.dateKey, todayKey)
+    : Infinity;
+
+  if (currentItems.length && currentAgeDays >= 0 && currentAgeDays <= 14) {
+    const currentDateKey = selectedCurrentEntry.dateKey;
+    const currentList = toPrettyList(currentItems.map((item) => {
+      const label = symptomPhraseFromCode(item.code);
+      return `${label} (${severityLabel(item.severity)})`;
+    }), 3);
+    const recurring = currentItems.filter((item) =>
+      symptomStatCountBefore(byCode.get(String(item.code || "").toUpperCase()), currentDateKey) > 0
+    );
+    const newer = currentItems.filter((item) =>
+      symptomStatCountBefore(byCode.get(String(item.code || "").toUpperCase()), currentDateKey) === 0
+    );
+    const recurringNames = toPrettyList(recurring.map((item) =>
+      symptomPhraseFromCode(item.code)
+    ), 2);
+    const newNames = toPrettyList(newer.map((item) =>
+      symptomPhraseFromCode(item.code)
+    ), 2);
+    const avgCurrentSeverity = averageSeverity(currentItems);
+    const datePhrase = formatSymptomLogDate(currentDateKey, todayKey);
+    const patternLabel = recurring.length
+      ? "Returning pattern"
+      : newer.length > 1
+      ? "New symptoms"
+      : "New symptom";
+    const patternLine = recurring.length
+      ? `${sentenceCase(recurringNames)} ${recurring.length === 1 ? "has" : "have"} appeared before.`
+      : `${sentenceCase(newNames || "This symptom")} ${newer.length === 1 ? "looks" : "look"} new in your saved history.`;
+
+    signals.push({
+      code: "PERSONAL_CURRENT_SYMPTOM_CONTEXT",
+      title: "Latest symptom log",
+      level: avgCurrentSeverity >= 3.5 || recurring.length >= 2 || currentItems.length >= 3 ? "medium" : "low",
+      show: true,
+      summary: currentDateKey === todayKey
+        ? `You logged ${currentList} today.`
+        : `Most recent symptoms: ${currentList}.`,
+      details: [
+        `Date: ${datePhrase}`,
+        `Pattern: ${patternLabel}`,
+        `What Bloom sees: ${patternLine}`,
+      ],
+      guidance: "Log these again if they continue so Bloom can tell whether this is a one-off or part of your usual pattern.",
+      debug: {
+        currentDateKey,
+        avgCurrentSeverity,
+        recurringSymptoms: recurring.map((item) => item.code),
+        newSymptoms: newer.map((item) => item.code),
+      },
+    });
+  }
+
+  const forecastCandidates = ranked
+    .filter((s) => (s.recent30 >= 2 || s.total >= 2) && !/^SEEK_|URGENT|SEVERE_|HEAVY_BLEEDING/.test(s.code))
+    .sort((a, b) => {
+      const aAvg = a.severityCount ? a.severitySum / a.severityCount : 0;
+      const bAvg = b.severityCount ? b.severitySum / b.severityCount : 0;
+      return b.recent30 - a.recent30 || b.total - a.total || bAvg - aAvg;
+    });
+
+  if (forecastCandidates.length) {
+    const topForecast = forecastCandidates.slice(0, 3);
+    const forecastNames = toPrettyList(topForecast.map((s) =>
+      symptomPhraseFromCode(s.code)
+    ), 3);
+    const avgForecastSeverity = averageSeverity(topForecast.map((s) => ({
+      severity: s.severityCount ? s.severitySum / s.severityCount : 0,
+    })));
+    const timingBits = [
+      phase ? `${formatPhaseLabelForInsight(phase)} phase` : "",
+      Number.isFinite(Number(dayOfCycle)) ? `cycle day ${Number(dayOfCycle)}` : "",
+    ].filter(Boolean);
+
+    signals.push({
+      code: "PERSONAL_SYMPTOM_FORECAST",
+      title: "Likely next symptom",
+      level: topForecast[0].recent30 >= 4 || avgForecastSeverity >= 3.5 ? "medium" : "low",
+      show: true,
+      summary: `${sentenceCase(forecastNames)} ${topForecast.length === 1 ? "is" : "are"} the strongest repeat in your saved logs for this timing.`,
+      details: [
+        `Timing: ${timingBits.length ? timingBits.join(" • ") : "current cycle timing"}`,
+        `Usual severity: ${severityLabel(avgForecastSeverity)}`,
+        "Basis: your saved symptom history",
+      ],
+      guidance: "If it shows up, log it with severity so Bloom can confirm whether this cycle is following your usual pattern.",
+      debug: {
+        forecastSymptoms: topForecast.map((s) => s.code),
+        forecastBasis: "recent user symptom frequency",
+        avgForecastSeverity,
+        phase,
+        dayOfCycle,
+      },
+    });
+  }
 
   if (top.prev30 > 0 && top.recent30 >= top.prev30 + 2) {
     // Trending up - lead with the change
@@ -1776,7 +2103,13 @@ function buildPersonalizedSymptomSignals({ symptomHistory = [], today = new Date
       title: `${topLabel} is coming up more often`,
       level: "medium",
       show: true,
-      message: `${topLabel} has appeared ${top.recent30} time${top.recent30 !== 1 ? "s" : ""} this past month, up from ${top.prev30} the month before. This kind of uptick can sometimes reflect a hormonal shift - worth keeping an eye on.`,
+      summary: `${sentenceCase(topPhrase)} increased compared with last month.`,
+      details: [
+        `This month: ${top.recent30} log${top.recent30 !== 1 ? "s" : ""}`,
+        `Previous month: ${top.prev30} log${top.prev30 !== 1 ? "s" : ""}`,
+        "Pattern: emerging",
+      ],
+      guidance: `Keep logging ${topPhrase} with severity so Bloom can tell whether this is continuing or settling back down.`,
     });
   } else if (top.recent30 >= 2) {
     const freqWord = top.recent30 >= 6 ? "frequently" : top.recent30 >= 4 ? "several times" : "a few times";
@@ -1786,19 +2119,31 @@ function buildPersonalizedSymptomSignals({ symptomHistory = [], today = new Date
       title: `${topLabel} is a pattern for you`,
       level: top.recent30 >= 4 ? "medium" : "low",
       show: true,
-      message: `You've logged ${topLabel.toLowerCase()} ${freqWord} this month${sevNote}. Recurring symptoms like this are useful to track - they can reveal how your cycle or hormones affect how you feel day to day.`,
+      summary: `${sentenceCase(topPhrase)} is recurring in your recent logs.`,
+      details: [
+        `Frequency: ${freqWord} this month`,
+        `Severity: ${severityLabel(topAvgSeverity)}${sevNote ? "" : " in your saved logs"}`,
+        "Pattern: recurring",
+      ],
+      guidance: `Keep severity updated when ${topPhrase} appears so forecasts can become more specific to you.`,
     });
   }
 
   const uniqueRecent = ranked.filter((s) => s.recent30 > 0).length;
   if (uniqueRecent >= 3 && recentSymptomDays.size >= 4) {
-    const topThree = ranked.slice(0, 3).map(s => friendlySymptomNameFromCode(s.code).toLowerCase()).join(", ");
+    const topThree = ranked.slice(0, 3).map(s => symptomPhraseFromCode(s.code)).join(", ");
     signals.push({
       code: "PERSONAL_SYMPTOM_MIX_PATTERN",
       title: "You have a consistent symptom cluster",
       level: "low",
       show: true,
-      message: `Your most frequent symptoms lately - ${topThree} - are showing up together across multiple days. Symptom clusters like this often follow the rhythm of your cycle phases.`,
+      summary: `${sentenceCase(topThree)} are showing up as a cluster.`,
+      details: [
+        `Logged days: ${recentSymptomDays.size} in the last month`,
+        `Symptoms: ${topThree}`,
+        "Pattern: cluster",
+      ],
+      guidance: "Keep logging which symptoms happen together so Bloom can compare this cluster with future cycles.",
     });
   }
 
@@ -1808,11 +2153,162 @@ function buildPersonalizedSymptomSignals({ symptomHistory = [], today = new Date
       title: `${topLabel} noted in your recent logs`,
       level: "low",
       show: true,
-      message: `You've logged ${topLabel.toLowerCase()} recently. Log it a few more times with severity ratings and Bloom will be able to spot whether it's part of a pattern for you.`,
+      summary: `${sentenceCase(topPhrase)} is saved in your recent history.`,
+      details: [
+        "Pattern: one-off for now",
+        "Reason: not enough repeat logs yet",
+      ],
+      guidance: "If it happens again, log severity so Bloom can decide whether it is becoming a pattern.",
     });
   }
 
   return signals;
+}
+
+function normalizeBiometricLevelToScore(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (value >= 1 && value <= 4) return value;
+    if (value >= 0 && value <= 5) return Math.max(1, Math.min(4, Math.round(value)));
+  }
+
+  const normalized = String(value).trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const map = { low: 1, moderate: 2, medium: 2, high: 3, very_high: 4 };
+  return map[normalized] ?? null;
+}
+
+function biometricLevelLabel(score) {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return "not set";
+  if (n >= 3.5) return "very high";
+  if (n >= 2.5) return "high";
+  if (n >= 1.5) return "moderate";
+  return "low";
+}
+
+function sleepQualityLabel(score) {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return "not set";
+  if (n >= 8) return "strong";
+  if (n >= 6) return "okay";
+  if (n >= 4) return "low";
+  return "very low";
+}
+
+function average(values = []) {
+  const nums = values.filter((value) => Number.isFinite(Number(value))).map(Number);
+  if (!nums.length) return null;
+  return nums.reduce((sum, value) => sum + value, 0) / nums.length;
+}
+
+function buildBiometricHistory(logsByDate = {}) {
+  return Object.entries(logsByDate || {})
+    .map(([dateKey, log]) => {
+      const sleepScore = Number(log?.sleepScore);
+      const stressScore = normalizeBiometricLevelToScore(log?.stressLevel);
+      const activityScore = normalizeBiometricLevelToScore(log?.activityLevel);
+      if (!Number.isFinite(sleepScore) && stressScore === null && activityScore === null) return null;
+      return {
+        dateKey,
+        sleepScore: Number.isFinite(sleepScore) ? sleepScore : null,
+        stressScore,
+        activityScore,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
+function buildBiometricInsightSignals({
+  logsByDate = {},
+  today = new Date(),
+  phase = null,
+  dayOfCycle = null,
+} = {}) {
+  const history = buildBiometricHistory(logsByDate);
+  if (!history.length) return [];
+
+  const todayKey = toDateKey(today);
+  const recentStart = addDaysStr(todayKey, -13);
+  const recent = history.filter((entry) => entry.dateKey >= recentStart && entry.dateKey <= todayKey);
+  if (!recent.length) return [];
+
+  const latest = recent[recent.length - 1];
+  const sleepValues = recent.map((entry) => entry.sleepScore).filter((value) => value !== null);
+  const stressValues = recent.map((entry) => entry.stressScore).filter((value) => value !== null);
+  const activityValues = recent.map((entry) => entry.activityScore).filter((value) => value !== null);
+  const avgSleep = average(sleepValues);
+  const avgStress = average(stressValues);
+  const avgActivity = average(activityValues);
+  const lowSleepDays = sleepValues.filter((value) => value <= 5).length;
+  const highStressDays = stressValues.filter((value) => value >= 3).length;
+  const lowActivityDays = activityValues.filter((value) => value <= 1).length;
+  const timingBits = [
+    phase ? `${formatPhaseLabelForInsight(phase)} phase` : "",
+    Number.isFinite(Number(dayOfCycle)) ? `cycle day ${Number(dayOfCycle)}` : "",
+  ].filter(Boolean);
+
+  const signals = [];
+
+  if (
+    avgStress !== null &&
+    avgSleep !== null &&
+    (avgStress >= 2.75 || highStressDays >= 2) &&
+    (avgSleep <= 5.5 || lowSleepDays >= 2)
+  ) {
+    signals.push({
+      code: "BIOMETRIC_STRESS_SLEEP_LOAD",
+      title: "Stress and sleep are both elevated signals",
+      level: avgStress >= 3.25 && avgSleep <= 4.5 ? "medium" : "low",
+      show: true,
+      summary: `Recent logs show ${biometricLevelLabel(avgStress)} stress with ${sleepQualityLabel(avgSleep)} sleep.`,
+      details: [
+        `Recent window: ${recent.length} biometric log${recent.length !== 1 ? "s" : ""}`,
+        `Average sleep: ${avgSleep.toFixed(1)}/10`,
+        `Stress pattern: ${highStressDays} high-stress day${highStressDays === 1 ? "" : "s"}`,
+        timingBits.length ? `Timing: ${timingBits.join(" | ")}` : "Timing: recent cycle context",
+      ],
+      guidance: "Keep logging sleep and stress with symptoms so Bloom can tell whether low-rest days line up with cycle changes.",
+      debug: { avgSleep, avgStress, lowSleepDays, highStressDays, latestDateKey: latest.dateKey },
+    });
+  }
+
+  if (avgSleep !== null && avgActivity !== null && avgSleep <= 5.5 && (avgActivity <= 1.75 || lowActivityDays >= 2)) {
+    signals.push({
+      code: "BIOMETRIC_LOW_RECOVERY_LOAD",
+      title: "Recovery looks lower recently",
+      level: avgSleep <= 4.5 && avgActivity <= 1.5 ? "medium" : "low",
+      show: true,
+      summary: "Sleep and activity logs suggest a lower-recovery stretch.",
+      details: [
+        `Average sleep: ${avgSleep.toFixed(1)}/10`,
+        `Activity pattern: ${biometricLevelLabel(avgActivity)}`,
+        `Low-activity days: ${lowActivityDays}`,
+        timingBits.length ? `Timing: ${timingBits.join(" | ")}` : "Timing: recent cycle context",
+      ],
+      guidance: "If symptoms feel stronger during lower-recovery days, log both together so Bloom can connect the pattern.",
+      debug: { avgSleep, avgActivity, lowActivityDays, latestDateKey: latest.dateKey },
+    });
+  }
+
+  if (avgStress !== null && avgActivity !== null && avgStress >= 2.75 && avgActivity <= 2) {
+    signals.push({
+      code: "BIOMETRIC_ACTIVITY_STRESS_SHIFT",
+      title: "Activity dipped while stress was higher",
+      level: "low",
+      show: true,
+      summary: `Recent activity is ${biometricLevelLabel(avgActivity)} while stress is ${biometricLevelLabel(avgStress)}.`,
+      details: [
+        `Stress pattern: ${biometricLevelLabel(avgStress)}`,
+        `Activity pattern: ${biometricLevelLabel(avgActivity)}`,
+        `Recent logs used: ${recent.length}`,
+      ],
+      guidance: "This is useful context for cycle predictions because stress and routine shifts can affect timing and symptoms.",
+      debug: { avgStress, avgActivity, latestDateKey: latest.dateKey },
+    });
+  }
+
+  return signals.slice(0, 2);
 }
 
 
@@ -2134,6 +2630,156 @@ function humanizeCrossEngineNote(note) {
   return raw.replace(/[_-]+/g, " ");
 }
 
+const SIGNAL_PRIORITY = { high: 3, medium: 2, low: 1 };
+const SIGNAL_SOURCE_PRIORITY = { symptom: 3, biometric: 3, cycle: 2, anomaly: 1 };
+const SIGNAL_SKIP_CODES = new Set(["LOW_PREDICTION_CONFIDENCE", "LOGGING_GAP"]);
+
+function softenSignalText(value) {
+  return String(value || "")
+    .replace(/\bdetected\b/gi, "noticed")
+    .replace(/\bAlert:\s*/gi, "")
+    .trim();
+}
+
+function normalizeSignalLevel(level) {
+  const value = String(level || "low").toLowerCase();
+  return value === "high" || value === "medium" || value === "low" ? value : "low";
+}
+
+function signalGuidance(signal) {
+  const guidance = String(signal?.guidance || "").trim();
+  if (guidance) return softenSignalText(guidance);
+  if (normalizeSignalLevel(signal?.level) === "high") {
+    return "Track what happens next and consider checking in with a healthcare professional if this feels unusual for your body.";
+  }
+  return "";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function visibleDashboardSignals(signals = []) {
+  const seen = new Set();
+  return (Array.isArray(signals) ? signals : [])
+    .filter((s) => s?.show !== false)
+    .filter((s) => !SIGNAL_SKIP_CODES.has(String(s?.code || "").toUpperCase()))
+    .filter((s) => !String(s?.code || "").toUpperCase().startsWith("CROSS_ENGINE_NOTE_"))
+    .filter((s) => {
+      const key = String(s?.code || "").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => {
+      const byLevel = (SIGNAL_PRIORITY[normalizeSignalLevel(b.level)] || 0) -
+        (SIGNAL_PRIORITY[normalizeSignalLevel(a.level)] || 0);
+      if (byLevel !== 0) return byLevel;
+      return (SIGNAL_SOURCE_PRIORITY[b._source] || 0) - (SIGNAL_SOURCE_PRIORITY[a._source] || 0);
+    });
+}
+
+function signalCode(signal) {
+  return String(signal?.code || "").trim().toUpperCase();
+}
+
+function isSymptomInsightSignal(signal) {
+  return signal?._source === "symptom" || String(signal?.category || "").toLowerCase() === "symptom";
+}
+
+function selectDashboardSignals(signals = []) {
+  let visible = visibleDashboardSignals(signals);
+  if (visible.some((s) => signalCode(s) === "SYMPTOM_FORECAST")) {
+    visible = visible.filter((s) => signalCode(s) !== "PERSONAL_SYMPTOM_FORECAST");
+  }
+
+  const selected = [];
+  const add = (signal) => {
+    if (!signal || selected.length >= 3) return;
+    const code = signalCode(signal);
+    if (selected.some((existing) => signalCode(existing) === code)) return;
+    selected.push(signal);
+  };
+
+  visible
+    .filter((s) => normalizeSignalLevel(s.level) === "high")
+    .forEach(add);
+
+  const symptomSignals = visible.filter(isSymptomInsightSignal);
+  const preferredSymptomCodes = [
+    "SYMPTOM_FORECAST",
+    "PERSONAL_SYMPTOM_FORECAST",
+    "PERSONAL_CURRENT_SYMPTOM_CONTEXT",
+  ];
+
+  for (const code of preferredSymptomCodes) {
+    add(symptomSignals.find((s) => signalCode(s) === code));
+  }
+
+  if (!selected.some(isSymptomInsightSignal)) {
+    add(symptomSignals.find((s) => {
+      const level = normalizeSignalLevel(s.level);
+      return level === "medium" || level === "high";
+    }) || symptomSignals[0]);
+  }
+
+  visible
+    .filter((s) => {
+      const level = normalizeSignalLevel(s.level);
+      return level === "medium" || level === "high";
+    })
+    .forEach(add);
+
+  visible.forEach(add);
+  return selected.slice(0, 3);
+}
+
+function renderSignalCard(signal) {
+  const level = normalizeSignalLevel(signal?.level);
+  const title = escapeHtml(softenSignalText(signal?.title || signalLabel(signal?.code) || "Bloom noticed something"));
+  const summary = escapeHtml(softenSignalText(signal?.summary || ""));
+  const message = escapeHtml(softenSignalText(signal?.message || ""));
+  const guidance = escapeHtml(signalGuidance(signal));
+  const details = Array.isArray(signal?.details)
+    ? signal.details.map((item) => escapeHtml(softenSignalText(item))).filter(Boolean).slice(0, 4)
+    : [];
+  const icon = level === "high" ? "!" : "•";
+  const detailList = details.length
+    ? `<ul class="bloom-signal-details">${details.map((item) => `<li>${item}</li>`).join("")}</ul>`
+    : "";
+  const hiddenGuidance = guidance && level !== "high"
+    ? `<div class="bloom-signal-guidance bloom-signal-guidance--inside">${guidance}</div>`
+    : "";
+  const expandable = detailList || hiddenGuidance
+    ? `
+      <details class="bloom-signal-more">
+        <summary>View details</summary>
+        <div class="bloom-signal-more-body">
+          ${detailList}
+          ${hiddenGuidance}
+        </div>
+      </details>`
+    : "";
+
+  return `
+    <article class="bloom-signal-card bloom-signal-card--${level}">
+      <div class="bloom-signal-heading">
+        <span class="bloom-signal-icon" aria-hidden="true">${icon}</span>
+        <span>${title}</span>
+      </div>
+      ${summary ? `<div class="bloom-signal-summary">${summary}</div>` : ""}
+      ${!summary && message ? `<div class="bloom-signal-message">${message}</div>` : ""}
+      ${expandable}
+      ${level === "high" && guidance ? `<div class="bloom-signal-guidance">${guidance}</div>` : ""}
+    </article>
+  `;
+}
+
 function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodStart, lastLogDate, logsByDate, mlPredictedCycleLength }) {
   if (!advancedEl) return;
   const customInsightsHtml = renderCustomSymptomAdvancedInsights(logsByDate, new Date());
@@ -2144,10 +2790,26 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
   const today          = new Date();
   const lastPeriodDate = lastPeriodStart ? new Date(lastPeriodStart + "T00:00:00") : null;
   const lastLogDateObj = lastLogDate     ? new Date(lastLogDate     + "T00:00:00") : null;
-  const nextWindow     = cycle.nextPeriodDate ? {
-    start: new Date(cycle.nextPeriodDate + "T00:00:00"),
-    end:   new Date(addDaysStr(cycle.nextPeriodDate, 5) + "T00:00:00"),
+  const expectedStart = cycle.periodPrediction?.status === "overdue"
+    ? cycle.periodPrediction.predictedStart
+    : cycle.nextPeriodDate;
+  const expectedEnd = cycle.periodPrediction?.status === "overdue"
+    ? (cycle.periodPrediction.predictedEnd || addDaysStr(cycle.periodPrediction.predictedStart, 5))
+    : (cycle.nextPeriodDate ? addDaysStr(cycle.nextPeriodDate, 5) : null);
+  const nextWindow = expectedStart ? {
+    start: new Date(expectedStart + "T00:00:00"),
+    end:   new Date(expectedEnd + "T00:00:00"),
   } : null;
+  const ENGINE_PHASE_MAP = { late_luteal: "luteal", ovulatory: "ovulation" };
+  const enginePhase = ENGINE_PHASE_MAP[cycle.phase] ?? cycle.phase;
+
+  const biometricSignals = buildBiometricInsightSignals({
+    logsByDate,
+    today,
+    phase: enginePhase,
+    dayOfCycle: cycle.dayInCycle,
+  });
+  signals.push(...biometricSignals.map((s) => ({ ...s, _source: "biometric" })));
 
   // Cycle engine
   if (algoCycleEngine) {
@@ -2185,7 +2847,7 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
     }
   }
 
-  // Anomaly engine (requires ≥ 4 cycle lengths)
+  // Anomaly engine (requires â‰¥ 4 cycle lengths)
   if (algoAnomalyEngine && cycleLengths.length >= 4) {
     try {
       const anomalyResult = algoAnomalyEngine.generateAnomalySignals({
@@ -2204,21 +2866,42 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
       const latestWithSymptoms = symptomHistoryForInsights.length
         ? symptomHistoryForInsights[symptomHistoryForInsights.length - 1]
         : null;
-      const loggedSymptoms = latestWithSymptoms?.items || [];
-      const ENGINE_PHASE_MAP = { late_luteal: "luteal", ovulatory: "ovulation" };
-      const enginePhase = ENGINE_PHASE_MAP[cycle.phase] ?? cycle.phase;
+      const todayKey = toDateKey(today);
+      const todayWithSymptoms = symptomHistoryForInsights.find((entry) => entry?.dateKey === todayKey) || null;
+      const currentSymptomEntry = todayWithSymptoms || latestWithSymptoms;
+      const loggedSymptoms = currentSymptomEntry?.items || [];
+      let integratedSignals = null;
+      const cycleCount = Math.max((cycle.cycleStarts || []).length, symptomHistoryForInsights.length > 0 ? 2 : 0);
 
-      const symptomSignals = algoSymptomEngine.generateSymptomSignals({
-        loggedSymptoms,
-        phase:           enginePhase,
-        dayOfCycle:      cycle.dayInCycle,
-        cycleLengths,
-        cycleCount:      Math.max((cycle.cycleStarts || []).length, symptomHistoryForInsights.length > 0 ? 2 : 0),
-        symptomHistory: symptomHistoryForInsights,
-        lastPeriodStart: lastPeriodDate,
-        today,
-      });
-      signals.push(...(symptomSignals || []).map((s) => ({ ...s, _source: "symptom" })));
+      if (typeof algoSymptomEngine.generateIntegratedSignals === "function") {
+        integratedSignals = algoSymptomEngine.generateIntegratedSignals({
+          expectedNextPeriodWindow: nextWindow,
+          today,
+          lastPeriodStart: lastPeriodDate,
+          lastLogDate: lastLogDateObj,
+          cycleLengths,
+          loggedSymptoms,
+          phase: enginePhase,
+          dayOfCycle: cycle.dayInCycle,
+          cycleCount,
+          symptomHistory: symptomHistoryForInsights,
+        });
+
+        signals.push(...(integratedSignals?.cycleSignals || []).map((s) => ({ ...s, _source: "cycle" })));
+        signals.push(...(integratedSignals?.symptomSignals || []).map((s) => ({ ...s, _source: "symptom" })));
+      } else {
+        const symptomSignals = algoSymptomEngine.generateSymptomSignals({
+          loggedSymptoms,
+          phase:           enginePhase,
+          dayOfCycle:      cycle.dayInCycle,
+          cycleLengths,
+          cycleCount,
+          symptomHistory: symptomHistoryForInsights,
+          lastPeriodStart: lastPeriodDate,
+          today,
+        });
+        signals.push(...(symptomSignals || []).map((s) => ({ ...s, _source: "symptom" })));
+      }
 
       if (typeof algoSymptomEngine.generateAdvancedSymptomInsights === "function") {
         const advancedSymptom = algoSymptomEngine.generateAdvancedSymptomInsights({
@@ -2231,27 +2914,20 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
 
       // Personalization fallback: ensure advanced insights can still surface
       // user-specific symptom trends even when strict rule-based signals are sparse.
-      const personalized = buildPersonalizedSymptomSignals({ symptomHistory: symptomHistoryForInsights, today });
+      const personalized = buildPersonalizedSymptomSignals({
+        symptomHistory: symptomHistoryForInsights,
+        today,
+        currentEntry: currentSymptomEntry,
+        phase: enginePhase,
+        dayOfCycle: cycle.dayInCycle,
+      });
       signals.push(...personalized.map((s) => ({ ...s, _source: "symptom" })));
 
-      // Cross-engine integration from bloom-symptom-engine:
-      // adds notes when cycle and symptom engines agree on a pattern.
-      if (typeof algoSymptomEngine.generateIntegratedSignals === "function") {
-        const integrated = algoSymptomEngine.generateIntegratedSignals({
-          expectedNextPeriodWindow: nextWindow,
-          today,
-          lastPeriodStart: lastPeriodDate,
-          lastLogDate: lastLogDateObj,
-          cycleLengths,
-          loggedSymptoms,
-          phase: enginePhase,
-          dayOfCycle: cycle.dayInCycle,
-          cycleCount: Math.max((cycle.cycleStarts || []).length, symptomHistoryForInsights.length > 0 ? 2 : 0),
-          symptomHistory: symptomHistoryForInsights,
-        });
-
-        const crossNotes = Array.isArray(integrated?.crossValidatedNotes)
-          ? integrated.crossValidatedNotes
+      // Cross-engine notes from bloom-symptom-engine:
+      // adds low-priority context when cycle and symptom engines agree.
+      if (integratedSignals) {
+        const crossNotes = Array.isArray(integratedSignals?.crossValidatedNotes)
+          ? integratedSignals.crossValidatedNotes
           : [];
         crossNotes.slice(0, 2).forEach((note, idx) => {
           const pretty = humanizeCrossEngineNote(note);
@@ -2271,7 +2947,7 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
     }
   }
 
-  // ── Basic avg-cycle outlier flags (all goals) ──
+  // â”€â”€ Basic avg-cycle outlier flags (all goals) â”€â”€
   if (
     cycle.avgCycleLength &&
     cycle.avgCycleLength < 21 &&
@@ -2281,7 +2957,12 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
       code: "SHORT_CYCLE",
       level: "medium",
       show: true,
-      message: "Your average cycle is shorter than 21 days. This may be worth discussing with a healthcare provider.",
+      summary: "Your average cycle is shorter than the usual tracking range.",
+      details: [
+        `Average cycle: ${cycle.avgCycleLength} days`,
+        "Pattern: shorter cycle timing",
+      ],
+      guidance: "Keep logging start dates so Bloom can confirm whether this is consistent before you raise it with a provider.",
       _source: "cycle",
     });
   }
@@ -2294,7 +2975,12 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
       code: "LONG_CYCLE",
       level: "medium",
       show: true,
-      message: "Your average cycle is longer than 35 days. This can be worth monitoring with a provider.",
+      summary: "Your average cycle is running longer than the usual tracking range.",
+      details: [
+        `Average cycle: ${cycle.avgCycleLength} days`,
+        "Pattern: longer cycle timing",
+      ],
+      guidance: "Keep logging start dates so Bloom can confirm whether this is consistent before you raise it with a provider.",
       _source: "cycle",
     });
   }
@@ -2304,74 +2990,25 @@ function renderAdvancedInsights(advancedEl, { cycle, cycleLengths, lastPeriodSta
     return;
   }
 
-  // Sort: high severity first, then symptom > cycle > anomaly, then dedupe.
-  const srcPri = { symptom: 3, cycle: 2, anomaly: 1 };
-  const pri = { high: 3, medium: 2, low: 1 };
-  const seen = new Set();
+  const dashboardSignals = selectDashboardSignals(signals);
+  if (!dashboardSignals.length) {
+    advancedEl.innerHTML = customInsightsHtml || `<div class="adv-insight-empty">Keep logging daily - patterns will surface here as your data builds up.</div>`;
+    return;
+  }
+  const signalHtml = dashboardSignals.length
+    ? `<div class="bloom-signal-list">${dashboardSignals.map(renderSignalCard).join("")}</div>`
+    : "";
 
-  // Filter out low-value meta signals that aren't actionable for the user
-  const SKIP_CODES = new Set(["LOW_PREDICTION_CONFIDENCE", "LOGGING_GAP"]);
-
-  const deduped = signals
-    .filter((s) => s?.show !== false && !SKIP_CODES.has(String(s?.code || "").toUpperCase()))
-    .filter(s => { if (seen.has(s.code)) return false; seen.add(s.code); return true; })
-    .sort((a, b) => {
-      const byLevel = (pri[b.level] || 0) - (pri[a.level] || 0);
-      if (byLevel !== 0) return byLevel;
-      return (srcPri[b._source] || 0) - (srcPri[a._source] || 0);
-    })
-    .slice(0, 5);
-
-  const lateNoticeSignal =
-    deduped.find((s) => s.code === "EXTENDED_ABSENCE") ||
-    deduped.find((s) => s.code === "MISSED_PERIOD") ||
-    deduped.find((s) => s.code === "LATE_PERIOD") ||
-    null;
-  const lateNoticeHtml = buildLateNoticeBanner(lateNoticeSignal);
-  const listSignals = lateNoticeSignal
-    ? deduped.filter((s) => s.code !== lateNoticeSignal.code)
-    : deduped;
-
-  const structuredHtml = listSignals.map((s, idx) => {
-    const codeStr = String(s.code || "");
-    const isCrossEngine = codeStr.startsWith("CROSS_ENGINE_NOTE_");
-    const reason = isCrossEngine ? "" : buildPossibleReason(s, cycle);
-    const guidance = s.guidance && !isCrossEngine ? String(s.guidance) : "";
-
-    // Build one flowing paragraph: message + reason woven together
-    let body = s.message || "";
-    if (reason && !body.toLowerCase().includes(reason.toLowerCase().slice(0, 20))) {
-      body += ` ${reason}`;
-    }
-    if (guidance) {
-      body += ` ${guidance}`;
-    }
-
-    if (s.level === "high") {
-      return `
-        <div class="adv-insight-item adv-insight-item--alert" ${idx > 0 ? 'style="margin-top:0.65rem;"' : ''}>
-          <div class="adv-insight-title">⚠️ ${s.title || signalLabel(s.code)}</div>
-          <div class="adv-insight-body">${body}</div>
-        </div>`;
-    }
-
-    return `
-      <div class="adv-insight-item" ${idx > 0 ? 'style="border-top:1px solid var(--color-border);padding-top:0.75rem;margin-top:0.75rem;"' : ''}>
-        <div class="adv-insight-title">${s.title || signalLabel(s.code)}</div>
-        <div class="adv-insight-body">${body}</div>
-      </div>`;
-  }).join("");
-
-  advancedEl.innerHTML = lateNoticeHtml + structuredHtml + (customInsightsHtml || "");
+  advancedEl.innerHTML = signalHtml + (customInsightsHtml || "");
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function loadDashboard() {
   const goal = getUserGoal();
   const loadEpoch = ++_dashboardLoadEpoch;
   applyGoalClasses(goal);
-  // ── Age-lock gate ─────────────────────────────────────────────────────────────
+  // â”€â”€ Age-lock gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Try to Conceive, Track Pregnancy, and Track Perimenopause are 18+ goals.
   // If the user is under 18 and somehow reaches one, show a graceful locked state.
   if (isGoalAgeLocked(goal)) {
@@ -2425,7 +3062,7 @@ async function loadDashboard() {
   }
   const lastPeriodStart = cycleStarts.length ? cycleStarts[cycleStarts.length - 1] : null;
 
-  // ── Cycle state: backend when signed in, local rule-based otherwise ──────────
+  // â”€â”€ Cycle state: backend when signed in, local rule-based otherwise â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // fetchCycleState always returns at least a local estimate when period data exists,
   // so the dashboard degrades gracefully to a low-confidence prediction rather than
   // showing nothing when the backend is unavailable or the user is in anon mode.
@@ -2451,13 +3088,23 @@ async function loadDashboard() {
     `;
   }
 
-  renderPhaseCard(cycle, () => {});
-  renderGoalToolCard(goal, cycle);
+  const waitForBackendPhase = !isAnonMode() && !!lastPeriodStart;
+  const earlyCycleForPhaseCard = waitForBackendPhase
+    ? { ...cycle, phase: "unknown", phaseLabel: null, confidence: null }
+    : cycle;
+  const earlyCycleForGoalCard = waitForBackendPhase
+    ? { ...cycle, nextPeriodDate: null, fertileStart: null, fertileEnd: null, ovulationDate: null }
+    : cycle;
 
+  renderPhaseCard(earlyCycleForPhaseCard, () => {});
+  renderGoalToolCard(goal, earlyCycleForGoalCard);
+
+  let hasResolvedBackendState = false;
   if (lastPeriodStart) {
     const state = await _cycleStatePromise;
     if (loadEpoch !== _dashboardLoadEpoch) return;
     if (state?.ready) {
+      hasResolvedBackendState = true;
       cycle.phase          = state.phase          ?? cycle.phase;
       cycle.phaseLabel     = state.phaseLabel      ?? null;
       cycle.source         = state.source          ?? "backend";
@@ -2471,10 +3118,11 @@ async function loadDashboard() {
       cycle.dayInCycle     = state.dayInCycle      ?? cycle.dayInCycle;
       cycle.avgCycleLength = state.avgCycleLength  ?? cycle.avgCycleLength;
       predictedCycleLength = state.predictedCycleLength ?? null;
-      if (state.nextPeriodDate)     cycle.nextPeriodDate = state.nextPeriodDate;
-      if (state.ovulationDate)      cycle.ovulationDate  = state.ovulationDate;
-      if (state.fertileStart)       cycle.fertileStart   = state.fertileStart;
-      if (state.fertileEnd)         cycle.fertileEnd     = state.fertileEnd;
+      cycle.nextPeriodDate = state.nextPeriodDate ?? null;
+      cycle.periodPrediction = state.periodPrediction ?? null;
+      cycle.ovulationDate  = state.ovulationDate ?? null;
+      cycle.fertileStart   = state.fertileStart ?? null;
+      cycle.fertileEnd     = state.fertileEnd ?? null;
       if (state.futureCycles?.length) cycle.futureCycles = state.futureCycles;
       if (state.source === "local") {
         console.log("[dashboard] using local fallback state = backend unavailable or anon mode");
@@ -2483,6 +3131,11 @@ async function loadDashboard() {
 
     // FutureCycles resolution is now handled centrally in cycle-state.js
     // (_resolveFutureCycles runs on every fetchCycleState result before caching).
+  }
+
+  if (waitForBackendPhase && !hasResolvedBackendState) {
+    cycle.phase = "unknown";
+    cycle.phaseLabel = null;
   }
 
   const goalBadge = document.getElementById("goal-badge");
@@ -2501,7 +3154,7 @@ async function loadDashboard() {
         <div class="stat-number">Day ${cycle.dayInCycle}</div>
         <p class="muted-line">
           ${cycle.avgCycleLength ? `Avg cycle: ${cycle.avgCycleLength} days` : ""}
-          &nbsp;·&nbsp;<span class="fertility-conf ${confCls}">${confLabel} confidence</span>
+          &nbsp;|&nbsp;<span class="fertility-conf ${confCls}">${confLabel} confidence</span>
         </p>
       `;
     } else {
@@ -2513,19 +3166,15 @@ async function loadDashboard() {
   }
 
   const applyPhaseFeedbackToInsights = () => {
-    const fb = getTodayPhaseFeedback();
-    const phaseForInsight = fb?.response === "no" && fb?.updatedPhase
-      ? fb.updatedPhase
-      : (cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown");
-    const phaseLabelForInsight = fb?.response === "no" && fb?.updatedPhaseLabel
-      ? fb.updatedPhaseLabel
-      : cycle.phaseLabel;
+    const phaseForInsight = cycle.phase && cycle.phase !== "unknown" ? cycle.phase : "unknown";
+    const phaseLabelForInsight = cycle.phaseLabel;
     const todaySymptoms = (logsByDate[toDateKey(new Date())]?.symptoms) || [];
     setTodayInsights(phaseForInsight, goal, phaseLabelForInsight, todaySymptoms);
   };
 
   renderPhaseCard(cycle, applyPhaseFeedbackToInsights);
   renderGoalToolCard(goal, cycle);
+  triggerNotifications(cycle, logsByDate);
 
   applyPhaseFeedbackToInsights();
 
@@ -2535,7 +3184,7 @@ async function loadDashboard() {
     if (advCard) {
       advCard.innerHTML = `
         <div style="text-align:center;padding:1.5rem 1rem;">
-          <div style="font-size:1.5rem;margin-bottom:0.5rem;">🔒</div>
+          <div style="font-size:1rem;font-weight:800;margin-bottom:0.5rem;">Locked</div>
           <p style="font-weight:700;color:var(--color-primary-dark);margin:0 0 0.35rem;">Advanced Insights</p>
           <p style="font-size:0.88rem;color:var(--color-text-muted);margin:0 0 1rem;">Create a free account to unlock cycle predictions, personalised insights, and health reports.</p>
           <a href="/pages/register.html" class="btn btn-primary btn-sm">Create account</a>
@@ -2551,7 +3200,7 @@ async function loadDashboard() {
     pdfBtn.onclick = async () => {
       pdfBtn.disabled = true;
       const prev = pdfBtn.textContent;
-      pdfBtn.textContent = "Generating…";
+      pdfBtn.textContent = "Generating...";
       try {
         const [{ generatePDF }, { buildReportData }] = await Promise.all([
           import("./pdf-generator.js"),
@@ -2560,13 +3209,13 @@ async function loadDashboard() {
         const userName = localStorage.getItem("bloom_user_name") ?? null;
         const data = buildReportData(logsByDate, cycle, userName);
         if (!data.cyclesTracked) {
-          alert("No cycle history yet. Log period days in the Calendar first.");
+          showToast("No cycle history yet. Log period days in the Calendar first.", "error");
           return;
         }
         generatePDF(data);
       } catch (e) {
         console.error("[export-pdf]", e);
-        alert("Could not generate PDF. Please try again.");
+        showToast("Could not generate PDF. Please try again.", "error");
       } finally {
         pdfBtn.disabled = false;
         pdfBtn.textContent = prev;
@@ -2612,23 +3261,9 @@ async function loadDashboard() {
 }
 
 
-onAuthChange(() => { loadDashboard(); });
-
-// Fire notifications using the same cycle state already fetched by loadDashboard.
-// Reuses the same logs promise to avoid duplicate cloud fetches on first paint.
-ensureLogsPromise().then(async logs => {
-  const cycle = buildCycleBase(logs);
-
-  if (!isAnonMode() && (cycle.cycleStarts || []).length >= 1) {
-    // Reuse only the in-flight/resolved promise from loadDashboard.
-    // Avoid triggering a second startup fetch that can race and timeout.
-    const state = await (_cycleStatePromise ?? Promise.resolve(null)).catch(() => null);
-    if (state) {
-      if (state.nextPeriodDate) cycle.nextPeriodDate = state.nextPeriodDate;
-      if (state.fertileStart)   cycle.fertileStart   = state.fertileStart;
-      if (state.fertileEnd)     cycle.fertileEnd     = state.fertileEnd;
-    }
-  }
-
-  triggerNotifications(cycle, logs);
+onAuthChange(() => {
+  // Auth state may resolve after initial script execution. Reset bootstrap
+  // promises so account mode does not reuse an early empty logs fetch.
+  resetDashboardDataPromises();
+  loadDashboard();
 });

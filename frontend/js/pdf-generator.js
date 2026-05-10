@@ -465,6 +465,85 @@ function drawSummary(doc, data, y) {
 }
 
 // ── CYCLE HISTORY ─────────────────────────────────────────────────────────────
+function drawSignalSummary(doc, data, y) {
+  const summary = data.signalSummary || {};
+  const signals = Array.isArray(summary.signals) ? summary.signals : [];
+  const guidanceLines = Array.isArray(summary.guidanceLines) ? summary.guidanceLines : [];
+  if (!signals.length && !summary.patternLine && !guidanceLines.length) return y;
+
+  y = maybeNewPage(doc, y, 34);
+  y = sectionHeading(doc, "Advanced Insights", y);
+
+  if (summary.patternLine) {
+    const lines = doc.splitTextToSize(summary.patternLine, CW - 18);
+    const boxH = lines.length * 4.8 + 11;
+    y = maybeNewPage(doc, y, boxH + 6);
+    fc(doc, C.primaryLightest);
+    dc(doc, C.borderDark);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(M, y, CW, boxH, 3, 3, "FD");
+    fc(doc, C.primary);
+    doc.roundedRect(M, y, 4, boxH, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    tc(doc, C.primary);
+    doc.text("Pattern Bloom noticed", M + 9, y + 7);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    tc(doc, C.textMid);
+    doc.text(lines, M + 9, y + 13);
+    y += boxH + 8;
+  }
+
+  signals.forEach((signal) => {
+    const level = String(signal.level || "low").toLowerCase();
+    const accent = level === "high" ? C.warning : level === "medium" ? C.primary : C.textMuted;
+    const body = [signal.message, signal.guidance ? `Guidance: ${signal.guidance}` : ""]
+      .filter(Boolean)
+      .join(" ");
+    const lines = doc.splitTextToSize(body, CW - 12);
+    const cardH = lines.length * 4.7 + 13;
+    y = maybeNewPage(doc, y, cardH + 4);
+    fc(doc, level === "low" ? C.bgCard : C.primaryLightest);
+    dc(doc, C.border);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(M, y, CW, cardH, 3, 3, "FD");
+    fc(doc, accent);
+    doc.roundedRect(M, y, 3.5, cardH, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    tc(doc, accent);
+    doc.text(signal.title || "Bloom noticed something", M + 8, y + 7);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    tc(doc, C.textMid);
+    doc.text(lines, M + 8, y + 13);
+    y += cardH + 5;
+  });
+
+  if (guidanceLines.length) {
+    y = maybeNewPage(doc, y, guidanceLines.length * 6 + 12);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    tc(doc, C.textDark);
+    doc.text("Guidance", M, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.2);
+    tc(doc, C.textMid);
+    guidanceLines.forEach((line) => {
+      const wrapped = doc.splitTextToSize(line, CW - 8);
+      fc(doc, C.primary);
+      doc.circle(M + 1.5, y - 1.6, 1, "F");
+      doc.text(wrapped, M + 6, y);
+      y += wrapped.length * 4.6 + 2;
+    });
+    y += 4;
+  }
+
+  return y;
+}
+
 function drawCycleHistory(doc, data, y) {
   if (!data.cyclesTracked) return y;
   y = maybeNewPage(doc, y, 30);
@@ -787,6 +866,7 @@ export function generatePDF(data) {
   let y = 22;
 
   y = drawSummary(doc, data, y);
+  y = drawSignalSummary(doc, data, y);
   y = drawCycleHistory(doc, data, y);
   y = drawSymptomLog(doc, data, y);
   y = drawTrends(doc, data, y);

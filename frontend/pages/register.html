@@ -331,7 +331,7 @@
       } catch (err) {
         let msg = 'Registration failed. Please try again.';
         if (err.code === 'auth/email-already-in-use') {
-          msg = 'An account with this email already exists. <a href="/pages/login.html">Log in instead?</a>';
+          msg = 'An account with this email already exists. If it was disabled, an admin must enable or delete it before this email can be reused. <a href="/pages/login.html">Log in instead?</a>';
         } else if (err.code === 'auth/weak-password' || err.code === 'auth/weak-password-custom') {
           msg = err.errors
             ? 'Password requirements not met: ' + err.errors.join(', ') + '.'

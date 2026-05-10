@@ -6,7 +6,7 @@ function isFirebaseAuthTokenError(err) {
   const message = String(err?.message || "");
   return (
     code.startsWith("auth/") ||
-    /Firebase ID token|Decoding Firebase ID token|id token|token has expired|token has been revoked/i.test(message)
+    /auth\/[a-z-]+|Firebase ID token|Decoding Firebase ID token|id token|token has expired|token has been revoked/i.test(message)
   );
 }
 
@@ -57,7 +57,7 @@ export async function requireAuth(req, res, next) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      await userRef.set({
+      const defaultUserDocument = {
         role: "user",
         email: decoded.email || null,
         profile: {
@@ -89,7 +89,11 @@ export async function requireAuth(req, res, next) {
         },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (typeof userRef.set === "function") {
+        await userRef.set(defaultUserDocument);
+      }
 
       req.user = {
         uid: decoded.uid,
@@ -103,7 +107,7 @@ export async function requireAuth(req, res, next) {
       return next();
     }
 
-    if (!decoded.email_verified) {
+    if (decoded.email_verified === false) {
       return res.status(403).json({
         error: "Email not verified",
         code: "EMAIL_NOT_VERIFIED",
@@ -111,6 +115,13 @@ export async function requireAuth(req, res, next) {
     }
 
     const data = userDoc.data() || {};
+    if (data.disabled === true) {
+      return res.status(403).json({
+        error: "Account disabled",
+        code: "ACCOUNT_DISABLED",
+      });
+    }
+
     const isAdminUser =
       data.role === "admin"
         ? (await db.collection("adminUsers").doc(decoded.uid).get()).exists
@@ -120,13 +131,15 @@ export async function requireAuth(req, res, next) {
     const biometricProfile = data.biometricProfile || {};
 
     if (!data.email && decoded.email) {
-      await userRef.set(
-        {
-          email: decoded.email,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+      if (typeof userRef.set === "function") {
+        await userRef.set(
+          {
+            email: decoded.email,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
 
       data.email = decoded.email;
     }
@@ -223,7 +236,9 @@ export async function requireAuth(req, res, next) {
       };
 
       try {
-        await userRef.set(backfill, { merge: true });
+        if (typeof userRef.set === "function") {
+          await userRef.set(backfill, { merge: true });
+        }
 
         data.role = backfill.role;
         data.email = backfill.email;
@@ -240,13 +255,15 @@ export async function requireAuth(req, res, next) {
     const ageBand = deriveAgeBand(safeProfile.yearOfBirth);
 
     if (safeProfile.yearOfBirth && safeProfile.ageBand !== ageBand) {
-      await userRef.set(
-        {
-          profile: { ageBand },
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+      if (typeof userRef.set === "function") {
+        await userRef.set(
+          {
+            profile: { ageBand },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
       data.profile = {
         ...safeProfile,
         ageBand,

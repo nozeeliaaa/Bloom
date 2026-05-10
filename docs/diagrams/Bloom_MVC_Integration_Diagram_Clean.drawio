@@ -1,0 +1,355 @@
+<mxfile host="app.diagrams.net" agent="Codex">
+  <diagram id="Bloom-MVC-Integration-Clean" name="Bloom MVC Integration Diagram">
+    <mxGraphModel dx="3391" dy="1877" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=24;fontStyle=1;fontColor=#35122f;align=center;verticalAlign=middle;" value="Bloom MVC Integration Diagram" vertex="1">
+          <mxGeometry height="40" width="1900" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_view" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=17;align=center;verticalAlign=top;spacingTop=10;" value="VIEW LAYER&amp;#xa;browser UI" vertex="1">
+          <mxGeometry height="1410" width="300" x="30" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_front_ctrl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=17;align=center;verticalAlign=top;spacingTop=10;" value="FRONTEND CONTROLLERS&amp;#xa;event handling + page state" vertex="1">
+          <mxGeometry height="1410" width="310" x="360" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_backend_ctrl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=17;align=center;verticalAlign=top;spacingTop=10;" value="BACKEND CONTROLLERS / SERVICES&amp;#xa;Express routes + business logic" vertex="1">
+          <mxGeometry height="1410" width="480" x="700" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_model" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=17;align=center;verticalAlign=top;spacingTop=10;" value="MODEL LAYER&amp;#xa;domain entities + Firestore documents" vertex="1">
+          <mxGeometry height="1410" width="410" x="1210" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_external" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=17;align=center;verticalAlign=top;spacingTop=10;" value="EXTERNAL SERVICES&amp;#xa;third-party adapters" vertex="1">
+          <mxGeometry height="1410" width="220" x="1650" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ApiClient" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="ApiClient &amp;lt;&amp;lt;singleton module&amp;gt;&amp;gt;&amp;#xa;--------------------&amp;#xa;+ request(path, options)&amp;#xa;+ authHeaders()&amp;#xa;+ clearCache()&amp;#xa;Used by all frontend controllers" vertex="1">
+          <mxGeometry height="120" width="250" x="390" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="ExpressApp" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="ExpressApp&amp;#xa;--------------------&amp;#xa;+ applyMiddleware()&amp;#xa;+ mountRoutes()&amp;#xa;+ listen()&amp;#xa;Receives HTTPS REST requests" vertex="1">
+          <mxGeometry height="120" width="200" x="730" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="RequireAuth" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="RequireAuthMiddleware &amp;lt;&amp;lt;middleware&amp;gt;&amp;gt;&amp;#xa;--------------------&amp;#xa;+ verifyIdToken()&amp;#xa;+ attachUser()&amp;#xa;+ enforceAdmin()" vertex="1">
+          <mxGeometry height="120" width="195" x="955" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="FirestoreRepository" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="FirestoreRepository &amp;lt;&amp;lt;repository&amp;gt;&amp;gt;&amp;#xa;--------------------&amp;#xa;+ getDoc(path)&amp;#xa;+ setDoc(path, data)&amp;#xa;+ updateDoc(path, data)&amp;#xa;+ query(collection, filters)" vertex="1">
+          <mxGeometry height="150" width="195" x="955" y="1280" as="geometry" />
+        </mxCell>
+        <mxCell id="ExternalAdapter" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="ExternalServiceAdapter &amp;lt;&amp;lt;adapter&amp;gt;&amp;gt;&amp;#xa;--------------------&amp;#xa;+ verifyToken()&amp;#xa;+ sendPush()&amp;#xa;+ getDirections()&amp;#xa;+ sendEmail()" vertex="1">
+          <mxGeometry height="145" width="170" x="1675" y="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="FirebaseServices" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="Firebase Services&amp;#xa;--------------------&amp;#xa;Auth&amp;#xa;Firestore&amp;#xa;Cloud Messaging" vertex="1">
+          <mxGeometry height="95" width="170" x="1675" y="1370" as="geometry" />
+        </mxCell>
+        <mxCell id="view_auth" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="PageShell / Auth Views&amp;#xa;--------------------&amp;#xa;Login, signup, session shell" vertex="1">
+          <mxGeometry height="120" width="230" x="65" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="front_auth" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="AuthController&amp;#xa;--------------------&amp;#xa;+ login()&amp;#xa;+ register()&amp;#xa;+ restoreSession()&amp;#xa;+ logout()" vertex="1">
+          <mxGeometry height="125" width="230" x="400" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="back_auth" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="UserRouteController&amp;#xa;--------------------&amp;#xa;/api/user&amp;#xa;+ getProfile()&amp;#xa;+ saveProfile()&amp;#xa;+ getGame()" vertex="1">
+          <mxGeometry height="140" width="230" x="735" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="model_auth" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="User + UserProfile&amp;#xa;--------------------&amp;#xa;uid, email, role&amp;#xa;nickname, goal, mode&amp;#xa;createdAt, updatedAt" vertex="1">
+          <mxGeometry height="135" width="320" x="1245" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_auth" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="Firebase Auth&amp;#xa;verifies identity tokens" vertex="1">
+          <mxGeometry height="95" width="170" x="1675" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="e_view_front_auth" edge="1" parent="1" source="view_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="front_auth" value="delegates user event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_view_auth" edge="1" parent="1" source="front_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_auth" value="renders result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_api_auth" edge="1" parent="1" source="front_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ApiClient" value="creates / fetches profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_back_auth" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="back_auth" value="HTTPS REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_repo_auth" edge="1" parent="1" source="back_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirestoreRepository" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_model_auth" edge="1" parent="1" source="back_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="model_auth" value="maps / returns model data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_model_view_auth" edge="1" parent="1" source="model_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_auth" value="displayed as UI state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_ext_auth" edge="1" parent="1" source="back_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ext_auth" value="uses adapter/service">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="view_dashboard" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="DashboardView&amp;#xa;--------------------&amp;#xa;Cycle snapshot&amp;#xa;Phase card&amp;#xa;Cycle history" vertex="1">
+          <mxGeometry height="120" width="230" x="65" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="front_dashboard" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="DashboardController&amp;#xa;--------------------&amp;#xa;+ loadDashboard()&amp;#xa;+ loadCycleState()&amp;#xa;+ submitPhaseFeedback()" vertex="1">
+          <mxGeometry height="125" width="230" x="400" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="back_dashboard" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="CycleRouteController + PredictionEngine&amp;#xa;--------------------&amp;#xa;/api/cycles/state&amp;#xa;+ estimatePhase()&amp;#xa;+ buildConfidence()" vertex="1">
+          <mxGeometry height="140" width="230" x="735" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="model_dashboard" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="UserCycleData + CyclePrediction&amp;#xa;--------------------&amp;#xa;cycle history&amp;#xa;phase, confidence&amp;#xa;futureCycles[]" vertex="1">
+          <mxGeometry height="135" width="320" x="1245" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="e_view_front_dashboard" edge="1" parent="1" source="view_dashboard" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="front_dashboard" value="delegates user event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_view_dashboard" edge="1" parent="1" source="front_dashboard" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_dashboard" value="renders result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_api_dashboard" edge="1" parent="1" source="front_dashboard" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ApiClient" value="loads dashboard state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_back_dashboard" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="back_dashboard" value="HTTPS REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_repo_dashboard" edge="1" parent="1" source="back_dashboard" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirestoreRepository" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_model_dashboard" edge="1" parent="1" source="back_dashboard" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="model_dashboard" value="maps / returns model data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_model_view_dashboard" edge="1" parent="1" source="model_dashboard" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_dashboard" value="displayed as UI state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="view_calendar" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="CalendarView + CycleLogModal&amp;#xa;--------------------&amp;#xa;Month/year view&amp;#xa;Log modal&amp;#xa;Cycle overlays" vertex="1">
+          <mxGeometry height="120" width="230" x="65" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="front_calendar" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="CalendarController&amp;#xa;--------------------&amp;#xa;+ renderCalendar()&amp;#xa;+ saveLog()&amp;#xa;+ deleteLog()&amp;#xa;+ refreshPredictions()" vertex="1">
+          <mxGeometry height="125" width="230" x="400" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="back_calendar" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="LogRouteController + CycleRouteController&amp;#xa;--------------------&amp;#xa;/api/logs&amp;#xa;/api/symptoms&amp;#xa;/api/biometric-logs&amp;#xa;/api/cycles/state" vertex="1">
+          <mxGeometry height="140" width="230" x="735" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="model_calendar" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="CycleLogEntry + SymptomLogEntry + BiometricLogEntry&amp;#xa;--------------------&amp;#xa;flowLevel, symptoms&amp;#xa;sleep, stress, activity&amp;#xa;notes" vertex="1">
+          <mxGeometry height="135" width="320" x="1245" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="e_view_front_calendar" edge="1" parent="1" source="view_calendar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="front_calendar" value="delegates user event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_view_calendar" edge="1" parent="1" source="front_calendar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_calendar" value="renders result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_api_calendar" edge="1" parent="1" source="front_calendar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ApiClient" value="saves logs / refreshes predictions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_back_calendar" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="back_calendar" value="HTTPS REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_repo_calendar" edge="1" parent="1" source="back_calendar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirestoreRepository" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_model_calendar" edge="1" parent="1" source="back_calendar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="model_calendar" value="maps / returns model data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_model_view_calendar" edge="1" parent="1" source="model_calendar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_calendar" value="displayed as UI state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="view_learn" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="LearnView&amp;#xa;--------------------&amp;#xa;Pamphlet grid&amp;#xa;Search + category filter&amp;#xa;Sensitive content gate" vertex="1">
+          <mxGeometry height="120" width="230" x="65" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="front_learn" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="LearnController&amp;#xa;--------------------&amp;#xa;+ loadPamphlets()&amp;#xa;+ filterPamphlets()&amp;#xa;+ openPamphlet(id)" vertex="1">
+          <mxGeometry height="125" width="230" x="400" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="back_learn" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="CatalogRouteController&amp;#xa;--------------------&amp;#xa;/catalog/pamphlets&amp;#xa;/catalog/symptoms" vertex="1">
+          <mxGeometry height="140" width="230" x="735" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="model_learn" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="Pamphlet + SymptomCatalogItem + Preference&amp;#xa;--------------------&amp;#xa;title, category, sensitive&amp;#xa;teenSafe, hideSensitive" vertex="1">
+          <mxGeometry height="135" width="320" x="1245" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="e_view_front_learn" edge="1" parent="1" source="view_learn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="front_learn" value="delegates user event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_view_learn" edge="1" parent="1" source="front_learn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_learn" value="renders result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_api_learn" edge="1" parent="1" source="front_learn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ApiClient" value="loads pamphlets / filters content">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_back_learn" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="back_learn" value="HTTPS REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_repo_learn" edge="1" parent="1" source="back_learn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirestoreRepository" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_model_learn" edge="1" parent="1" source="back_learn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="model_learn" value="maps / returns model data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_model_view_learn" edge="1" parent="1" source="model_learn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_learn" value="displayed as UI state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="view_clinics" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="ClinicsView&amp;#xa;--------------------&amp;#xa;Clinic cards&amp;#xa;Leaflet map&amp;#xa;Use my location" vertex="1">
+          <mxGeometry height="120" width="230" x="65" y="990" as="geometry" />
+        </mxCell>
+        <mxCell id="front_clinics" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="ClinicFinderController&amp;#xa;--------------------&amp;#xa;+ loadClinics()&amp;#xa;+ applyFilters()&amp;#xa;+ requestLocation()&amp;#xa;+ fetchRoute(clinicId)" vertex="1">
+          <mxGeometry height="125" width="230" x="400" y="990" as="geometry" />
+        </mxCell>
+        <mxCell id="back_clinics" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="CatalogRouteController&amp;#xa;--------------------&amp;#xa;/catalog/clinics&amp;#xa;/catalog/route" vertex="1">
+          <mxGeometry height="140" width="230" x="735" y="990" as="geometry" />
+        </mxCell>
+        <mxCell id="model_clinics" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="ClinicDirectoryEntry&amp;#xa;--------------------&amp;#xa;name, parish, services&amp;#xa;latitude, longitude&amp;#xa;phone, address" vertex="1">
+          <mxGeometry height="135" width="320" x="1245" y="990" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_clinics" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="OpenRouteService&amp;#xa;route lookup for directions" vertex="1">
+          <mxGeometry height="95" width="170" x="1675" y="990" as="geometry" />
+        </mxCell>
+        <mxCell id="e_view_front_clinics" edge="1" parent="1" source="view_clinics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="front_clinics" value="delegates user event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_view_clinics" edge="1" parent="1" source="front_clinics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_clinics" value="renders result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_api_clinics" edge="1" parent="1" source="front_clinics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ApiClient" value="loads clinics / requests route">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_back_clinics" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="back_clinics" value="HTTPS REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_repo_clinics" edge="1" parent="1" source="back_clinics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirestoreRepository" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_model_clinics" edge="1" parent="1" source="back_clinics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="model_clinics" value="maps / returns model data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_model_view_clinics" edge="1" parent="1" source="model_clinics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_clinics" value="displayed as UI state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_ext_clinics" edge="1" parent="1" source="back_clinics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ext_clinics" value="uses adapter/service">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="view_bloomie" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="AssistantView&amp;#xa;--------------------&amp;#xa;Chat bubbles&amp;#xa;Input bar&amp;#xa;Feedback buttons" vertex="1">
+          <mxGeometry height="120" width="230" x="65" y="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="front_bloomie" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="BloomieController&amp;#xa;--------------------&amp;#xa;+ sendMessage(text)&amp;#xa;+ saveMemory()&amp;#xa;+ saveAnalytics()&amp;#xa;+ submitFeedback()" vertex="1">
+          <mxGeometry height="125" width="230" x="400" y="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="back_bloomie" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="BloomieRouteController&amp;#xa;--------------------&amp;#xa;/api/bloomie-*&amp;#xa;+ saveMemory()&amp;#xa;+ saveAnalytics()&amp;#xa;+ saveFeedback()" vertex="1">
+          <mxGeometry height="140" width="230" x="735" y="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="model_bloomie" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="BloomieMemory + PhaseFeedback&amp;#xa;--------------------&amp;#xa;lastIntent, topics&amp;#xa;predictedPhase, response&amp;#xa;createdAt" vertex="1">
+          <mxGeometry height="135" width="320" x="1245" y="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="e_view_front_bloomie" edge="1" parent="1" source="view_bloomie" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="front_bloomie" value="delegates user event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_view_bloomie" edge="1" parent="1" source="front_bloomie" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_bloomie" value="renders result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_api_bloomie" edge="1" parent="1" source="front_bloomie" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ApiClient" value="saves memory / feedback">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_back_bloomie" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="back_bloomie" value="HTTPS REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_repo_bloomie" edge="1" parent="1" source="back_bloomie" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirestoreRepository" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_model_bloomie" edge="1" parent="1" source="back_bloomie" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="model_bloomie" value="maps / returns model data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_model_view_bloomie" edge="1" parent="1" source="model_bloomie" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_bloomie" value="displayed as UI state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="view_settings" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="SettingsView + NotificationBellView&amp;#xa;--------------------&amp;#xa;Preferences UI&amp;#xa;Reminder toggle&amp;#xa;Notification inbox" vertex="1">
+          <mxGeometry height="120" width="230" x="65" y="1350" as="geometry" />
+        </mxCell>
+        <mxCell id="front_settings" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="SettingsController + NotificationController&amp;#xa;--------------------&amp;#xa;+ savePreferences()&amp;#xa;+ requestPermission()&amp;#xa;+ saveToken()&amp;#xa;+ markAsRead()" vertex="1">
+          <mxGeometry height="125" width="230" x="400" y="1350" as="geometry" />
+        </mxCell>
+        <mxCell id="back_settings" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="PreferencesRouteController + NotificationRouteController + ReminderScheduler&amp;#xa;--------------------&amp;#xa;/api/preferences&amp;#xa;/api/notifications&amp;#xa;scheduled reminders" vertex="1">
+          <mxGeometry height="140" width="230" x="735" y="1350" as="geometry" />
+        </mxCell>
+        <mxCell id="model_settings" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="Preference + NotificationToken&amp;#xa;--------------------&amp;#xa;theme, hideSensitive&amp;#xa;periodReminder, fertileAlert&amp;#xa;FCM token" vertex="1">
+          <mxGeometry height="135" width="320" x="1245" y="1350" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_settings" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="Firebase Cloud Messaging&amp;#xa;push notifications" vertex="1">
+          <mxGeometry height="95" width="170" x="1675" y="1350" as="geometry" />
+        </mxCell>
+        <mxCell id="e_view_front_settings" edge="1" parent="1" source="view_settings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="front_settings" value="delegates user event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_view_settings" edge="1" parent="1" source="front_settings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_settings" value="renders result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_api_settings" edge="1" parent="1" source="front_settings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ApiClient" value="saves preferences / notification tokens">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_back_settings" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="back_settings" value="HTTPS REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_repo_settings" edge="1" parent="1" source="back_settings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirestoreRepository" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_model_settings" edge="1" parent="1" source="back_settings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="model_settings" value="maps / returns model data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_model_view_settings" edge="1" parent="1" source="model_settings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_settings" value="displayed as UI state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_ext_settings" edge="1" parent="1" source="back_settings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ext_settings" value="uses adapter/service">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="view_admin" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="AdminView&amp;#xa;--------------------&amp;#xa;Stats&amp;#xa;Users&amp;#xa;Pamphlets / Clinics&amp;#xa;Support requests" vertex="1">
+          <mxGeometry height="120" width="230" x="65" y="1530" as="geometry" />
+        </mxCell>
+        <mxCell id="front_admin" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="AdminController&amp;#xa;--------------------&amp;#xa;+ loadStats()&amp;#xa;+ loadUsers()&amp;#xa;+ manageContent()&amp;#xa;+ reviewSupport()" vertex="1">
+          <mxGeometry height="125" width="230" x="400" y="1530" as="geometry" />
+        </mxCell>
+        <mxCell id="back_admin" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="AdminRouteController + ContactRouteController&amp;#xa;--------------------&amp;#xa;/api/admin&amp;#xa;/api/contact&amp;#xa;requires admin role" vertex="1">
+          <mxGeometry height="140" width="230" x="735" y="1530" as="geometry" />
+        </mxCell>
+        <mxCell id="model_admin" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;shadow=0;" value="User + Pamphlet + ClinicDirectoryEntry + SupportRequest&amp;#xa;--------------------&amp;#xa;admin-managed records&amp;#xa;support tickets" vertex="1">
+          <mxGeometry height="135" width="320" x="1245" y="1530" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_admin" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;dashed=1;" value="SMTP / Helpdesk Email&amp;#xa;sends contact messages" vertex="1">
+          <mxGeometry height="95" width="170" x="1675" y="1530" as="geometry" />
+        </mxCell>
+        <mxCell id="e_view_front_admin" edge="1" parent="1" source="view_admin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="front_admin" value="delegates user event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_view_admin" edge="1" parent="1" source="front_admin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_admin" value="renders result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_front_api_admin" edge="1" parent="1" source="front_admin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ApiClient" value="loads admin data / reviews support">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_back_admin" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="back_admin" value="HTTPS REST">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_repo_admin" edge="1" parent="1" source="back_admin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirestoreRepository" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_model_admin" edge="1" parent="1" source="back_admin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="model_admin" value="maps / returns model data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_model_view_admin" edge="1" parent="1" source="model_admin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=11;" target="view_admin" value="displayed as UI state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_back_ext_admin" edge="1" parent="1" source="back_admin" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ext_admin" value="uses adapter/service">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_express" edge="1" parent="1" source="ApiClient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ExpressApp" value="base REST gateway">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_express_auth" edge="1" parent="1" source="ExpressApp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="RequireAuth" value="applies auth middleware">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_auth_ext" edge="1" parent="1" source="RequireAuth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="ExternalAdapter" value="verifies token">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_repo_firebase" edge="1" parent="1" source="FirestoreRepository" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirebaseServices" value="persists documents">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ext_firebase" edge="1" parent="1" source="ExternalAdapter" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=11;" target="FirebaseServices" value="uses Auth / FCM">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="MvcNote" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;" value="Reading this diagram: each row is one Bloom feature. The View delegates user actions to a frontend controller. The controller sends authenticated API requests through ApiClient. Express routes perform backend logic, read/write model data through FirestoreRepository, then return data for the View to render. The Model never directly controls the View." vertex="1">
+          <mxGeometry height="115" width="590" x="65" y="1685" as="geometry" />
+        </mxCell>
+        <mxCell id="Legend" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#35122f;fontSize=12;align=left;verticalAlign=top;spacing=8;" value="Line legend&amp;#xa;--------------------&amp;#xa;Dashed open arrow: dependency / request&amp;#xa;Dotted return arrow: render/update response&amp;#xa;Solid open arrow: model mapping / result&amp;#xa;Rows are aligned to reduce crossing lines." vertex="1">
+          <mxGeometry height="115" width="360" x="720" y="1685" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

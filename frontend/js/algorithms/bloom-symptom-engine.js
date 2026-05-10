@@ -574,7 +574,13 @@ export function groupSymptomsByCycleWindow(symptomHistory, cycleStarts) {
         for (const item of entry.items) {
           if (!item?.code) continue;
           if (!byCode.has(item.code)) byCode.set(item.code, []);
-          byCode.get(item.code).push({ cycleIndex: i, dayOfCycle, phase, dateKey: entry.dateKey });
+          byCode.get(item.code).push({
+            cycleIndex: i,
+            dayOfCycle,
+            phase,
+            dateKey: entry.dateKey,
+            severity: Number(item.severity) || 0,
+          });
         }
         break; // entry belongs to exactly one cycle
       }
@@ -654,13 +660,16 @@ export function getSymptomForecastCandidates(
     if (FORECAST_EXCLUDED_CODES.has(code))  continue; // safety-sensitive
     if (loggedTodayCodes.has(code))          continue; // already logged today
 
-    const phaseSupport  = currentPhase !== null
-      ? countCyclesSupportingPhase(occurrences, currentPhase)
-      : 0;
+    const phaseMatches = currentPhase !== null
+      ? occurrences.filter(o => o.cycleIndex !== 0 && o.phase === currentPhase)
+      : [];
 
-    const windowSupport = currentDayOfCycle !== null
-      ? countCyclesSupportingDayWindow(occurrences, currentDayOfCycle, dayWindowHalf)
-      : 0;
+    const windowMatches = currentDayOfCycle !== null
+      ? occurrences.filter(o => o.cycleIndex !== 0 && Math.abs(o.dayOfCycle - currentDayOfCycle) <= dayWindowHalf)
+      : [];
+
+    const phaseSupport  = new Set(phaseMatches.map(o => o.cycleIndex)).size;
+    const windowSupport = new Set(windowMatches.map(o => o.cycleIndex)).size;
 
     const phaseOk  = phaseSupport  >= minSupportingCycles;
     const windowOk = windowSupport >= minSupportingCycles;
@@ -669,6 +678,14 @@ export function getSymptomForecastCandidates(
     const basis = (phaseOk && windowOk) ? "combined"
                 : phaseOk               ? "phase"
                 :                         "day_window";
+    const supportingOccurrences = [...phaseMatches, ...windowMatches]
+      .filter((o, idx, arr) =>
+        arr.findIndex(x => x.cycleIndex === o.cycleIndex && x.dateKey === o.dateKey) === idx
+      );
+    const severities = supportingOccurrences
+      .map(o => Number(o.severity) || 0)
+      .filter(n => n > 0);
+    const severityEstimate = severities.length ? median(severities) : null;
 
     candidates.push({
       code,
@@ -676,6 +693,8 @@ export function getSymptomForecastCandidates(
       supportingCycles: Math.max(phaseSupport, windowSupport),
       phaseSupport,
       windowSupport,
+      severityEstimate,
+      severitySamples: severities.length,
     });
   }
 
@@ -720,6 +739,16 @@ export function formatSymptomForecastList(labels) {
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
+function formatSeverityEstimate(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n >= 4.5) return "severe";
+  if (n >= 3.5) return "high";
+  if (n >= 2.5) return "moderate";
+  if (n >= 1.5) return "mild";
+  return "light";
+}
+
 /**
  * Compose the forecast message body using safe, future-framed language.
  * Never uses certainty language; always frames as personal pattern observation.
@@ -728,10 +757,19 @@ export function formatSymptomForecastList(labels) {
  * @param {string|null} phase
  * @param {number|null} dayOfCycle
  * @param {string}      basis  - "phase" | "day_window" | "combined"
+ * @param {number|null} severityEstimate
+ * @param {number}      supportingCycles
  * @returns {string}
  */
-export function buildForecastMessage(labels, phase, dayOfCycle, basis) {
+export function buildForecastMessage(labels, phase, dayOfCycle, basis, severityEstimate = null, supportingCycles = 0) {
   const symptomStr = formatSymptomForecastList(labels);
+  const severityLabel = formatSeverityEstimate(severityEstimate);
+  const supportText = supportingCycles > 0
+    ? ` This is based on ${supportingCycles} previous cycle${supportingCycles === 1 ? "" : "s"} in your logs.`
+    : "";
+  const severityText = severityLabel
+    ? ` When this has shown up before, your logged severity was usually ${severityLabel}.`
+    : "";
   const PHASE_LABELS = {
     menstrual:  "around your period",
     follicular: "during the follicular phase",
@@ -741,15 +779,15 @@ export function buildForecastMessage(labels, phase, dayOfCycle, basis) {
 
   if ((basis === "combined" || basis === "day_window") && dayOfCycle !== null) {
     const phaseSuffix = phase ? ` (${PHASE_LABELS[phase] ?? `in your ${phase} phase`})` : "";
-    return `Based on your past logs, you often notice ${symptomStr} around day ${dayOfCycle} of your cycle${phaseSuffix}.`;
+    return `Based on your past logs, you often notice ${symptomStr} around day ${dayOfCycle} of your cycle${phaseSuffix}.${supportText}${severityText}`;
   }
 
   if (phase) {
     const phaseLabel = PHASE_LABELS[phase] ?? `during your ${phase} phase`;
-    return `Based on your past logs, you often notice ${symptomStr} ${phaseLabel}.`;
+    return `Based on your past logs, you often notice ${symptomStr} ${phaseLabel}.${supportText}${severityText}`;
   }
 
-  return `Based on your past logs, you often notice ${symptomStr} around this point in your cycle.`;
+  return `Based on your past logs, you often notice ${symptomStr} around this point in your cycle.${supportText}${severityText}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1713,26 +1751,43 @@ export function detectSymptomForecastSignal({
   const { selected, labels, basis } = selectForecastableSymptoms(candidates, maxSymptoms);
   const forecastCodes   = selected.map(c => c.code);
   const topSupporting   = selected[0]?.supportingCycles ?? 0;
-  const message         = buildForecastMessage(labels, phase, dayOfCycle, basis);
+  const topSeverityEstimate = selected[0]?.severityEstimate ?? null;
+  const message         = buildForecastMessage(labels, phase, dayOfCycle, basis, topSeverityEstimate, topSupporting);
 
-  return makeSignal({
+  return {
+    ...makeSignal({
     code:     "SYMPTOM_FORECAST",
     level:    "low",
     show:     true,
     title:    "A familiar pattern may be approaching",
     message,
-    guidance: "Keep logging over the next few days so Bloom can keep learning your pattern.",
+    guidance: "If these symptoms show up, log severity too so Bloom can confirm whether this cycle matches your usual pattern.",
     category: "symptom",
     debug: {
       forecastSymptoms:            forecastCodes,
       forecastBasis:               basis,
       supportingCycles:            topSupporting,
+      estimatedSeverity:           topSeverityEstimate,
+      estimatedSeverityLabel:      formatSeverityEstimate(topSeverityEstimate),
       currentPhase:                phase,
       currentDayOfCycle:           dayOfCycle,
       totalCyclesAnalyzed:         cycleStarts.length,
       excludedAlreadyLoggedToday:  [...loggedTodayCodes],
       candidatesBeforeSelection:   candidates.length,
     },
+    }),
+    priority: 4,
+  };
+}
+
+function sortSymptomSignals(signals = []) {
+  const priorityOrder = { high: 3, medium: 2, low: 1 };
+  return [...signals].sort((a, b) => {
+    const byLevel = (priorityOrder[b.level] || 0) - (priorityOrder[a.level] || 0);
+    if (byLevel !== 0) return byLevel;
+    const byPriority = (Number(b.priority) || 0) - (Number(a.priority) || 0);
+    if (byPriority !== 0) return byPriority;
+    return String(a.code).localeCompare(String(b.code));
   });
 }
 
@@ -1857,15 +1912,7 @@ export function generateSymptomSignals({
     signals = signals.filter(s => !redundant.has(s.code));
   }
 
-  const priorityOrder = { high: 3, medium: 2, low: 1 };
-
-  return signals
-    .filter(s => s.show)
-    .sort((a, b) => {
-      const byLevel = (priorityOrder[b.level] || 0) - (priorityOrder[a.level] || 0);
-      if (byLevel !== 0) return byLevel;
-      return String(a.code).localeCompare(String(b.code));
-    });
+  return sortSymptomSignals(signals.filter(s => s.show));
 }
 
 /* ------------------------------------------------------------------ */
@@ -1878,13 +1925,8 @@ export function generateSymptomSignals({
  * @returns {SymptomSignal|null}
  */
 export function getHighestPrioritySymptomSignal(signals = []) {
-  const priority = { high: 3, medium: 2, low: 1 };
   if (!Array.isArray(signals) || signals.length === 0) return null;
-  return [...signals].sort((a, b) => {
-    const byLevel = (priority[b.level] || 0) - (priority[a.level] || 0);
-    if (byLevel !== 0) return byLevel;
-    return String(a.code).localeCompare(String(b.code));
-  })[0];
+  return sortSymptomSignals(signals)[0];
 }
 
 /* ------------------------------------------------------------------ */
@@ -2160,6 +2202,8 @@ for (const [group, codes] of Object.entries(SYMPTOM_GROUPS)) {
 
 /** Numeric priority per code - higher wins deduplication within a group */
 const ADVSYM_PRIORITIES = {
+  PERSONAL_CURRENT_SYMPTOM_CONTEXT: 10,
+  PERSONAL_SYMPTOM_CHANGE_TYPE:    9,
   DYSMENORRHEA_PATTERN:         5,
   PAINFUL_PERIOD_PATTERN:       4,
   MENSTRUAL_DISCOMFORT_PATTERN: 3,
@@ -2215,6 +2259,49 @@ function _advSevLabel(sev) {
   if (sev >= 3) return "moderate";
   if (sev >= 2) return "mild";
   return "light";
+}
+
+function _avgSeverityLabel(items = []) {
+  const values = items.map(i => Number(i?.severity) || 0).filter(n => n > 0);
+  if (!values.length) return "unrated";
+  return formatSeverityEstimate(values.reduce((sum, n) => sum + n, 0) / values.length) || "unrated";
+}
+
+function _resolveCurrentDateKey(symptomHistory = [], currentDateKey = null, today = new Date()) {
+  if (currentDateKey) return currentDateKey;
+  const latest = [...(symptomHistory || [])]
+    .map(e => e?.dateKey)
+    .filter(Boolean)
+    .sort()
+    .pop();
+  return latest || toDateKey(today);
+}
+
+function _historyBeforeDate(symptomHistory = [], currentDateKey = null) {
+  const currentKey = currentDateKey || _resolveCurrentDateKey(symptomHistory);
+  return (symptomHistory || []).filter(e => e?.dateKey && e.dateKey < currentKey);
+}
+
+function _codeOccurrenceStats(symptomHistory = [], code) {
+  const entries = (symptomHistory || []).filter(e =>
+    Array.isArray(e?.items) && e.items.some(i => i.code === code)
+  );
+  const severities = entries
+    .flatMap(e => e.items || [])
+    .filter(i => i.code === code)
+    .map(i => Number(i.severity) || 0)
+    .filter(n => n > 0);
+  return {
+    count: entries.length,
+    avgSeverity: severities.length ? severities.reduce((sum, n) => sum + n, 0) / severities.length : null,
+    lastDateKey: entries.map(e => e.dateKey).filter(Boolean).sort().pop() || null,
+  };
+}
+
+function _formatSymptomWithSeverity(item) {
+  const sev = Number(item?.severity) || 0;
+  const severity = formatSeverityEstimate(sev);
+  return `${_advSympLabel(item?.code)}${severity ? ` (${severity})` : ""}`;
 }
 
 /**

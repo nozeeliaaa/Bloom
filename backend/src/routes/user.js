@@ -4,6 +4,7 @@ import { db, auth } from "../firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateUserProfile } from "../validators/validateUser.js";
 import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
+import { deleteBloomUserData } from "../utils/deleteUserData.js";
 
 const router = express.Router();
 
@@ -19,6 +20,12 @@ function computeAgeBand(yob) {
   return null;
 }
 
+function normalizeGoal(goal) {
+  if (goal === "track_cycle") return "period";
+  if (goal === "no_period") return "track_symptoms";
+  return goal;
+}
+
 /* Create or update user profile */
 router.post("/profile", requireAuth, async (req, res) => {
   try {
@@ -30,6 +37,21 @@ router.post("/profile", requireAuth, async (req, res) => {
     const existing = snap.exists ? snap.data() : null;
     const existingProfile = existing?.profile || {};
     const existingBiometricProfile = existing?.biometricProfile || {};
+    const onboardingCompleted =
+      req.body.onboardingCompleted !== undefined
+        ? Boolean(req.body.onboardingCompleted)
+        : Boolean(existing?.onboardingCompleted ?? existingProfile?.onboardingCompleted ?? false);
+    const onboardingCompletedAt =
+      onboardingCompleted
+        ? (
+            existing?.onboardingCompletedAt ??
+            existing?.onboardedAt ??
+            existingProfile?.onboardingCompletedAt ??
+            existingProfile?.onboardedAt ??
+            req.body.onboardingCompletedAt ??
+            admin.firestore.FieldValue.serverTimestamp()
+          )
+        : null;
 
     const validation = validateUserProfile(req.body, existingProfile);
     if (!validation.valid) {
@@ -54,7 +76,7 @@ router.post("/profile", requireAuth, async (req, res) => {
           ? (typeof req.body.avatar === "string" ? req.body.avatar.slice(0, 10) : "👤")
           : existingProfile?.avatar ?? "👤",
       goal:
-        req.body.goal ??
+        normalizeGoal(req.body.goal) ??
         (
           existingProfile?.goal === "track_cycle"
             ? "period"
@@ -66,6 +88,8 @@ router.post("/profile", requireAuth, async (req, res) => {
       yearOfBirth: finalYearOfBirth,
       ageBand: finalYearOfBirth ? computeAgeBand(finalYearOfBirth) : null,
       consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
+      onboardingCompleted,
+      onboardingCompletedAt,
     };
 
     const healthProfile = {
@@ -118,6 +142,8 @@ router.post("/profile", requireAuth, async (req, res) => {
       cycleLengths: existing?.cycleLengths ?? [],
       phaseEstimation: phaseProfile.phaseEstimation,
       phaseProfile,   
+      onboardingCompleted,
+      onboardingCompletedAt,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: existing?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
@@ -180,6 +206,8 @@ router.post("/profile", requireAuth, async (req, res) => {
       healthProfile: savedData?.healthProfile ?? null,
       biometricProfile: savedData?.biometricProfile ?? null,
       phaseProfile: savedData?.phaseProfile ?? null,
+      onboardingCompleted: savedData?.onboardingCompleted ?? savedData?.profile?.onboardingCompleted ?? false,
+      onboardingCompletedAt: savedData?.onboardingCompletedAt ?? savedData?.profile?.onboardingCompletedAt ?? null,
     });
   } catch (err) {
     console.error("POST /profile error:", err);
@@ -263,8 +291,8 @@ router.get("/profile", requireAuth, async (req, res) => {
 
     const data = doc.data();
 
-    if (data?.profile?.goal === "track_cycle") {
-      data.profile.goal = "period";
+    if (data?.profile?.goal === "track_cycle" || data?.profile?.goal === "no_period") {
+      data.profile.goal = normalizeGoal(data.profile.goal);
     }
 
     return res.json(data);
@@ -283,6 +311,28 @@ router.get("/profile", requireAuth, async (req, res) => {
 
     console.error("GET /profile error:", err?.message ?? err);
     return res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+router.delete("/account", requireAuth, async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const stats = await deleteBloomUserData(uid);
+
+    await logAudit({
+      actorUid:   uid,
+      actorRole:  req.user.role,
+      action:     AUDIT_ACTIONS.ACCOUNT_DELETED,
+      entityType: "user",
+      entityId:   uid,
+      targetUid:  uid,
+      meta:       { reasonCode: "self_delete" },
+    });
+
+    return res.json({ ok: true, deleted: true, stats });
+  } catch (err) {
+    console.error("DELETE /account error:", err);
+    return res.status(500).json({ error: "Failed to delete account" });
   }
 });
 

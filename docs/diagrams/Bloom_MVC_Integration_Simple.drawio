@@ -1,0 +1,168 @@
+<mxfile host="app.diagrams.net" agent="Codex">
+  <diagram id="Bloom-MVC-Integration-Simple" name="Bloom MVC Integration Simple">
+    <mxGraphModel dx="4757" dy="2190" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1500" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="view_lane" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=25;align=center;verticalAlign=top;spacingTop=14;" value="VIEW" vertex="1">
+          <mxGeometry height="817.5" width="470" x="-555" y="90.5" as="geometry" />
+        </mxCell>
+        <mxCell id="controller_lane" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=25;align=center;verticalAlign=top;spacingTop=14;" value="CONTROLLER" vertex="1">
+          <mxGeometry height="1546" width="1102" x="352" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="model_lane" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=25;align=center;verticalAlign=top;spacingTop=14;" value="MODEL" vertex="1">
+          <mxGeometry height="1456" width="553" x="1666" y="117" as="geometry" />
+        </mxCell>
+        <mxCell id="external_lane" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8fc;strokeColor=#c2187a;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=25;align=center;verticalAlign=top;spacingTop=14;" value="EXTERNAL SERVICES" vertex="1">
+          <mxGeometry height="604" width="414" x="2490" y="213" as="geometry" />
+        </mxCell>
+        <mxCell id="view_shell" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;fontStyle=1" value="PageShell / Shared UI&lt;div&gt;&amp;nbsp;--------------------&amp;nbsp;&lt;/div&gt;&lt;div&gt;Navigation bar&amp;nbsp;&lt;/div&gt;&lt;div&gt;Footer&amp;nbsp;&lt;/div&gt;&lt;div&gt;Bloomie floating button&amp;nbsp;&lt;/div&gt;&lt;div&gt;Notification bell&lt;/div&gt;" vertex="1">
+          <mxGeometry height="218" width="330" x="-479" y="165.5" as="geometry" />
+        </mxCell>
+        <mxCell id="view_feature" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;fontStyle=1" value="Feature Views&lt;div&gt;&amp;nbsp;--------------------&amp;nbsp;&lt;/div&gt;&lt;div&gt;DashboardView&amp;nbsp;&lt;/div&gt;&lt;div&gt;CalendarView + CycleLogModal&lt;/div&gt;&lt;div&gt;LearnView&amp;nbsp;&lt;/div&gt;&lt;div&gt;ClinicsView&amp;nbsp;&lt;/div&gt;&lt;div&gt;AssistantView&amp;nbsp;&lt;/div&gt;&lt;div&gt;SettingsView&amp;nbsp;&lt;/div&gt;&lt;div&gt;AdminView&lt;/div&gt;" vertex="1">
+          <mxGeometry height="339" width="407" x="-523.5" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="front_ctrl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;fontStyle=1" value="Frontend Controllers&amp;nbsp;&lt;div&gt;--------------------&amp;nbsp;&lt;/div&gt;&lt;div&gt;AuthController&amp;nbsp;&lt;/div&gt;&lt;div&gt;DashboardController&lt;br&gt;CalendarController&amp;nbsp;&lt;/div&gt;&lt;div&gt;LearnController&amp;nbsp;&lt;/div&gt;&lt;div&gt;ClinicFinderController&amp;nbsp;&lt;/div&gt;&lt;div&gt;BloomieController&amp;nbsp;&lt;/div&gt;&lt;div&gt;SettingsController&amp;nbsp;&lt;/div&gt;&lt;div&gt;NotificationController&amp;nbsp;&lt;/div&gt;&lt;div&gt;AdminController&lt;/div&gt;" vertex="1">
+          <mxGeometry height="380" width="508" x="646" y="169" as="geometry" />
+        </mxCell>
+        <mxCell id="api_client" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;dashed=1;fontStyle=1" value="ApiClient &amp;lt;&amp;lt;singleton module&amp;gt;&amp;gt;&lt;div&gt;&amp;nbsp;--------------------&lt;/div&gt;&lt;div&gt;Adds Firebase ID token&amp;nbsp;&lt;/div&gt;&lt;div&gt;Sends fetch()&amp;nbsp;&lt;/div&gt;&lt;div&gt;requests&lt;br&gt;Normalises response/errors&lt;br&gt;Caches short-lived state&lt;/div&gt;" vertex="1">
+          <mxGeometry height="254" width="406" x="382" y="671.5" as="geometry" />
+        </mxCell>
+        <mxCell id="backend_ctrl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff5fb;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;fontStyle=1" value="Express Backend Controllers&lt;div&gt;&amp;nbsp;--------------------&lt;/div&gt;&lt;div&gt;ExpressApp&amp;nbsp;&lt;/div&gt;&lt;div&gt;RequireAuthMiddleware&lt;br&gt;UserRouteController&lt;br&gt;LogRouteController&lt;br&gt;CycleRouteController&lt;br&gt;CatalogRouteController&lt;br&gt;PreferencesRouteController&lt;br&gt;BloomieRouteController&lt;br&gt;AdminRouteController&lt;/div&gt;" vertex="1">
+          <mxGeometry height="380" width="451" x="426.5" y="1186" as="geometry" />
+        </mxCell>
+        <mxCell id="services" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;dashed=1;fontStyle=1" value="Backend Services&amp;nbsp;&lt;div&gt;--------------------&lt;/div&gt;&lt;div&gt;FirestoreRepository&lt;br&gt;PredictionEngine&lt;br&gt;ReminderScheduler&lt;br&gt;ExternalServiceAdapter&lt;/div&gt;" vertex="1">
+          <mxGeometry height="213" width="312" x="1047" y="692" as="geometry" />
+        </mxCell>
+        <mxCell id="model_user" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;fontStyle=1" value="User Models&amp;nbsp;&lt;div&gt;--------------------&amp;nbsp;&lt;/div&gt;&lt;div&gt;Bloom &amp;lt;&amp;lt;Singleton&amp;gt;&amp;gt;&amp;nbsp;&lt;/div&gt;&lt;div&gt;User&amp;nbsp;&lt;/div&gt;&lt;div&gt;UserProfile&amp;nbsp;&lt;/div&gt;&lt;div&gt;Preference&amp;nbsp;&lt;/div&gt;&lt;div&gt;NotificationToken&amp;nbsp;&lt;/div&gt;&lt;div&gt;MythGameState&lt;/div&gt;" vertex="1">
+          <mxGeometry height="278" width="418.5" x="1739.5" y="194" as="geometry" />
+        </mxCell>
+        <mxCell id="model_cycle" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;fontStyle=1" value="Cycle Models&lt;div&gt;&amp;nbsp;--------------------&amp;nbsp;&lt;/div&gt;&lt;div&gt;UserCycleData&amp;nbsp;&lt;/div&gt;&lt;div&gt;CycleLogEntry&amp;nbsp;&lt;/div&gt;&lt;div&gt;SymptomLogEntry&amp;nbsp;&lt;/div&gt;&lt;div&gt;BiometricLogEntry&amp;nbsp;&lt;/div&gt;&lt;div&gt;CyclePrediction&amp;nbsp;&lt;/div&gt;&lt;div&gt;FutureCycle&amp;nbsp;&lt;/div&gt;&lt;div&gt;PhaseFeedback&lt;/div&gt;" vertex="1">
+          <mxGeometry height="329" width="272.25" x="1812.6200000000001" y="619" as="geometry" />
+        </mxCell>
+        <mxCell id="model_content" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffafc;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;fontStyle=1" value="Content / Support Models&amp;nbsp;&lt;div&gt;--------------------&amp;nbsp;&lt;/div&gt;&lt;div&gt;Pamphlet&amp;nbsp;&lt;/div&gt;&lt;div&gt;ClinicDirectoryEntry&lt;br&gt;SymptomCatalogItem&lt;br&gt;BloomieMemory&amp;nbsp;&lt;/div&gt;&lt;div&gt;SupportRequest&lt;/div&gt;" vertex="1">
+          <mxGeometry height="249" width="350.25" x="1747" y="1242" as="geometry" />
+        </mxCell>
+        <mxCell id="external_services" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;align=left;verticalAlign=top;spacing=10;shadow=0;arcSize=8;dashed=1;fontStyle=1" value="External Services&amp;nbsp;&lt;div&gt;--------------------&amp;nbsp;&lt;div&gt;Firebase Auth&lt;br&gt;Firestore&amp;nbsp;&lt;/div&gt;&lt;div&gt;Firebase Cloud Messaging&amp;nbsp;&lt;/div&gt;&lt;div&gt;OpenRouteService&amp;nbsp;&lt;/div&gt;&lt;div&gt;SMTP / Helpdesk email&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="259" width="345" x="2524.5" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="view_shell" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="front_ctrl" value="auth/session events">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="193" y="237" />
+              <mxPoint x="193" y="237" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="view_feature" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="front_ctrl" value="user actions / page events">
+          <mxGeometry relative="1" x="-0.5883" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="-320" y="452" />
+              <mxPoint x="134" y="452" />
+              <mxPoint x="134" y="276" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="front_ctrl" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=25;fontStyle=1" target="view_feature" value="renders page state">
+          <mxGeometry relative="1" x="0.5587" as="geometry">
+            <mxPoint x="1" as="offset" />
+            <Array as="points">
+              <mxPoint x="203" y="333" />
+              <mxPoint x="203" y="584" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="front_ctrl" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="api_client" value="calls authenticated API helper">
+          <mxGeometry relative="1" x="0.4564" y="13" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="578" y="483" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="api_client" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="backend_ctrl" value="HTTPS REST requests">
+          <mxGeometry relative="1" x="0.5558" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="600" y="1128" />
+              <mxPoint x="600" y="1128" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="backend_ctrl" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="services" value="uses repository + engines">
+          <mxGeometry relative="1" x="0.0398" y="46" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="957" y="1289" />
+              <mxPoint x="957" y="767" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="services" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="model_user" value="read/write user data">
+          <mxGeometry relative="1" x="-0.2044" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1240" y="1023" />
+              <mxPoint x="2340" y="1023" />
+              <mxPoint x="2340" y="362" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="services" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="model_cycle" value="read logs / compute predictions">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1213" y="786" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="services" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="model_content" value="read catalog / save support + memory">
+          <mxGeometry relative="1" x="0.4204" as="geometry">
+            <mxPoint x="-1" as="offset" />
+            <Array as="points">
+              <mxPoint x="1089" y="1396" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="services" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;html=1;strokeColor=#c2187a;fontColor=#35122f;fontSize=25;fontStyle=1" target="external_services" value="auth, routing, push, email">
+          <mxGeometry relative="1" x="-0.088" as="geometry">
+            <mxPoint x="1" as="offset" />
+            <Array as="points">
+              <mxPoint x="1179" y="1117" />
+              <mxPoint x="2603" y="1117" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="model_user" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=25;fontStyle=1;entryX=1.008;entryY=0.367;entryDx=0;entryDy=0;entryPerimeter=0;" target="front_ctrl" value="profile + preferences returned">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="model_cycle" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=25;fontStyle=1" target="front_ctrl" value="cycle state returned">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1894" y="511" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="model_content" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=25;fontStyle=1" target="front_ctrl" value="resources, clinics, support state returned">
+          <mxGeometry relative="1" x="-0.6131" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1922" y="1695" />
+              <mxPoint x="269" y="1695" />
+              <mxPoint x="269" y="415" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="external_services" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=open;endFill=0;dashed=1;dashPattern=3 3;html=1;strokeColor=#8b5a7a;fontColor=#35122f;fontSize=25;fontStyle=1" target="services" value="service responses">
+          <mxGeometry relative="1" x="0.1135" y="-6" as="geometry">
+            <mxPoint x="-1" as="offset" />
+            <Array as="points">
+              <mxPoint x="2708" y="1180" />
+              <mxPoint x="1141" y="1180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

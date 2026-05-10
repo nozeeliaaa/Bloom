@@ -1,6 +1,11 @@
 import { isAnonMode } from "./mode.js";
 import { setUserGoal } from "./goals.js";
 import { getIdToken } from "./auth.js";
+import {
+  isOnboardingCompleteFromProfileData,
+  isOnboardingCompleteLocal,
+  markOnboardingCompleteLocal,
+} from "./onboarding.js";
 
 export function Survey() {
   return `
@@ -45,9 +50,17 @@ export function Survey() {
   `;
 }
 
-export function mountSurvey() {
+export async function mountSurvey() {
+  const forceSurvey = new URLSearchParams(window.location.search).get("force") === "1";
+
   // If already onboarded, skip to dashboard
-  if (localStorage.getItem("bloom_onboarded") === "1") {
+  if (!forceSurvey && isOnboardingCompleteLocal()) {
+    window.location.href = "/pages/dashboard.html";
+    return;
+  }
+
+  if (!forceSurvey && !isAnonMode() && await isBackendOnboardingComplete()) {
+    markOnboardingCompleteLocal();
     window.location.href = "/pages/dashboard.html";
     return;
   }
@@ -180,7 +193,7 @@ export function mountSurvey() {
     if (answers.surveyHeight)  answers.heightCm = Number(answers.surveyHeight);
 
     saveAnswers(answers); // also calls setUserGoal(answers.focusGoal)
-    localStorage.setItem("bloom_onboarded", "1");
+    markOnboardingCompleteLocal();
 
     // Save LMP so pregnancy/cycle cards can use it immediately
     if (answers.lastPeriodDate) {
@@ -242,8 +255,11 @@ export function mountSurvey() {
     }
   });
 
-  btnSkipTop.addEventListener("click", () => {
-    localStorage.setItem("bloom_onboarded", "1");
+  btnSkipTop.addEventListener("click", async () => {
+    readCurrentStepInputs();
+    saveAnswers(answers);
+    markOnboardingCompleteLocal();
+    if (!isAnonMode()) await writeProfileToBackend(answers).catch(() => {});
     window.location.href = "/pages/dashboard.html";
   });
 
@@ -416,7 +432,10 @@ async function writeProfileToBackend(answers) {
     const token = await getIdToken();
     if (!token) return;
     const apiBase = window.BLOOM_API_BASE || "";
-    const payload = {};
+    const payload = {
+      onboardingCompleted: true,
+      onboardingCompletedAt: new Date().toISOString(),
+    };
     if (answers.focusGoal)     payload.goal           = answers.focusGoal;
     if (answers.yob)           payload.yearOfBirth    = Number(answers.yob);
     if (answers.nickname)      payload.nickname       = answers.nickname;
@@ -431,6 +450,37 @@ async function writeProfileToBackend(answers) {
     });
   } catch {
     // silently fail - localStorage is the source of truth on this device
+  }
+}
+
+async function isBackendOnboardingComplete() {
+  try {
+    const token = await getIdToken({ waitForAuthMs: 1800 });
+    if (!token) return false;
+    const apiBase = window.BLOOM_API_BASE || "";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    try {
+      const res = await fetch(`${apiBase}/api/user/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      if (!res.ok) return false;
+      const data = await res.json().catch(() => null);
+      if (isOnboardingCompleteFromProfileData(data)) return true;
+
+      const logsRes = await fetch(`${apiBase}/api/logs?start=2000-01-01&end=2100-12-31`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }).catch(() => null);
+      if (!logsRes?.ok) return false;
+      const logsData = await logsRes.json().catch(() => null);
+      return Array.isArray(logsData?.items) && logsData.items.length > 0;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return false;
   }
 }
 

@@ -19,6 +19,9 @@ import adminRoutes from "./routes/admin.js";
 import bloomieMemoryRoutes from "./routes/bloomieMemory.js";
 import bloomieSafetyLogRoutes from "./routes/bloomieSafetyLog.js";
 import bloomieAnalyticsRoutes from "./routes/bloomieAnalytics.js";
+import bloomieAIRoutes from "./routes/bloomieAI.js";
+import bloomieContentMatchRoutes from "./routes/bloomieContentMatch.js";
+import bloomieContextRoutes from "./routes/bloomieContext.js";
 import feedbackRoutes from "./routes/feedback.js";
 import preferencesRoutes from "./routes/preferences.js";
 import cyclesMLRoutes from "./routes/cyclesML.js";
@@ -38,13 +41,40 @@ const WARN_ENV_VARS = [
 let warnedOptionalEnv = false;
 let warnedOpenCors = false;
 
+const BASE_ALLOWED_ORIGINS = [
+  "http://localhost:4000",
+  "http://127.0.0.1:4000",
+  "http://localhost:4100",
+  "http://127.0.0.1:4100",
+  "http://localhost:4173",
+  "http://127.0.0.1:4173",
+  "http://localhost:4200",
+  "http://127.0.0.1:4200",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "https://bloom-8401a.web.app",
+  "https://bloom-8401a.firebaseapp.com",
+];
+
 function parseAllowedOrigins() {
   const raw = process.env.ALLOWED_ORIGINS;
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const envOrigins = raw
+    ? raw
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+    : [];
+  return [...BASE_ALLOWED_ORIGINS, ...envOrigins];
+}
+
+function isNetlifyOrigin(origin) {
+  try {
+    return new URL(origin).hostname.endsWith(".netlify.app");
+  } catch (_) {
+    return false;
+  }
 }
 
 function logOptionalEnvWarnings() {
@@ -78,6 +108,11 @@ function buildCorsOptions() {
       }
 
       if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      if (isNetlifyOrigin(origin)) {
         callback(null, true);
         return;
       }
@@ -139,6 +174,7 @@ export function createApp({ serveFrontend = false } = {}) {
   app.use("/api/consent", consentRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/clinics", clinicRoutes);
+  app.use("/api/catalog", catalogRoutes);
   app.use("/catalog", catalogRoutes);
   app.use("/api/user", userRoutes);
   app.use("/api/admin", adminRoutes);
@@ -146,6 +182,9 @@ export function createApp({ serveFrontend = false } = {}) {
   app.use("/api/bloomie-memory", bloomieMemoryRoutes);
   app.use("/api/bloomie-safety-log", bloomieSafetyLogRoutes);
   app.use("/api/bloomie/analytics", bloomieAnalyticsRoutes);
+  app.use("/api/bloomie/ai", bloomieAIRoutes);
+  app.use("/api/bloomie-content-match", bloomieContentMatchRoutes);
+  app.use("/api/bloomie-context", bloomieContextRoutes);
   app.use("/api/biometric-logs", biometricLogRoutes);
   app.use("/api/phase-feedback", phaseFeedbackRoutes);
   app.use("/api/feedback", feedbackRoutes);

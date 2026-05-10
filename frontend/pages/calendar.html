@@ -289,6 +289,12 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
+      <div class="calendar-view-switch">
+        <div class="calendar-view-segment" role="tablist" aria-label="Calendar view">
+          <button type="button" class="calendar-view-btn is-active" id="view-month-btn" role="tab" aria-selected="true">Month</button>
+          <button type="button" class="calendar-view-btn" id="view-year-btn" role="tab" aria-selected="false">Year</button>
+        </div>
+      </div>
 
       <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Calendar">
         <div role="row">
@@ -301,6 +307,7 @@
           <div class="calendar-header-cell" role="columnheader">Sat</div>
         </div>
       </div>
+      <div id="calendar-year-view" class="calendar-year-view" hidden></div>
 
       <section class="card">
         <h3 class="key-heading">Key</h3>
@@ -383,10 +390,10 @@
         <div class="form-group">
           <label class="form-label">Can't find your symptom?</label>
           <div class="custom-sym-input-row">
-            <input type="text" class="form-input" id="other-symptom-input" maxlength="80" placeholder="e.g. Back pain, light sensitivity…" />
+            <input type="text" class="form-input" id="other-symptom-input" maxlength="80" placeholder="e.g. Back pain, light sensitivity..." />
             <button type="button" class="btn btn-primary btn-sm custom-sym-add-btn" id="add-other-symptom-btn">+ Add</button>
           </div>
-          <p class="custom-sym-meta">Tracked in history · won't affect predictions</p>
+          <p class="custom-sym-meta">Tracked in history | won't affect predictions</p>
           <div class="custom-symptom-list" id="other-symptom-list"></div>
         </div>
 

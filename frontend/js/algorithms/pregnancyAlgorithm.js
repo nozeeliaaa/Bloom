@@ -94,7 +94,7 @@ export function estimatedDueDate(lmpDate, cycleLength = 28) {
 
   const today        = new Date();
   const daysPregnant = Math.floor((today - lmpDate) / (1000 * 60 * 60 * 24));
-  const currentWeek  = daysPregnant >= 0 && daysPregnant <= 280
+  const currentWeek  = daysPregnant >= 0
     ? Math.floor(daysPregnant / 7) + 1
     : null;
 

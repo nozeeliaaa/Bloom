@@ -65,9 +65,8 @@
 .nav-toggle svg { width: 24px; height: 24px; }
 
 @media (max-width: 768px) {
-  .nav-toggle { display: none; }
-  .navbar-inner { justify-content: center; }
-  .navbar-links { display: none !important; }
+  .nav-toggle { display: inline-flex; }
+  .navbar-inner { justify-content: space-between; }
   .navbar-links {
     display: none;
     flex-direction: column;
@@ -1095,10 +1094,11 @@
 
 .bloomie-modal-panel{
   position:absolute;
-  right: 18px;
-  bottom: 90px;
-  width: min(420px, calc(100vw - 36px));
-  height: min(78vh, 760px);
+  right: 12px;
+  bottom: 86px;
+  width: min(520px, calc(100vw - 24px));
+  height: min(82vh, 760px);
+  height: min(82dvh, 760px);
   background: transparent;
   border: none;
   border-radius: 0;
@@ -1112,16 +1112,16 @@
 }
 .bloomie-close{
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: -12px;
+  right: -8px;
   z-index: 10;
   border: none;
-  background: rgba(0,0,0,0.15);
+  background: rgba(58, 32, 46, 0.22);
   color: #fff;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  font-size: 14px;
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
   display: grid;
@@ -1134,6 +1134,22 @@
   border:0;
   border-radius: 16px;
   overflow: hidden;
+}
+
+@media (max-width: 520px){
+  .bloomie-modal-panel{
+    right: 8px;
+    left: 8px;
+    bottom: 78px;
+    width: auto;
+    height: min(84vh, 720px);
+    height: min(84dvh, 720px);
+  }
+
+  .bloomie-close{
+    top: -10px;
+    right: -4px;
+  }
 }
 
 .book-grid{

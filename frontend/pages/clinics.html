@@ -17,11 +17,19 @@
   <!-- Page-specific styles (kept here because you asked for full edited file). -->
   <style>
     .clinic-filters {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 0.75rem;
       align-items: center;
       margin-bottom: 1rem;
+    }
+    .clinic-filters .form-select {
+      width: 100%;
+      min-width: 0;
+      min-height: 40px;
+      padding-top: 0.45rem;
+      padding-bottom: 0.45rem;
+      font-size: 0.95rem;
     }
 
     .clinic-actions {
@@ -31,11 +39,16 @@
       align-items: center;
       margin-bottom: 1.25rem;
     }
-
+    .clinic-actions .btn {
+      min-height: 40px;
+    }
     .clinic-grid {
       display: grid;
       grid-template-columns: 1fr;
       gap: 1rem;
+    }
+    @media (max-width: 720px) {
+      .clinic-filters { grid-template-columns: 1fr; }
     }
     @media (min-width: 640px) {
       .clinic-grid { grid-template-columns: repeat(2, 1fr); }
@@ -132,6 +145,14 @@
       0%, 100% { transform: scale(1);   opacity: 1;   }
       50%       { transform: scale(1.5); opacity: 0.5; }
     }
+    .user-location-marker {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #6d4dff;
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 3px rgba(109,77,255,0.26), 0 4px 12px rgba(49,31,119,0.24);
+    }
   </style>
 </head>
 
@@ -178,6 +199,7 @@
     <!-- Actions -->
     <div class="clinic-actions">
       <button class="btn btn-outline" id="btn-locate" type="button">Use my location</button>
+      <button class="btn btn-outline" id="btn-stop-location" type="button" hidden>Stop using my location</button>
       <button class="btn btn-outline" id="btn-pin" type="button">Pin location on map</button>
       <span class="status-line" id="loc-status">Tip: Allow location or pin yourself on the map.</span>
     </div>
@@ -204,6 +226,7 @@
 
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
+    import { getApiBase } from '/js/api-base.js';
 
     renderNav('clinics');
     renderFooter();
@@ -233,6 +256,10 @@
     window.debugClinics = () => clinics;
     let map, markersLayer;
     let userLocation = null;       // { lat, lng }
+    let userLocationAccuracy = null;
+    let userLocationTrusted = false;
+    let locationWatchId = null;
+    let userMarker = null;
     let routeLayer = null;         // active route polyline
     let userAccuracyCircle = null; // accuracy radius circle on map
     let selectedClinicIdx = null;  // idx into currentFiltered
@@ -255,11 +282,29 @@
     }
 
     function attachCoords(clinic) {
-      // If you later add clinic.lat/clinic.lng to clinics.json, we’ll use that automatically.
-      if (typeof clinic.lat === 'number' && typeof clinic.lng === 'number') return clinic;
+      const candidates = [
+        [clinic.lat, clinic.lng],
+        [clinic.latitude, clinic.longitude],
+        [clinic.location?.lat, clinic.location?.lng],
+        [clinic.location?.latitude, clinic.location?.longitude],
+        [clinic.coordinates?.lat, clinic.coordinates?.lng],
+        [clinic.coordinates?.latitude, clinic.coordinates?.longitude],
+      ];
+      const pair = candidates.find(([lat, lng]) => Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)));
+      const reviewedOut = ["needs_review", "area_estimate", "rejected"].includes(
+        String(clinic.coordinateStatus || "").toLowerCase()
+      );
+      if (pair && !reviewedOut) {
+        return { ...clinic, lat: Number(pair[0]), lng: Number(pair[1]), coordSource: "clinic" };
+      }
 
       const coords = parishCoords[clinic.parish] || JAMAICA_CENTER;
-      return { ...clinic, lat: coords[0], lng: coords[1] };
+      return {
+        ...clinic,
+        lat: coords[0],
+        lng: coords[1],
+        coordSource: reviewedOut ? "review" : "parish",
+      };
     }
 
     const SERVICE_LABELS = {
@@ -287,6 +332,7 @@
     }
 
     let searchQuery = '';
+    const MAX_TRUSTED_BROWSER_ACCURACY_METERS = 5000;
 
     function getFilters() {
       return {
@@ -318,13 +364,19 @@
       if (service !== 'all') filtered = filtered.filter(c => (c.services || []).includes(service));
 
       // If user location exists, compute distance + sort near->far
-      if (userLocation) {
+      if (userLocation && userLocationTrusted) {
         filtered = filtered
           .map(c => ({
             ...c,
-            distance: distanceKm(userLocation.lat, userLocation.lng, c.lat, c.lng)
+            distance: c.coordSource === "clinic"
+              ? distanceKm(userLocation.lat, userLocation.lng, c.lat, c.lng)
+              : null
           }))
-          .sort((a, b) => (a.distance ?? 999999) - (b.distance ?? 999999));
+          .sort((a, b) => {
+            const aDist = typeof a.distance === "number" ? a.distance : Infinity;
+            const bDist = typeof b.distance === "number" ? b.distance : Infinity;
+            return aDist - bDist || String(a.name ?? "").localeCompare(String(b.name ?? ""));
+          });
       } else {
         filtered = filtered.map(c => ({ ...c, distance: null }));
       }
@@ -387,34 +439,59 @@
     }
 
     async function getDirections(clinic, idx) {
-      if (!userLocation) {
+      if (!userLocation || !userLocationTrusted) {
         setStatus('Set your location first - use "Use my location" or "Pin location on map".', true);
+        return;
+      }
+
+      const infoEl = document.getElementById(`route-info-${idx}`);
+      if (clinic.coordSource !== "clinic") {
+        const message = "This clinic needs a verified map pin before Bloom can give road directions. Try another clinic or ask an admin to add its latitude and longitude.";
+        setStatus(message, true);
+        if (infoEl) {
+          infoEl.style.display = 'block';
+          infoEl.innerHTML = `
+            <div class="route-fetch-error">
+              <span>${message}</span>
+            </div>`;
+        }
         return;
       }
 
       // Show loading state on button
       const card = document.querySelector(`.clinic-card[data-idx="${idx}"]`);
       const btn = card?.querySelector('.btn-get-directions');
-      if (btn) { btn.disabled = true; btn.textContent = 'Routing…'; }
+      if (btn) { btn.disabled = true; btn.textContent = 'Routing...'; }
 
-      const infoEl = document.getElementById(`route-info-${idx}`);
       if (infoEl) {
         infoEl.style.display = 'block';
-        infoEl.innerHTML = '<em style="font-size:0.85rem;color:var(--color-text-muted)">Calculating route…</em>';
+        infoEl.innerHTML = '<em style="font-size:0.85rem;color:var(--color-text-muted)">Calculating route...</em>';
       }
 
       let result = null;
       let isFallback = false;
 
       try {
-        const apiBase = window.BLOOM_API_BASE ?? '';
-        const res = await fetch(
-          `${apiBase}/catalog/route?fromLat=${userLocation.lat}&fromLng=${userLocation.lng}` +
-          `&toLat=${clinic.lat}&toLng=${clinic.lng}&mode=driving-car`
-        );
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || `Status ${res.status}`);
-        result = data;
+        const apiBase = getApiBase();
+        const routeQuery =
+          `fromLat=${userLocation.lat}&fromLng=${userLocation.lng}` +
+          `&toLat=${clinic.lat}&toLng=${clinic.lng}&mode=driving-car`;
+        const routePaths = ["/api/catalog/route", "/catalog/route"];
+        let lastError = null;
+
+        for (const routePath of routePaths) {
+          try {
+            const res = await fetch(`${apiBase}${routePath}?${routeQuery}`);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error(data.error || `Status ${res.status}`);
+            result = data;
+            break;
+          } catch (routeErr) {
+            lastError = routeErr;
+          }
+        }
+
+        if (!result) throw lastError || new Error("Route unavailable");
       } catch (err) {
         console.warn('ORS routing unavailable, using Dijkstra fallback:', err.message);
         isFallback = true;
@@ -432,9 +509,14 @@
       drawRoute(result.coords);
 
       if (infoEl) {
-        const tag = isFallback
-          ? `<span class="badge badge-distance" style="font-size:0.75rem;margin-left:0.4rem">Straight-line est.</span>`
-          : '';
+        const tags = [];
+        if (isFallback) {
+          tags.push(`<span class="badge badge-distance" style="font-size:0.75rem;margin-left:0.4rem">Straight-line est.</span>`);
+        }
+        if (clinic.coordSource !== "clinic") {
+          tags.push(`<span class="badge" style="font-size:0.75rem;margin-left:0.4rem;background:var(--color-bg-hover);color:var(--color-text-muted);">Clinic pin estimated</span>`);
+        }
+        const tag = tags.join('');
         infoEl.innerHTML = `
           <div class="clinic-detail" style="margin-top:0.5rem;margin-bottom:0;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -464,10 +546,10 @@
         document.getElementById('clinic-map').style.cursor = '';
         document.getElementById('btn-pin').textContent = 'Pin location on map';
 
-        userLocation = { lat: e.latlng.lat, lng: e.latlng.lng };
+        stopLocationWatch({ keepStatus: true });
+        setUserLocation({ lat: e.latlng.lat, lng: e.latlng.lng, accuracy: null, source: "pin" });
         setStatus('Location pinned. Showing clinics near you.');
 
-        if (userAccuracyCircle) { map.removeLayer(userAccuracyCircle); userAccuracyCircle = null; }
         renderClinics();
       });
     }
@@ -493,6 +575,24 @@
       iconAnchor: [9, 9],
     });
 
+    const userIcon = L.divIcon({
+      className: '',
+      html: '<div class="user-location-marker"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+
+    function updateUserMarker() {
+      if (!map || !userLocation) return;
+      if (!userMarker) {
+        userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 })
+          .addTo(map)
+          .bindPopup("You are here");
+      } else {
+        userMarker.setLatLng([userLocation.lat, userLocation.lng]);
+      }
+    }
+
     function renderMarkers(filtered) {
       if (!markersLayer) return;
       markersLayer.clearLayers();
@@ -510,12 +610,7 @@
         marker.addTo(markersLayer).bindPopup(popup);
       });
 
-      // Add user marker (if available)
-      if (userLocation) {
-        L.circleMarker([userLocation.lat, userLocation.lng], {
-          radius: 8, color: '#7c4dff', fillColor: '#7c4dff', fillOpacity: 1, weight: 2,
-        }).addTo(markersLayer).bindPopup("You are here (approximate)");
-      }
+      updateUserMarker();
     }
 
     function selectClinic(idx) {
@@ -547,6 +642,9 @@
               ${c.type ? `<span class="badge" style="background:var(--color-bg-hover);color:var(--color-text-muted);">${typeLabel(c.type)}</span>` : ''}
               ${userLocation && typeof c.distance === 'number'
                 ? `<span class="badge badge-distance">${c.distance.toFixed(1)} km</span>`
+                : ''}
+              ${c.coordSource !== "clinic"
+                ? `<span class="badge" style="background:var(--color-bg-hover);color:var(--color-text-muted);">${c.coordSource === "review" ? "Pin needs review" : "Area pin"}</span>`
                 : ''}
             </div>
           </div>
@@ -640,6 +738,71 @@
       el.classList.toggle('status-error', isError);
     }
 
+    function setStopLocationVisible(visible) {
+      const btn = document.getElementById('btn-stop-location');
+      if (btn) btn.hidden = !visible;
+    }
+
+    function setUserLocation({ lat, lng, accuracy = null, source = "browser", trusted = true, focus = true }) {
+      const previousLocation = userLocation;
+      userLocation = { lat, lng };
+      userLocationAccuracy = Number.isFinite(Number(accuracy)) ? Number(accuracy) : null;
+      userLocationTrusted = Boolean(trusted);
+      setStopLocationVisible(true);
+      if (
+        previousLocation &&
+        distanceKm(previousLocation.lat, previousLocation.lng, lat, lng) > 0.02
+      ) {
+        clearRoute();
+      }
+
+      if (!map) return;
+      if (userAccuracyCircle) {
+        map.removeLayer(userAccuracyCircle);
+        userAccuracyCircle = null;
+      }
+      if (userLocationAccuracy) {
+        userAccuracyCircle = L.circle([lat, lng], {
+          radius: userLocationAccuracy,
+          color: '#7c4dff',
+          fillColor: '#7c4dff',
+          fillOpacity: 0.08,
+          weight: 1.5,
+        }).addTo(map);
+      }
+      updateUserMarker();
+      if (focus) {
+        map.setView([lat, lng], source === "pin" || source === "manual" ? 12 : 11);
+      }
+    }
+
+    function stopLocationWatch({ keepStatus = false } = {}) {
+      if (locationWatchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(locationWatchId);
+        locationWatchId = null;
+      }
+      if (userAccuracyCircle && map) {
+        map.removeLayer(userAccuracyCircle);
+        userAccuracyCircle = null;
+      }
+      if (userMarker && map) {
+        map.removeLayer(userMarker);
+        userMarker = null;
+      }
+      userLocation = null;
+      userLocationAccuracy = null;
+      userLocationTrusted = false;
+      setStopLocationVisible(false);
+      const locateBtn = document.getElementById('btn-locate');
+      if (locateBtn) {
+        locateBtn.disabled = false;
+        locateBtn.textContent = 'Use my location';
+      }
+      clearRoute();
+      if (!keepStatus) setStatus('Location stopped. Clinics are no longer sorted by your location.');
+      renderClinics();
+    }
+
     function requestUserLocation() {
       if (!navigator.geolocation) {
         setStatus("Location is not supported in this browser.");
@@ -686,6 +849,82 @@
       );
     }
 
+    function requestUserLocationV2() {
+      if (!navigator.geolocation) {
+        setStatus("Location is not supported in this browser.");
+        return;
+      }
+
+      if (locationWatchId !== null) {
+        navigator.geolocation.clearWatch(locationWatchId);
+        locationWatchId = null;
+      }
+
+      const locateBtn = document.getElementById('btn-locate');
+      if (locateBtn) {
+        locateBtn.disabled = true;
+        locateBtn.textContent = 'Finding location...';
+      }
+
+      setStatus("Requesting your location...");
+
+      locationWatchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const accuracyM = Math.round(pos.coords.accuracy);
+          const trusted = accuracyM <= MAX_TRUSTED_BROWSER_ACCURACY_METERS;
+          const accuracyLabel = accuracyM < 100
+            ? `+/-${accuracyM} m (good)`
+            : accuracyM < 1000
+              ? `+/-${accuracyM} m (moderate - desktop/Wi-Fi estimate)`
+              : `+/-${(accuracyM / 1000).toFixed(1)} km (rough - IP estimate only)`;
+
+          if (!trusted) {
+            setStopLocationVisible(true);
+            setStatus(
+              `Browser location is too rough (${accuracyLabel}), so Bloom is waiting for a more precise fix before showing or using your location.`,
+              true
+            );
+            if (locateBtn) {
+              locateBtn.disabled = false;
+              locateBtn.textContent = 'Retry precise location';
+            }
+            renderClinics();
+            return;
+          }
+
+          setUserLocation({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            source: "browser",
+            trusted: true,
+            focus: true,
+          });
+          setStatus(`Location active - ${accuracyLabel}`);
+
+          if (locateBtn) {
+            locateBtn.disabled = false;
+            locateBtn.textContent = 'Refresh my location';
+          }
+
+          renderClinics();
+        },
+        (err) => {
+          const msgs = {
+            1: "Location permission denied. Use 'Pin location on map' instead.",
+            2: "Location unavailable - check your browser settings.",
+            3: "Location request timed out. Try again or pin manually.",
+          };
+          setStatus(msgs[err.code] || "Could not get location.", true);
+          if (locateBtn) {
+            locateBtn.disabled = false;
+            locateBtn.textContent = 'Use my location';
+          }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
+
     // ----- Events -----
     document.getElementById('search-clinics').addEventListener('input', function () {
       searchQuery = this.value.trim().toLowerCase();
@@ -698,7 +937,8 @@
     document.getElementById('filter-parish').addEventListener('change', renderClinics);
     document.getElementById('filter-type').addEventListener('change', renderClinics);
     document.getElementById('filter-service').addEventListener('change', renderClinics);
-    document.getElementById('btn-locate').addEventListener('click', requestUserLocation);
+    document.getElementById('btn-locate').addEventListener('click', requestUserLocationV2);
+    document.getElementById('btn-stop-location').addEventListener('click', () => stopLocationWatch());
     document.getElementById('btn-pin').addEventListener('click', togglePinMode);
 
 
@@ -707,7 +947,7 @@
       initMap(); // always init the map first so it renders regardless of data
 
       try {
-        const apiBase = window.BLOOM_API_BASE ?? '';
+        const apiBase = getApiBase();
         const res = await fetch(`${apiBase}/api/clinics`);
 
         if (!res.ok) throw new Error(`Backend error: ${res.status}`);
@@ -736,7 +976,7 @@
 
       // Auto-request location when navigated from the chat "Find care near me" button
       if (new URLSearchParams(window.location.search).get("autolocate") === "true") {
-        requestUserLocation();
+        requestUserLocationV2();
       }
     }
 

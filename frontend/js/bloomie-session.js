@@ -89,6 +89,9 @@ export function createCtx() {
     backgroundContext:  null,
     flowId:             0,
     nodeFlowId:         -1,
+    queuedUserInput:    null,       // text submitted while Bloomie is locked; flushed once the reply finishes
+    lastUserTurnMode:   null,       // "typed" | "choice" | null, used to keep typed/button turns from leaking context
+    lastChoiceTurn:     null,       // metadata for the most recent quick-reply/button turn
     insightsGiven:      new Set(),  // keys like "luteal_mood" - prevents repeated full insights
     cycleVariability:   null,       // range (max–min) across last 3 logged cycle lengths, null if unknown
     currentTone:        null,       // tone resolved for the current message ('distressed'|'angry'|…|'neutral')

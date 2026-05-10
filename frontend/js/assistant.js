@@ -8,7 +8,7 @@ import { resolveIntentAssist, classifyRepairClarification, extractMultiIntentTag
 import { extractSignalsAI }   from "./bloomie-extract.js";
 import { createCtx } from "./bloomie-session.js";
 import { logSafetyEvent, logAnalyticsEvent, bloomieDebug } from "./bloomie-logger.js";
-import { getIdToken, getUser, isAdminCached } from "./auth.js";
+import { getIdToken, getUser } from "./auth.js";
 import { generateIntegratedSignals, getBloomieSymptomContext } from "./algorithms/bloom-symptom-engine.js";
 import { generateAnomalySignals } from "./algorithms/bloom-anomaly-engine.js";
 import { parseNaturalDate, validateCycleDate, validateCalendarDate, computePhaseConfidence } from "./algorithms/bloom-date-utils.js";
@@ -32,6 +32,7 @@ import {
   shouldAskFollowUp,
   softenEscalationLine,
 } from "./bloomie-response-layers.js";
+import { showToast } from "./utils.js";
 
 // ── Mood anomaly context ────────────────────────────────────────────────────
 // Combines cycle-timing anomaly (from bloom-anomaly-engine) with a
@@ -139,6 +140,14 @@ export function Chat() {
   `;
 }
 
+function firstText(...values) {
+  for (const value of values) {
+    const text = typeof value === "string" ? value.trim() : "";
+    if (text) return text;
+  }
+  return null;
+}
+
 export async function mountChat(
   user = null,
   cycleData = null,
@@ -153,16 +162,17 @@ export async function mountChat(
     isAnon ? Promise.resolve(null) : loadBloomieMemory(),
     isAnon ? Promise.resolve({ nickname: null }) : loadUserProfile(),
   ]);
+  const resolvedNickname = firstText(profile?.nickname, user?.nickname, user?.displayName);
 
   initBloomieChat({
-    userName: user?.nickname || user?.displayName || null,
+    userName: resolvedNickname,
     cycleData,
     symptomHistory,
     bloomieMemory,
     isMinor,
     isAnon,
     policySeed,
-    profile,
+    profile: { ...(profile || {}), nickname: resolvedNickname },
     onSaveMemory: saveBloomieMemory,
     onOpenCareMap: () => {
       window.location.href = "/pages/clinics.html?autolocate=true";
@@ -208,7 +218,7 @@ export async function mountChat(
     doc.save(`bloom-chat-summary-${new Date().toISOString().slice(0,10)}.pdf`);
   } catch (err) {
     console.error("PDF export failed:", err);
-    alert("PDF export failed. Please try again.");
+    showToast("PDF export failed. Please try again.", "error");
   }
 },
   });
@@ -901,6 +911,17 @@ export function initBloomieChat({
     }
   }
 
+  function clearPendingTurnContext({ preservePendingRoute = false } = {}) {
+    ctx.pendingQuestion = null;
+    ctx.inlineChoices = null;
+    ctx.inlineQuestion = null;
+    ctx.pendingClarification = null;
+    ctx.pendingAmbiguityContext = null;
+    ctx.pendingContradictionContext = null;
+    ctx.pendingContextProbe = null;
+    if (!preservePendingRoute) ctx.pendingRoute = null;
+  }
+
   function isLowInfoContextualFollowUp(text) {
     return /^\s*(yes|no|nope|yep|not yet|still no|same|same thing|still same|again|also|and)\b/i.test(String(text || ""));
   }
@@ -1166,78 +1187,17 @@ export function initBloomieChat({
   ctx.policyAnonDisclosureShown = false;
   ctx.policyContext = null;
   ctx.policyTrustedAdultNudgePending = false;
-  ctx.userNickname = profile?.nickname ?? null;
+  ctx.userNickname = firstText(profile?.nickname, userName);
   const memory = ctx.isAnon ? null : loadLocalBloomieMemory();
   ctx.memory = memory ?? {};
 
-  const debugPanel = createBloomieDebugPanel();
+  document.getElementById("bloomie-debug-panel")?.remove();
+  document.getElementById("bloomie-debug-panel-style")?.remove();
+  const debugPanel = null;
 
-  function canShowBloomieDebugPanel() {
-    try {
-      return isBloomieDebugEnabled() || isAdminCached();
-    } catch {
-      return isBloomieDebugEnabled();
-    }
-  }
-
-  function createBloomieDebugPanel() {
-    if (!$box || !canShowBloomieDebugPanel()) return null;
-    if (!document.getElementById("bloomie-debug-panel-style")) {
-      const style = document.createElement("style");
-      style.id = "bloomie-debug-panel-style";
-      style.textContent = `
-        .bloomie-debug-panel {
-          margin: 0.55rem 1rem 0.75rem;
-          border: 1px solid var(--color-border);
-          border-radius: 12px;
-          background: rgba(255, 243, 247, 0.8);
-          color: var(--color-text);
-          font-size: 0.78rem;
-          overflow: hidden;
-        }
-        .bloomie-debug-panel summary {
-          cursor: pointer;
-          padding: 0.55rem 0.7rem;
-          font-weight: 800;
-          color: var(--color-primary-dark);
-        }
-        .bloomie-debug-panel pre {
-          margin: 0;
-          padding: 0 0.7rem 0.7rem;
-          white-space: pre-wrap;
-          font: 0.76rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-          color: var(--color-text-muted);
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    const panel = document.createElement("details");
-    panel.id = "bloomie-debug-panel";
-    panel.className = "bloomie-debug-panel";
-    panel.innerHTML = `
-      <summary>Why Bloomie said this</summary>
-      <pre id="bloomie-debug-panel-body">Waiting for a turn...</pre>
-    `;
-    $box.insertAdjacentElement("afterend", panel);
-    return panel;
-  }
-
-  function updateBloomieDebugPanel(extra = {}) {
-    if (!debugPanel) return;
-    const body = debugPanel.querySelector("#bloomie-debug-panel-body");
-    if (!body) return;
-    const reasoning = ctx.lastReasoning || {};
-    const payload = {
-      state: ctx.state,
-      interpretation: reasoning.interpretation ?? null,
-      strategy: reasoning.strategy ?? null,
-      confidence: reasoning.confidence ?? null,
-      next: reasoning.next ?? null,
-      route: extra.route ?? ctx.lastRoute ?? null,
-      why: reasoning.why ?? null,
-    };
-    body.textContent = JSON.stringify(payload, null, 2);
+  function updateBloomieDebugPanel(_extra = {}) {
+    // Debug details stay in the browser console only; users should never see
+    // an explanation panel inside the Bloomie chat UI.
   }
 
   function emitDueReminders() {
@@ -1687,10 +1647,12 @@ export function initBloomieChat({
   if ($form && $input) {
     $form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (ctx.locked) return;
-
       const rawInput = String($input.value || "");
       const text = sanitizeInput(rawInput.trim());
+      if (ctx.locked) {
+        if (text) ctx.queuedUserInput = text;
+        return;
+      }
       // Defensive no-op for empty submits (including accidental voice-event submits).
       // This prevents false fallback/OOS prompts from blank or whitespace-only content.
       if (!text) {
@@ -2003,6 +1965,8 @@ export function initBloomieChat({
       // in the DOM from the previous node are immediately invalidated.
       advanceFlow();
       pushMsg("user", text);
+      ctx.lastUserTurnMode = "typed";
+      ctx.lastChoiceTurn = null;
 
       // ── Loop detection - track recent inputs ─────────────────────────────
       ctx.recentInputs = ctx.recentInputs || [];
@@ -2316,6 +2280,9 @@ export function initBloomieChat({
           else { onRequestPdf(buildSummaryText()); }
         }
         if (choice.action?.startsWith("LOG_")) onLogAction(choice.action, choice.logData || {});
+        clearPendingTurnContext({
+          preservePendingRoute: choice.next === "_MEDIUM_YES" || choice.next === "_MEDIUM_NO",
+        });
         const effectiveNext = (choice.id === "done" && choice.next === "CLOSE" && ctx.adviceGiven.size > 0)
           ? "SUMMARY"
           : choice.next;
@@ -4306,12 +4273,22 @@ export function initBloomieChat({
     ctx.backgroundIntervals.clear();
   }
 
+  function flushQueuedUserInput() {
+    if (ctx.locked || !$form || !$input || !ctx.queuedUserInput) return;
+    const queued = sanitizeInput((String($input.value || "").trim() || ctx.queuedUserInput).trim());
+    ctx.queuedUserInput = null;
+    if (!queued) return;
+    $input.value = queued;
+    $form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  }
+
   function lockUI(v) {
     ctx.locked = v;
     $box.querySelectorAll("button").forEach((b) => {
       b.disabled = v;
       b.setAttribute("aria-disabled", v ? "true" : "false");
     });
+    if (!v) flushQueuedUserInput();
   }
 
   function pushMsg(from, text, meta = {}) {
@@ -4549,6 +4526,9 @@ export function initBloomieChat({
       ctx.pendingAmbiguityContext   = null;
       ctx.pendingContradictionContext = null;
       ctx.pendingContextProbe       = null;
+      ctx.queuedUserInput           = null;
+      ctx.lastUserTurnMode          = null;
+      ctx.lastChoiceTurn            = null;
       ctx.recentInputs              = [];
       ctx.preEndChatState           = null;
       ctx.closeConfirmationPending  = false;
@@ -5061,7 +5041,16 @@ export function initBloomieChat({
             transition("POLICY_MINOR_CONSENT_REQUIRED");
             return;
           }
+          const fromState = ctx.state;
           advanceFlow();
+          ctx.lastUserTurnMode = "choice";
+          ctx.lastChoiceTurn = {
+            id: choice.id,
+            label: choice.label,
+            next: choice.next,
+            fromState,
+            flowId: ctx.flowId,
+          };
           pushMsg("user", choice.label);
           // Refresh tone from the button label so downstream say/choices transforms
           // are not stale from a previous typed message. Rule-only (no AI call needed
@@ -5080,6 +5069,9 @@ export function initBloomieChat({
           const effectiveNext = (choice.id === "done" && choice.next === "CLOSE" && ctx.adviceGiven.size > 0)
             ? "SUMMARY"
             : choice.next;
+          clearPendingTurnContext({
+            preservePendingRoute: effectiveNext === "_MEDIUM_YES" || effectiveNext === "_MEDIUM_NO",
+          });
           transition(effectiveNext, { choiceId });
         });
       });
@@ -5443,6 +5435,9 @@ export function initBloomieChat({
       ctx.inlineQuestion = null;
       ctx.pendingClarification = null;
       ctx.turnFocus = null;
+      ctx.queuedUserInput = null;
+      ctx.lastUserTurnMode = null;
+      ctx.lastChoiceTurn = null;
       ctx.locked = false;
       ctx.toneRequestId = 0;
       ctx.narrowingAttemptCount = 0;

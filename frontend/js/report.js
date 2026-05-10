@@ -8,6 +8,7 @@ import {
   renderFooter,
   renderModeBanner,
   renderBloomieFab,
+  showToast,
 } from "./utils.js";
 import { getAllLogs }         from "./db.js";
 import { fetchCycleState }   from "./cycle-state.js";
@@ -90,6 +91,19 @@ async function loadPreview() {
              <div class="stat-tile-value">${predictedCycleLength}d</div>
            </div>`
         : "";
+      const signalSummary = report.signalSummary || {};
+      const signalLines = Array.isArray(signalSummary.guidanceLines)
+        ? signalSummary.guidanceLines.slice(0, 3)
+        : [];
+      const signalPreview = signalSummary.patternLine || signalLines.length
+        ? `<div style="margin-top:1rem;padding:0.85rem 1rem;border:1px solid var(--color-border);border-left:4px solid var(--color-primary);border-radius:8px;background:var(--color-primary-lightest);">
+             ${signalSummary.patternLine ? `<p style="margin:0 0 0.5rem;font-weight:800;color:var(--color-primary-dark);">${signalSummary.patternLine}</p>` : ""}
+             ${signalLines.length ? `
+               <ul style="margin:0;padding-left:1rem;color:var(--color-text-muted);font-size:0.88rem;line-height:1.55;">
+                 ${signalLines.map((line) => `<li>${line}</li>`).join("")}
+               </ul>` : ""}
+           </div>`
+        : "";
 
       previewEl.innerHTML = `
         ${regularityBadge}
@@ -128,6 +142,7 @@ async function loadPreview() {
             </thead>
             <tbody>${cycleRows}</tbody>
           </table>` : ""}
+        ${signalPreview}
         ${confidenceLevel && confidenceLevel !== "High" && report.confidenceMessage ? `
           <p class="text-muted" style="font-size:0.8rem;margin-top:0.75rem;">
             ${report.confidenceMessage}
@@ -139,7 +154,7 @@ async function loadPreview() {
       btn.disabled = false;
       btn.onclick = () => {
         if (!report.cyclesTracked) {
-          alert("No cycle history yet. Log period days in the Calendar first.");
+          showToast("No cycle history yet. Log period days in the Calendar first.", "error");
           return;
         }
         console.log("[report] generating PDF…", report);

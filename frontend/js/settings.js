@@ -44,12 +44,11 @@ function isMinorProfile() {
  
 // ─── DOM refs ──────────────────────────────────────────────────────────────────
 const els = {
-  hideSensitive:  document.getElementById("pref-hide-sensitive"),
-  compact:        document.getElementById("pref-compact"),
-
   reminders:      document.getElementById("pref-reminders"),
   periodReminder: document.getElementById("pref-period-reminder"),
   fertileAlert:   document.getElementById("pref-fertile-alert"),
+  hideSensitive:  document.getElementById("pref-hide-sensitive"),
+  compact:        document.getElementById("pref-compact"),
   discreetNotif:  document.getElementById("pref-discreet-notif"),
 
   save:           document.getElementById("save-prefs"),
@@ -97,32 +96,37 @@ async function saveToBackend(prefs) {
   try {
     const headers = await authHeaders();
     if (!headers) return false;
- 
+
     const payload = {
       theme:          getTheme(),
       hideSensitive:  isMinorProfile() ? true : prefs.hideSensitive,
       compact:        prefs.compact ?? false,
       reminders: {
-        enabled:      prefs.reminders      ?? false,
+        enabled: prefs.reminders ?? false,
         discreetCopy: prefs.discreetNotif ?? false,
         types: [
-          ...(prefs.periodReminder ? ["PERIOD_SOON"]     : []),
-          ...(prefs.fertileAlert   ? ["FERTILE_WINDOW"]  : []),
+          ...(prefs.reminders ? ["LOG_REMINDER"] : []),
+          ...(prefs.periodReminder ? ["PERIOD_SOON"] : []),
+          ...(prefs.fertileAlert ? ["FERTILE_WINDOW"] : []),
         ],
       },
+      periodReminder: prefs.periodReminder ?? false,
+      fertileAlert: prefs.fertileAlert ?? false,
+      compact: prefs.compact ?? false,
+      discreetNotif: prefs.discreetNotif ?? false,
     };
 
     const res = await fetch(`${API_BASE}/api/preferences`, {
-      method:  "PUT",
+      method: "PUT",
       headers,
-      body:    JSON.stringify(payload),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       console.error("[Bloom] preferences save failed:", res.status, err);
     } else {
-      console.log("[Bloom] preferences saved to backend ✓");
+      console.log("[Bloom] preferences saved to backend");
     }
     return res.ok;
   } catch (e) {
@@ -130,8 +134,8 @@ async function saveToBackend(prefs) {
     return false;
   }
 }
- 
-// ─── FCM helpers ───────────────────────────────────────────────────────────────
+
+// FCM helpers ───────────────────────────────────────────────────────────────
 function anyNotificationEnabled() {
   return (
     els.reminders?.checked      ||
@@ -172,10 +176,10 @@ function applyPrefsToUI(prefs) {
   }
 
   // Reminders - flatten from backend shape or local shape
-  const remindersEnabled = prefs.reminders?.enabled ?? !!prefs.reminders;
+  const types = prefs.reminders?.types || [];
+  const remindersEnabled = types.includes("LOG_REMINDER") || (prefs.reminders?.enabled ?? !!prefs.reminders);
   if (els.reminders) els.reminders.checked = remindersEnabled;
  
-  const types = prefs.reminders?.types || [];
   if (els.periodReminder) {
     els.periodReminder.checked = types.includes("PERIOD_SOON") || !!prefs.periodReminder;
   }
@@ -229,14 +233,15 @@ Object.entries(els.themeBtns).forEach(([key, btn]) => {
  
 // ─── Save ──────────────────────────────────────────────────────────────────────
 els.save?.addEventListener("click", async () => {
+  const existing = getLocalPrefs();
   const prefs = {
-    theme: getTheme(),
-    hideSensitive: isMinorProfile() ? true : (els.hideSensitive?.checked ?? false),
-    reminders: els.reminders?.checked ?? false,
+    theme:          getTheme(),
+    hideSensitive:  isMinorProfile() ? true : (els.hideSensitive?.checked ?? existing.hideSensitive ?? false),
+    reminders:      els.reminders?.checked      ?? false,
     periodReminder: els.periodReminder?.checked ?? false,
-    fertileAlert: els.fertileAlert?.checked ?? false,
-    compact: els.compact?.checked ?? false,
-    discreetNotif: els.discreetNotif?.checked ?? false,
+    fertileAlert:   els.fertileAlert?.checked   ?? false,
+    compact:        els.compact?.checked        ?? existing.compact ?? false,
+    discreetNotif:  els.discreetNotif?.checked  ?? false,
   };
  
   setLocalPrefs(prefs);
@@ -276,3 +281,4 @@ els.reset?.addEventListener("click", async () => {
   showStatus("Reset to defaults.");
   showToast("Preferences reset.", "info");
 });
+

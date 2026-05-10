@@ -57,6 +57,7 @@
     .detail-dot.dot-ovulation  { background: #1A8080; }
     .detail-dot.dot-follicular { background: #A8C8E8; }
     .detail-dot.dot-luteal     { background: var(--phase-luteal); }
+    .detail-dot.dot-other      { background: #DDD4E8; }
 
     .detail-legend {
       display: flex;
@@ -150,9 +151,9 @@
       font-size: 1.25rem;
       flex-shrink: 0;
     }
-    .detail-event-icon.period-icon     { background: rgba(224, 92, 138, 0.15); }
-    .detail-event-icon.fertile-icon    { background: rgba(61, 184, 130, 0.15); }
-    .detail-event-icon.ovulation-icon  { background: rgba(61, 184, 130, 0.10); border: 2px dashed rgba(61,184,130,0.5); }
+    .detail-event-icon.period-icon     { background: rgba(228, 106, 148, 0.16); color: #e46a94; }
+    .detail-event-icon.fertile-icon    { background: rgba(45, 212, 191, 0.16); color: #1A8080; }
+    .detail-event-icon.ovulation-icon  { background: rgba(26, 128, 128, 0.10); color: #1A8080; border: 2px dashed rgba(26,128,128,0.45); }
     .detail-event-text {
       font-size: 0.95rem;
       font-weight: 700;
@@ -188,7 +189,7 @@
         <h1 class="detail-page-title">Cycle details</h1>
       </div>
       <div id="detail-content">
-        <p class="text-muted">Loading…</p>
+        <p class="text-muted">Loading...</p>
       </div>
     </div>
   </main>
@@ -196,6 +197,7 @@
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner, formatDate, toDateKey } from '/js/utils.js';
     import { getAllLogs } from '/js/db.js';
+    import { fetchCycleState } from '/js/cycle-state.js';
 
     renderNav();
     renderFooter();
@@ -228,6 +230,16 @@
       });
     }
 
+    function isLoggedPeriodDay(log) {
+      return !!(log?.flow && log.flow !== 'none');
+    }
+
+    function clampDateKey(dateKey, minKey, maxKey) {
+      if (!dateKey) return null;
+      if (dateKey < minKey || dateKey > maxKey) return null;
+      return dateKey;
+    }
+
     // ── Main ───────────────────────────────────────────────────────────────────
     const params    = new URLSearchParams(location.search);
     const startKey  = params.get('start');
@@ -238,19 +250,35 @@
       container.innerHTML = `<div class="no-data-msg"><p>No cycle selected.</p><a href="/pages/dashboard.html" class="btn btn-primary">Go to Dashboard</a></div>`;
     } else {
       const logsByDate = await getAllLogs();
-      render(logsByDate);
+      let currentCycleState = null;
+      if (!nextKey) {
+        currentCycleState = await fetchCycleState(logsByDate).catch(() => null);
+      }
+      render(logsByDate, currentCycleState);
     }
 
-    function render(logsByDate) {
+    function render(logsByDate, currentCycleState = null) {
       const todayKey     = toDateKey(new Date());
       const isCurrent    = !nextKey;
       const cycleEndKey  = nextKey ? addDaysStr(nextKey, -1) : todayKey;
       const cycleLen     = nextKey ? diffDays(startKey, nextKey) : null;
 
       // Estimated phase dates (based on next period start)
-      const ovulationKey    = nextKey ? addDaysStr(nextKey, -14) : null;
-      const fertileStartKey = nextKey ? addDaysStr(nextKey, -19) : null;
-      const fertileEndKey   = nextKey ? addDaysStr(nextKey, -13) : null;
+      let ovulationKey    = nextKey ? addDaysStr(nextKey, -14) : (currentCycleState?.ovulationDate ?? null);
+      let fertileStartKey = nextKey ? addDaysStr(nextKey, -19) : (currentCycleState?.fertileStart ?? null);
+      let fertileEndKey   = nextKey ? addDaysStr(nextKey, -13) : (currentCycleState?.fertileEnd ?? null);
+
+      const currentPhaseKey = String(currentCycleState?.phase || '').toLowerCase();
+      const currentPhaseIsLuteal = isCurrent && (currentPhaseKey === 'luteal' || currentPhaseKey === 'late_luteal');
+      if (currentPhaseIsLuteal && (!ovulationKey || ovulationKey >= todayKey)) {
+        ovulationKey = addDaysStr(todayKey, -1);
+        fertileEndKey = ovulationKey;
+        fertileStartKey = addDaysStr(ovulationKey, -5);
+      }
+
+      ovulationKey = clampDateKey(ovulationKey, startKey, cycleEndKey);
+      fertileStartKey = clampDateKey(fertileStartKey, startKey, cycleEndKey);
+      fertileEndKey = clampDateKey(fertileEndKey, startKey, cycleEndKey);
 
       // Collect period days within this cycle
       const periodDays = [];
@@ -259,7 +287,7 @@
       while (d <= endDate) {
         const dk = toDateKey(d);
         const log = logsByDate[dk];
-        if (log?.flow && log.flow !== 'none') periodDays.push(dk);
+        if (isLoggedPeriodDay(log)) periodDays.push(dk);
         d.setDate(d.getDate() + 1);
       }
 
@@ -274,12 +302,12 @@
       const periodLenNormal = periodLen >= 2 && periodLen <= 7;
 
       // Build dots (cap at 45 for display)
-      const displayLen = Math.min(cycleLen ?? diffDays(startKey, todayKey) + 1, 45);
+      const displayLen = Math.min(cycleLen ?? diffDays(startKey, cycleEndKey) + 1, 45);
       const dots = [];
       for (let i = 0; i < displayLen; i++) {
         const dk = addDaysStr(startKey, i);
         const log = logsByDate[dk];
-        const isPeriod = !!(log?.flow && log.flow !== 'none');
+        const isPeriod = isLoggedPeriodDay(log);
         let cls = 'dot-follicular';
         if (isPeriod) {
           cls = 'dot-period';

@@ -104,6 +104,46 @@ function apiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
+function normalizeNickname(value) {
+  const nickname = typeof value === "string" ? value.trim() : "";
+  return nickname ? nickname.slice(0, 40) : null;
+}
+
+function extractNickname(payload = null) {
+  return normalizeNickname(
+    payload?.nickname ??
+    payload?.profile?.nickname ??
+    payload?.user?.nickname ??
+    payload?.displayName ??
+    null
+  );
+}
+
+function loadLocalNickname() {
+  try {
+    const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
+    return extractNickname(profile) || normalizeNickname(localStorage.getItem("bloom_user_name"));
+  } catch {
+    return normalizeNickname(localStorage.getItem("bloom_user_name"));
+  }
+}
+
+function cacheLocalNickname(nickname, profile = null) {
+  const clean = normalizeNickname(nickname);
+  if (!clean) return;
+  localStorage.setItem("bloom_user_name", clean);
+  try {
+    const existing = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
+    localStorage.setItem("bloom_profile", JSON.stringify({
+      ...existing,
+      ...(profile && typeof profile === "object" ? profile : {}),
+      nickname: clean,
+    }));
+  } catch {
+    localStorage.setItem("bloom_profile", JSON.stringify({ nickname: clean }));
+  }
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -325,6 +365,29 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
   return merged;
 }
 
+function mergeLocalAndCloudLogs(localLogs = {}, cloudLogs = {}) {
+  const merged = { ...(localLogs || {}) };
+
+  for (const [dateKey, cloudEntry] of Object.entries(cloudLogs || {})) {
+    const localEntry = merged[dateKey] || {};
+    merged[dateKey] = {
+      ...localEntry,
+      ...(cloudEntry || {}),
+    };
+
+    // Do not let an incomplete cloud row erase a local period marker. This can
+    // happen during migrations where older canonical docs lack period fields
+    // while legacy/local data still has the user's historical flow logs.
+    if (isPeriodEntry(localEntry) && !isPeriodEntry(cloudEntry)) {
+      if (localEntry.flow !== undefined) merged[dateKey].flow = localEntry.flow;
+      if (localEntry.flowLevel !== undefined) merged[dateKey].flowLevel = localEntry.flowLevel;
+      if (localEntry.periodDay !== undefined) merged[dateKey].periodDay = localEntry.periodDay;
+    }
+  }
+
+  return merged;
+}
+
 function addDays(dateKey, n) {
   const d = new Date(dateKey + "T00:00:00");
   d.setDate(d.getDate() + n);
@@ -379,6 +442,7 @@ export async function saveDailyLog(dateKey, log) {
     },
   };
   writeJSON(LOGS_KEY, all);
+  invalidateLogsCache();
 
   if (!isAccountMode()) return all[dateKey];
 
@@ -563,12 +627,13 @@ export async function getAllLogs({ timeoutMs = 4500 } = {}) {
 
       const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
 
-      const logs = mergeCloudLogs(cycleItems, symptomItems);
+      const cloudLogs = mergeCloudLogs(cycleItems, symptomItems);
+      const logs = mergeLocalAndCloudLogs(local, cloudLogs);
 
       // Only overwrite local cache if cloud actually returned data.
       // If cloud is empty but local has entries, keep local to avoid
       // wiping logs that were saved before a sync had a chance to run.
-      if (Object.keys(logs).length > 0) {
+      if (Object.keys(cloudLogs).length > 0) {
         writeJSON(LOGS_KEY, logs);
         setCloudSyncedBanner();
         clearSyncIssue("logs");
@@ -598,6 +663,7 @@ export async function deleteDailyLog(dateKey) {
   const all = readJSON(LOGS_KEY, {});
   delete all[dateKey];
   writeJSON(LOGS_KEY, all);
+  invalidateLogsCache();
 
   if (!isAccountMode()) return;
 
@@ -807,7 +873,7 @@ export async function saveBloomieMemory(memoryData) {
 export async function loadUserProfile() {
   try {
     const headers = await authHeaders();
-    if (!headers) return { nickname: null };
+    if (!headers) return { nickname: loadLocalNickname() };
     const timeout = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("timeout")), 3000)
     );
@@ -823,10 +889,13 @@ export async function loadUserProfile() {
         source: "profile",
         message: "Bloom could not refresh your cloud profile. Using saved local details for now.",
       });
-      return { nickname: null };
+      return { nickname: loadLocalNickname() };
     }
     const data = await res.json();
-    return { nickname: data?.nickname ?? null };
+    const profile = data?.profile || data || null;
+    const nickname = extractNickname(data);
+    cacheLocalNickname(nickname, profile);
+    return { nickname, profile };
   } catch (err) {
     bloomieDiagnostic("profile_sync_failed", {
       module: "db",
@@ -838,7 +907,7 @@ export async function loadUserProfile() {
       message: "Bloom could not refresh your cloud profile. Using saved local details for now.",
       detail: err?.message || "",
     });
-    return { nickname: null };
+    return { nickname: loadLocalNickname() };
   }
 }
 
@@ -846,10 +915,12 @@ export async function deleteAllLocalData() {
   localStorage.removeItem(LOGS_KEY);
   localStorage.removeItem(ASSIST_KEY);
   clearBloomieMemoryLocal();
+  invalidateLogsCache();
 }
 
 export async function clearAllLogs() {
   writeJSON(LOGS_KEY, {});
+  invalidateLogsCache();
 
   if (!isAccountMode()) return;
 

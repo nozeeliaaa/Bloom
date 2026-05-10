@@ -14,6 +14,13 @@ const ALLOWED_PHASES = new Set([
   "luteal",
 ]);
 
+function toMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 router.post("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -147,26 +154,25 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
 
-    let snap = await db
+    const canonicalSnapPromise = db
       .collection("users")
       .doc(uid)
       .collection("phaseFeedback")
       .orderBy("createdAt", "desc")
       .get();
 
-    if (snap.empty) {
-      snap = await db
-        .collection("phaseFeedback")
-        .doc(uid)
-        .collection("entries")
-        .orderBy("createdAt", "desc")
-        .get();
-    }
+    const legacySnapPromise = db
+      .collection("phaseFeedback")
+      .doc(uid)
+      .collection("entries")
+      .orderBy("createdAt", "desc")
+      .get();
 
-    const entries = snap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const [legacySnap, canonicalSnap] = await Promise.all([legacySnapPromise, canonicalSnapPromise]);
+    const byId = new Map();
+    legacySnap.docs.forEach((doc) => byId.set(doc.id, { id: doc.id, ...doc.data() }));
+    canonicalSnap.docs.forEach((doc) => byId.set(doc.id, { id: doc.id, ...doc.data() }));
+    const entries = [...byId.values()].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
 
     return res.json({ ok: true, entries });
   } catch (err) {

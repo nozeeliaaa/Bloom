@@ -78,9 +78,26 @@ router.get("/symptoms", requireAuth, async (req, res) => {
 // Query: fromLat, fromLng, toLat, toLng, mode (driving-car|foot-walking)
 router.get("/route", async (req, res) => {
   const { fromLat, fromLng, toLat, toLng, mode = "driving-car" } = req.query;
+  const allowedModes = new Set(["driving-car", "foot-walking"]);
 
   if (!fromLat || !fromLng || !toLat || !toLng) {
     return res.status(400).json({ error: "Missing coordinates" });
+  }
+
+  const from = { lat: Number(fromLat), lng: Number(fromLng) };
+  const to = { lat: Number(toLat), lng: Number(toLng) };
+
+  if (
+    !Number.isFinite(from.lat) || !Number.isFinite(from.lng) ||
+    !Number.isFinite(to.lat) || !Number.isFinite(to.lng) ||
+    Math.abs(from.lat) > 90 || Math.abs(to.lat) > 90 ||
+    Math.abs(from.lng) > 180 || Math.abs(to.lng) > 180
+  ) {
+    return res.status(400).json({ error: "Invalid coordinates" });
+  }
+
+  if (!allowedModes.has(mode)) {
+    return res.status(400).json({ error: "Invalid route mode" });
   }
 
   const apiKey = process.env.ORS_API_KEY;
@@ -89,7 +106,7 @@ router.get("/route", async (req, res) => {
   }
 
   try {
-    const url = `https://api.heigit.org/openrouteservice/v2/directions/${mode}/geojson`;
+    const url = `https://api.openrouteservice.org/v2/directions/${mode}/geojson`;
 
     const orsRes = await fetch(url, {
       method: "POST",
@@ -99,7 +116,7 @@ router.get("/route", async (req, res) => {
         "Accept": "application/json, application/geo+json",
       },
       body: JSON.stringify({
-        coordinates: [[Number(fromLng), Number(fromLat)], [Number(toLng), Number(toLat)]],
+        coordinates: [[from.lng, from.lat], [to.lng, to.lat]],
         radiuses: [-1, -1],
       }),
     });
@@ -122,6 +139,7 @@ router.get("/route", async (req, res) => {
       distance_km: +(distance / 1000).toFixed(2),
       duration_min: Math.round(duration / 60),
       coords,
+      source: "openrouteservice",
     });
   } catch (err) {
     console.error("GET /catalog/route error:", err.message);

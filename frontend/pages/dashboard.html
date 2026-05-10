@@ -426,6 +426,28 @@
     .baby-size-img    { width: 72px; height: 72px; object-fit: contain; display: block; margin: 0 auto 0.35rem; }
     .baby-size-label  { font-size: 1rem; font-weight: 800; color: var(--color-primary); margin-top: 0.25rem; }
     .baby-size-week   { font-size: 0.85rem; color: var(--color-text-muted); }
+    .preg-overdue-banner {
+      margin-bottom: 0.85rem;
+      padding: 0.75rem 0.9rem;
+      border-radius: 12px;
+      border: 1px solid #f2c58f;
+      background: #fff8ef;
+    }
+    .preg-overdue-title {
+      display: block;
+      font-size: 0.84rem;
+      font-weight: 800;
+      color: #9a5e1f;
+      margin-bottom: 0.2rem;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
+    }
+    .preg-overdue-body {
+      margin: 0;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      color: var(--color-text-muted);
+    }
 
     .fertility-conf {
       display: inline-flex; align-items: center; gap: 0.4rem;
@@ -971,7 +993,7 @@
           <div id="insights"></div>
         </div>
 
-        <!-- Advanced Insight (non-TTC goals) / hidden for TTC -->
+        <!-- Advanced Insights (non-TTC goals) / hidden for TTC -->
         <div class="card insight-box" id="advanced-insight-card">
           <div class="card-header">
             <div class="card-icon">
@@ -979,7 +1001,7 @@
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
               </svg>
             </div>
-            <div class="card-title">Advanced Insight</div>
+            <div class="card-title">Advanced Insights</div>
           </div>
           <div id="advanced-insights">
             <p class="text-muted">Loading insights...</p>

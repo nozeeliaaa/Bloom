@@ -218,10 +218,10 @@
   </main>
 
   <script type="module">
-    import { renderNav, renderFooter, renderModeBanner } from "/js/utils.js";
-    import { onAuthChange, getUser, getIdToken } from "/js/auth.js";
+    import { renderNav, renderFooter, renderModeBanner, showToast } from "/js/utils.js";
+    import { onAuthChange, getUser, getIdToken, logout, clearLocalSessionData } from "/js/auth.js";
     import { setMode } from "/js/mode.js";
-    import { getFirebaseAuth, isFirebaseConfigured } from "/js/firebase.js";
+    import { isFirebaseConfigured } from "/js/firebase.js";
     import { getUserGoal } from "/js/goals.js";
 
     renderNav("profile");
@@ -330,6 +330,7 @@
     function showStatus(msg) {
       statusEl.textContent = msg;
       statusEl.classList.add("show");
+      showToast(msg, /failed|could not|must be|security|try again/i.test(msg) ? "error" : "success");
       setTimeout(() => statusEl.classList.remove("show"), 3500);
     }
 
@@ -580,12 +581,25 @@
       if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
       try {
         if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
-        const { deleteUser } = await import("https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js");
-        await deleteUser(getFirebaseAuth().currentUser);
-        localStorage.removeItem(LS_PROFILE);
-        localStorage.removeItem(LS_AVATAR);
-        localStorage.removeItem(LS_LMP);
-        setMode("anon");
+        const token = await getIdToken();
+        if (!token) throw new Error("Could not get auth token");
+
+        const apiBase = window.BLOOM_API_BASE ?? "";
+        const res = await fetch(`${apiBase}/api/user/account`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+
+        try {
+          await logout();
+        } catch (_) {
+          clearLocalSessionData();
+          setMode("anon");
+        }
         window.location.href = "/index.html";
       } catch (err) {
         const msg = String(err?.message || err);

@@ -14,21 +14,19 @@
 
 import nodemailer from "nodemailer";
 
-const HELPDESK_EMAIL = "Bloomhelpdesk@outlook.com";
+const HELPDESK_EMAIL = "bloomhelpdesk@outlook.com";
 
 function createTransport() {
   return nodemailer.createTransport({
-    host: "smtp-mail.outlook.com",
+    host: "smtp.office365.com",
     port: 587,
-    secure: false, // STARTTLS
+    secure: false,
     auth: {
       user: HELPDESK_EMAIL,
       pass: process.env.HELPDESK_EMAIL_PASS,
     },
-    tls: { ciphers: "SSLv3" },
   });
 }
-
 /**
  * Send an email to the Bloom helpdesk inbox.
  * @param {{ subject: string, html: string, replyTo?: string }} opts
