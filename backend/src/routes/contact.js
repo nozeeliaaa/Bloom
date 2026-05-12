@@ -3,7 +3,7 @@
  *
  * POST /api/contact
  *   Saves the submission to Firestore (contactMessages collection) and
- *   sends an email notification to bloomhelpdesk@outlook.com.
+ *   sends an email notification to bloomhelpdesk1@gmail.com.
  *   Returns a requestId (BLM-YYYY-XXXXX) to show the user.
  *
  * Rate-limited to 5 requests per 15 minutes per IP.

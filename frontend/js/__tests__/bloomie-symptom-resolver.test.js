@@ -1,7 +1,7 @@
 /**
  * bloomie-symptom-resolver.test.js
  *
- * Unit tests for resolveSymptoms() — the symptom-source arbitration layer.
+ * Unit tests for resolveSymptoms() - the symptom-source arbitration layer.
  * No mocks needed: the function is pure and has no external imports.
  *
  * Covers all seven cases from the spec plus edge/safety guards.
@@ -23,7 +23,7 @@ function ai(primary, secondary = [], confidence = 0.85, clarificationNeeded = fa
 // ─────────────────────────────────────────────────────────────────────────────
 // Case 1: No local matches + strong AI
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Case 1 — no local matches, strong AI", () => {
+describe("Case 1 - no local matches, strong AI", () => {
   it("uses AI primary when local is empty", () => {
     const result = resolveSymptoms([], ai("NAUSEA", ["SMELL_SENSITIVITY"], 0.9));
 
@@ -55,7 +55,7 @@ describe("Case 1 — no local matches, strong AI", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Case 2: Strong local (>= 0.85) + weaker AI
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Case 2 — strong local, weaker AI", () => {
+describe("Case 2 - strong local, weaker AI", () => {
   it("keeps local as primary even when AI disagrees", () => {
     const result = resolveSymptoms(
       [local("BLOATING", 0.9)],
@@ -99,7 +99,7 @@ describe("Case 2 — strong local, weaker AI", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Case 3: Medium local (0.6–0.85) + stronger AI
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Case 3 — medium local, AI has higher confidence", () => {
+describe("Case 3 - medium local, AI has higher confidence", () => {
   it("uses AI primary when AI confidence exceeds local", () => {
     const result = resolveSymptoms(
       [local("HEADACHE", 0.7)],
@@ -141,7 +141,7 @@ describe("Case 3 — medium local, AI has higher confidence", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Case 4: Low local confidence (< 0.6) + AI absent
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Case 4 — low local, no AI", () => {
+describe("Case 4 - low local, no AI", () => {
   it("returns clarificationNeeded when local is weak and AI is null", () => {
     const result = resolveSymptoms([local("HEADACHE", 0.4)], null);
 
@@ -163,7 +163,7 @@ describe("Case 4 — low local, no AI", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Case 5: AI clarificationNeeded with weak local
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Case 5 — AI requests clarification, local is weak", () => {
+describe("Case 5 - AI requests clarification, local is weak", () => {
   it("respects AI clarificationNeeded when local match is weak", () => {
     const result = resolveSymptoms(
       [local("FATIGUE", 0.5)],
@@ -188,7 +188,7 @@ describe("Case 5 — AI requests clarification, local is weak", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Case 6: Merged output with deduped secondary
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Case 6 — merged secondary deduplication", () => {
+describe("Case 6 - merged secondary deduplication", () => {
   it("never duplicates keys in secondary", () => {
     // AI secondary overlaps with local secondary
     const result = resolveSymptoms(
@@ -223,7 +223,7 @@ describe("Case 6 — merged secondary deduplication", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Case 7: Null / empty input safety
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Case 7 — null and empty input safety", () => {
+describe("Case 7 - null and empty input safety", () => {
   it("handles null localMatches without throwing", () => {
     expect(() => resolveSymptoms(null, null)).not.toThrow();
     const result = resolveSymptoms(null, null);

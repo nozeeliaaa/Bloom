@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/bloom-logo.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Calendar - Bloom</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -342,6 +343,9 @@
         <div class="form-group">
           <label class="form-label">Flow</label>
           <div class="chip-group" id="flow-chips"></div>
+          <div class="chip-group" id="blood-clots-row">
+            <button type="button" class="chip" id="blood-clots-chip">🩸 Blood clots</button>
+          </div>
         </div>
 
         <div class="form-group">
@@ -352,21 +356,21 @@
                 <span class="biometric-label">Sleep score</span>
                 <span class="biometric-value" id="sleep-score-value">Not set</span>
               </div>
-              <input class="biometric-slider" type="range" id="sleep-score" min="1" max="10" step="1" value="7" />
+              <input class="biometric-slider" type="range" id="sleep-score" min="1" max="10" step="1" value="7" aria-label="Sleep score" />
             </div>
             <div>
               <div class="biometric-row">
                 <span class="biometric-label">Stress level</span>
                 <span class="biometric-value" id="stress-level-value">Not set</span>
               </div>
-              <input class="biometric-slider" type="range" id="stress-level" min="1" max="4" step="1" value="2" />
+              <input class="biometric-slider" type="range" id="stress-level" min="1" max="4" step="1" value="2" aria-label="Stress level" />
             </div>
             <div>
               <div class="biometric-row">
                 <span class="biometric-label">Activity level</span>
                 <span class="biometric-value" id="activity-level-value">Not set</span>
               </div>
-              <input class="biometric-slider" type="range" id="activity-level" min="1" max="4" step="1" value="2" />
+              <input class="biometric-slider" type="range" id="activity-level" min="1" max="4" step="1" value="2" aria-label="Activity level" />
             </div>
           </div>
           <p class="biometric-note">Quick daily check-in to support phase estimation.</p>

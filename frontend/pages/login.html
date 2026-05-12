@@ -167,6 +167,23 @@
     let _unverifiedEmail = null;
     let _unverifiedPassword = null;
 
+    function getMailboxUrl(email) {
+      const domain = (email || '').split('@')[1]?.toLowerCase() || '';
+      if (domain === 'gmail.com' || domain === 'googlemail.com') return 'https://mail.google.com';
+      if (domain === 'yahoo.com' || domain.startsWith('yahoo.'))  return 'https://mail.yahoo.com';
+      if (['outlook.com','hotmail.com','live.com','msn.com','hotmail.co.uk','live.co.uk'].includes(domain)) return 'https://outlook.live.com';
+      if (['icloud.com','me.com','mac.com'].includes(domain)) return 'https://www.icloud.com/mail';
+      if (domain === 'aol.com') return 'https://mail.aol.com';
+      if (domain === 'protonmail.com' || domain === 'proton.me') return 'https://mail.proton.me';
+      return null;
+    }
+
+    function openInboxLink(email) {
+      const url = getMailboxUrl(email);
+      if (!url) return '';
+      return ` <a href="${url}" target="_blank" rel="noopener" style="font-weight:700;">Open my inbox &rarr;</a>`;
+    }
+
     function showError(msg) {
       errorMsg.textContent = msg;
       errorMsg.classList.remove('hidden');
@@ -231,6 +248,12 @@
             const completedOnboarding = isOnboardingCompleteFromProfileData(data);
             const hasStoredProfile = hasProfileObject(profile);
             profileStatus = data?.degraded ? "indeterminate" : (completedOnboarding ? "found" : "missing");
+
+            // Sync role immediately so the nav renders the Admin link on the next page
+            const role = data?.role ?? data?.profile?.role ?? "user";
+            localStorage.setItem("bloom_user_role", role || "user");
+            localStorage.setItem("bloom_is_admin", role === "admin" ? "1" : "0");
+            localStorage.setItem("bloom_role_synced_at", String(Date.now()));
             if (completedOnboarding) {
               markOnboardingCompleteLocal();
             }
@@ -308,10 +331,33 @@
 
       const restoreStatus = await fastRestore;
 
+      // Minor check - if under 18 without approved consent, send to consent-pending
+      try {
+        const restoredProfile = JSON.parse(localStorage.getItem('bloom_profile') || '{}');
+        const yob = restoredProfile.yob || restoredProfile.yearOfBirth;
+        if (yob) {
+          const age = new Date().getFullYear() - Number(yob);
+          if (age >= 10 && age <= 17) {
+            const tok = await getIdToken();
+            const apiBase = window.BLOOM_API_BASE ?? '';
+            const consentRes = await fetch(`${apiBase}/api/consent/status`, {
+              headers: { Authorization: `Bearer ${tok}` },
+            }).catch(() => null);
+            const consentData = consentRes?.ok ? await consentRes.json().catch(() => null) : null;
+            if (consentData?.status === 'denied') {
+              window.location.href = '/pages/consent-denied.html';
+              return;
+            }
+            if (!consentData || consentData.status !== 'approved') {
+              window.location.href = '/pages/consent-pending.html';
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+
       const onboarded = isOnboardingCompleteLocal();
-      const target = onboarded || restoreStatus === "indeterminate"
-        ? '/pages/dashboard.html'
-        : '/pages/survey.html';
+      const target = onboarded ? '/pages/dashboard.html' : '/pages/survey.html';
       window.location.href = target;
     };
 
@@ -351,9 +397,10 @@
           // Show the resend verification notice
           _unverifiedEmail = email;
           _unverifiedPassword = password;
-          verifyText.textContent =
+          verifyText.innerHTML =
             `Your email (${email}) hasn't been verified yet. ` +
-            `Check your inbox/spam or resend the verification email below.`;
+            `Check your inbox or resend the verification email below.` +
+            openInboxLink(email);
           verifyNotice.classList.remove('hidden');
           errorMsg.classList.add('hidden');
 
@@ -393,8 +440,9 @@
       btn.textContent = 'Sending...';
       try {
         await resendVerificationEmail(_unverifiedEmail, _unverifiedPassword);
-        verifyText.textContent =
-          `Verification email resent to ${_unverifiedEmail}. Please check your inbox.`;
+        verifyText.innerHTML =
+          `Verification email resent to ${_unverifiedEmail}. Please check your inbox.` +
+          openInboxLink(_unverifiedEmail);
         btn.style.display = 'none';
       } catch (e) {
         showError('Could not resend. Please try again shortly.');
@@ -436,8 +484,9 @@
 
       try {
         await sendPasswordReset(email);
-        resetOk.textContent =
-          `Reset link sent to ${email}. Check your inbox (and spam folder).`;
+        resetOk.innerHTML =
+          `Reset link sent to ${email}. Check your inbox.` +
+          openInboxLink(email);
         resetOk.classList.remove('hidden');
         btn.style.display = 'none';
       } catch (err) {

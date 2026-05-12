@@ -268,8 +268,33 @@ export async function mountSurvey() {
 
 /* ------------------ Step Builder (curated flow) ------------------ */
 function buildSteps(answers) {
-  // focusGoal now uses real dashboard goal IDs directly
   const focus = answers.focusGoal || "period";
+
+  // Resolve YOB from answers, localStorage, or sessionStorage (set during registration)
+  const knownYob = answers.yob
+    || (() => { try { return JSON.parse(localStorage.getItem("bloom_profile") || "{}").yearOfBirth; } catch { return null; } })()
+    || sessionStorage.getItem("bloom_user_yob");
+
+  if (knownYob && !answers.yob) answers.yob = String(knownYob);
+
+  const userAge = knownYob ? (new Date().getFullYear() - Number(knownYob)) : null;
+  const isMinor = userAge !== null && userAge >= 10 && userAge <= 17;
+
+  // Goals filtered by age - minors cannot see pregnancy, ttc, or perimenopause
+  const goalOptions = [
+    { value: "period",    icon: "🗓️", title: "Track my period",   desc: "Cycle predictions, phases, and period timing" },
+    { value: "no_period", icon: "🩷", title: "Track symptoms",    desc: "Log symptoms and patterns without period predictions" },
+    ...(!isMinor ? [
+      { value: "ttc",           icon: "🌱", title: "Try to conceive",                  desc: "Fertility window, ovulation insights, and timing tools" },
+      { value: "pregnancy",     icon: "🤰", title: "Track my pregnancy",               desc: "Due date, trimester milestones, and pregnancy logs" },
+      { value: "perimenopause", icon: "🌙", title: "Track menopause / perimenopause",  desc: "Cycle changes, hot flashes, and transitions" },
+    ] : []),
+  ];
+
+  // Ensure a minor’s saved goal is still valid after filtering
+  if (isMinor && ["ttc", "pregnancy", "perimenopause"].includes(answers.focusGoal)) {
+    answers.focusGoal = "period";
+  }
 
   const base = [
     {
@@ -279,11 +304,10 @@ function buildSteps(answers) {
       hint: "",
       render: () => consentCard(),
       autoAdvance: false,
-      onNext: () => {
-        answers.consent = answers.consent ?? "yes";
-      },
+      onNext: () => { answers.consent = answers.consent ?? "yes"; },
     },
-    {
+    // Only ask for year of birth if it isn’t already known
+    ...(!knownYob ? [{
       key: "yob",
       type: "select",
       title: "What year were you born?",
@@ -291,29 +315,15 @@ function buildSteps(answers) {
       hint: "",
       autoAdvance: false,
       render: () => yobSelectBlock(answers.yob),
-    },
+    }] : []),
     {
-      // Single step - directly picks the dashboard goal
       key: "focusGoal",
       title: "What would you like Bloom to focus on?",
       note: "This sets up your dashboard. You can change it anytime.",
       hint: "",
-      autoAdvance: false,
-      render: () =>
-        cardRadio(
-          "focusGoal",
-          [
-            { value: "period",        icon: "🗓️", title: "Track my period",              desc: "Cycle predictions, phases, and period timing" },
-            { value: "no_period",     icon: "🩷", title: "Track symptoms",               desc: "Log symptoms and patterns without period predictions" },
-            { value: "ttc",           icon: "🌱", title: "Try to conceive",              desc: "Fertility window, ovulation insights, and timing tools" },
-            { value: "perimenopause", icon: "🌙", title: "Track menopause / perimenopause", desc: "Cycle changes, hot flashes, and transitions" },
-            { value: "pregnancy",     icon: "🤰", title: "Track my pregnancy",           desc: "Due date, trimester milestones, and pregnancy logs" },
-          ],
-          answers.focusGoal || "period"
-        ),
-      onNext: () => {
-        answers.focusGoal = answers.focusGoal || "period";
-      },
+      autoAdvance: false,  // don’t jump away before user sees their selection
+      render: () => cardRadio("focusGoal", goalOptions, answers.focusGoal || "period"),
+      onNext: () => { answers.focusGoal = answers.focusGoal || "period"; },
     },
   ];
 
@@ -342,6 +352,7 @@ function buildSteps(answers) {
         title: "Are your cycles usually regular?",
         note: "This affects prediction accuracy.",
         hint: "",
+        autoAdvance: false,
         render: () =>
           radioGroup(
             "regularity",
@@ -359,6 +370,7 @@ function buildSteps(answers) {
         title: "Do you want reminders?",
         note: "You can change this anytime.",
         hint: "",
+        autoAdvance: false,
         render: () =>
           cardRadio(
             "reminders",
@@ -388,6 +400,7 @@ function buildSteps(answers) {
       title: "How private do you want Bloom to feel?",
       note: "This only changes the vibe + what we highlight; you can edit later.",
       hint: "",
+      autoAdvance: false,
       render: () =>
         cardRadio(
           "privacyPref",
@@ -419,10 +432,10 @@ function yobSelectBlock(selectedYear) {
   }
   return `
     <div style="margin-top:14px;">
-      <select id="yob" class="input" style="width:100%;padding:10px 14px;font-size:1rem;border-radius:12px;border:1px solid rgba(0,0,0,0.12);background:#fff;color:#333;">
+      <select id="yob" class="input">
         ${opts.join("")}
       </select>
-      <div class="tiny-note" style="margin-top:8px;opacity:0.8;">Optional - you can skip this. Once set, it can only be changed by contacting support.</div>
+      <div class="tiny-note" style="margin-top:8px;">Optional - you can skip this. Once set, it can only be changed by contacting support.</div>
     </div>
   `;
 }
@@ -432,22 +445,44 @@ async function writeProfileToBackend(answers) {
     const token = await getIdToken();
     if (!token) return;
     const apiBase = window.BLOOM_API_BASE || "";
+
+    // Map reminder survey choice → remindersEnabled boolean
+    const remindersEnabled = answers.reminders && answers.reminders !== "none";
+
     const payload = {
       onboardingCompleted: true,
       onboardingCompletedAt: new Date().toISOString(),
     };
-    if (answers.focusGoal)     payload.goal           = answers.focusGoal;
-    if (answers.yob)           payload.yearOfBirth    = Number(answers.yob);
-    if (answers.nickname)      payload.nickname       = answers.nickname;
-    if (answers.avgCycleLength) payload.avgCycleLength = Number(answers.avgCycleLength);
-    if (answers.periodDuration) payload.periodDuration = Number(answers.periodDuration);
-    if (answers.weightKg)      payload.weightKg       = Number(answers.weightKg);
-    if (answers.heightCm)      payload.heightCm       = Number(answers.heightCm);
+    if (answers.focusGoal)      payload.goal             = answers.focusGoal;
+    if (answers.yob)            payload.yearOfBirth      = Number(answers.yob);
+    if (answers.nickname)       payload.nickname         = answers.nickname;
+    if (answers.avgCycleLength) payload.avgCycleLength   = Number(answers.avgCycleLength);
+    if (answers.periodDuration) payload.periodDuration   = Number(answers.periodDuration);
+    if (answers.weightKg)       payload.weightKg         = Number(answers.weightKg);
+    if (answers.heightCm)       payload.heightCm         = Number(answers.heightCm);
+    if (answers.reminders)      payload.remindersEnabled = remindersEnabled;
+    if (answers.regularity)     payload.regularity       = answers.regularity;
+    if (answers.privacyPref)    payload.privacyPref      = answers.privacyPref;
+
     await fetch(`${apiBase}/api/user/profile`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
     });
+
+    // Also persist notification preferences locally so settings page
+    // reflects the survey choices without requiring a fresh profile fetch.
+    if (answers.reminders) {
+      const existingPrefs = JSON.parse(localStorage.getItem("bloom_preferences") || "{}");
+      const updatedPrefs = {
+        ...existingPrefs,
+        reminders:      remindersEnabled,
+        periodReminder: ["period", "both"].includes(answers.reminders),
+        fertileAlert:   ["ovulation", "both"].includes(answers.reminders),
+        discreetNotif:  answers.privacyPref === "high",
+      };
+      localStorage.setItem("bloom_preferences", JSON.stringify(updatedPrefs));
+    }
   } catch {
     // silently fail - localStorage is the source of truth on this device
   }
@@ -610,26 +645,19 @@ function lastPeriodBlock(answers) {
       )}
 
       <div class="miniGrid">
-        <div style="
-          padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
-          background:rgba(255,255,255,0.92);
-        ">
-          <div class="tiny-note" style="margin-bottom:8px;">Last period start (optional)</div>
+        <div class="sf-wrap">
+          <label class="sf-label" for="lastPeriodDate">Last period start (optional)</label>
           <input
             id="lastPeriodDate"
             type="date"
             value="${escapeAttr(dateVal)}"
             class="input"
-            style="width:100%;"
           />
-          <div class="tiny-note" style="margin-top:8px; opacity:0.8;">Best guess is fine.</div>
+          <div class="sf-hint">Best guess is fine.</div>
         </div>
 
-        <div style="
-          padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
-          background:rgba(255,255,255,0.92);
-        ">
-          <div class="tiny-note" style="margin-bottom:8px;">Average cycle length in days (optional)</div>
+        <div class="sf-wrap">
+          <label class="sf-label" for="cycleLength">Cycle length in days (optional)</label>
           <input
             id="cycleLength"
             type="number"
@@ -639,16 +667,12 @@ function lastPeriodBlock(answers) {
             max="60"
             value="${escapeAttr(cycleLen)}"
             class="input"
-            style="width:100%;"
           />
-          <div class="tiny-note" style="margin-top:8px; opacity:0.8;">Leave blank if unsure.</div>
+          <div class="sf-hint">Leave blank if unsure.</div>
         </div>
 
-        <div style="
-          padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
-          background:rgba(255,255,255,0.92);
-        ">
-          <div class="tiny-note" style="margin-bottom:8px;">Typical period duration in days (optional)</div>
+        <div class="sf-wrap">
+          <label class="sf-label" for="periodDuration">Period duration in days (optional)</label>
           <input
             id="periodDuration"
             type="number"
@@ -658,17 +682,13 @@ function lastPeriodBlock(answers) {
             max="14"
             value="${escapeAttr(periodDur)}"
             class="input"
-            style="width:100%;"
           />
-          <div class="tiny-note" style="margin-top:8px; opacity:0.8;">How many days it usually lasts.</div>
+          <div class="sf-hint">How many days it usually lasts.</div>
         </div>
       </div>
 
-      <div style="
-        padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
-        background:rgba(255,255,255,0.92);
-      ">
-        <div class="tiny-note" style="margin-bottom:10px;">Typical flow (optional)</div>
+      <div class="sf-wrap">
+        <div class="sf-label">Typical flow (optional)</div>
         ${cardRadio(
           "flow",
           [
@@ -691,11 +711,8 @@ function bodyBasicsBlock(answers) {
   return `
     <div style="display:grid; gap:14px; margin-top:14px;">
       <div class="miniGrid">
-        <div style="
-          padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
-          background:rgba(255,255,255,0.92);
-        ">
-          <div class="tiny-note" style="margin-bottom:8px;">Weight in kg (optional)</div>
+        <div class="sf-wrap">
+          <label class="sf-label" for="surveyWeight">Weight in kg (optional)</label>
           <input
             id="surveyWeight"
             type="number"
@@ -706,15 +723,11 @@ function bodyBasicsBlock(answers) {
             step="0.1"
             value="${escapeAttr(weight)}"
             class="input"
-            style="width:100%;"
           />
         </div>
 
-        <div style="
-          padding:14px;border-radius:18px;border:1px solid rgba(0,0,0,0.07);
-          background:rgba(255,255,255,0.92);
-        ">
-          <div class="tiny-note" style="margin-bottom:8px;">Height in cm (optional)</div>
+        <div class="sf-wrap">
+          <label class="sf-label" for="surveyHeight">Height in cm (optional)</label>
           <input
             id="surveyHeight"
             type="number"
@@ -725,7 +738,6 @@ function bodyBasicsBlock(answers) {
             step="0.1"
             value="${escapeAttr(height)}"
             class="input"
-            style="width:100%;"
           />
         </div>
       </div>

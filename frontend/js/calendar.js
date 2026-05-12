@@ -91,9 +91,11 @@ let selectedOtherSymptoms = []; // [{ text, normalizedText, severity, note, crea
 let selectedSleepScore = null;
 let selectedStressLevel = null;
 let selectedActivityLevel = null;
-let symptomCategories = Object.fromEntries(
-  Object.entries(SYMPTOM_CATEGORIES).map(([cat, list]) => [cat, [...list]])
-);
+// symptomCategories is intentionally empty on load for authenticated users.
+// It is populated exclusively from the backend catalog by loadCatalogSymptomsForUI().
+// Local SYMPTOM_CATEGORIES (from symptoms.json) is only used as a fallback for
+// anonymous/offline users who cannot reach the authenticated catalog endpoint.
+let symptomCategories = {};
 const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
 const BIOMETRIC_LEVEL_LABELS = {
   low: "Low",
@@ -124,16 +126,30 @@ function buildSymptomCategoriesFromCatalog(catalogItems = []) {
 }
 
 async function loadCatalogSymptomsForUI() {
-  const catalog = await getSymptomCatalog({ timeoutMs: 3500 });
-  if (!Array.isArray(catalog) || !catalog.length) return;
+  const catalog = await getSymptomCatalog({ timeoutMs: 5000 });
 
-  const grouped = buildSymptomCategoriesFromCatalog(catalog);
-  if (!Object.keys(grouped).length) return;
+  if (Array.isArray(catalog) && catalog.length) {
+    // Backend catalog loaded — use it exclusively.
+    const grouped = buildSymptomCategoriesFromCatalog(catalog);
+    if (Object.keys(grouped).length) {
+      symptomCategories = grouped;
+      buildSymptomUI();
+      updateSymptomChips();
+      updateSeverityPanel();
+      return;
+    }
+  }
 
-  symptomCategories = grouped;
-  buildSymptomUI();
-  updateSymptomChips();
-  updateSeverityPanel();
+  // Backend returned nothing (anon user, offline, or empty catalog).
+  // Fall back to local symptoms.json only in this case so the UI is never blank.
+  if (!Object.keys(symptomCategories).length) {
+    symptomCategories = Object.fromEntries(
+      Object.entries(SYMPTOM_CATEGORIES).map(([cat, list]) => [cat, [...list]])
+    );
+    buildSymptomUI();
+    updateSymptomChips();
+    updateSeverityPanel();
+  }
 }
 
 // ── Load & compute ─────────────────────────────────────────────────────────
@@ -244,10 +260,26 @@ FLOW_OPTIONS.forEach((f) => {
   flowChips.appendChild(chip);
 });
 
+let selectedBloodClots = false;
+const bloodClotsRow  = document.getElementById("blood-clots-row");
+const bloodClotsChip = document.getElementById("blood-clots-chip");
+
+bloodClotsChip?.addEventListener("click", () => {
+  selectedBloodClots = !selectedBloodClots;
+  bloodClotsChip.classList.toggle("selected", selectedBloodClots);
+});
+
 function updateFlowChips() {
   flowChips.querySelectorAll(".chip").forEach((c) => {
     c.classList.toggle("selected", c.dataset.value === selectedFlow);
   });
+  // Show blood clots toggle only when a non-none flow is selected
+  const hasFlow = selectedFlow && selectedFlow !== "none";
+  bloodClotsRow?.classList.toggle("visible", hasFlow);
+  if (!hasFlow) {
+    selectedBloodClots = false;
+    bloodClotsChip?.classList.remove("selected");
+  }
 }
 
 const sleepScoreInput = document.getElementById("sleep-score");
@@ -347,6 +379,14 @@ activityLevelInput.addEventListener("input", () => {
 function buildSymptomUI() {
   const container = document.getElementById("symptom-categories");
   container.innerHTML = "";
+
+  if (!Object.keys(symptomCategories).length) {
+    container.innerHTML =
+      `<p class="symptom-loading-msg" style="color:var(--color-text-muted);font-size:0.9rem;padding:0.5rem 0;">
+        Loading symptoms…
+      </p>`;
+    return;
+  }
 
   Object.entries(symptomCategories).forEach(([cat, symptoms]) => {
     const section = document.createElement("div");
@@ -553,10 +593,6 @@ function addOtherSymptomFromInput() {
 // Related terms for each symptom label. Lets users find symptoms using
 // everyday language even when the exact label isn't in the list.
 const SYMPTOM_SYNONYMS = {
-  "Vaginal bleeding":      ["period", "menstruation", "bleeding", "blood", "flow", "menstrual"],
-  "Spotting":              ["light bleeding", "breakthrough bleeding", "implantation bleeding", "pink discharge"],
-  "Heavy flow":            ["heavy period", "menorrhagia", "flooding", "heavy bleeding", "excessive bleeding"],
-  "Large clots":           ["blood clots", "clotting", "clots"],
   "Cramps":                ["period cramps", "menstrual cramps", "uterine cramps", "abdominal pain", "stomach pain", "tummy pain", "tummy ache", "dysmenorrhea", "stomach cramps"],
   "Pelvic pain":           ["lower abdominal pain", "hip pain", "groin pain", "lower back pain", "pelvic pressure"],
   "Ovulation pain":        ["mittelschmerz", "ovulation cramps", "mid-cycle pain", "one-sided pain", "side pain"],
@@ -603,11 +639,8 @@ const SYMPTOM_SYNONYMS = {
   "Frequent urination":    ["peeing a lot", "urinary frequency", "need to pee more", "bladder", "bathroom a lot"],
   "Smell sensitivity":     ["hyperosmia", "sensitive to smells", "smell aversion", "strong smells", "scent sensitivity"],
   "Nasal congestion":      ["stuffy nose", "blocked nose", "runny nose", "congestion", "sinus"],
-  "Weight change":         ["weight gain", "weight loss", "scale change", "gained weight", "lost weight"],
   "Sociable":              ["social", "outgoing", "extroverted", "talkative", "friendly"],
   "Withdrawn":             ["antisocial", "isolated", "introverted", "reclusive", "avoiding people", "wanting to be alone"],
-  "Missed period":         ["late period", "no period", "skipped period", "amenorrhea", "period late", "period missing"],
-  "Irregular period":      ["irregular cycle", "unpredictable period", "cycle changes", "erratic period"],
   "Increased libido":      ["high sex drive", "horny", "aroused", "increased desire", "wanting sex"],
   "Decreased libido":      ["low sex drive", "low desire", "not interested in sex", "no libido"],
   "Cervical mucus change": ["cm change", "discharge change", "mucus change", "cervical fluid"],
@@ -768,6 +801,17 @@ function buildCalendarMarkerSets(todayKey) {
 
   }
 
+  // Strip any confirmed logged period days from all prediction sets.
+  // This is the authoritative data-level guard: no prediction marker should
+  // ever coexist with a day the user has confirmed as a bleeding day.
+  for (const dateKey of Object.keys(allLogs)) {
+    if (isLoggedPeriodDay(allLogs[dateKey])) {
+      predictedSet.delete(dateKey);
+      fertileSet.delete(dateKey);
+      ovulationSet.delete(dateKey);
+    }
+  }
+
   return { predictedSet, fertileSet, ovulationSet };
 }
 
@@ -792,7 +836,8 @@ function applyDayDecorators(cell, dateObj, dateKey, markerSets, todayKey, todayS
 
   if (isPredicted) cell.classList.add("predicted-period");
 
-  if (!isPredicted) {
+  // Logged period days always win - never show fertility markers on top of confirmed bleeding.
+  if (!isLoggedPeriod && !isPredicted) {
     if (isOvulation) {
       cell.classList.add("ovulation-day");
       if (isFuture) cell.classList.add("predicted-ovulation");
@@ -984,6 +1029,9 @@ function openLogModal(dateKey) {
 
   // Reset state
   selectedFlow = "none";
+  selectedBloodClots = false;
+  bloodClotsChip?.classList.remove("selected");
+  bloodClotsRow?.classList.remove("visible");
   selectedSymptoms.clear();
   selectedSymptomSeverity.clear();
   selectedOtherSymptoms = [];
@@ -1001,6 +1049,8 @@ function openLogModal(dateKey) {
   const existing = allLogs[dateKey];
   if (existing) {
     selectedFlow = existing.flow || "none";
+    selectedBloodClots = existing.hadLargeClots === true;
+    bloodClotsChip?.classList.toggle("selected", selectedBloodClots);
     restoreBiometricsFromLog(existing);
 
     if (existing.symptoms) {
@@ -1072,6 +1122,7 @@ document.getElementById("log-form").addEventListener("submit", (e) => {
 
   const data = {
     flow: selectedFlow,
+    hadLargeClots: selectedBloodClots,
     sleepScore: selectedSleepScore,
     stressLevel: selectedStressLevel,
     activityLevel: selectedActivityLevel,
@@ -1403,8 +1454,20 @@ function renderPredictionPanel() {
 let _initDone = false;
 
 async function init() {
+  // Show loading state immediately, then populate from backend catalog.
+  // Never render local symptom data first — this prevents stale/wrong symptoms
+  // from appearing before the backend responds.
   buildSymptomUI();
-  loadCatalogSymptomsForUI().catch(() => {});
+  loadCatalogSymptomsForUI().catch(() => {
+    // If catalog load fails completely, fall back to local data so the UI
+    // is not permanently blank.
+    if (!Object.keys(symptomCategories).length) {
+      symptomCategories = Object.fromEntries(
+        Object.entries(SYMPTOM_CATEGORIES).map(([cat, list]) => [cat, [...list]])
+      );
+      buildSymptomUI();
+    }
+  });
   setPredictionPanelState("loading");
   renderPredictionPanel();
   // Render calendar shell immediately with logged days (no predictions yet)

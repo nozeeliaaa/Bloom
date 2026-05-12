@@ -127,7 +127,7 @@ export function buildFollowUpClarifier({ concern, missing = [], seed = "" } = {}
       };
     }
     return {
-      text: "How long has the heavier bleeding been going on — just today, a couple of days, or longer?",
+      text: "How long has the heavier bleeding been going on - just today, a couple of days, or longer?",
     };
   }
 
@@ -151,7 +151,7 @@ export function buildSoftClarifierCopy({ normalizedText = "" } = {}) {
     reply: [
       chooseVariant([
         "I might be missing part of what you mean 🩷",
-        "I hear you — let me make sure I understood 🩷",
+        "I hear you - let me make sure I understood 🩷",
       ], `${normalizedText}|soft_clarify`),
       "Is this about your cycle or a body symptom (like cramps, spotting, discharge, or mood changes)?",
     ],

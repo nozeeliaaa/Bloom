@@ -67,7 +67,6 @@ export function createGeneralNodes(env, helpers) {
         { id: "skin",  label: "Acne or skin changes",             next: "ELSE_NOT_SURE", primary: true },
         { id: "hair",  label: "Hair thinning or shedding",        next: "ELSE_NOT_SURE" },
         { id: "sleep", label: "Sleep problems",                   next: "MOOD_INTRO" },
-        { id: "wt",    label: "Weight changes",                   next: "ELSE_NOT_SURE" },
         { id: "hfsh",  label: "Hot flashes or night sweats",      next: "PERIMENOPAUSE_INTRO" },
         { id: "back",  label: "Back to main options",             next: "ELSE_INTRO" },
       ],
@@ -192,7 +191,7 @@ export function createGeneralNodes(env, helpers) {
       ],
       choices: [
         { id: "sum", label: "Help me summarize", next: "ELSE_SUMMARY_DONE", action: "REQUEST_PDF", primary: true },
-        { id: "map", label: "Find care near me", next: "START", action: "OPEN_MAP" },
+        { id: "map", label: "Find care near me", next: "START_MENU", action: "OPEN_MAP" },
         { id: "menu", label: pickMainLabel(), next: "START_MENU" },
       ],
     },
@@ -204,7 +203,7 @@ export function createGeneralNodes(env, helpers) {
         "Want to use the care map, or go back to the main menu?",
       ],
       choices: [
-        { id: "map", label: "Find care near me", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map", label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: pickMainLabel(), next: "START_MENU" },
         { id: "done", label: pickCloseLabel(), next: "CLOSE" },
       ],
@@ -230,7 +229,7 @@ export function createGeneralNodes(env, helpers) {
         "Want to use the care map?",
       ],
       choices: [
-        { id: "map", label: "Find care near me", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map", label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "sum", label: "Help me summarize", next: "ELSE_SUMMARY_DONE", action: "REQUEST_PDF" },
         { id: "menu", label: pickMainLabel(), next: "START_MENU" },
       ],
@@ -255,7 +254,7 @@ export function createGeneralNodes(env, helpers) {
         "If the pain is sudden, intense, or interfering with daily activities, it would be a good idea to seek medical care.",
       ],
       choices: [
-        { id: "map", label: "Find care near me", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map", label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: pickMainLabel(), next: "START_MENU" },
         { id: "done", label: pickCloseLabel(), next: "CLOSE" },
       ],
@@ -264,9 +263,9 @@ export function createGeneralNodes(env, helpers) {
       say: ["Thanks for sharing 🩷", "Is the discharge unusual in color, smell, or amount compared to what's normal for you?"],
       question: "Discharge unusual vs normal?",
       choices: [
-        { id: "yes", label: "Yes", next: "ELSE_PROVIDER", primary: true },
-        { id: "no", label: "No", next: "ELSE_WRAP" },
-        { id: "ns", label: "Not sure", next: "ELSE_PROVIDER" },
+        { id: "yes", label: "Yes, something feels off",        next: "ELSE_DISCHARGE_ENTRY", primary: true },
+        { id: "no",  label: "No, it seems normal but more",    next: "DISCHARGE_MONITOR" },
+        { id: "ns",  label: "Not sure / hard to tell",         next: "DISCHARGE_CLARIFY" },
       ],
     },
     ELSE_OFF: {
@@ -278,11 +277,16 @@ export function createGeneralNodes(env, helpers) {
       ],
     },
     ELSE_PROVIDER: {
-      say: ["Thanks for letting me know.", "If this continues, worsens, or feels concerning, it may be helpful to speak with a healthcare provider."],
+      say: [
+        "Thanks for sharing that 🩷",
+        "When discharge changes in smell, colour, or texture, it's worth getting checked — not because it's definitely something serious, but because some infections are very easy to treat when caught early.",
+        "Signs that mean get checked soon: strong or fishy smell, yellow or green colour, cottage-cheese texture, or discharge with itching, burning, or pelvic pain.",
+        "A pharmacist or clinic visit is a quick, no-judgment way to rule things out.",
+      ],
       choices: [
-        { id: "map", label: "Find care near me", next: "START", action: "OPEN_MAP", primary: true },
-        { id: "menu", label: pickMainLabel(), next: "START_MENU" },
-        { id: "done", label: pickCloseLabel(), next: "CLOSE" },
+        { id: "what",  label: "What could cause this?",  next: "EDUC_DISCHARGE", primary: true },
+        { id: "map",   label: "Find care near me",        next: "START_MENU", action: "OPEN_MAP" },
+        { id: "menu",  label: pickMainLabel(),             next: "START_MENU" },
       ],
     },
     ELSE_SUMMARY_DONE: {
@@ -315,7 +319,6 @@ export function createGeneralNodes(env, helpers) {
       choices: [
         { id: "acne",  label: "Acne or oily skin",                   next: "BODY_HORMONAL_ROUTE", primary: true },
         { id: "hair",  label: "Hair thinning or increased facial hair", next: "BODY_HORMONAL_ROUTE" },
-        { id: "wt",    label: "Weight changes",                       next: "BODY_HORMONAL_ROUTE" },
         { id: "sleep", label: "Sleep issues or insomnia",             next: "BODY_SLEEP_ROUTE" },
         { id: "hfsh",  label: "Hot flashes or night sweats",          next: "PERIMENOPAUSE_INTRO" },
         { id: "mix",   label: "Not sure or a mix of these",           next: "BODY_HORMONAL_ROUTE" },
@@ -332,7 +335,7 @@ export function createGeneralNodes(env, helpers) {
       choices: [
         { id: "pcos",  label: "Learn about PCOS",     next: "EDUC_PCOS",    primary: true },
         { id: "log",   label: "Track this concern",   next: "START_MENU",   action: "LOG_SYMPTOM", logData: { type: "body_hormonal", note: "Body change concern logged from Bloomie chat" } },
-        { id: "map",   label: "Find care near me",    next: "START",        action: "OPEN_MAP" },
+        { id: "map",   label: "Find care near me",    next: "START_MENU",        action: "OPEN_MAP" },
         { id: "menu",  label: "Back to main menu",    next: "START_MENU" },
       ],
     },
@@ -375,7 +378,7 @@ export function createGeneralNodes(env, helpers) {
         "In the meantime, avoid scented products or harsh home remedies down there, and wear breathable cotton underwear if you can.",
       ],
       choices: [
-        { id: "map",  label: "Find care near me",  next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me",  next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: "Back to main menu",  next: "START_MENU" },
       ],
     },
@@ -387,7 +390,7 @@ export function createGeneralNodes(env, helpers) {
         "Please don't wait on this one. Try to see a provider today or go to urgent care.",
       ],
       choices: [
-        { id: "map",  label: "Find care near me",  next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me",  next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: "Back to main menu",  next: "START_MENU" },
       ],
     },
@@ -464,7 +467,7 @@ export function createGeneralNodes(env, helpers) {
         "Find a provider near you or go to urgent care.",
       ],
       choices: [
-        { id: "map",    label: "Find care near me",       next: "START",            action: "OPEN_MAP", primary: true },
+        { id: "map",    label: "Find care near me",       next: "START_MENU",            action: "OPEN_MAP", primary: true },
         { id: "change", label: "Help me figure out more", next: "ELSE_CHANGE_TYPE" },
       ],
     },
@@ -486,9 +489,15 @@ export function createGeneralNodes(env, helpers) {
     ELSE_TALK_THROUGH: {
       say: [
         "Of course 🩷 Sometimes you just need to get it out before figuring out what it is.",
-        "Tell me what's been going on in your own words, no right or wrong way to say it.",
+        "Tell me what's been going on in your own words — no right or wrong way to say it.",
       ],
-      choices: [],
+      choices: [
+        { id: "cycle",   label: "It's about my cycle or period",   next: "PERIOD_TRIAGE",       primary: true },
+        { id: "pain",    label: "Pain or discomfort",              next: "PELVIC_INTRO" },
+        { id: "mood",    label: "Mood or emotional changes",       next: "MOOD_SAFETY_CHECK" },
+        { id: "dis",     label: "Discharge or odour",              next: "ELSE_DISCHARGE_ENTRY" },
+        { id: "ns",      label: "Not sure yet",                    next: "ELSE_CHANGE_TYPE" },
+      ],
     },
 
     /* ---- ELSE: wrap nodes ---- */
@@ -510,7 +519,7 @@ export function createGeneralNodes(env, helpers) {
         "A healthcare provider can do the kind of assessment that actually rules things in or out.",
       ],
       choices: [
-        { id: "map",  label: "Find care near me", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: "Back to main menu", next: "START_MENU" },
       ],
     },

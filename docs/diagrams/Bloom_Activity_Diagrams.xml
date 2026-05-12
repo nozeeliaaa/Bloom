@@ -2166,19 +2166,19 @@
         <mxCell id="uc026_n1" parent="userLane" style="ellipse;html=1;aspect=fixed;fillColor=#ec008c;strokeColor=#ec008c;fontSize=20;" value="" vertex="1">
           <mxGeometry height="24" width="24" x="223" y="45" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n2" parent="userLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Tap clinic from results" vertex="1">
+        <mxCell id="uc026_n2" parent="userLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Select clinic card from results" vertex="1">
           <mxGeometry height="50" width="260" x="105" y="110" as="geometry" />
         </mxCell>
         <mxCell id="uc026_n7" parent="userLane" style="ellipse;html=1;shape=doubleEllipse;aspect=fixed;fillColor=#ffffff;strokeColor=#ec008c;strokeWidth=3;fontSize=20;" value="" vertex="1">
           <mxGeometry height="24" width="24" x="199" y="468" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n9" parent="userLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Choose Call, Directions, Back, or Save/share" vertex="1">
+        <mxCell id="uc026_n9" parent="userLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Choose View on map, Get directions, or change filters" vertex="1">
           <mxGeometry height="60" width="260" x="110" y="590" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n10" parent="userLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Back to results?" vertex="1">
+        <mxCell id="uc026_n10" parent="userLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Change search or filters?" vertex="1">
           <mxGeometry height="74" width="130" x="175" y="710" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n11" parent="userLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Return to clinic search results" vertex="1">
+        <mxCell id="uc026_n11" parent="userLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Edit search, parish, type, or service filter" vertex="1">
           <mxGeometry height="60" width="260" x="110" y="870" as="geometry" />
         </mxCell>
         <mxCell id="uc026_n12" parent="userLane" style="ellipse;html=1;shape=doubleEllipse;aspect=fixed;fillColor=#ffffff;strokeColor=#ec008c;strokeWidth=3;fontSize=20;" value="" vertex="1">
@@ -2187,7 +2187,7 @@
         <mxCell id="uc026_n15" parent="userLane" style="ellipse;html=1;shape=doubleEllipse;aspect=fixed;fillColor=#ffffff;strokeColor=#ec008c;strokeWidth=3;fontSize=20;" value="" vertex="1">
           <mxGeometry height="24" width="24" x="228" y="1050" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n17" parent="userLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Allow location access?" vertex="1">
+        <mxCell id="uc026_n17" parent="userLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Location set by browser or map pin?" vertex="1">
           <mxGeometry height="74" width="180" x="145" y="1200" as="geometry" />
         </mxCell>
         <mxCell id="uc026_n19" parent="userLane" style="ellipse;html=1;shape=doubleEllipse;aspect=fixed;fillColor=#ffffff;strokeColor=#ec008c;strokeWidth=3;fontSize=20;" value="" vertex="1">
@@ -2211,46 +2211,46 @@
         <mxCell id="systemLane" parent="1" style="swimlane;horizontal=1;startSize=30;rounded=0;fillColor=#fdf2f8;strokeColor=#c2187a;fontStyle=1;fontSize=20;" value="System (Bloom)" vertex="1">
           <mxGeometry height="1650" width="910" x="190" y="30" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n3" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Request clinic details by id" vertex="1">
+        <mxCell id="uc026_n3" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Use loaded clinic list from /api/clinics" vertex="1">
           <mxGeometry height="50" width="260" x="290" y="110" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n5" parent="systemLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Clinic exists and active?" vertex="1">
+        <mxCell id="uc026_n5" parent="systemLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Clinics loaded and match filters?" vertex="1">
           <mxGeometry height="100" width="190" x="315" y="280" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n6" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Show clinic unavailable message" vertex="1">
+        <mxCell id="uc026_n6" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Show data unavailable or no matching clinics" vertex="1">
           <mxGeometry height="60" width="260" x="120" y="450" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n8" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Display address, parish, phones, services, hours, map link" vertex="1">
+        <mxCell id="uc026_n8" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Display clinic card with address, parish, phone text, services, hours, and marker" vertex="1">
           <mxGeometry height="90" width="260" x="480" y="440" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n13" parent="systemLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="User chose call?" vertex="1">
+        <mxCell id="uc026_n13" parent="systemLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="User chose View on map?" vertex="1">
           <mxGeometry height="74" width="120" x="380" y="710" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n14" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Open phone dialer with clinic phone number" vertex="1">
+        <mxCell id="uc026_n14" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Center map on selected clinic marker" vertex="1">
           <mxGeometry height="50" width="260" x="130" y="872" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n16" parent="systemLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="User chose directions?" vertex="1">
+        <mxCell id="uc026_n16" parent="systemLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="User chose Get directions?" vertex="1">
           <mxGeometry height="90" width="190" x="560" y="860" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n18" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Use address/map link fallback" vertex="1">
+        <mxCell id="uc026_n18" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Show status error: set location or verified clinic pin needed" vertex="1">
           <mxGeometry height="50" width="260" x="130" y="1400" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n20" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Request route from directions API proxy" vertex="1">
+        <mxCell id="uc026_n20" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Request route from catalog route proxy" vertex="1">
           <mxGeometry height="50" width="260" x="525" y="1212" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n22" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Show distance, travel time, and route" vertex="1">
+        <mxCell id="uc026_n22" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Show distance, estimated travel time, and route line" vertex="1">
           <mxGeometry height="50" width="260" x="525" y="1497" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n24" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Copy/share clinic information" vertex="1">
+        <mxCell id="uc026_n24" parent="systemLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Continue displaying clinic card and map" vertex="1">
           <mxGeometry height="50" width="260" x="530" y="1100" as="geometry" />
         </mxCell>
-        <mxCell id="dbLane" parent="1" style="swimlane;horizontal=1;startSize=30;rounded=0;fillColor=#FDF2F8;strokeColor=#C2187A;fontStyle=1;fontSize=20;" value="Database (Firestore)" vertex="1">
+        <mxCell id="dbLane" parent="1" style="swimlane;horizontal=1;startSize=30;rounded=0;fillColor=#FDF2F8;strokeColor=#C2187A;fontStyle=1;fontSize=20;" value="Database / Route Service" vertex="1">
           <mxGeometry height="1640" width="450" x="1150" y="40" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n4" parent="dbLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#FDF2F8;strokeColor=#C2187A;fontSize=20;" value="Read clinicDirectory/{clinicId}" vertex="1">
+        <mxCell id="uc026_n4" parent="dbLane" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#FDF2F8;strokeColor=#C2187A;fontSize=20;" value="Read clinicDirectory where status=active" vertex="1">
           <mxGeometry height="50" width="260" x="80" y="100" as="geometry" />
         </mxCell>
-        <mxCell id="uc026_n21" parent="dbLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Route available?" vertex="1">
+        <mxCell id="uc026_n21" parent="dbLane" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff0f7;strokeColor=#c2187a;fontSize=20;" value="Route available or fallback computed?" vertex="1">
           <mxGeometry height="74" width="210" x="550" y="1326" as="geometry" />
         </mxCell>
         <mxCell id="uc026_e1" edge="1" parent="1" source="uc026_n1" style="orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#c2187a;strokeWidth=2;fontSize=20;" target="uc026_n2">

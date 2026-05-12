@@ -388,7 +388,7 @@ export async function triggerNotifications(cycle, logsByDate) {
       } else if (daysLate >= 14) {
         const id = `missed-period-${cycle.nextPeriodDate}`;
         if (!hasNotifiedToday(notified, id)) {
-          const title = discreet ? "Bloom reminder" : "Missed period";
+          const title = "Bloom reminder";
           const body  = discreet
             ? "You have a health reminder in Bloom. Open the app to view details."
             : `Your period appears to be ${daysLate} days late. Consider logging any changes and speaking with a healthcare provider if needed.`;

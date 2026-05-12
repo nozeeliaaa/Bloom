@@ -7,7 +7,7 @@ import { getClarificationSpec } from "../bloomie-clarification-specs.js";
 
 describe("pending clarification resolver", () => {
   const painClarifier = createPendingClarification({
-    prompt: "Where does the pain feel like it's coming from — more in your belly, lower pelvic area, or somewhere else?",
+    prompt: "Where does the pain feel like it's coming from - more in your belly, lower pelvic area, or somewhere else?",
     kind: "missing_context",
     originalText: "i have pain",
     spec: getClarificationSpec("pain_location"),

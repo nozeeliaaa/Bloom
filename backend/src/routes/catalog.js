@@ -41,29 +41,30 @@ router.get("/clinics", async (req, res) => {
 });
 
 // ─── GET /catalog/symptoms ───────────────────────────────────────────────────
-// Returns symptom catalog, filtered by teenSafe and sensitive flags
+// Returns symptom catalog, filtered by teenSafe and sensitive flags.
+// Fetches all documents then filters in JS — avoids requiring a composite
+// Firestore index for the teenSafe + sensitive compound query.
 router.get("/symptoms", requireAuth, async (req, res) => {
   try {
     const { teenSafe, excludeSensitive } = req.query;
 
-    let q = db.collection("symptomCatalog");
+    const snap = await db.collection("symptomCatalog").get();
+    let symptoms = snap.docs.map((d) => ({ id: d.id, key: d.id, ...d.data() }));
 
-    // Filter for teen-safe symptoms if requested
     if (teenSafe === "true") {
-      q = q.where("teenSafe", "==", true);
+      symptoms = symptoms.filter((s) => s.teenSafe === true);
     }
-
-    // Exclude sensitive symptoms if requested
     if (excludeSensitive === "true") {
-      q = q.where("sensitive", "==", false);
+      symptoms = symptoms.filter((s) => s.sensitive !== true);
     }
 
-    const snap = await q.get();
-    const symptoms = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // Only include items that have both a label and a category
+    symptoms = symptoms.filter((s) => s.label && s.category);
 
-    // Sort by category then label client-side (avoids needing extra index)
+    // Sort by category then label
     symptoms.sort((a, b) =>
-      a.category.localeCompare(b.category) || a.label.localeCompare(b.label)
+      String(a.category).localeCompare(String(b.category)) ||
+      String(a.label).localeCompare(String(b.label))
     );
 
     return res.json({ ok: true, symptoms });

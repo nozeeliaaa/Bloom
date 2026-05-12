@@ -275,20 +275,33 @@ export function createPerimenopauseNodes(env, helpers) {
 
     /* ---------------- EDUCATION: CONTRACEPTION ---------------- */
     EDUC_CONTRACEPTION: {
-      say(ctx) {
-        const lines = [
+      say() {
+        if (ctx.isMinor) {
+          return [
+            "That's a really healthy question to ask 🩷",
+            "Contraception and sexual health are topics that a doctor, school nurse, or a trusted adult in your life can help you with properly - they can give advice that fits your specific situation, which Bloomie can't do safely for someone your age.",
+            "Your school's nurse or a family doctor are great starting points - you can ask them confidentially.",
+          ];
+        }
+        return [
           "Contraception is something Bloomie can give you a general overview of, but I want to be upfront: I can't recommend a specific method for you, because what works best really depends on your health history, your cycle, and your own goals 🩷",
           "That said, here's a quick lay of the land: barrier methods (like condoms or diaphragms) work in the moment and don't affect your hormones. Hormonal methods (the pill, patch, ring, shot) use synthetic hormones to prevent pregnancy and can also help with cycle symptoms. Long-acting options (IUDs, hormonal or copper, and implants) are set-and-forget for years at a time.",
           "Each category has real trade-offs, side effects, how easy they are to use, how quickly fertility returns and a provider or pharmacist can walk you through what fits your situation, your body, and your life.",
           "If you don't have a regular provider, a sexual health clinic or a pharmacist are both great first steps 🩷",
         ];
-        if (ctx.isMinor) lines.unshift("Asking about this is a smart, healthy thing to do - you should feel good about looking into it 🩷");
-        return lines;
       },
-      choices: [
-        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
-        { id: "menu", label: "Back to main menu", next: "START_MENU" },
-      ],
+      choices() {
+        if (ctx.isMinor) {
+          return [
+            { id: "map",  label: "Find a clinic near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
+            { id: "menu", label: "Back to main menu",     next: "START_MENU" },
+          ];
+        }
+        return [
+          { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
+          { id: "menu", label: "Back to main menu", next: "START_MENU" },
+        ];
+      },
     },
 
     /* ---------------- EDUCATION: PCOS ---------------- */

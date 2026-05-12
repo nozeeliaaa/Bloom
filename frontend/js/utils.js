@@ -15,7 +15,7 @@ initTheme();
 
 // Load symptom catalog at runtime so static hosting (Firebase web.app) does
 // not try to execute JSON as a JavaScript module.
-const SYMPTOM_DATA_CACHE_KEY = "bloom_symptom_catalog_v1";
+const SYMPTOM_DATA_CACHE_KEY = "bloom_symptom_catalog_v2";
 // Resolve via Vite so the JSON is emitted to dist even with publicDir disabled.
 const SYMPTOM_DATA_URL = new URL("../data/symptoms.json", import.meta.url).href;
 const BLOOM_LOGO_URL = new URL("../assets/bloom-logo.png", import.meta.url).href;
@@ -398,11 +398,6 @@ export const SYMPTOM_CATEGORIES = symptoms.reduce((acc, symptom) => {
 
 /** Emoji icon for each symptom label - no external dependency */
 export const SYMPTOM_ICONS = {
-  // Bleeding
-  "Vaginal bleeding":           "🩸",
-  "Spotting":                   "🩷",
-  "Heavy flow":                 "🔴",
-  "Large clots":                "🩸",
   // Blood Colour - coloured circles to match the actual shade
   "Bright red blood":           "🔴",
   "Dark red blood":             "🟥",
@@ -585,7 +580,6 @@ export const SYMPTOM_ICONS = {
   "Frequent urination":         "🚿",
   "Smell sensitivity":          "👃",
   "Nasal congestion":           "🤧",
-  "Weight change":              "⚖️",
   // Urinary
   "Urinary urgency":            "🚿",
   "Burning urination":          "🔥",
@@ -617,9 +611,6 @@ export const SYMPTOM_ICONS = {
   "Feeling isolated":           "😔",
   "Affectionate":               "💕",
   "Distant":                    "🚶",
-  // Cycle
-  "Missed period":              "📅",
-  "Irregular period":           "📆",
   // Fertility
   "Increased libido":           "💕",
   "Decreased libido":           "💔",
@@ -691,6 +682,7 @@ style.textContent = `@keyframes slideIn { from { transform: translateY(20px); op
 document.head.appendChild(style);
 
 export function renderBloomieFab() {
+  if (isAnonMode()) return;
   if (document.getElementById("bloomie-fab")) return;
 
   const fab = document.createElement("button");

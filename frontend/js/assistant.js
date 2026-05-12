@@ -3743,11 +3743,24 @@ export function initBloomieChat({
       // soft affirmations
       "i think so", "think so", "i believe so", "believe so",
       "probably", "most likely", "i'd say yes", "id say yes",
+      // Patois affirmations
+      "aye", "dat right", "dat correct", "true dat", "mi agree",
+      "mi understand", "mi get it", "mi feel it", "yeah man",
+      "fi real", "for real", "mhm", "uhuh", "uh huh",
+      // expanded conversational
+      "absolutely", "of course", "sure thing", "indeed", "certainly",
+      "it is", "it does", "it has", "i am", "i do have",
     ];
     const NO_WORDS   = [
       "no", "nah", "nope", "not really", "i have not", "i don't",
       "i dont", "no i", "nah i", "mi nuh", "mi never",
       "no me", "nah me", "definitely not", "not at all",
+      // Patois denials
+      "mi nuh have", "mi nuh did", "mi nuh do", "a no", "no way",
+      "annuh", "nuh uh", "nah man", "nope not at all",
+      // expanded conversational
+      "i haven't", "i didn't", "never", "negative", "it's not",
+      "it isn't", "it doesn't", "i don't have", "i'm not",
     ];
     const UNSURE_WORDS = [
       "not sure", "unsure", "idk", "i don't know", "i dont know",
@@ -3755,6 +3768,10 @@ export function initBloomieChat({
       // added
       "maybe", "can't tell", "cant tell", "could be", "possibly",
       "not totally sure", "i'm not sure", "im not sure", "i'm unsure",
+      // Patois unsure
+      "mi nuh sure", "cyaan say", "mi cyaan tell", "mi nuh know",
+      // expanded
+      "perhaps", "might be", "unclear", "kind of", "sort of", "i guess",
     ];
 
     // ── Match order: soft denials → affirm → deny → unsure ───────────────
@@ -3794,32 +3811,41 @@ export function initBloomieChat({
     // ── Keyword hints per choice id ──────────────────────────────────────
     const CHOICE_HINTS = {
       // timing
-      "before":  ["before", "before period", "day before", "days before", "prior"],
-      "during":  ["during", "while", "when i have"],
-      "period":  ["during period", "on my period", "when period"],
-      "any":     ["anytime", "random", "any time", "all the time", "always"],
-      "sex":     ["during sex", "after sex", "when we", "pain sex"],
+      "before":  ["before", "before period", "day before", "days before", "prior", "pms", "premenstrual", "week before", "before it starts"],
+      "during":  ["during", "while", "when i have", "while bleeding", "on my period", "when bleeding"],
+      "period":  ["during period", "on my period", "when period", "during bleeding"],
+      "any":     ["anytime", "random", "any time", "all the time", "always", "constantly", "non-stop", "every day", "all month"],
+      "most":    ["most of", "almost always", "whole cycle", "all month", "all the time", "always", "constantly", "most days", "every day"],
+      "random":  ["random", "no pattern", "no clear pattern", "unpredictable", "varies", "all over", "mixed"],
+      "sex":     ["during sex", "after sex", "when we", "pain sex", "during intercourse", "having sex"],
       // severity
-      "mild":    ["mild", "little", "not bad", "manageable", "likkle"],
-      "mod":     ["moderate", "medium", "sometimes bad", "affects my day"],
-      "sev":     ["severe", "very bad", "really bad", "bad bad", "kill mi", "unbearable"],
+      "mild":    ["mild", "little", "not bad", "manageable", "likkle", "bearable", "tolerable", "okay", "not too bad"],
+      "mod":     ["moderate", "medium", "sometimes bad", "affects my day", "middling", "so-so", "in between"],
+      "sev":     ["severe", "very bad", "really bad", "bad bad", "kill mi", "unbearable", "terrible", "awful", "extreme", "excruciating", "debilitating"],
+      "varies":  ["varies", "changes", "inconsistent", "unpredictable", "shifts", "mixed", "sometimes bad"],
       // test result
-      "pos":     ["positive", "it positive", "came back positive", "two line"],
-      "neg":     ["negative", "it negative", "came back negative", "one line"],
-      "unc":     ["unclear", "faint line", "not sure", "can't tell"],
+      "pos":     ["positive", "it positive", "came back positive", "two line", "two lines", "pregnant"],
+      "neg":     ["negative", "it negative", "came back negative", "one line", "not pregnant"],
+      "unc":     ["unclear", "faint line", "not sure", "can't tell", "hard to read"],
       // spotting amount
-      "wipe":    ["wipe", "few drops", "just a little", "likkle drops"],
-      "light":   ["light flow", "more flow", "light bleed"],
+      "wipe":    ["wipe", "few drops", "just a little", "likkle drops", "just when i wipe"],
+      "light":   ["light flow", "more flow", "light bleed", "a light flow"],
       // pain response
-      "sometimes": ["sometimes", "a little", "kinda", "sorta", "likkle"],
+      "sometimes": ["sometimes", "a little", "kinda", "sorta", "likkle", "kind of", "sort of"],
       // duration
-      "few":     ["few days", "day or two", "short", "quick"],
-      "week":    ["a week", "week or so", "about week"],
-      "most":    ["most of", "almost always", "whole cycle", "all month"],
+      "few":     ["few days", "day or two", "short", "quick", "2-3 days", "couple days", "a few days"],
+      "week":    ["a week", "week or so", "about week", "7 days", "one week"],
+      "most":    ["most of", "almost always", "whole cycle", "all month", "most of the month", "all the time"],
+      // cycle pattern
+      "often":   ["often", "regularly", "all the time", "always", "most cycles", "every cycle"],
+      "new":     ["new", "different", "changed", "never before", "first time", "unusual", "not normal for me"],
+      "normal":  ["normal for me", "always like this", "usual", "typical for me", "my usual"],
       // improvements
-      "improving_yes": ["yes it help", "helps", "getting better"],
-      "normal":  ["normal for me", "always like this", "usual"],
-      "new":     ["new", "different", "changed", "never before", "first time"],
+      "improving_yes": ["yes it help", "helps", "getting better", "it helps", "yes helps"],
+      // pregnancy chance
+      "yes_preg": ["yes", "maybe", "possibly", "could be", "might be", "i think so", "there's a chance"],
+      // irregular
+      "irregular": ["irregular", "unpredictable", "all over the place", "no pattern", "random cycles"],
     };
 
     for (const choice of node._resolvedChoices) {

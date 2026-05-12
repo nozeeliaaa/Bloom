@@ -1,5 +1,6 @@
 import { auth, db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 
 function isFirebaseAuthTokenError(err) {
   const code = String(err?.code || "");
@@ -69,6 +70,7 @@ export async function requireAuth(req, res, next) {
           consentSensitive: false,
           remindersEnabled: false,
           reminderTime: "09:00",
+          onboardingCompleted: false,
         },
         healthProfile: {
           avgCycleLength: null,
@@ -108,10 +110,26 @@ export async function requireAuth(req, res, next) {
     }
 
     if (decoded.email_verified === false) {
-      return res.status(403).json({
-        error: "Email not verified",
-        code: "EMAIL_NOT_VERIFIED",
-      });
+      // Allow through if the user has an approved guardian consent -
+      // this covers the window between consent approval and client token refresh
+      const hasApprovedConsent = await db
+        .collection("consents")
+        .where("teenUid", "==", decoded.uid)
+        .where("status", "==", "approved")
+        .limit(1)
+        .get()
+        .then(snap => !snap.empty)
+        .catch(() => false);
+
+      if (!hasApprovedConsent) {
+        return res.status(403).json({
+          error: "Email not verified",
+          code: "EMAIL_NOT_VERIFIED",
+        });
+      }
+      // Has approved consent - mark email verified in the background
+      // so future tokens come through without this extra DB read
+      getAuth().updateUser(decoded.uid, { emailVerified: true }).catch(() => {});
     }
 
     const data = userDoc.data() || {};
@@ -300,6 +318,36 @@ export async function requireAuth(req, res, next) {
       error: "Authentication check failed",
       code: "AUTH_CHECK_FAILED",
     });
+  }
+}
+
+/**
+ * Lightweight auth middleware that accepts unverified emails.
+ * Use only on routes that must work before email verification
+ * (e.g. consent/request, consent/status for new minor accounts).
+ */
+export async function requireAuthUnverified(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing token" });
+  }
+  const token = header.split(" ")[1];
+  try {
+    const decoded = await auth.verifyIdToken(token);
+    req.user = {
+      uid: decoded.uid,
+      email: decoded.email || null,
+      email_verified: !!decoded.email_verified,
+      role: "user",
+      ageBand: null,
+      yob: null,
+    };
+    return next();
+  } catch (err) {
+    if (isFirebaseAuthTokenError(err)) {
+      return res.status(401).json({ error: "Invalid token", code: err.code || "auth/invalid-token" });
+    }
+    return res.status(500).json({ error: "Authentication check failed" });
   }
 }
 

@@ -109,7 +109,7 @@ A persistent top navigation bar appears on every page of the authenticated appli
 Consistent Layout & Visual Structure
 All four main pages (Dashboard, Calendar, Resources, Clinic Finder) share the same layout skeleton: a top navigation bar, a page heading with a short description, and a content area below. This consistency means users build a mental model quickly and can switch between features without reorientation. Colour coding is consistent throughout: pink always signals the current cycle phase or a primary action, green signals ovulation, and purple signals the fertile window.
 Card-Based UI
-Information is chunked into discrete cards rather than presented as walls of text. Each card has a clear heading, a short description, and one or two action buttons. This format mirrors the reading patterns of mobile users and reduces cognitive load by presenting one idea per card. Cards are touch-target sized (minimum 44 Ã— 44 px) for comfortable tapping.
+Information is chunked into discrete cards rather than presented as walls of text. Each card has a clear heading, a short description, and one or two action buttons. This format mirrors the reading patterns of mobile users and reduces cognitive load by presenting one idea per card. Cards are touch-target sized (minimum 44 Ã- 44 px) for comfortable tapping.
 Minimal Input Friction
 The Cycle Log Modal is designed to be completable in under 60 seconds. Flow intensity and symptoms use tap-to-select chip controls rather than text fields. Biometric scores use sliders with tactile drag handles. The modal remembers the last-used date and defaults to today, eliminating repetitive date selection. Required fields are minimal: only flow intensity is required; all other fields are optional.
 Accessibility Considerations
@@ -118,7 +118,7 @@ All text and interactive elements meet WCAG 2.1 Level AA contrast requirements. 
 Clear Language
 Medical terminology is either avoided or accompanied by a plain-English explanation. For example, â€œluteual phaseâ€ is presented as â€œLuteal Phase (days after ovulation)â€. Tooltips and info icons provide additional context where brevity requires condensed labels. Error messages are written in first person and explain what happened and what to do next (e.g., â€œWe couldnâ€™t save your log. Please check your connection and try again.â€).
 Large Clickable Areas
-Every interactive element â€” buttons, navigation links, calendar day cells, filter chips, map markers, and card action buttons â€” has a minimum touch target of 44 Ã— 44 px as recommended by Appleâ€™s Human Interface Guidelines and Googleâ€™s Material Design. Adequate spacing between targets prevents accidental mis-taps on mobile.
+Every interactive element â€” buttons, navigation links, calendar day cells, filter chips, map markers, and card action buttons â€” has a minimum touch target of 44 Ã- 44 px as recommended by Appleâ€™s Human Interface Guidelines and Googleâ€™s Material Design. Adequate spacing between targets prevents accidental mis-taps on mobile.
 Structured Content
 Semantic HTML heading hierarchy (h1 â†’ h2 â†’ h3) is maintained throughout the application so that screen reader users can navigate by heading. ARIA labels are added to icon-only buttons (e.g., aria-label="Close modal"). Form inputs are associated with visible <label> elements, and all images carry descriptive alt text. The Cycle Log Modal is fully keyboard-navigable, with tab order flowing logically through fields and focus returning to the trigger button on close.
 5.5.1  System Decomposition â€” Frontend
@@ -132,7 +132,7 @@ Insights Panel: Executes a set of client-side analysis functions against the las
 Trend Charts: Uses the Chart.js library to render line charts (cycle length over time) and bar charts (average symptom frequency). Data is fetched once on mount and cached in module-level state for the session.
 Module 2: Calendar Module
 The Calendar module combines historical data with forward-looking cycle predictions in a monthly grid view.
-Monthly Calendar View: Generates a 5-or-6-row Ã— 7-column grid from the current monthâ€™s date range. Each cell is a <div> with a data-date attribute. Cycle log data and predictions are overlaid by adding CSS classes (period-day, fertile-window, ovulation-day) to the corresponding cells.
+Monthly Calendar View: Generates a 5-or-6-row Ã- 7-column grid from the current monthâ€™s date range. Each cell is a <div> with a data-date attribute. Cycle log data and predictions are overlaid by adding CSS classes (period-day, fertile-window, ovulation-day) to the corresponding cells.
 Cycle Overlay Panel: A sidebar panel that displays the colour legend, the predicted start and end dates of the next period, and the fertile window range. Values are recalculated whenever the user navigates to a different month.
 Cycle Log Modal: (Shared component, instantiated from the Calendar module.) Opening it from the calendar pre-populates the date field with the clicked cellâ€™s date. Submitting a log triggers a Firestore write and immediately re-applies the calendar overlays.
 Module 3: Resource Module
@@ -209,7 +209,7 @@ Three dropdown filter controls provide structured narrowing of the clinic list:
 All three filters are applied simultaneously (AND logic), so selecting â€œSt. Andrewâ€ and â€œSTI Testingâ€ shows only clinics in St. Andrew that offer STI testing. Resetting any filter to â€œAllâ€ removes that constraint.
 Interactive Map
 The Leaflet map provides spatial context that a list alone cannot offer:
-Custom pink map-pin icons (SVG, 32 Ã— 40 px) replace Leafletâ€™s default blue markers, maintaining brand consistency.
+Custom pink map-pin icons (SVG, 32 Ã- 40 px) replace Leafletâ€™s default blue markers, maintaining brand consistency.
 Marker clustering groups pins that are within 40 px of each other at the current zoom level into a numbered cluster bubble. Clicking a cluster zooms in to reveal the individual pins.
 Clicking an individual marker opens a Leaflet popup with the clinic name and a â€œView Cardâ€ button that smooth-scrolls to the corresponding clinic card below the map and applies a highlight animation.
 The map dynamically pans and zooms to fit the bounding box of all filtered markers when a filter or search is applied, so the user always sees all results without manual navigation.

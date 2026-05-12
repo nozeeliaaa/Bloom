@@ -1,0 +1,137 @@
+﻿<!doctype html><html><head><meta charset="utf-8"><title>Bloom Test Results Documentation</title><style>body{font-family:Arial,sans-serif;font-size:10pt;color:#111;}h1{font-size:20pt;}h2{font-size:15pt;margin-top:24px;}table{border-collapse:collapse;width:100%;margin:10px 0 18px 0;}th,td{border:1px solid #777;padding:5px;vertical-align:top;}th{background:#f3d7e7;}code{font-family:Consolas,monospace;background:#f6f6f6;padding:1px 3px;}pre{border:1px solid #aaa;background:#f7f7f7;padding:8px;}ul,ol{margin-top:4px;}</style></head><body>
+<h1>Bloom Test Results Documentation</h1>
+<br>
+<p>Last verified: May 11, 2026</p>
+<br>
+<p>Command run:</p>
+<br>
+<pre>
+npm test
+npm run test:coverage
+</pre>
+<br>
+<p>Overall result:</p>
+<br>
+<table>
+<tr><th>Metric</th><th>Result</th></tr>
+<tr><td>Total tests documented</td><td>43</td></tr>
+<tr><td>Passed tests</td><td>38</td></tr>
+<tr><td>Skipped tests</td><td>5</td></tr>
+<tr><td>Failed tests</td><td>0</td></tr>
+<tr><td>Passing test files</td><td>5</td></tr>
+<tr><td>Skipped test files</td><td>1</td></tr>
+</table>
+<br>
+<h2>Unit / Frontend Tests</h2>
+<br>
+<p>These tests validate individual frontend modules, page structures, browser behavior, configuration, and mocked service boundaries.</p>
+<br>
+<table>
+<tr><th>#</th><th>Test</th><th>Component</th><th>Purpose</th><th>Test Input</th><th>Expected Output</th><th>Actual Output</th><th>Result</th><th>Analysis</th></tr>
+<tr><td>1</td><td>Production uses correct Cloud Run URL</td><td>API base config</td><td>Confirm deployed frontend targets the correct backend</td><td>Hostname: `bloom.example`</td><td>`https://bloom-backend-538005116995.us-central1.run.app`</td><td>Correct Cloud Run URL returned</td><td>Passed</td><td>Prevents the old broken backend endpoint from being used in production.</td></tr>
+<tr><td>2</td><td>Localhost uses local API</td><td>API base config</td><td>Confirm local development uses local backend</td><td>Hostname: `localhost`</td><td>`http://127.0.0.1:4000`</td><td>Local API URL returned</td><td>Passed</td><td>Supports safe local testing without production calls.</td></tr>
+<tr><td>3</td><td>localStorage API override trims URL</td><td>API base config</td><td>Confirm manual API override works safely</td><td>`localStorage.bloom_api_base = &quot;  https://api.example.test/// &quot;`</td><td>`https://api.example.test`</td><td>Trimmed URL with trailing slashes removed</td><td>Passed</td><td>Confirms override behavior and URL cleanup.</td></tr>
+<tr><td>4</td><td>VITE_BLOOM_API_BASE override works</td><td>API base config</td><td>Confirm build-time env override works</td><td>`VITE_BLOOM_API_BASE=https://vite.example.test/`</td><td>`https://vite.example.test`</td><td>Env URL returned without trailing slash</td><td>Passed</td><td>Confirms deploy-time config can override defaults.</td></tr>
+<tr><td>5</td><td>window.BLOOM_API_BASE avoids old broken URL</td><td>Firebase config / API config</td><td>Confirm global API base is correct</td><td>Production-like hostname</td><td>Correct Cloud Run URL and no old east1 URL</td><td>Correct URL set; old URL absent</td><td>Passed</td><td>Directly verifies the documented production backend requirement.</td></tr>
+<tr><td>6</td><td>Rejects weak passwords</td><td>Auth helper</td><td>Validate password rules</td><td>Password: `weak`</td><td>Validation errors for length, uppercase, number</td><td>Expected errors returned</td><td>Passed</td><td>Confirms signup password validation catches weak input.</td></tr>
+<tr><td>7</td><td>Valid signup calls Firebase</td><td>Auth helper</td><td>Confirm registration calls mocked Firebase</td><td>Email: `new@bloom.test`, password: `Strong1!`</td><td>Firebase create user called and verification sent</td><td>Mocked Firebase called; account mode stored</td><td>Passed</td><td>Proves signup path works without real Firebase writes.</td></tr>
+<tr><td>8</td><td>Underage signup can skip verification email</td><td>Auth helper</td><td>Support guardian-consent flow</td><td>Email: `minor@bloom.test`, skip verification option</td><td>User created but verification email not sent</td><td>Create user called; verification not sent</td><td>Passed</td><td>Supports the consent-pending flow for underage users.</td></tr>
+<tr><td>9</td><td>Duplicate email error surfaces</td><td>Auth helper</td><td>Ensure duplicate email can be shown by UI</td><td>Firebase mock throws `auth/email-already-in-use`</td><td>Same error code is thrown to page</td><td>Duplicate error surfaced</td><td>Passed</td><td>Confirms UI can display duplicate email message.</td></tr>
+<tr><td>10</td><td>Valid login stores account mode</td><td>Auth helper</td><td>Confirm successful login path</td><td>Email: `rose@bloom.test`, password: `Strong1!`</td><td>Verified user returned and mode stored</td><td>User returned; `bloom_mode=account`</td><td>Passed</td><td>Confirms successful login session state.</td></tr>
+<tr><td>11</td><td>Invalid login exposes Firebase error</td><td>Auth helper</td><td>Confirm login failure can display error</td><td>Firebase mock throws `auth/invalid-credential`</td><td>Error code returned to UI</td><td>Invalid credential error surfaced</td><td>Passed</td><td>Supports user-friendly invalid login messaging.</td></tr>
+<tr><td>12</td><td>Unverified login signs out</td><td>Auth helper</td><td>Block unverified email login</td><td>Unverified Firebase user</td><td>Verification email sent, user signed out, error thrown</td><td>All expected actions occurred</td><td>Passed</td><td>Prevents unverified users from entering account mode.</td></tr>
+<tr><td>13</td><td>Logout clears session</td><td>Auth helper</td><td>Confirm logout removes local session data</td><td>Local/session storage populated</td><td>Storage cleared and Firebase sign out called</td><td>Session data removed</td><td>Passed</td><td>Confirms logout protects account data on shared devices.</td></tr>
+<tr><td>14</td><td>Signup page renders required fields</td><td>Register page</td><td>Confirm account form and consent controls exist</td><td>`frontend/pages/register.html`</td><td>Email, password, confirm password, YOB, guardian email, terms</td><td>All controls found</td><td>Passed</td><td>Verifies signup UI exists for documentation and testing.</td></tr>
+<tr><td>15</td><td>Signin page renders login controls</td><td>Login page</td><td>Confirm login, reset, resend, anonymous paths exist</td><td>`frontend/pages/login.html`</td><td>Login form, reset panel, resend button, anonymous button</td><td>All controls found</td><td>Passed</td><td>Confirms visible auth entry points.</td></tr>
+<tr><td>16</td><td>Survey page has app mount and module</td><td>Survey page</td><td>Confirm survey shell is wired</td><td>`frontend/pages/survey.html`</td><td>`main#app` and survey script present</td><td>Mount and module found</td><td>Passed</td><td>Confirms survey page can load frontend survey logic.</td></tr>
+<tr><td>17</td><td>Profile/settings expose preferences UI</td><td>Profile/settings pages</td><td>Confirm preferences, theme, notifications, logout exist</td><td>Profile and settings HTML</td><td>Goal grid, theme buttons, notification preferences, save button</td><td>All expected controls found</td><td>Passed</td><td>Covers profile and user-preference documentation areas.</td></tr>
+<tr><td>18</td><td>Profile detail page contains delete account controls</td><td>Profile view page</td><td>Confirm delete-account UI exists</td><td>`frontend/pages/profile-view.html`</td><td>Delete account text/control</td><td>Delete control found</td><td>Passed</td><td>Confirms destructive account action has UI coverage.</td></tr>
+<tr><td>19</td><td>Dashboard renders cycle and export UI</td><td>Dashboard page</td><td>Confirm dashboard core regions exist</td><td>`frontend/pages/dashboard.html`</td><td>Goal, phase, insights, chart, export controls</td><td>All dashboard regions found</td><td>Passed</td><td>Validates the dashboard structure for final documentation.</td></tr>
+<tr><td>20</td><td>Calendar renders navigation, legend, log modal</td><td>Calendar page</td><td>Confirm calendar and logging UI exists</td><td>`frontend/pages/calendar.html`</td><td>Month nav, legend, grid, modal, flow, symptoms, notes, delete</td><td>All controls found</td><td>Passed</td><td>Covers calendar and health logging UI structure.</td></tr>
+<tr><td>21</td><td>Learn page exposes search, filters, reader, PDF metadata</td><td>Pamphlets/Learn page</td><td>Confirm educational content UI exists</td><td>`frontend/pages/pamphlets.html`</td><td>Search, category filters, grid, reader, PDF reference</td><td>All expected areas found</td><td>Passed</td><td>Confirms Learn resources can be searched and opened.</td></tr>
+<tr><td>22</td><td>Clinic finder exposes search, filters, map, grid</td><td>Clinics page</td><td>Confirm clinic finder UI exists</td><td>`frontend/pages/clinics.html`</td><td>Search, parish/type/service filters, location buttons, map, grid</td><td>All expected areas found</td><td>Passed</td><td>Confirms clinic finder has map and search structure.</td></tr>
+<tr><td>23</td><td>Bloomie page renders chat UI</td><td>Bloomie assistant page</td><td>Confirm assistant controls exist</td><td>`frontend/pages/assistant.html`</td><td>Chat feed, form, input, mic, send, settings, offline badge</td><td>All controls found</td><td>Passed</td><td>Confirms user can interact with Bloomie UI.</td></tr>
+<tr><td>24</td><td>Help/support page renders FAQ and contact form</td><td>Help page</td><td>Confirm support UI exists</td><td>`frontend/pages/help.html`</td><td>FAQ, resources, contact tab, subject, message, success/error states</td><td>All expected elements found</td><td>Passed</td><td>Covers help, FAQ, and support request entry.</td></tr>
+<tr><td>25</td><td>Admin dashboard contains management sections</td><td>Admin page</td><td>Confirm admin UI sections exist</td><td>`frontend/pages/admin.html`</td><td>Overview, users, pamphlets, clinics, support, reviews, modals</td><td>All sections found</td><td>Passed</td><td>Confirms admin dashboard areas exist for mocked integration.</td></tr>
+<tr><td>26</td><td>Navigation code includes routes and admin gating</td><td>Shared utilities</td><td>Confirm main navigation routes are declared</td><td>`frontend/js/utils.js`</td><td>Dashboard, calendar, learn, clinics, assistant, admin gating</td><td>Routes and admin logic found</td><td>Passed</td><td>Confirms navigation coverage without requiring real routing.</td></tr>
+<tr><td>27</td><td>Health log add/edit/delete persists locally</td><td>Storage/logging</td><td>Confirm anonymous log CRUD works locally</td><td>Save, edit, delete May 1 log</td><td>Log saved, updated, deleted; no Firebase fetch</td><td>Expected local changes occurred</td><td>Passed</td><td>Confirms local storage logging is safe and functional.</td></tr>
+<tr><td>28</td><td>Account-mode log save calls mocked API</td><td>Storage/logging API</td><td>Confirm account log sync uses mocked backend</td><td>Account mode, mock user, May 2 log</td><td>`PUT /api/logs` and `PUT /api/symptoms` with auth header</td><td>Mocked endpoints called</td><td>Passed</td><td>Confirms account logging does not call real services in tests.</td></tr>
+<tr><td>29</td><td>Notification permission and reminders work</td><td>Notifications</td><td>Confirm granted browser notification behavior</td><td>Granted permission and reminder preferences</td><td>Inbox entry and mock Notification created</td><td>Inbox and mock instance created</td><td>Passed</td><td>Verifies notification preference flow with mocked API.</td></tr>
+<tr><td>30</td><td>Denied notification permission is safe</td><td>Notifications</td><td>Confirm denied permissions do not crash</td><td>Permission: `denied`</td><td>No exception and no browser notification required</td><td>Function resolved safely</td><td>Passed</td><td>Confirms denied permission is handled gracefully.</td></tr>
+<tr><td>31</td><td>PDF export uses mocked jsPDF</td><td>Export data</td><td>Confirm PDF export calls mock only</td><td>Report data for May 11, 2026</td><td>`bloom-cycle-report-2026-05-11.pdf` saved by mock</td><td>Mock save called; no fetch</td><td>Passed</td><td>Confirms export works without real external calls.</td></tr>
+</table>
+<br>
+<h2>Integration Tests</h2>
+<br>
+<p>These tests simulate complete frontend flows with mocked Firebase, fetch, storage, PDF generation, and map APIs.</p>
+<br>
+<table>
+<tr><th>#</th><th>Test</th><th>Component</th><th>Purpose</th><th>Test Input</th><th>Expected Output</th><th>Actual Output</th><th>Result</th><th>Analysis</th></tr>
+<tr><td>32</td><td>Flow 1: New User Cycle Tracking</td><td>Auth, survey profile, logs, cycle state</td><td>Confirm new user can create cycle data and receive predictions</td><td>New account mode user, profile goal `period`, May 1 period log</td><td>Log saved; next period May 29; fertile window May 12-17; ovulation May 16</td><td>Expected dates returned from mocked cycle state</td><td>Passed</td><td>Covers signup-to-cycle prediction path using shared prediction source.</td></tr>
+<tr><td>33</td><td>Flow 2: Returning User</td><td>Account logs, backend cycle state</td><td>Confirm existing account history loads</td><td>Mock logs on Apr 3 and May 1, backend cycle state</td><td>Logs loaded; backend state shows Menstrual phase</td><td>History and backend state returned</td><td>Passed</td><td>Confirms returning users see existing cycle history.</td></tr>
+<tr><td>34</td><td>Flow 3: Missed Period</td><td>Cycle prediction status</td><td>Confirm overdue period state</td><td>Predicted May 1, today May 9, no new period</td><td>Status `overdue`, 8 days late</td><td>Overdue status returned</td><td>Passed</td><td>Prevents stale predicted periods from appearing as upcoming.</td></tr>
+<tr><td>35</td><td>Flow 4: Learn Content</td><td>Admin content + Learn page</td><td>Confirm admin-added content appears to user</td><td>Mock admin PCOS guide with PDF path</td><td>Learn grid shows guide and safe PDF link</td><td>Guide and PDF link rendered</td><td>Passed</td><td>Confirms educational content integration can be documented safely.</td></tr>
+<tr><td>36</td><td>Flow 5: Clinic Finder</td><td>Admin clinic + clinic finder + map</td><td>Confirm admin-added clinic can be searched and mapped</td><td>Mock Kingston clinic and search term `admin`</td><td>Clinic appears; Leaflet map and route polyline mocked</td><td>Clinic card rendered; map mocks called</td><td>Passed</td><td>Covers clinic search/details/map without external route calls.</td></tr>
+<tr><td>37</td><td>Flow 6: Support Request</td><td>User support + admin response</td><td>Confirm support submission and admin response save</td><td>Support message and admin response with email failure</td><td>Request accepted; response saved; email failure preserved safely</td><td>Response saved true; emailDelivered false</td><td>Passed</td><td>Confirms email failures do not lose admin response.</td></tr>
+<tr><td>38</td><td>Flow 7: Export</td><td>Logs, dashboard report data, PDF</td><td>Confirm logged data can produce PDF export</td><td>May 1 log and cycle state report</td><td>Report has cycles tracked and PDF mock save called</td><td>Report generated; mock save called</td><td>Passed</td><td>Covers final export flow without real PDF/email/backend calls.</td></tr>
+</table>
+<br>
+<h2>Use Case Test Matrix</h2>
+<br>
+<table>
+<tr><th>Use Case #</th><th>Type of Testing</th><th>Where This Is Being Tested</th><th>Input</th><th>Expected Output</th><th>Actual Output</th><th>Evaluation</th></tr>
+<tr><td>UC-01</td><td>Unit / frontend</td><td>`auth-account.frontend.test.js`</td><td>Weak password `weak`</td><td>Password rejected with rule messages</td><td>Rejected with expected messages</td><td>Passed</td></tr>
+<tr><td>UC-02</td><td>Unit / frontend</td><td>`auth-account.frontend.test.js`</td><td>Valid signup credentials</td><td>Firebase signup mock called; verification sent</td><td>Mock called and account mode stored</td><td>Passed</td></tr>
+<tr><td>UC-03</td><td>Unit / frontend</td><td>`auth-account.frontend.test.js`</td><td>Underage signup option</td><td>Verification email skipped before guardian consent</td><td>Verification skipped</td><td>Passed</td></tr>
+<tr><td>UC-04</td><td>Unit / frontend</td><td>`auth-account.frontend.test.js`</td><td>Duplicate email Firebase error</td><td>Duplicate email error exposed to UI</td><td>Error code surfaced</td><td>Passed</td></tr>
+<tr><td>UC-05</td><td>Unit / frontend</td><td>`auth-account.frontend.test.js`</td><td>Valid login credentials</td><td>Verified user logged in</td><td>User returned and account mode stored</td><td>Passed</td></tr>
+<tr><td>UC-06</td><td>Unit / frontend</td><td>`auth-account.frontend.test.js`</td><td>Invalid login credentials</td><td>Login error displayed by UI layer</td><td>Error code surfaced</td><td>Passed</td></tr>
+<tr><td>UC-07</td><td>Unit / frontend</td><td>`auth-account.frontend.test.js`</td><td>Unverified email user</td><td>User signed out and verification error thrown</td><td>User signed out and error thrown</td><td>Passed</td></tr>
+<tr><td>UC-08</td><td>Unit / frontend</td><td>`auth-account.frontend.test.js`</td><td>Logout with local/session data</td><td>Session data removed</td><td>Storage cleared and signout mock called</td><td>Passed</td></tr>
+<tr><td>UC-09</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Register page HTML</td><td>Signup and guardian controls visible</td><td>Controls found</td><td>Passed</td></tr>
+<tr><td>UC-10</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Login page HTML</td><td>Login, reset, resend, anonymous controls visible</td><td>Controls found</td><td>Passed</td></tr>
+<tr><td>UC-11</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Survey page HTML</td><td>Survey mount and script present</td><td>Mount/script found</td><td>Passed</td></tr>
+<tr><td>UC-12</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Profile/settings HTML</td><td>Preferences, theme, notification controls visible</td><td>Controls found</td><td>Passed</td></tr>
+<tr><td>UC-13</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Profile view HTML</td><td>Delete account control visible</td><td>Delete control found</td><td>Passed</td></tr>
+<tr><td>UC-14</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Dashboard HTML</td><td>Cycle, insight, chart, export regions visible</td><td>Regions found</td><td>Passed</td></tr>
+<tr><td>UC-15</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Calendar HTML</td><td>Navigation, legend, modal fields visible</td><td>Controls found</td><td>Passed</td></tr>
+<tr><td>UC-16</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Learn page HTML</td><td>Search, filters, reader, PDF metadata visible</td><td>Areas found</td><td>Passed</td></tr>
+<tr><td>UC-17</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Clinics page HTML</td><td>Search, filters, map, grid visible</td><td>Areas found</td><td>Passed</td></tr>
+<tr><td>UC-18</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Bloomie page HTML</td><td>Chat input, send, mic, settings visible</td><td>Controls found</td><td>Passed</td></tr>
+<tr><td>UC-19</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Help page HTML</td><td>FAQ, resources, contact form visible</td><td>Areas found</td><td>Passed</td></tr>
+<tr><td>UC-20</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Admin page HTML</td><td>Admin tabs and modals visible</td><td>Sections found</td><td>Passed</td></tr>
+<tr><td>UC-21</td><td>Unit / frontend</td><td>`documentation-pages.static.test.js`</td><td>Shared nav utility file</td><td>Main routes and admin gating present</td><td>Routes/gating found</td><td>Passed</td></tr>
+<tr><td>UC-22</td><td>Unit / frontend</td><td>`storage-notifications-export.frontend.test.js`</td><td>Anonymous May 1 health log</td><td>Add, edit, delete persists locally</td><td>Local CRUD worked</td><td>Passed</td></tr>
+<tr><td>UC-23</td><td>Unit / frontend</td><td>`storage-notifications-export.frontend.test.js`</td><td>Account May 2 health log</td><td>Mocked API receives authenticated log save</td><td>Mocked API called</td><td>Passed</td></tr>
+<tr><td>UC-24</td><td>Unit / frontend</td><td>`storage-notifications-export.frontend.test.js`</td><td>Granted notification permission</td><td>Reminder stored and browser notification mocked</td><td>Inbox and mock notification created</td><td>Passed</td></tr>
+<tr><td>UC-25</td><td>Unit / frontend</td><td>`storage-notifications-export.frontend.test.js`</td><td>Denied notification permission</td><td>No crash or unsafe call</td><td>Resolved safely</td><td>Passed</td></tr>
+<tr><td>UC-26</td><td>Unit / frontend</td><td>`storage-notifications-export.frontend.test.js`</td><td>Cycle report data</td><td>PDF generated using mock</td><td>jsPDF mock save called</td><td>Passed</td></tr>
+<tr><td>UC-27</td><td>Unit / frontend</td><td>`api-base-config.frontend.test.js`</td><td>Production hostname</td><td>Correct Cloud Run URL</td><td>Correct URL returned</td><td>Passed</td></tr>
+<tr><td>UC-28</td><td>Unit / frontend</td><td>`api-base-config.frontend.test.js`</td><td>Localhost hostname</td><td>Local API URL</td><td>Local URL returned</td><td>Passed</td></tr>
+<tr><td>UC-29</td><td>Unit / frontend</td><td>`api-base-config.frontend.test.js`</td><td>localStorage API override</td><td>Trimmed override URL</td><td>Trimmed URL returned</td><td>Passed</td></tr>
+<tr><td>UC-30</td><td>Unit / frontend</td><td>`api-base-config.frontend.test.js`</td><td>Vite API override</td><td>Trimmed env URL</td><td>Env URL returned</td><td>Passed</td></tr>
+<tr><td>UC-31</td><td>Unit / frontend</td><td>`api-base-config.frontend.test.js`</td><td>Firebase/API config import</td><td>`window.BLOOM_API_BASE` correct and old URL absent</td><td>Correct global URL; old URL absent</td><td>Passed</td></tr>
+<tr><td>UC-32</td><td>Integration</td><td>`full-flows.integration.test.js`</td><td>New user, survey profile, May 1 log</td><td>Dashboard/calendar prediction source returns next period and fertile data</td><td>Expected prediction dates returned</td><td>Passed</td></tr>
+<tr><td>UC-33</td><td>Integration</td><td>`full-flows.integration.test.js`</td><td>Returning user with Apr/May logs</td><td>Existing history loads and phase displays</td><td>Logs and Menstrual phase returned</td><td>Passed</td></tr>
+<tr><td>UC-34</td><td>Integration</td><td>`full-flows.integration.test.js`</td><td>Predicted May 1, today May 9</td><td>Missed/late period state</td><td>Overdue, 8 days late</td><td>Passed</td></tr>
+<tr><td>UC-35</td><td>Integration</td><td>`full-flows.integration.test.js`</td><td>Admin-added PCOS guide</td><td>User Learn page shows new content and PDF link</td><td>Content rendered</td><td>Passed</td></tr>
+<tr><td>UC-36</td><td>Integration</td><td>`full-flows.integration.test.js`</td><td>Admin-added clinic, search `admin`</td><td>Clinic appears and map route is mocked</td><td>Clinic rendered; map mock called</td><td>Passed</td></tr>
+<tr><td>UC-37</td><td>Integration</td><td>`full-flows.integration.test.js`</td><td>Support request and admin response</td><td>Response saved even when email fails</td><td>Response saved; email failure preserved</td><td>Passed</td></tr>
+<tr><td>UC-38</td><td>Integration</td><td>`full-flows.integration.test.js`</td><td>Logged cycle data and export click logic</td><td>PDF mock is called</td><td>Mock save called</td><td>Passed</td></tr>
+</table>
+<br>
+<h2>Skipped / Pending Tests</h2>
+<br>
+<p>These tests did not fail. They are intentionally skipped because the matching frontend feature does not currently exist as a standalone testable flow.</p>
+<br>
+<table>
+<tr><th>#</th><th>Skipped Test</th><th>Why It Is Skipped</th><th>How To Fix</th></tr>
+<tr><td>S1</td><td>Facts/Myths standalone game page</td><td>Bloom has myth/fact behavior embedded in dashboard/FAB, but no standalone game page or route.</td><td>Add a standalone page or exported game component; add stable selectors for question, Fact/Myth buttons, feedback, score, next, and restart; wire it into navigation if needed; change `it.skip` to `it`.</td></tr>
+<tr><td>S2</td><td>Unknown client route state</td><td>Bloom uses static pages and `404.html`; there is no client-side router fallback.</td><td>Decide whether unknown routes should use a client router or only `404.html`; add fallback selectors/message; enable the skipped test or replace it with a direct `404.html` test.</td></tr>
+<tr><td>S3</td><td>Mood field saves in health log</td><td>Calendar logging currently has flow, symptoms, notes, and biometrics, but no first-class mood field.</td><td>Add a mood input to `calendar.html`; persist mood in `calendar.js`/log payload; render saved mood in log details; enable the skipped test.</td></tr>
+<tr><td>S4</td><td>User support ticket history</td><td>Users can submit support and admins can respond, but users do not have a ticket-history page.</td><td>Add support history UI; fetch/render signed-in user&#39;s requests; show status/message/admin response; enable the skipped test.</td></tr>
+<tr><td>S5</td><td>Separate clinic detail route</td><td>Clinic details are shown inline in the finder/cards, not on a separate route.</td><td>Add a dedicated route or modal with stable selectors for details/map/directions, or replace the skipped test with one matching the final inline design.</td></tr>
+</table>
+<br>
+<br>
+</body></html>

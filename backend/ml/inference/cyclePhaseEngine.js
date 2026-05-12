@@ -62,11 +62,12 @@ export function computeCyclePhaseML(logs, mlPredictedCycleLength = null) {
   // otherwise fall back to a 28-day default. Confidence is always low
   // here since we have no interval history yet.
   if (cycleStarts.length === 1) {
-    const effectiveCycleLength = (
+    const hasValidMLPrediction = Boolean(
       mlPredictedCycleLength &&
       mlPredictedCycleLength >= 21 &&
       mlPredictedCycleLength <= 45
-    ) ? Math.round(mlPredictedCycleLength) : 28;
+    );
+    const effectiveCycleLength = hasValidMLPrediction ? Math.round(mlPredictedCycleLength) : 28;
 
     const lastStart  = cycleStarts[0];
     const todayKey   = toDateKey(new Date());
@@ -96,8 +97,8 @@ export function computeCyclePhaseML(logs, mlPredictedCycleLength = null) {
       phaseLabel,
       dayInCycle,
       avgCycleLength:         null,
-      mlPredictedCycleLength: mlPredictedCycleLength ?? null,
-      usingML:                !!mlPredictedCycleLength,
+      mlPredictedCycleLength: hasValidMLPrediction ? effectiveCycleLength : null,
+      usingML:                hasValidMLPrediction,
       confidence:             'low',
       message:                'Based on your first cycle - log more periods to improve accuracy.',
       cycleStarts,

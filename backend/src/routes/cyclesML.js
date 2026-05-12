@@ -474,7 +474,7 @@ function buildDisplay(estimatedPhase, confidenceLevel, conflictDetected, quality
   if (conflictDetected) {
     return {
       mode: 'soft',
-      message: `Bloom is picking up mixed signals — you may be transitioning into your ${label} phase.`,
+      message: `Bloom is picking up mixed signals - you may be transitioning into your ${label} phase.`,
     };
   }
   if (quality.lowHistory) {
@@ -525,7 +525,7 @@ function buildExplanation(phaseData, symptomScore, biometricScore, estimatedPhas
   }
 
   if (symptomScore.contradictions.length > 0) {
-    details.push('Some conflicting signals were detected — logging more data will improve accuracy.');
+    details.push('Some conflicting signals were detected - logging more data will improve accuracy.');
   }
 
   if (quality.lowHistory) {
@@ -664,7 +664,7 @@ function phaseLabelForDisplay(phaseKey, fallback = 'Unknown') {
   return labels[String(phaseKey || '').toLowerCase()] || fallback;
 }
 
-function buildCalendarOverlays(futureCycles, clusterStarts) {
+function buildCalendarOverlays(futureCycles, clusterStarts, loggedPeriodDays = new Set()) {
   const today = todayDateKey();
   const predictedPeriodDays = [];
   const futureOvulationDates = [];
@@ -683,10 +683,16 @@ function buildCalendarOverlays(futureCycles, clusterStarts) {
       : 5;
     for (let i = 0; i < duration; i++) predictedPeriodDays.push(dateStrAddDays(c.periodStart, i));
     if (!nextPeriodDate) nextPeriodDate = c.periodStart;
-    if (c.ovulationDay) futureOvulationDates.push(c.ovulationDay);
+    // Only add ovulation/fertile days that don't fall on a confirmed period day
+    if (c.ovulationDay && !loggedPeriodDays.has(c.ovulationDay)) {
+      futureOvulationDates.push(c.ovulationDay);
+    }
     if (c.fertileWindow?.start && c.fertileWindow?.end) {
       let d = c.fertileWindow.start;
-      while (d <= c.fertileWindow.end) { allFertileDays.push(d); d = dateStrAddDays(d, 1); }
+      while (d <= c.fertileWindow.end) {
+        if (!loggedPeriodDays.has(d)) allFertileDays.push(d);
+        d = dateStrAddDays(d, 1);
+      }
     }
   }
   return { predictedPeriodDays, futureOvulationDates, allFertileDays, nextPeriodDate };
@@ -744,12 +750,12 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
   const mlTimeoutMs = Number(options.mlTimeoutMs ?? Math.min(PYTHON_TIMEOUT_MS, 1200));
   const allowML = options.allowML !== false;
 
-  // 1 — Fetch all logs from Firestore
+  // 1 - Fetch all logs from Firestore
   const { cycleLogs, symptomLogs, biometricLogs, phaseFeedback } = await fetchUserLogs(uid, 180, cycleLogsOverride);
   const userDoc = await db.collection('users').doc(uid).get();
   const userData = userDoc.exists ? userDoc.data() || {} : {};
 
-  // 2 — Derive period clusters from cycle logs
+  // 2 - Derive period clusters from cycle logs
   const clusters = getPeriodClustersBackend(cycleLogs);
 
   if (!clusters.length) {
@@ -841,7 +847,7 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
     recentFeedbackCount: phaseFeedback.length,
   };
 
-  // 3 — ML-predicted cycle length
+  // 3 - ML-predicted cycle length
   let predictedCycleLength = avgLen;
   let predMethod = 'avg';
 
@@ -864,21 +870,21 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
     predMethod = 'weighted-avg';
   }
 
-  // 4 — Phase via cyclePhaseEngine
+  // 4 - Phase via cyclePhaseEngine
   const phaseData = computeCyclePhaseML(cycleLogs, predictedCycleLength);
 
-  // 5 — Score symptoms and biometrics
+  // 5 - Score symptoms and biometrics
   const symptomScore   = scoreSymptoms(symptomLogs);
   const biometricScore = scoreBiometrics(biometricLogs);
 
-  // 6 — Fuse all signals
+  // 6 - Fuse all signals
   const fusion = fuseSignals(phaseData, symptomScore, biometricScore, quality);
 
-  // 7 — Build display + explanation
+  // 7 - Build display + explanation
   const display     = buildDisplay(fusion.estimatedPhase, fusion.confidence.level, fusion.agreement.conflictDetected, quality);
   const explanation = buildExplanation(phaseData, symptomScore, biometricScore, fusion.estimatedPhase, quality);
 
-  // 8 — Confidence + calendar overlays
+  // 8 - Confidence + calendar overlays
   const periodDuration = estimatePeriodDurationBackend(
     clusters,
     userData.healthProfile?.periodDuration
@@ -891,7 +897,8 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
     FUTURE_CYCLES_TO_PROJECT,
     confidence.windowDays
   );
-  const overlays    = buildCalendarOverlays(futureCycles, clusterStarts);
+  const loggedPeriodDays = new Set(expandPeriodDaysBackend(cycleLogs));
+  const overlays    = buildCalendarOverlays(futureCycles, clusterStarts, loggedPeriodDays);
   const periodPrediction = buildPeriodPredictionStatus(futureCycles, clusterStarts);
   const displayPhaseKey = fusion.estimatedPhase;
   const displayPhaseLabel = phaseLabelForDisplay(displayPhaseKey, phaseData.phaseLabel);
@@ -906,7 +913,7 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
     currentFertileEnd = null;
   }
 
-  // 9 — Build full phaseEstimation object (Jahzara's spec)
+  // 9 - Build full phaseEstimation object (Jahzara's spec)
   const phaseEstimation = {
     estimatedPhase: displayPhaseKey,
     confidence: fusion.confidence,
@@ -1007,7 +1014,7 @@ router.post('/predict', requireAuth, async (req, res) => {
 });
 
 // ── Route: POST /api/cycles/state ────────────────────────────
-// No body needed — reads all logs from Firestore using req.user.uid
+// No body needed - reads all logs from Firestore using req.user.uid
 
 router.post('/state', requireAuth, async (req, res) => {
   try {
@@ -1094,7 +1101,7 @@ router.post('/feedback', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `userResponse must be one of: ${VALID_RESPONSES.join(', ')}` });
     }
 
-    // 1 — Store feedback doc in phaseFeedback subcollection
+    // 1 - Store feedback doc in phaseFeedback subcollection
     await ensureUserDocument(uid);
 
     const feedbackRef = db.collection('users').doc(uid).collection('phaseFeedback').doc();
@@ -1119,14 +1126,14 @@ router.post('/feedback', requireAuth, async (req, res) => {
     await feedbackRef.set(feedbackDoc);
     await legacyFeedbackRef.set(feedbackDoc);
 
-    // 2 — If strong correction (bleeding confirmed or explicit phase given), re-estimate
+    // 2 - If strong correction (bleeding confirmed or explicit phase given), re-estimate
     const isStrongCorrection = correction === 'bleeding' || (userResponse === 'no' && correction);
 
     if (!isStrongCorrection) {
       return res.json({ ok: true, reestimated: false, message: 'Feedback saved.' });
     }
 
-    // 3 — If bleeding correction, update lastPeriodStart to today
+    // 3 - If bleeding correction, update lastPeriodStart to today
     if (correction === 'bleeding') {
       const today = todayDateKey();
       await db.collection('users').doc(uid).set(
@@ -1139,11 +1146,11 @@ router.post('/feedback', requireAuth, async (req, res) => {
       );
     }
 
-    // 4 — Clear cache and re-run estimation
+    // 4 - Clear cache and re-run estimation
     _clearCache(uid);
     const { state, lastStart } = await computeFullEstimation(uid);
 
-    // 5 — If bleeding, override the estimated phase
+    // 5 - If bleeding, override the estimated phase
     if (correction === 'bleeding' && state.phaseEstimation) {
       state.phaseEstimation.estimatedPhase = 'menstrual';
       state.phaseEstimation.confidence     = { level: 'high', score: 0.9 };
@@ -1159,7 +1166,7 @@ router.post('/feedback', requireAuth, async (req, res) => {
       state.phaseLabel = 'Menstrual';
     }
 
-    // 6 — Persist updated state
+    // 6 - Persist updated state
     _setCachedState(uid, lastStart ?? 'none', state);
 
     if (db) {

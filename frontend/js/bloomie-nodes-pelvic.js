@@ -82,7 +82,7 @@ export function createPelvicNodes(env, helpers) {
     PELVIC_NOT_SURE_SAFETY: {
       say: ["Trust that instinct 🩷 If something feels seriously wrong, getting checked is always the safer call."],
       choices: [
-        { id: "map",  label: "Find care near me",       next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me",       next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "cont", label: "Continue with Bloomie",   next: "PELVIC_ENTRY_GATE" },
       ],
     },
@@ -96,7 +96,7 @@ export function createPelvicNodes(env, helpers) {
         "If you have one-sided sharp pain and there's any chance of pregnancy, that needs to be checked urgently.",
       ],
       choices: [
-        { id: "map",  label: "Find emergency care", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find emergency care", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: pickMainLabel(),         next: "START_MENU" },
       ],
     },
@@ -406,7 +406,7 @@ export function createPelvicNodes(env, helpers) {
         ];
       },
       choices: [
-        { id: "map",  label: "Find care near me",  next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me",  next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "log",  label: "Log pelvic pain",    next: "START_MENU",
           action: "LOG_SYMPTOM", logData: { type: "pelvic_pain", note: "Pelvic pain logged from Bloomie chat" } },
         { id: "sum",  label: "Help me summarize",  next: "PELVIC_SUMMARY_DONE", action: "REQUEST_PDF" },
@@ -443,7 +443,7 @@ export function createPelvicNodes(env, helpers) {
         ];
       },
       choices: [
-        { id: "map",  label: "Find care near me",  next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me",  next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "log",  label: "Log pelvic pain",    next: "START_MENU",
           action: "LOG_SYMPTOM", logData: { type: "pelvic_pain", note: "Pelvic pain logged from Bloomie chat" } },
         { id: "menu", label: pickMainLabel(),        next: "START_MENU" },
@@ -473,7 +473,7 @@ export function createPelvicNodes(env, helpers) {
         ...safeFooter(),
       ],
       choices: [
-        { id: "map",  label: "Find care near me", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "sum",  label: "Help me summarize", next: "PELVIC_SUMMARY_DONE", action: "REQUEST_PDF" },
         { id: "menu", label: pickMainLabel(),       next: "START_MENU" },
       ],

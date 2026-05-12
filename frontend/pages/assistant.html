@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/bloom-logo.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bloomie - Bloom</title>
 
@@ -773,7 +774,7 @@
         lastFinalChunk = '';
 
         recognition = new SR();
-        recognition.lang = (loadChatPrefs().chatLanguage === 'en-jm') ? 'en-JM' : 'en-US';
+        recognition.lang = 'en-US';
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
         recognition.continuous = false;
@@ -806,14 +807,22 @@
 
         recognition.onerror = (event) => {
           const code = event?.error || '';
-          if (code === 'not-allowed' || code === 'service-not-allowed') {
-            setMicError('Microphone permission was denied.');
-          } else if (code === 'no-speech') {
-            setMicError('No speech detected. Try again.');
-          } else if (code === 'audio-capture') {
-            setMicError('No microphone was found.');
-          } else if (code === 'aborted' && userStopped) {
+          if (code === 'aborted' && userStopped) {
+            // User manually stopped — onend will fire and handle the transcript
             setMicState('processing', 'Transcribing...');
+            return;
+          }
+          // For all genuine errors, mark as handled so onend doesn't overwrite
+          endHandled = true;
+          recognition = null;
+          if (code === 'not-allowed' || code === 'service-not-allowed') {
+            setMicError('Microphone permission was denied. Please allow it in your browser settings.');
+          } else if (code === 'no-speech') {
+            setMicError('No speech detected. Tap the mic and speak clearly.');
+          } else if (code === 'audio-capture') {
+            setMicError('No microphone found. Check your device settings.');
+          } else if (code === 'network') {
+            setMicError('Network error during transcription. Check your connection and try again.');
           } else {
             setMicError('Could not transcribe right now. Please try again.');
           }
@@ -822,19 +831,19 @@
         recognition.onend = () => {
           if (endHandled) return;
           endHandled = true;
-
-          const transcript = (finalTranscript || '').trim();
           recognition = null;
 
+          const transcript = (finalTranscript || '').trim();
+
           if (!transcript) {
-            if (userStopped) setMicError('No transcript captured. Try speaking a little longer.');
-            else setMicError('No speech detected. Try again.');
+            if (userStopped) setMicError('Nothing captured. Try speaking a little longer and tap again to stop.');
+            else setMicError('No speech detected. Tap the mic and speak clearly.');
             return;
           }
 
           input.value = transcript;
           input.focus();
-          setMicState('ready', 'Transcript ready. Edit if needed, then tap Send.');
+          setMicState('ready', 'Got it! Review and tap Send.');
         };
 
         try {
@@ -851,6 +860,10 @@
           setMicState('processing', 'Transcribing...');
           try { recognition.stop(); } catch (_) { setMicError('Could not stop recording cleanly.'); }
           return;
+        }
+        // If in "ready" state, clear the input and start fresh
+        if (micState === 'ready') {
+          input.value = '';
         }
         startRecognition();
       });
@@ -945,14 +958,22 @@
         try {
           const token = await getIdToken();
           const apiBase = window.BLOOM_API_BASE ?? '';
-          const res = await fetch(`${apiBase}/api/user/profile`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const data = await res.json();
+          const [profileRes, consentRes] = await Promise.allSettled([
+            fetch(`${apiBase}/api/user/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${apiBase}/api/consent/status`,  { headers: { 'Authorization': `Bearer ${token}` } }),
+          ]);
+          if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
+            const data = await profileRes.value.json();
             profilePayload = data?.profile || data || null;
             const nickname = profilePayload?.nickname || '';
             if (nickname) enrichedUser = { ...user, nickname };
+          }
+          // Cache the guardian consent status in localStorage so readGuardianConsent picks it up
+          if (consentRes.status === 'fulfilled' && consentRes.value.ok) {
+            const cd = await consentRes.value.json().catch(() => null);
+            if (cd?.status === 'approved' && user?.uid) {
+              localStorage.setItem(`bloom_consent_status_${user.uid}`, 'approved');
+            }
           }
         } catch (_) { /* fall back to user.displayName */ }
       }

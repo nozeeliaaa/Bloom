@@ -602,13 +602,10 @@
 
     // â”€â”€ Glossary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const GLOSS_TERMS = [
-      { term: "API base URL",                   def: "The backend web address Bloom uses for app data requests. In production this points to your deployed backend service. If this is missing or wrong, pages can load but data may fail to appear." },
       { term: "Amenorrhea",                     def: "The absence of menstruation. Primary amenorrhea means a period has never started by age 16. Secondary amenorrhea means periods stopped for 3 or more months in someone who previously had them. Both can have many causes and are worth discussing with a doctor." },
       { term: "Anovulation",                    def: "When the ovaries do not release an egg during a cycle. It can cause irregular or absent periods and is a common reason why some cycles feel 'off'. It can be related to stress, hormonal imbalances, or conditions like PCOS." },
       { term: "Basal body temperature (BBT)",   def: "Your body's lowest resting temperature, measured first thing in the morning before getting up. BBT rises slightly after ovulation due to progesterone. Tracking it over time can help identify when ovulation has occurred." },
-      { term: "Cache hit",                      def: "When Bloom reuses already-fetched cycle data from local storage instead of making a fresh request. This is normal and improves speed." },
       { term: "Confidence score",               def: "How certain Bloom is about your predicted phase and dates based on your available logs. More consistent logs usually increase confidence." },
-      { term: "CORS",                           def: "Cross-Origin Resource Sharing. A browser security rule that controls whether your frontend can call a backend on another domain. If CORS is misconfigured, requests can fail before they reach app logic." },
       { term: "Cervical mucus",                 def: "Fluid produced by the cervix that changes in texture and appearance throughout the cycle. Around ovulation it becomes clear and stretchy - similar to raw egg white - which is a sign of peak fertility." },
       { term: "Contraception",                  def: "Methods used to prevent pregnancy. These include hormonal options (like the pill, patch, or injection), barrier methods (like condoms), long-acting devices (like the IUD), and emergency contraception. Each has different effects on the menstrual cycle." },
       { term: "Cycle length",                   def: "The number of days from the first day of one period to the first day of the next. The average is 28 days, but 21-35 days is considered a normal range." },
@@ -618,7 +615,6 @@
       { term: "Egg freezing",                   def: "A process where eggs are retrieved from the ovaries, frozen, and stored for future use. It is often chosen by people who want to preserve fertility before medical treatment or who are not yet ready for pregnancy." },
       { term: "Endometrium",                    def: "The inner lining of the uterus. It thickens each cycle in preparation for a potential pregnancy. If no fertilisation occurs, it sheds - this is your period. In conditions like endometriosis, similar tissue grows outside the uterus." },
       { term: "Estrogen",                       def: "A primary female sex hormone produced mainly by the ovaries. It drives the development of the uterine lining during the first half of the cycle, supports bone health, and influences mood, skin, and energy. Levels naturally fluctuate throughout the cycle." },
-      { term: "Fallback engine",                def: "A local prediction path Bloom can use if the backend is temporarily unreachable. It keeps the app usable, but backend-powered results are preferred when available." },
       { term: "Fertile window",                 def: "The days each cycle when pregnancy is most possible - typically the 5 days before ovulation and the day of ovulation itself. Bloom estimates this window based on your cycle history." },
       { term: "Fertility tracking",             def: "The practice of monitoring cycle signs - such as BBT, cervical mucus, and cycle length - to identify fertile days. It can be used to support conception or as a way to better understand your body." },
       { term: "Follicular phase",               def: "The phase from the first day of your period until ovulation. The pituitary gland releases FSH (follicle-stimulating hormone), prompting follicles in the ovaries to develop. Oestrogen rises, thickening the uterine lining." },
@@ -644,7 +640,6 @@
       { term: "Predicted period",               def: "A projected future period range calculated from your cycle pattern. Predicted days may shift as you add new logs." },
       { term: "Prediction window",              def: "A date range Bloom provides (instead of one exact day) when timing confidence is lower or cycle variation is higher." },
       { term: "Progesterone",                   def: "A hormone produced by the ovaries after ovulation. It prepares the uterine lining for implantation and helps maintain early pregnancy. If pregnancy does not occur, progesterone drops and triggers menstruation." },
-      { term: "Sensitive content filter",       def: "A setting that hides or limits mature reproductive-health content in parts of the app. It is useful for privacy preferences and younger users." },
       { term: "Session timeout",                def: "Automatic sign-out after extended inactivity for account safety. You are usually warned before logout so you can stay signed in." },
     ].sort((a, b) => a.term.localeCompare(b.term));
 

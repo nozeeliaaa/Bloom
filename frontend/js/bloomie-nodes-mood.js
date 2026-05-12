@@ -304,7 +304,7 @@ export function createMoodNodes(env, helpers) {
         ];
       },
       choices: [
-        { id: "map",  label: "Find care near me", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: pickMainLabel(),       next: "START_MENU" },
       ],
     },
@@ -803,7 +803,7 @@ export function createMoodNodes(env, helpers) {
         "You deserve real help, not just coping strategies.",
       ],
       choices: [
-        { id: "map",  label: "Find care near me", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: "Main menu",          next: "START_MENU" },
       ],
     },

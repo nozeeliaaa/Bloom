@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import { resolve } from "path";
-import { readdirSync } from "fs";
+import { readdirSync, copyFileSync, mkdirSync, existsSync } from "fs";
 
 const LOCAL_API_TARGET = "http://127.0.0.1:4000";
 const PAGES_DIR = resolve(__dirname, "frontend/pages");
@@ -13,6 +13,21 @@ const pageInputs = Object.fromEntries(
       resolve(PAGES_DIR, entry.name),
     ])
 );
+
+function copyDataDir() {
+  return {
+    name: "copy-data-dir",
+    closeBundle() {
+      const src = resolve(__dirname, "frontend/data");
+      const dest = resolve(__dirname, "dist/data");
+      if (!existsSync(src)) return;
+      mkdirSync(dest, { recursive: true });
+      for (const file of readdirSync(src)) {
+        copyFileSync(resolve(src, file), resolve(dest, file));
+      }
+    },
+  };
+}
 
 export default defineConfig({
   root: "frontend",
@@ -47,6 +62,7 @@ export default defineConfig({
       ],
     },
   },
+  plugins: [copyDataDir()],
   build: {
     outDir: "../dist",
     emptyOutDir: true,

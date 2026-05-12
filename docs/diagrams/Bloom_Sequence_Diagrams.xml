@@ -1,0 +1,715 @@
+<mxfile host="app.diagrams.net" agent="Codex" pages="4">
+  <diagram id="seq001" name="Sequence - Sign Up and Guardian Request">
+    <mxGraphModel dx="3603" dy="2883" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="seq001_title" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=20;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Sequence Diagram - Sign Up and Guardian Consent Request" vertex="1">
+          <mxGeometry height="42" width="700" x="450" y="-50" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p0" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;system&gt;&gt;&lt;br&gt;Bloom Web App" vertex="1">
+          <mxGeometry height="58" width="130" x="25" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p1" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=14;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Prospective User" vertex="1">
+          <mxGeometry height="90" width="70" x="220" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p2" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;boundary&gt;&gt;&lt;br&gt;register.html" vertex="1">
+          <mxGeometry height="68" width="130" x="385" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p3" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;auth.js" vertex="1">
+          <mxGeometry height="68" width="120" x="585" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p4" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;external&gt;&gt;&lt;br&gt;Firebase Auth" vertex="1">
+          <mxGeometry height="68" width="130" x="775" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p5" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;consent.js" vertex="1">
+          <mxGeometry height="68" width="130" x="975" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p6" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;validateConsent.js" vertex="1">
+          <mxGeometry height="68" width="150" x="1160" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p7" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;service&gt;&gt;&lt;br&gt;mailer.js" vertex="1">
+          <mxGeometry height="68" width="120" x="1375" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_p8" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Firestore Database" vertex="1">
+          <mxGeometry height="70" width="110" x="1510" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_l0" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="90" y="120" as="sourcePoint" />
+            <mxPoint x="90" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_l1" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="255" y="85" as="sourcePoint" />
+            <mxPoint x="255" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_l2" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="450" y="90" as="sourcePoint" />
+            <mxPoint x="450" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_l3" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="645" y="90" as="sourcePoint" />
+            <mxPoint x="645" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_l4" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="840" y="90" as="sourcePoint" />
+            <mxPoint x="840" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_l5" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1040" y="90" as="sourcePoint" />
+            <mxPoint x="1040" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_l6" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1235" y="90" as="sourcePoint" />
+            <mxPoint x="1235" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_l7" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1435" y="90" as="sourcePoint" />
+            <mxPoint x="1435" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_l8" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1565" y="90" as="sourcePoint" />
+            <mxPoint x="1565" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_a0" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="540" width="12" x="84" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_a1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="500" width="12" x="249" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_a2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="455" width="12" x="444" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_a3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="140" width="12" x="639" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_a4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="70" width="12" x="834" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_a5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="150" width="12" x="1034" y="425" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_a6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="40" width="12" x="1229" y="445" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_a7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="35" width="12" x="1429" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_a8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry height="60" width="12" x="1559" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_m1" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="display Create Account entry point">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="96" y="160" as="sourcePoint" />
+            <mxPoint x="249" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m2" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="select Create Account">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="249" y="185" as="sourcePoint" />
+            <mxPoint x="96" y="185" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m2b" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="load /pages/register.html and render form">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="96" y="205" as="sourcePoint" />
+            <mxPoint x="444" y="205" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m3" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="submit(email, password, yearOfBirth, guardianEmail?)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="249" y="225" as="sourcePoint" />
+            <mxPoint x="444" y="225" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m4" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="validatePassword(password)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="456" y="245" as="sourcePoint" />
+            <mxPoint x="639" y="245" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m5" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="register(email, password, { skipVerificationEmail })">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="456" y="280" as="sourcePoint" />
+            <mxPoint x="639" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m6" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="createUserWithEmailAndPassword()">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="651" y="310" as="sourcePoint" />
+            <mxPoint x="834" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_r1" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="user">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="834" y="345" as="sourcePoint" />
+            <mxPoint x="651" y="345" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_opt" parent="1" style="shape=umlFrame;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingTop=8;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontColor=#EC008C;strokeColor=#EC008C;fillColor=none" value="alt [isMinorUser] / [adult user]" vertex="1">
+          <mxGeometry height="220" width="1060" x="420" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="seq001_m7" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="getIdToken()">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="456" y="415" as="sourcePoint" />
+            <mxPoint x="639" y="415" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m8" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="POST /api/consent/request">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="456" y="445" as="sourcePoint" />
+            <mxPoint x="1034" y="445" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m9" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="validateConsentRequest(body)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1046" y="470" as="sourcePoint" />
+            <mxPoint x="1229" y="470" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m10" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="set users/{teenUid}; set consents/{consentId}">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1046" y="510" as="sourcePoint" />
+            <mxPoint x="1559" y="510" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m11" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="sendMailTo(guardianEmail, approveLink, denyLink)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1046" y="545" as="sourcePoint" />
+            <mxPoint x="1429" y="545" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_r2" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="{ ok: true }">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1034" y="585" as="sourcePoint" />
+            <mxPoint x="456" y="585" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m12" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="redirect to consent-pending.html [minor user]">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="456" y="630" as="sourcePoint" />
+            <mxPoint x="249" y="630" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m13a" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="sendEmailVerification(res.user) [adult user]">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="651" y="675" as="sourcePoint" />
+            <mxPoint x="834" y="675" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq001_m13" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="display verification notice [adult user]">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="456" y="720" as="sourcePoint" />
+            <mxPoint x="249" y="720" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="seq002" name="Sequence - Guardian Consent Decision">
+    <mxGraphModel dx="1521" dy="821" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="seq002_title" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=20;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Sequence Diagram - Guardian Consent Decision" vertex="1">
+          <mxGeometry x="440" y="-50" width="620" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_p0" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=14;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Guardian" vertex="1">
+          <mxGeometry x="65" y="30" width="70" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_p1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;system&gt;&gt;&lt;br&gt;Bloom Backend" vertex="1">
+          <mxGeometry x="205" y="25" width="130" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_p2" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;consent.js" vertex="1">
+          <mxGeometry x="420" y="20" width="130" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_p3" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;consentToken.js" vertex="1">
+          <mxGeometry x="635" y="20" width="145" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_p4" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Firestore Database" vertex="1">
+          <mxGeometry x="865" y="20" width="120" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_p5" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;external&gt;&gt;&lt;br&gt;Firebase Auth" vertex="1">
+          <mxGeometry x="1065" y="20" width="130" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_p6" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;service&gt;&gt;&lt;br&gt;mailer.js" vertex="1">
+          <mxGeometry x="1275" y="20" width="120" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_l0" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="120" as="sourcePoint" />
+            <mxPoint x="100" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_l1" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="270" y="85" as="sourcePoint" />
+            <mxPoint x="270" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_l2" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="485" y="90" as="sourcePoint" />
+            <mxPoint x="485" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_l3" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="708" y="90" as="sourcePoint" />
+            <mxPoint x="708" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_l4" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="925" y="90" as="sourcePoint" />
+            <mxPoint x="925" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_l5" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1130" y="90" as="sourcePoint" />
+            <mxPoint x="1130" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_l6" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1335" y="90" as="sourcePoint" />
+            <mxPoint x="1335" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_a0" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="94" y="145" width="12" height="500" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_a1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="264" y="165" width="12" height="455" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_a2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="479" y="190" width="12" height="405" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_a3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="702" y="265" width="12" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_a4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="919" y="220" width="12" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_a5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="1124" y="410" width="12" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_a6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="1329" y="480" width="12" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_m1" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="click approve/deny email link">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="106" y="165" as="sourcePoint" />
+            <mxPoint x="264" y="165" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_m2" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="GET /api/consent/approve?token&amp;consentId">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="276" y="200" as="sourcePoint" />
+            <mxPoint x="479" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_m3" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="get consents/{consentId}">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="491" y="230" as="sourcePoint" />
+            <mxPoint x="919" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_m4" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="generateRevokeToken() [approve only]">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="491" y="275" as="sourcePoint" />
+            <mxPoint x="702" y="275" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_r1" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="revokeToken">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="702" y="315" as="sourcePoint" />
+            <mxPoint x="491" y="315" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_alt" parent="1" style="shape=umlFrame;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingTop=8;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontColor=#EC008C;strokeColor=#EC008C;fillColor=none" value="alt [approve] / [deny]" vertex="1">
+          <mxGeometry x="440" y="350" width="950" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="seq002_m5" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="validate inviteToken/expiresAt/status; update consent">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="491" y="380" as="sourcePoint" />
+            <mxPoint x="919" y="380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_m6" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="set relationships/{consentId} active/revoked">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="491" y="420" as="sourcePoint" />
+            <mxPoint x="919" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_m7" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="updateUser(teenUid, { emailVerified: true })">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="491" y="445" as="sourcePoint" />
+            <mxPoint x="1124" y="445" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_m8" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="sendMailTo(teen/guardian result notice)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="491" y="490" as="sourcePoint" />
+            <mxPoint x="1329" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq002_m9" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="redirect consent-result.html?result=approved/denied">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="479" y="595" as="sourcePoint" />
+            <mxPoint x="106" y="595" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="seq003" name="Sequence - Delete Account">
+    <mxGraphModel dx="1521" dy="821" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="seq003_title" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=20;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Sequence Diagram - Delete Account" vertex="1">
+          <mxGeometry x="500" y="-50" width="500" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_p0" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=14;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="User" vertex="1">
+          <mxGeometry x="65" y="30" width="70" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_p1" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;boundary&gt;&gt;&lt;br&gt;profile-view.html" vertex="1">
+          <mxGeometry x="230" y="20" width="140" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_p2" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;auth.js" vertex="1">
+          <mxGeometry x="440" y="20" width="120" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_p3" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;user.js" vertex="1">
+          <mxGeometry x="640" y="20" width="120" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_p4" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;deleteUserData.js" vertex="1">
+          <mxGeometry x="830" y="20" width="150" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_p5" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Firestore Database" vertex="1">
+          <mxGeometry x="1060" y="20" width="120" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_p6" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;external&gt;&gt;&lt;br&gt;Firebase Auth" vertex="1">
+          <mxGeometry x="1260" y="20" width="130" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_l0" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="120" as="sourcePoint" />
+            <mxPoint x="100" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_l1" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="90" as="sourcePoint" />
+            <mxPoint x="300" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_l2" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="500" y="90" as="sourcePoint" />
+            <mxPoint x="500" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_l3" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="700" y="90" as="sourcePoint" />
+            <mxPoint x="700" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_l4" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="905" y="90" as="sourcePoint" />
+            <mxPoint x="905" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_l5" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1120" y="90" as="sourcePoint" />
+            <mxPoint x="1120" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_l6" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1325" y="90" as="sourcePoint" />
+            <mxPoint x="1325" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_a0" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="94" y="145" width="12" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_a1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="294" y="165" width="12" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_a2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="494" y="205" width="12" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_a3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="694" y="300" width="12" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_a4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="899" y="330" width="12" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_a5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="1114" y="360" width="12" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_a6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="1319" y="420" width="12" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_m1" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="click Delete Account">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="106" y="165" as="sourcePoint" />
+            <mxPoint x="294" y="165" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_m2" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="confirm permanent deletion">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="294" y="195" as="sourcePoint" />
+            <mxPoint x="106" y="195" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_m3" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="getIdToken()">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="306" y="225" as="sourcePoint" />
+            <mxPoint x="494" y="225" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_r1" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="Firebase ID token">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="494" y="270" as="sourcePoint" />
+            <mxPoint x="306" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_m4" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="DELETE /api/user/account">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="306" y="310" as="sourcePoint" />
+            <mxPoint x="694" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_m5" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="deleteBloomUserData(uid)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="706" y="340" as="sourcePoint" />
+            <mxPoint x="899" y="340" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_loop" parent="1" style="shape=umlFrame;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingTop=8;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontColor=#EC008C;strokeColor=#EC008C;fillColor=none" value="loop [directDocs and queryDeletes]" vertex="1">
+          <mxGeometry x="870" y="355" width="290" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="seq003_m6" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="deleteDocumentTree()/deleteDocsMatching()">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="911" y="390" as="sourcePoint" />
+            <mxPoint x="1114" y="390" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_m7" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="auth.deleteUser(uid)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="911" y="430" as="sourcePoint" />
+            <mxPoint x="1319" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_r2" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="{ ok:true, deleted:true, stats }">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="694" y="485" as="sourcePoint" />
+            <mxPoint x="306" y="485" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_m8" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="logout(); clearLocalSessionData(); setMode(&#39;anon&#39;)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="306" y="525" as="sourcePoint" />
+            <mxPoint x="494" y="525" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq003_m9" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="redirect /index.html">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="294" y="575" as="sourcePoint" />
+            <mxPoint x="106" y="575" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="seq004" name="Sequence - Clinic Search">
+    <mxGraphModel dx="1521" dy="821" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="seq004_title" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=20;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="Sequence Diagram - Clinic Search" vertex="1">
+          <mxGeometry x="500" y="-50" width="500" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_p0" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=14;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="User" vertex="1">
+          <mxGeometry x="65" y="30" width="70" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_p1" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;boundary&gt;&gt;&lt;br&gt;clinics.html" vertex="1">
+          <mxGeometry x="240" y="20" width="130" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_p2" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;api-base.js" vertex="1">
+          <mxGeometry x="455" y="20" width="120" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_p3" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;clinics.js" vertex="1">
+          <mxGeometry x="655" y="20" width="120" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_p4" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;listClinics()" vertex="1">
+          <mxGeometry x="850" y="20" width="130" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_p5" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="&lt;&lt;control&gt;&gt;&lt;br&gt;applyClinicFilters()" vertex="1">
+          <mxGeometry x="1045" y="20" width="155" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_p6" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12;fontStyle=1;fontColor=#EC008C;strokeColor=#EC008C;fillColor=#FFF7FA" value="clinicDirectory" vertex="1">
+          <mxGeometry x="1280" y="20" width="120" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_l0" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="120" as="sourcePoint" />
+            <mxPoint x="100" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_l1" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="305" y="90" as="sourcePoint" />
+            <mxPoint x="305" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_l2" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="515" y="90" as="sourcePoint" />
+            <mxPoint x="515" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_l3" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="715" y="90" as="sourcePoint" />
+            <mxPoint x="715" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_l4" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="915" y="90" as="sourcePoint" />
+            <mxPoint x="915" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_l5" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1123" y="90" as="sourcePoint" />
+            <mxPoint x="1123" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_l6" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#EC008C">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1340" y="90" as="sourcePoint" />
+            <mxPoint x="1340" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_a0" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="94" y="145" width="12" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_a1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="299" y="165" width="12" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_a2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="509" y="190" width="12" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_a3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="709" y="260" width="12" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_a4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="909" y="290" width="12" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_a5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="1117" y="340" width="12" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_a6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF7FA;strokeColor=#EC008C" vertex="1">
+          <mxGeometry x="1334" y="310" width="12" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="seq004_m1" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="open /pages/clinics.html">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="106" y="165" as="sourcePoint" />
+            <mxPoint x="299" y="165" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m2" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="init(); initMap()">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="305" y="195" as="sourcePoint" />
+            <mxPoint x="305" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m3" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="getApiBase()">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="311" y="230" as="sourcePoint" />
+            <mxPoint x="509" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m4" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="GET /api/clinics">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="311" y="270" as="sourcePoint" />
+            <mxPoint x="709" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m5" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="listClinics(req.query)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="721" y="300" as="sourcePoint" />
+            <mxPoint x="909" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m6" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="collection(&#39;clinicDirectory&#39;).get()">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="921" y="325" as="sourcePoint" />
+            <mxPoint x="1334" y="325" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m7" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="applyClinicFilters(clinics, query)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="921" y="365" as="sourcePoint" />
+            <mxPoint x="1117" y="365" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_r1" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="{ ok:true, clinics:[...] }">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="709" y="410" as="sourcePoint" />
+            <mxPoint x="311" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m8" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="attachCoords(); populateFilters(); renderClinics()">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="305" y="450" as="sourcePoint" />
+            <mxPoint x="305" y="485" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m9" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="enter search / change filters">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="106" y="525" as="sourcePoint" />
+            <mxPoint x="299" y="525" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m10" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="renderClinics() filters loaded clinics client-side">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="305" y="565" as="sourcePoint" />
+            <mxPoint x="305" y="595" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seq004_m11" edge="1" parent="1" style="endArrow=block;html=1;rounded=0;strokeColor=#EC008C;fontColor=#EC008C;fontFamily=Nunito,Segoe UI,sans-serif;fontSize=12" value="display matching cards/map markers or no-clinics message">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="299" y="620" as="sourcePoint" />
+            <mxPoint x="106" y="620" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

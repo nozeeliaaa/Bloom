@@ -88,6 +88,12 @@ router.post("/profile", requireAuth, async (req, res) => {
       yearOfBirth: finalYearOfBirth,
       ageBand: finalYearOfBirth ? computeAgeBand(finalYearOfBirth) : null,
       consentSensitive: req.body.consentSensitive ?? existingProfile?.consentSensitive ?? false,
+      remindersEnabled: req.body.remindersEnabled !== undefined
+        ? Boolean(req.body.remindersEnabled)
+        : (existingProfile?.remindersEnabled ?? false),
+      reminderTime: existingProfile?.reminderTime ?? "09:00",
+      regularity: req.body.regularity ?? existingProfile?.regularity ?? null,
+      privacyPref: req.body.privacyPref ?? existingProfile?.privacyPref ?? null,
       onboardingCompleted,
       onboardingCompletedAt,
     };

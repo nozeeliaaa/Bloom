@@ -13,9 +13,9 @@
  *
  * INPUT
  * ─────
- * localMatches  — array of { key: string, confidence: number } from the
+ * localMatches  - array of { key: string, confidence: number } from the
  *                 rule-based catalog matcher, in any order.
- * aiResult      — optional object:
+ * aiResult      - optional object:
  *                 { primary, secondary, confidence, clarificationNeeded, reason }
  *                 from inferSymptomsAI() in bloomie-symptom-infer.js, or null.
  *
@@ -23,8 +23,8 @@
  * ──────
  * {
  *   primary:             string | null,
- *   secondary:           string[],        — ≤2 keys, no duplicates
- *   confidence:          number,          — 0.0–1.0
+ *   secondary:           string[],        - ≤2 keys, no duplicates
+ *   confidence:          number,          - 0.0–1.0
  *   clarificationNeeded: boolean,
  *   source:              "local" | "ai" | "merged",
  *   reason:              string,
@@ -116,7 +116,7 @@ export function resolveSymptoms(localMatches, aiResult = null) {
   const localKey        = topLocal.key;
   const localConfidence = topLocal.confidence;
 
-  // Case B: high-confidence local (>= 0.85) — prefer local as primary
+  // Case B: high-confidence local (>= 0.85) - prefer local as primary
   if (localConfidence >= HIGH_CONFIDENCE) {
     // Only include AI secondary if it doesn't conflict with local primary
     const secondaryCandidates = aiPrimary && aiPrimary !== localKey
@@ -143,7 +143,7 @@ export function resolveSymptoms(localMatches, aiResult = null) {
     const aiExists = aiResult !== null && aiPrimary !== null;
 
     if (aiExists && aiConfidence > localConfidence) {
-      // AI wins — higher confidence
+      // AI wins - higher confidence
       const secondary = buildSecondary(
         aiPrimary,
         [localKey, ...localSecondary, ...aiSecondary],

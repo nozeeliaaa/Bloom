@@ -1,6 +1,6 @@
 import "./firebaseConfig.js";
 
-const DEFAULT_API_BASE = "https://bloom-backend-538005116995-538005116995.us-east1.run.app";
+const DEFAULT_API_BASE = "https://bloom-backend-538005116995.us-central1.run.app";
 const LOCAL_API_BASE = "http://127.0.0.1:4000";
 
 function cleanBase(value) {

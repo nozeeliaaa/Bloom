@@ -222,7 +222,17 @@ const HEALTH_GATE = new RegExp(
   "smell(?:ing|s)?\\s+(?:off|different|weird|bad)|" +
   // Worried + vague concern
   "(?:worried|scared|concerned)\\s+(?:about\\s+)?(?:something|my body|what.?s)|" +
-  "something.*(?:wrong|off|not right).*(?:me|my body|my cycle|my period)",
+  "something.*(?:wrong|off|not right).*(?:me|my body|my cycle|my period)|" +
+  // ── Tier 3: conversational in-context replies (typed instead of clicking) ─
+  // "all the time", "always", frequency replies to pending timing questions
+  "all the time|always feel|feel (?:like )?this (?:all the time|always|constantly)|" +
+  "this always happens|happens all the time|feel (?:like )?this every day|" +
+  // "it's random", "no clear pattern" replies
+  "no (?:clear )?pattern|no (?:clear )?link|not connected to|all over the place|" +
+  // "before my period", "during my period" as typed timing answers
+  "before my period|during my period|right before (?:my )?period|" +
+  // General "feel like this" catch-all when in a health conversation
+  "feel like this|feel (?:this|it) (?:all|every)|this is (?:how i|my) (?:always|always feel)",
   "i"
 );
 

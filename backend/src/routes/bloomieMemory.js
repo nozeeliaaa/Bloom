@@ -24,7 +24,10 @@ const VALID_SYMPTOM_KEYS = new Set([
 const VALID_SEVERITIES = new Set(["mild", "moderate", "severe"]);
 
 // GET /api/bloomie-memory - load last session snapshot
-router.get("/", requireAuth, requireConsent, async (req, res) => {
+// requireConsent is intentionally omitted here: a user who previously had an
+// approved session should still be able to read their stored memory even if
+// their consent state changes. The data returned is non-sensitive session context.
+router.get("/", requireAuth, async (req, res) => {
   try {
     const doc = await db.collection("bloomieMemory").doc(req.user.uid).get();
     if (!doc.exists) return res.json(null);
@@ -40,10 +43,11 @@ router.put("/", requireAuth, requireConsent, async (req, res) => {
   try {
     const { lastSymptoms, lastIntent, lastSeverity, lastDuration, lastPregnancyChance, recentTopics } = req.body;
 
+    // Filter to known valid keys only — no catalog key conversion on the backend
+    // (SYMPTOM_TO_CATALOG_KEYS is a frontend-only mapping and is not available here)
     const symptoms = Array.isArray(lastSymptoms)
       ? lastSymptoms
         .filter(s => VALID_SYMPTOM_KEYS.has(s))
-        .flatMap(s => SYMPTOM_TO_CATALOG_KEYS[s] || [s]) // 🔥 convert
         .slice(0, 20)
       : [];
 

@@ -23,6 +23,9 @@ export function isOnboardingCompleteFromProfileData(data) {
   const health = data.healthProfile && typeof data.healthProfile === "object" ? data.healthProfile : {};
   const phase = data.phaseProfile && typeof data.phaseProfile === "object" ? data.phaseProfile : {};
 
+  // Explicit "not done" always wins - new accounts have this set to false
+  if (data.onboardingCompleted === false || profile.onboardingCompleted === false) return false;
+
   if (data.onboardingCompleted === true || profile.onboardingCompleted === true) return true;
   if (
     hasValue(data.onboardingCompletedAt) ||
@@ -33,11 +36,11 @@ export function isOnboardingCompleteFromProfileData(data) {
     return true;
   }
 
-  // Backward compatibility for accounts that completed setup before the
-  // explicit onboarding flag existed. Default profile-only fields such as
-  // goal/mode/avatar are not enough to count as completed setup.
+  // Backward compatibility: accounts that completed setup before the explicit
+  // flag existed. Require at least one health metric alongside YOB so that
+  // pre-filled registration data (e.g. minor yearOfBirth) doesn't count.
   return Boolean(
-    hasValue(profile.yearOfBirth) ||
+    (hasValue(profile.yearOfBirth) && (hasValue(health.avgCycleLength) || hasValue(health.periodDuration))) ||
     hasValue(health.avgCycleLength) ||
     hasValue(health.periodDuration) ||
     hasValue(health.weightKg) ||

@@ -1063,11 +1063,6 @@ function getPregnancyWeekTips(week) {
 
 // â”€â”€ Pregnancy symptom insights (uses logged symptoms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PREGNANCY_SYMPTOM_MAP = {
-  // Bleeding
-  VAGINAL_BLEEDING:     { label: "Bleeding", note: "Any vaginal bleeding in pregnancy should be reported to your provider promptly, even if light." },
-  SPOTTING:             { label: "Spotting", note: "Light spotting can occur in early pregnancy from implantation or cervical sensitivity. Always mention it to your provider." },
-  HEAVY_FLOW:           { label: "Heavy bleeding", note: "Heavy bleeding during pregnancy requires prompt medical attention. Contact your provider or go to emergency care." },
-  LARGE_CLOTS:          { label: "Blood clots", note: "Passing clots during pregnancy should always be assessed by your healthcare provider right away." },
   // Pain
   CRAMPS:               { label: "Cramping", note: "Mild cramping can be normal as the uterus stretches. Sharp, persistent, or one-sided pain should be assessed by your provider." },
   PELVIC_PAIN:          { label: "Pelvic pain", note: "Pelvic girdle pain is common as ligaments loosen. A support belt or prenatal physiotherapy can help. Severe pain warrants a check-up." },
@@ -1090,7 +1085,6 @@ const PREGNANCY_SYMPTOM_MAP = {
   FATIGUE:              { label: "Fatigue", note: "Extremely common especially in the first and third trimesters. Prioritise rest, accept help, and eat iron-rich foods to support energy levels." },
   FLUID_RETENTION:      { label: "Swelling", note: "Mild swelling in legs and feet is common later in pregnancy. Sudden or severe swelling in the face or hands should be reported to your provider." },
   FREQUENT_URINATION:   { label: "Frequent urination", note: "Normal as the uterus grows and presses on the bladder. Reduce fluids in the evening if it disrupts sleep, but stay hydrated during the day." },
-  WEIGHT_CHANGE:        { label: "Weight changes", note: "Steady weight gain is expected during pregnancy. Your provider will monitor this at each visit to ensure it's on track for you." },
   NASAL_CONGESTION:     { label: "Nasal congestion", note: "Pregnancy rhinitis - a stuffy nose caused by increased blood flow - is common. A humidifier and saline spray can help." },
   SMELL_SENSITIVITY:    { label: "Smell sensitivity", note: "Heightened sense of smell is very common in the first trimester and often linked to nausea. Avoiding strong scents where possible can help." },
   // Skin & Hair
@@ -1440,14 +1434,6 @@ async function renderSymptomTools(goal, logsByDate, cycle) {
       LOW_MOOD: {
         why: "Low mood can increase when estrogen and progesterone fall in late luteal days.",
         tip: "Track mood with cycle timing; persistent low mood should be discussed with a clinician.",
-      },
-      SPOTTING: {
-        why: "Spotting may happen with ovulation timing, hormonal fluctuations, or cycle disruption.",
-        tip: "Track amount, timing, and accompanying symptoms to identify if a repeat pattern is forming.",
-      },
-      HEAVY_FLOW: {
-        why: "Heavy flow can increase fatigue and pain burden and may affect cycle predictions.",
-        tip: "Log flow intensity daily; soaking products rapidly needs urgent medical care.",
       },
     };
 
@@ -1844,7 +1830,6 @@ function signalLabel(code) {
     // Symptom engine
     SEEK_URGENT_CARE:             "Urgent = seek medical care",
     URGENT_SYMPTOM_COMBINATION:   "Concerning symptom combination",
-    HEAVY_BLEEDING_FLAG:          "Heavy bleeding flagged",
     SEVERE_PAIN_FLAG:             "Severe pain flagged",
     PHASE_UNEXPECTED_SYMPTOMS:    "Unusual symptoms for this phase",
     PMS_CLUSTER_DETECTED:         "PMS pattern detected",

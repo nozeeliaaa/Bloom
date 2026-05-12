@@ -4,7 +4,7 @@
  * AI-powered catalog-grounded symptom inference for Bloomie.
  *
  * Uses Claude Haiku via the secure backend proxy at /api/bloomie/ai/symptoms
- * to semantically map a user message to one or more keys from symptoms.json —
+ * to semantically map a user message to one or more keys from symptoms.json -
  * catching phrasing that the regex/alias layer in bloomie-symptom-catalog.js
  * would miss.
  *
@@ -16,23 +16,23 @@
  *
  * WHY IT IS SAFE
  * ──────────────
- * 1. AI returns catalog keys only — never free-form text or invented symptoms.
+ * 1. AI returns catalog keys only - never free-form text or invented symptoms.
  * 2. Every key is validated on the backend (against symptoms.json) AND here
  *    (against the same catalog keys exported from bloomie-symptom-catalog.js).
- * 3. Results are purely advisory — null means rule-based matching runs as normal.
+ * 3. Results are purely advisory - null means rule-based matching runs as normal.
  * 4. No PII forwarded. Only the trimmed user message + optional phase/recent keys.
  *
  * OUTPUT SHAPE (SymptomInference | null)
  * ───────────────────────────────────────
  * {
- *   primary:             string | null  — best-match catalog key
- *   secondary:           string[]       — up to 2 additional keys
- *   confidence:          number         — 0.0–1.0
- *   clarificationNeeded: boolean        — true when message is ambiguous
- *   reason:              string         — short explanation (≤120 chars)
+ *   primary:             string | null  - best-match catalog key
+ *   secondary:           string[]       - up to 2 additional keys
+ *   confidence:          number         - 0.0–1.0
+ *   clarificationNeeded: boolean        - true when message is ambiguous
+ *   reason:              string         - short explanation (≤120 chars)
  * }
  *
- * Returns null on any failure — the caller should treat null as "no AI signal".
+ * Returns null on any failure - the caller should treat null as "no AI signal".
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -58,7 +58,7 @@ function getCatalogKeySet() {
 }
 
 // ── Health keyword gate ───────────────────────────────────────────────────────
-// Mirrors bloomie-extract.js — avoids API round-trips for greetings and OOS.
+// Mirrors bloomie-extract.js - avoids API round-trips for greetings and OOS.
 const HEALTH_GATE = /\b(period|bleed(?:ing)?|blood|late|missed|spotting|spot|cramp|pain|pelvic|pregnant|pregnancy|discharge|mood|tired|exhausted|cycle|irregular|heavy|clot|dizzy|nausea|ovulat|hormone|endo|pcos|fibroid|symptom|flow|lmp|emotional|sad|angry|vex|frustrated|anxious|fatigue|energy|breast|back|headache|night.?sweat|sore|ache|hurt|swollen|bloat|gassy|constipat|diarrhea|sleep|insomnia|craving|rash|acne|discharge|dry|itchy)\b/i;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ function validateInference(parsed) {
         .slice(0, 2)
     : [];
 
-  // Nothing useful — skip storing
+  // Nothing useful - skip storing
   if (primary === null && secondary.length === 0 && !parsed.clarificationNeeded) return null;
 
   return {

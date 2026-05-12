@@ -123,7 +123,7 @@ diff --git a/frontend/js/__tests__/bloomie-inference.test.js b/frontend/js/__tes
 index 1bb6a5a..5391e04 100644
 --- a/frontend/js/__tests__/bloomie-inference.test.js
 +++ b/frontend/js/__tests__/bloomie-inference.test.js
-@@ -66,6 +66,11 @@ describe("extractEntities — symptoms", () => {
+@@ -66,6 +66,11 @@ describe("extractEntities - symptoms", () => {
      expect(e.symptoms.heavy).toBe(true);
    });
  
@@ -135,7 +135,7 @@ index 1bb6a5a..5391e04 100644
    it("detects spotting", () => {
      const e = extractEntities("i noticed spotting today");
      expect(e.symptoms.spotting).toBe(true);
-@@ -169,6 +174,11 @@ describe("extractEntities — severity", () => {
+@@ -169,6 +174,11 @@ describe("extractEntities - severity", () => {
      const e = extractEntities("pretty bad pain, affecting my day");
      expect(e.severity).toBe("moderate");
    });
@@ -146,8 +146,8 @@ index 1bb6a5a..5391e04 100644
 +  });
  });
  
- describe("extractEntities — timing", () => {
-@@ -332,6 +342,18 @@ describe("inferRoute — heavy bleeding routes", () => {
+ describe("extractEntities - timing", () => {
+@@ -332,6 +342,18 @@ describe("inferRoute - heavy bleeding routes", () => {
      expect(route.next).toBe("HEAVY_ROUTE_B");
      expect(REGISTERED_NODE_IDS.has(route.next)).toBe(true);
    });
@@ -165,7 +165,7 @@ index 1bb6a5a..5391e04 100644
 +  });
  });
  
- describe("inferRoute — spotting routes", () => {
+ describe("inferRoute - spotting routes", () => {
 diff --git a/frontend/js/__tests__/bloomie-intent-tags.test.js b/frontend/js/__tests__/bloomie-intent-tags.test.js
 index d1c6e94..7e29d95 100644
 --- a/frontend/js/__tests__/bloomie-intent-tags.test.js
@@ -543,7 +543,7 @@ index d387a9f..5b15524 100644
 -    boost: " late period",
 -  },
 -  {
--    // NOTE: boost must NOT include "pain" — combined with "severe" it triggers
+-    // NOTE: boost must NOT include "pain" - combined with "severe" it triggers
 -    // extractUrgency's severe.*pain pattern causing false escalation.
 -    patterns: [/cramp|pelvic pain|stomach pain|belly pain|lower abdom/i],
 -    boost: " cramp pelvic",
@@ -553,7 +553,7 @@ index d387a9f..5b15524 100644
 -    boost: " spotting light stain",
 -  },
 -  {
--    // NOTE: "missed period" removed from boost — it activated sym.late prematurely,
+-    // NOTE: "missed period" removed from boost - it activated sym.late prematurely,
 -    // causing the late+pregnancy combo rule to fire before spotting+pregnancy rules.
 -    patterns: [/pregnant|pregnancy|positive test|might be pregnant/i],
 -    boost: " pregnant pregnancy",
@@ -567,19 +567,19 @@ index d387a9f..5b15524 100644
 -    boost: " mood anxious sad irritable",
 -  },
 -  {
--    // NOTE: boost must NOT include "faint" — it is in extractUrgency's regex and
+-    // NOTE: boost must NOT include "faint" - it is in extractUrgency's regex and
 -    // causes false escalation when the user only mentions weakness (not fainting).
 -    // "dizziness" and "lightheaded" are NOT urgency keywords so they are safe.
 -    patterns: [/faint|dizzy|lightheaded|pass out/i],
 -    boost: " dizzy lightheaded",
 -  },
 -  {
--    // Amenorrhea — periods missing for extended time
+-    // Amenorrhea - periods missing for extended time
 -    patterns: [/amenorrhea|period.*months|months.*period|period.*stopped|period.*absent|not.*had.*period|missed.*more.*period|period.*gone/i],
 -    boost: " amenorrhea missing period months absent",
 -  },
 -  {
--    // TTC — trying to conceive context
+-    // TTC - trying to conceive context
 -    patterns: [/trying to conceive|ttc|trying to get pregnant|want.*pregnant|fertile days|ovulation.*test/i],
 -    boost: " ttc trying to conceive ovulation fertile",
 -  },

@@ -244,7 +244,7 @@ export function onAuthChange(callback) {
  * - Enforces password strength
  * - Sends email verification automatically
  */
-export async function register(email, password) {
+export async function register(email, password, { skipVerificationEmail = false } = {}) {
   const { valid, errors } = validatePassword(password);
   if (!valid) {
     const err = new Error("Password does not meet requirements: " + errors.join(", "));
@@ -255,7 +255,9 @@ export async function register(email, password) {
 
   const res = await createUserWithEmailAndPassword(auth(), email, password);
 
-  await sendEmailVerification(res.user);
+  if (!skipVerificationEmail) {
+    await sendEmailVerification(res.user);
+  }
 
   setMode("account");
   syncUserRoleInBackground(res.user);
@@ -341,6 +343,8 @@ const USER_LOCAL_KEYS = [
   "bloom_preferences",
   "bloom_show_mode_banner_once",
   "bloom_last_activity_ts",
+  "bloom_game",
+  "bloom_consent_status",
 ];
 
 export function clearLocalSessionData() {

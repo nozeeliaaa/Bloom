@@ -7,7 +7,7 @@
  * For production, use environment variables or a build step to inject these.
  * This file should be in .gitignore for security.
  */
-const defaultApiBase = "https://bloom-backend-538005116995-538005116995.us-east1.run.app";
+const defaultApiBase = "https://bloom-backend-538005116995.us-central1.run.app";
 const localApiBase = "http://127.0.0.1:4000";
 const hasWindow = typeof window !== "undefined";
 const host = hasWindow ? (window.location.hostname || "") : "";

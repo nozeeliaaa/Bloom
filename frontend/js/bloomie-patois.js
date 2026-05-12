@@ -5,22 +5,22 @@
  *
  * PREPROCESSING PIPELINE (4 stages):
  *
- *   Stage 1 — Phrase-level exact matching
+ *   Stage 1 - Phrase-level exact matching
  *             Multi-word Patois phrases → English equivalents.
  *             Processed first so idioms ("belly a kill mi") aren't broken up.
  *
- *   Stage 2 — Word-level exact matching
+ *   Stage 2 - Word-level exact matching
  *             Single Patois tokens → English equivalents (whole-word only).
  *
- *   Stage 3 — Fuzzy matching (Levenshtein distance)
+ *   Stage 3 - Fuzzy matching (Levenshtein distance)
  *             Catches near-misses: misspellings, regional spelling variation,
  *             elongation ("baad"), dropped letters ("bleedin"), transpositions
  *             ("peroid"). Uses dynamic threshold: distance ≤ 1 for short words
  *             (≤5 chars), distance ≤ 2 for longer words.
  *             This is the key answer to "what if her Patois doesn't match your
- *             dictionary exactly?" — it doesn't have to.
+ *             dictionary exactly?" - it doesn't have to.
  *
- *   Stage 4 — Intent boosters
+ *   Stage 4 - Intent boosters
  *             Appends extra scoring keywords for patterns that survive all three
  *             stages but still need a stronger signal in the scorer.
  *
@@ -30,7 +30,7 @@
  *   - Lalla & D'Costa's "Language in Exile" linguistic corpus
  *   - The JamCreole academic wordlist
  *   - Iterative testing with Jamaican users and community review
- *   It is not claimed to be exhaustive — Patois is a living language.
+ *   It is not claimed to be exhaustive - Patois is a living language.
  *   Fuzzy matching (Stage 3) is specifically designed to handle the variation
  *   that a fixed dictionary cannot.
  *
@@ -50,6 +50,12 @@
 
 const PHRASE_MAP = [
   // ── Greetings ──────────────────────────────────────────────────────────────
+  // Elongated/typo variants FIRST (more specific, caught before shorter base forms)
+  ["wah gwaann",         "what's going on"],
+  ["wah gwaaaan",        "what's going on"],
+  ["wagwaann",           "what's going on"],
+  ["wagwaaaan",          "what's going on"],
+  ["wha gwaan",          "what's going on"],
   ["wah gwaan",          "what's going on"],
   ["wagwaan",            "what's going on"],
   ["wha gwan",           "what's going on"],
@@ -553,13 +559,14 @@ const PHRASE_MAP = [
 
 
   //Seeking help / clinic phrases
-  ["mi need help", "i need help"],
   ["mi need fi see doctor", "i need to see a doctor"],
   ["mi need fi go clinic", "i need to go to a clinic"],
   ["mi need fi go hospital", "i need to go to a hospital"],
   ["clinic open", "clinic is open"],
   ["clinic close", "clinic is closed"],
   ["weh di clinic deh", "where is the clinic"],
+  ["weh clinic deh near mi", "where is the clinic near me"],
+  ["weh mi can go", "where can i go for help care"],
   ["mi cyaan afford doctor", "i cannot afford a doctor"],
 
 
@@ -570,7 +577,94 @@ const PHRASE_MAP = [
   ["a nuttn", "it is nothing"],
   ["annuh nutn", "it is nothing"],
 
+  // ── Period arrived / started ───────────────────────────────────────────────
+  ["mi period come", "my period has started period came"],
+  ["mi period reach", "my period has started period came"],
+  ["mi period start", "my period has started period came"],
+  ["mi period come today", "my period started today period came"],
+
+  // ── Period missed / not seen ───────────────────────────────────────────────
+  ["mi miss mi period", "i missed my period late"],
+  ["mi nuh see mi period yet", "i have not seen my period yet late"],
+  ["mi nuh get mi period yet", "i have not gotten my period yet late"],
+
+  // ── Flow / heavy bleeding ──────────────────────────────────────────────────
+  ["mi flow heavy", "my flow is heavy heavy bleeding"],
+  ["mi flow nuff", "my flow is heavy heavy bleeding"],
+  ["blood clot inna mi period", "blood clots in my period heavy bleeding clots"],
+  ["clot inna mi period", "clots in my period heavy bleeding"],
+
+  // ── Cycle irregularity ────────────────────────────────────────────────────
+  ["mi cycle irregular", "my cycle is irregular irregular cycle"],
+  ["mi period nah come regular", "my period is not regular irregular cycle"],
+  ["mi period nuh come regular", "my period does not come regularly irregular cycle"],
+
+  // ── Pregnancy / fertility ─────────────────────────────────────────────────
+  ["coulda mi pregnant", "could i be pregnant pregnancy"],
+  ["could mi be pregnant", "could i be pregnant pregnancy"],
+  ["when mi fertile", "when am i fertile fertile window ovulation"],
+  ["when mi most fertile", "when am i most fertile fertile window ovulation"],
+  ["when mi can tek pregnancy test", "when can i take a pregnancy test"],
+  ["when can mi tek pregnancy test", "when can i take a pregnancy test"],
+  ["when can mi tek di test", "when can i take the pregnancy test"],
+
+  // ── Discharge changes ─────────────────────────────────────────────────────
+  ["mi discharge look different", "my discharge looks different unusual discharge"],
+  ["mi discharge change", "my discharge has changed unusual discharge"],
+  ["mi discharge nuh normal", "my discharge is not normal unusual discharge"],
+
+  // ── Breast symptoms ───────────────────────────────────────────────────────
+  ["mi breast dem sore", "my breasts are sore breast tenderness"],
+  ["mi breast sore", "my breasts are sore breast tenderness"],
+  ["mi breast hurt", "my breasts hurt breast tenderness"],
+  ["mi nipple sore", "my nipples are sore breast tenderness"],
+
+  // ── Headache ──────────────────────────────────────────────────────────────
+  ["mi head a hurt bad", "i have a severe headache head pain"],
+  ["mi head a hurt", "i have a headache head pain"],
+  ["mi head hurt bad", "my head hurts badly head pain"],
+  ["mi head hurt", "my head hurts head pain"],
+
+  // ── Skin / hormonal symptoms ──────────────────────────────────────────────
+  ["mi face a bruk out", "my face is breaking out acne skin hormones"],
+  ["mi face bruk out bad", "my face is breaking out badly acne skin hormones"],
+  ["mi skin a bruk out", "my skin is breaking out acne hormones"],
+
+  // ── Bloating / swelling ───────────────────────────────────────────────────
+  ["mi belly swell up", "my stomach is swollen bloated bloating"],
+  ["mi belly swell", "my stomach is swollen bloated bloating"],
+  ["mi feel bloated", "i feel bloated bloating"],
+
+  // ── Mood / emotional ──────────────────────────────────────────────────────
+  ["mi mood all over di place", "my mood is all over the place mood swings mood changes"],
+  ["mi mood swing bad", "my mood swings are bad mood swings"],
+  ["mi mood nuh stable", "my mood is not stable mood swings"],
+
+  // ── Understanding / confusion (triggers clarification repair) ────────────
+  ["mi nuh understand wah yuh mean", "i don't understand what you mean"],
+  ["mi nuh understand", "i don't understand"],
+
+  // ── App help ─────────────────────────────────────────────────────────────
+  ["how mi log period", "how do i log my period log period"],
+  ["how mi log mi period", "how do i log my period log period"],
+  ["how mi use di calendar", "how do i use the calendar app help"],
+  ["how mi use calendar", "how do i use the calendar app help"],
+  ["weh mi dashboard mean", "what does my dashboard mean app help"],
+  ["how fi export mi data", "how to export my data app help"],
+  ["how fi download mi data", "how to download my data app help"],
+
+  // ── What can Bloomie do ───────────────────────────────────────────────────
+  ["weh yuh can do", "what can you do"],
+  ["weh yuh can help mi wid", "what can you help with"],
+  ["weh yuh know bout", "what do you know about"],
+
+  // ── Seeking social / professional support ─────────────────────────────────
+  ["mi need fi talk to somebody", "i need to talk to someone support help"],
+  ["mi need fi talk to someone", "i need to talk to someone support help"],
+  ["mi waan talk to somebody", "i want to talk to someone support help"],
+
 ];
+
 
 
 
@@ -609,7 +703,7 @@ const WORD_MAP = [
   ["likkle",    "little"],
   ["lil",       "little"],
   ["nuff",      "a lot of"],
-  // FIX #1 & #3: Removed ["bad", "badly"] — it mapped "bad" universally,
+  // FIX #1 & #3: Removed ["bad", "badly"] - it mapped "bad" universally,
   // breaking severity patterns like "bleed bad", "cramp bad", "hurt bad"
   // in both extractSymptoms and extractSeverity after normalization.
   // Severity signals are handled by phrase-level maps ("cramp bad" → "severe cramps")
@@ -721,23 +815,23 @@ const WORD_MAP = [
 // ─── 3. FUZZY MATCHING (Damerau-Levenshtein + phonetic variants) ──────────────
 //
 // Pipeline for each user message token:
-//   1. PHONETIC_VARIANTS lookup  — fast O(1), catches known Jamaican/Caribbean
+//   1. PHONETIC_VARIANTS lookup  - fast O(1), catches known Jamaican/Caribbean
 //      spelling patterns that Levenshtein alone won't handle within threshold.
-//   2. Exact-match check against FUZZY_DICTIONARY — skip correction if already correct.
-//   3. Damerau-Levenshtein (OSA) — handles insertions, deletions, substitutions,
+//   2. Exact-match check against FUZZY_DICTIONARY - skip correction if already correct.
+//   3. Damerau-Levenshtein (OSA) - handles insertions, deletions, substitutions,
 //      and adjacent transpositions. Threshold based on max(token, dictWord) length:
-//        1–4 chars  → distance 0 (no fuzzy — "pad" must not match "pain")
+//        1–4 chars  → distance 0 (no fuzzy - "pad" must not match "pain")
 //        5–7 chars  → distance ≤ 1
 //        8–11 chars → distance ≤ 2
 //        12+ chars  → distance ≤ 3
-//   4. PROTECTED_TOKENS — valid Patois words, never corrected.
-//   5. Correction cache — Map keyed on token, avoids re-running Levenshtein.
+//   4. PROTECTED_TOKENS - valid Patois words, never corrected.
+//   5. Correction cache - Map keyed on token, avoids re-running Levenshtein.
 //
 // fuzzyCorrect() is exported and handles both single-token and full-sentence input.
 // When given a sentence (contains whitespace), it corrects each token independently
 // and rejoins. Called explicitly AFTER normalizePatois() in the pipeline.
 
-// ── Phonetic variants — run FIRST before Levenshtein ─────────────────────────
+// ── Phonetic variants - run FIRST before Levenshtein ─────────────────────────
 const PHONETIC_VARIANTS = {
   // Pregnancy
   "pregnat":        "pregnant",
@@ -855,7 +949,7 @@ const PHONETIC_VARIANTS = {
   "ectoppic":       "ectopic",
 };
 
-// ── Fuzzy dictionary — organized by category ──────────────────────────────────
+// ── Fuzzy dictionary - organized by category ──────────────────────────────────
 const FUZZY_DICTIONARY = {
   reproductive_core: [
     "spotting", "bleeding", "pregnant", "pregnancy", "period", "periods",
@@ -912,13 +1006,13 @@ const FUZZY_DICTIONARY = {
 const ALL_FUZZY_TERMS_ARRAY = [...new Set(Object.values(FUZZY_DICTIONARY).flat())];
 const ALL_FUZZY_TERMS = new Set(ALL_FUZZY_TERMS_ARRAY);
 
-// ── Protected Patois tokens — must never be fuzzy-corrected ───────────────────
+// ── Protected Patois tokens - must never be fuzzy-corrected ───────────────────
 const PROTECTED_TOKENS = new Set([
   "mi", "di", "fi", "nuh", "wah", "yuh", "dem", "seh", "deh", "ting",
   "man", "gal", "bad", "good", "real",
 ]);
 
-// ── Correction cache — avoids re-running Levenshtein for repeated tokens ──────
+// ── Correction cache - avoids re-running Levenshtein for repeated tokens ──────
 const _correctionCache = new Map();
 let _cacheHits = 0;
 
@@ -930,7 +1024,7 @@ export function _getFuzzyCacheHits() { return _cacheHits; }
 
 // ── Damerau-Levenshtein distance (Optimal String Alignment) ───────────────────
 // Handles insertions, deletions, substitutions, and adjacent transpositions.
-// Transpositions cost 1 — this is why "peroid" → "period" now works (dist 1).
+// Transpositions cost 1 - this is why "peroid" → "period" now works (dist 1).
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, (_, i) =>
@@ -954,7 +1048,7 @@ function levenshtein(a, b) {
 
 // ── Threshold by max(token, dictWord) length ───────────────────────────────────
 function getThreshold(maxLen) {
-  if (maxLen <= 4)  return 0;  // no fuzzy — "pad" must not match "pain"
+  if (maxLen <= 4)  return 0;  // no fuzzy - "pad" must not match "pain"
   if (maxLen <= 7)  return 1;
   if (maxLen <= 11) return 2;
   return 3;
@@ -969,10 +1063,10 @@ function _correctToken(token) {
     return phonetic;
   }
 
-  // 2. Exact match in dictionary — already correct, no change needed
+  // 2. Exact match in dictionary - already correct, no change needed
   if (ALL_FUZZY_TERMS.has(token)) return token;
 
-  // 3. Levenshtein — only for tokens ≥ 5 chars (short words too collision-prone)
+  // 3. Levenshtein - only for tokens ≥ 5 chars (short words too collision-prone)
   if (token.length < 5) return null;
 
   let bestMatch = null;
@@ -987,7 +1081,7 @@ function _correctToken(token) {
     const threshold = getThreshold(maxLen);
     if (threshold === 0) continue;
 
-    // Length-difference filter — eliminates most comparisons immediately
+    // Length-difference filter - eliminates most comparisons immediately
     if (Math.abs(token.length - term.length) > threshold) continue;
 
     const dist = levenshtein(token, term);
@@ -1133,7 +1227,7 @@ export function detectPatois(rawText) {
   return PATOIS_SIGNALS.some((rx) => rx.test(t));
 }
 
-// ── Tone pattern arrays — each entry is one detectable signal ─────────────────
+// ── Tone pattern arrays - each entry is one detectable signal ─────────────────
 // Checking arrays (not a single combined regex) lets us COUNT how many signals
 // are present per category. The priority resolver then picks the highest-priority
 // category that has at least one match, resolving overlaps cleanly.
@@ -1173,7 +1267,7 @@ const EXHAUSTED_PATTERNS = [
   /\b(feel(?:ing)? like giving up|running on empty)\b/,
   /\b(burnt? out|nuh have no energy)\b/,
   /\b(feel(?:ing)? weak|body tired|mi body tired)\b/,
-  // "mi done" = exhausted; "mi done wid dis" = frustrated — negative lookahead separates them
+  // "mi done" = exhausted; "mi done wid dis" = frustrated - negative lookahead separates them
   /\bmi done(?!\s+wid)\b/,
 ];
 
@@ -1213,7 +1307,7 @@ const CASUAL_PATTERNS = [
  *
  * confidence = true when resolved tone has 2+ phrase matches, OR when a single
  * strong distressed/angry/exhausted/frustrated signal fires (serious tones are
- * always considered confident — a single "scared" or "vex" is unambiguous).
+ * always considered confident - a single "scared" or "vex" is unambiguous).
  *
  * @param  {string} text - Raw user input
  * @returns {{ tone: string, scores: object, confidence: boolean }}
@@ -1222,7 +1316,7 @@ export function detectUserToneWithScores(text) {
   if (!text) return { tone: "neutral", scores: {}, confidence: false };
 
   const t = text.toLowerCase();
-  // Normalize for mixed Patois/English support — checked alongside raw text
+  // Normalize for mixed Patois/English support - checked alongside raw text
   const tn = normalizePatois(text).toLowerCase();
 
   // Test a pattern against both raw and normalized text
@@ -1237,7 +1331,7 @@ export function detectUserToneWithScores(text) {
   };
 
   // Priority: distressed > angry > exhausted > frustrated > casual > neutral.
-  // A single match is enough for any serious tone — "lol I'm scared" → distressed.
+  // A single match is enough for any serious tone - "lol I'm scared" → distressed.
   const SERIOUS = ["distressed", "angry", "exhausted", "frustrated"];
   for (const tone of SERIOUS) {
     if (scores[tone] >= 1) {
@@ -1245,7 +1339,7 @@ export function detectUserToneWithScores(text) {
     }
   }
 
-  // Casual: keyword match OR short message length — but ONLY when no serious
+  // Casual: keyword match OR short message length - but ONLY when no serious
   // tones were detected anywhere in the message. Fixes: "help me" (short but
   // distressed), short urgent messages under 40 chars staying distressed.
   const hasShortLength = t.trim().length <= 40;
@@ -1265,7 +1359,7 @@ export function detectUserToneWithScores(text) {
  *
  * Priority: distressed > angry > exhausted > frustrated > casual > neutral.
  * Runs normalizePatois() internally so mixed Patois/English messages are handled.
- * Short message length is a weak casual signal only — it never overrides a
+ * Short message length is a weak casual signal only - it never overrides a
  * distressed, angry, exhausted, or frustrated match.
  *
  * @param  {string} text  - Raw user input
@@ -1294,7 +1388,7 @@ export function updateSessionTone(ctx, text) {
   ctx.previousTone = ctx.currentTone;
 
   if (tone === "neutral" || (!confidence && tone === "casual")) {
-    // Ambiguous turn — hold the previous tone if one exists
+    // Ambiguous turn - hold the previous tone if one exists
     ctx.currentTone = ctx.previousTone || tone;
   } else {
     ctx.currentTone = tone;

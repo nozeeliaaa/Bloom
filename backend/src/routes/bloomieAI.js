@@ -51,7 +51,7 @@ import rateLimit from "express-rate-limit";
 const _require      = createRequire(import.meta.url);
 const symptomCatalog = _require("../../data/symptoms.json");
 
-// All valid catalog keys — built once from the source of truth so the symptom
+// All valid catalog keys - built once from the source of truth so the symptom
 // endpoint's allowlist never drifts from symptoms.json.
 const VALID_CATALOG_KEYS = new Set(symptomCatalog.map(s => s.key));
 
@@ -398,7 +398,7 @@ router.post("/extract", aiLimiter, async (req, res) => {
  * Catalog-grounded symptom inference proxy.
  *
  * Maps a free-text user message to one or more keys from symptoms.json using
- * Haiku as a semantic matcher — handling phrasing that regex aliases miss.
+ * Haiku as a semantic matcher - handling phrasing that regex aliases miss.
  *
  * Body:    { input: string, phase?: string, recentSymptoms?: string[] }
  * Returns: { primary, secondary, confidence, clarificationNeeded, reason }
@@ -437,7 +437,7 @@ router.post("/symptoms", aiLimiter, async (req, res) => {
     "You are a symptom interpretation engine for a women's menstrual health app.",
     "Your ONLY job is to map the user's message to symptom keys from the catalog below.",
     "Do NOT generate advice, explanations, or free-form responses.",
-    "Output ONLY compact JSON — no markdown, no surrounding text.",
+    "Output ONLY compact JSON - no markdown, no surrounding text.",
     'Schema: {"primary":"KEY_OR_null","secondary":["KEY1","KEY2"],"confidence":0.0,"clarificationNeeded":false,"reason":"short explanation"}',
     "Rules:",
     "- Only use keys from the catalog. Never invent new keys.",
@@ -465,7 +465,7 @@ router.post("/symptoms", aiLimiter, async (req, res) => {
           ? parsed.primary
           : null);
 
-    // Validate secondary — drop any key not in catalog, cap at 2
+    // Validate secondary - drop any key not in catalog, cap at 2
     const secondary = Array.isArray(parsed.secondary)
       ? parsed.secondary
           .filter(k => typeof k === "string" && VALID_CATALOG_KEYS.has(k) && k !== primary)

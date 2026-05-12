@@ -301,8 +301,8 @@ export function buildNodeHelpers(env) {
   // Reads ctx.moodMentions (recorded in assistant.js on every mood entity hit)
   // and returns one of three signals:
   //   { type: "none" }
-  //   { type: "persistent", count }   — same mood 2–3 turns in a row
-  //   { type: "escalated",  count }   — tone has worsened across mentions
+  //   { type: "persistent", count }   - same mood 2–3 turns in a row
+  //   { type: "escalated",  count }   - tone has worsened across mentions
   //
   // Returns null when: urgency is active, fewer than 2 mentions exist, or the
   // continuity was already surfaced this session (adviceGiven guard).
@@ -315,7 +315,7 @@ export function buildNodeHelpers(env) {
     const mentions = ctx.moodMentions ?? [];
     if (mentions.length < 2) return null;
 
-    // Use last 3 mentions only — older history decays
+    // Use last 3 mentions only - older history decays
     const recent = mentions.slice(-3);
 
     // Escalation: tone has moved toward a more distressed/serious value
@@ -333,22 +333,22 @@ export function buildNodeHelpers(env) {
     const signal = getMoodContinuitySignal();
     if (!signal) return null;
 
-    // Mark as surfaced — only show once per session
+    // Mark as surfaced - only show once per session
     ctx.adviceGiven.add("mood_continuity_surfaced");
 
     if (signal.type === "escalated") {
       return pick([
-        "It sounds like this has been getting heavier as we've been talking — I want to make sure I'm giving you what you actually need right now 🩷",
-        "I'm noticing this feels like it's intensifying — that's worth paying attention to, not pushing through 🩷",
-        "The more you share, the clearer it is that this isn't a small thing — I hear you 🩷",
+        "It sounds like this has been getting heavier as we've been talking - I want to make sure I'm giving you what you actually need right now 🩷",
+        "I'm noticing this feels like it's intensifying - that's worth paying attention to, not pushing through 🩷",
+        "The more you share, the clearer it is that this isn't a small thing - I hear you 🩷",
       ]);
     }
 
     // persistent
     return pick([
-      "It sounds like this hasn't really eased up since you first mentioned it — and that matters 🩷",
+      "It sounds like this hasn't really eased up since you first mentioned it - and that matters 🩷",
       "You're still feeling this, and the fact that it keeps coming back tells me it deserves more than just sitting with it 🩷",
-      "I've been noticing this has come up more than once — that kind of persistence is worth taking seriously 🩷",
+      "I've been noticing this has come up more than once - that kind of persistence is worth taking seriously 🩷",
     ]);
   }
 
@@ -374,8 +374,8 @@ export function buildNodeHelpers(env) {
       ? labels[0]
       : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
     return pick([
-      `It's been a few days — last time you mentioned **${list}**. How are you feeling now?`,
-      `We last talked about **${list}** — is that still going on, or is something new coming up? 🩷`,
+      `It's been a few days - last time you mentioned **${list}**. How are you feeling now?`,
+      `We last talked about **${list}** - is that still going on, or is something new coming up? 🩷`,
     ]);
   }
 
@@ -394,8 +394,8 @@ export function buildNodeHelpers(env) {
     const label = INTENT_LABELS[bloomieMemory?.lastIntent];
     if (!label) return null;
     return pick([
-      `Last time you were looking into **${label}** — feel free to pick up where we left off, or start fresh 🩷`,
-      `It looks like **${label}** was on your mind last time — still relevant, or is something new coming up? 🩷`,
+      `Last time you were looking into **${label}** - feel free to pick up where we left off, or start fresh 🩷`,
+      `It looks like **${label}** was on your mind last time - still relevant, or is something new coming up? 🩷`,
     ]);
   }
 
@@ -422,7 +422,7 @@ export function buildNodeHelpers(env) {
     if (ctx.isAnon) {
       return r([
         introLine,
-        "You're not signed in, so I won't be able to see your cycle history — but I can still help 🩷",
+        "You're not signed in, so I won't be able to see your cycle history - but I can still help 🩷",
         "What's going on today?",
       ]);
     }
@@ -432,7 +432,7 @@ export function buildNodeHelpers(env) {
       const weeksAlong = Math.floor(daysBetween(cd.lmp, new Date()) / 7);
       return r([
         introLine,
-        `Looks like pregnancy tracking mode is on${weeksAlong > 0 ? ` — you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along by date estimate` : ""} 🩷`,
+        `Looks like pregnancy tracking mode is on${weeksAlong > 0 ? ` - you're around ${weeksAlong} week${weeksAlong === 1 ? "" : "s"} along by date estimate` : ""} 🩷`,
         "I can help with symptoms, test timing, due dates, or anything else on your mind. What's going on?",
       ]);
     }
@@ -465,7 +465,7 @@ export function buildNodeHelpers(env) {
       if (overdue) {
         const lateDays = Math.abs(daysLeft);
         const contextLine = pick([
-          `Based on your logged dates, your period may be a little late${enoughCycleHistory && lateDays > 1 ? ` — around ${lateDays} days overdue by estimate` : ""} 🩷`,
+          `Based on your logged dates, your period may be a little late${enoughCycleHistory && lateDays > 1 ? ` - around ${lateDays} days overdue by estimate` : ""} 🩷`,
           `Looks like your period might be a bit later than expected 🩷`,
           `From your recent logs, your period may not have arrived yet 🩷`,
         ]);
@@ -476,12 +476,12 @@ export function buildNodeHelpers(env) {
         const contextLine = pick([
           `Looks like your period might be coming up in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
           `Based on your logged dates, your period is due in about ${daysLeft} day${daysLeft === 1 ? "" : "s"} 🩷`,
-          `Your period window is getting close — around ${daysLeft} day${daysLeft === 1 ? "" : "s"} away 🌸`,
+          `Your period window is getting close - around ${daysLeft} day${daysLeft === 1 ? "" : "s"} away 🌸`,
         ]);
         return r([introLine, contextLine, "If you're already feeling symptoms, I can help. What's going on?"]);
       }
 
-      // No urgency signal — use phase awareness for returning users
+      // No urgency signal - use phase awareness for returning users
       const phaseInfo = getCurrentPhase();
       if (isReturning && phaseInfo) {
         const phaseLine = pick([
