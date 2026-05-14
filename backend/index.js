@@ -30,7 +30,62 @@ import {
 const app  = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+const BASE_ALLOWED_ORIGINS = [
+  "http://localhost:4000",
+  "http://127.0.0.1:4000",
+  "http://localhost:4100",
+  "http://127.0.0.1:4100",
+  "http://localhost:4173",
+  "http://127.0.0.1:4173",
+  "http://localhost:4200",
+  "http://127.0.0.1:4200",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "https://bloom-8401a.web.app",
+  "https://bloom-8401a.firebaseapp.com",
+];
+
+const envAllowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS
+      .split(",")
+      .map((o) => o.trim())
+      .filter(Boolean)
+  : [];
+
+function normalizeOrigin(origin) {
+  if (!origin || typeof origin !== "string") return "";
+  return origin.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+const normalizedAllowedOrigins = new Set(
+  [...BASE_ALLOWED_ORIGINS, ...envAllowedOrigins]
+    .map((origin) => normalizeOrigin(origin))
+    .filter(Boolean)
+);
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  const normalizedOrigin = normalizeOrigin(origin);
+  try {
+    if (new URL(normalizedOrigin).hostname.endsWith(".netlify.app")) return true;
+  } catch (_) {}
+  return normalizedAllowedOrigins.has(normalizedOrigin);
+}
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+};
+
+app.use(
+  cors(corsOptions)
+);
+app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 app.use(globalLimiter);
 

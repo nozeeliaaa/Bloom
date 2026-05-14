@@ -50,6 +50,12 @@
 
 const PHRASE_MAP = [
   // ── Greetings ──────────────────────────────────────────────────────────────
+  // Elongated/typo variants FIRST (more specific, caught before shorter base forms)
+  ["wah gwaann",         "what's going on"],
+  ["wah gwaaaan",        "what's going on"],
+  ["wagwaann",           "what's going on"],
+  ["wagwaaaan",          "what's going on"],
+  ["wha gwaan",          "what's going on"],
   ["wah gwaan",          "what's going on"],
   ["wagwaan",            "what's going on"],
   ["wha gwan",           "what's going on"],
@@ -553,13 +559,14 @@ const PHRASE_MAP = [
 
 
   //Seeking help / clinic phrases
-  ["mi need help", "i need help"],
   ["mi need fi see doctor", "i need to see a doctor"],
   ["mi need fi go clinic", "i need to go to a clinic"],
   ["mi need fi go hospital", "i need to go to a hospital"],
   ["clinic open", "clinic is open"],
   ["clinic close", "clinic is closed"],
   ["weh di clinic deh", "where is the clinic"],
+  ["weh clinic deh near mi", "where is the clinic near me"],
+  ["weh mi can go", "where can i go for help care"],
   ["mi cyaan afford doctor", "i cannot afford a doctor"],
 
 
@@ -570,7 +577,94 @@ const PHRASE_MAP = [
   ["a nuttn", "it is nothing"],
   ["annuh nutn", "it is nothing"],
 
+  // ── Period arrived / started ───────────────────────────────────────────────
+  ["mi period come", "my period has started period came"],
+  ["mi period reach", "my period has started period came"],
+  ["mi period start", "my period has started period came"],
+  ["mi period come today", "my period started today period came"],
+
+  // ── Period missed / not seen ───────────────────────────────────────────────
+  ["mi miss mi period", "i missed my period late"],
+  ["mi nuh see mi period yet", "i have not seen my period yet late"],
+  ["mi nuh get mi period yet", "i have not gotten my period yet late"],
+
+  // ── Flow / heavy bleeding ──────────────────────────────────────────────────
+  ["mi flow heavy", "my flow is heavy heavy bleeding"],
+  ["mi flow nuff", "my flow is heavy heavy bleeding"],
+  ["blood clot inna mi period", "blood clots in my period heavy bleeding clots"],
+  ["clot inna mi period", "clots in my period heavy bleeding"],
+
+  // ── Cycle irregularity ────────────────────────────────────────────────────
+  ["mi cycle irregular", "my cycle is irregular irregular cycle"],
+  ["mi period nah come regular", "my period is not regular irregular cycle"],
+  ["mi period nuh come regular", "my period does not come regularly irregular cycle"],
+
+  // ── Pregnancy / fertility ─────────────────────────────────────────────────
+  ["coulda mi pregnant", "could i be pregnant pregnancy"],
+  ["could mi be pregnant", "could i be pregnant pregnancy"],
+  ["when mi fertile", "when am i fertile fertile window ovulation"],
+  ["when mi most fertile", "when am i most fertile fertile window ovulation"],
+  ["when mi can tek pregnancy test", "when can i take a pregnancy test"],
+  ["when can mi tek pregnancy test", "when can i take a pregnancy test"],
+  ["when can mi tek di test", "when can i take the pregnancy test"],
+
+  // ── Discharge changes ─────────────────────────────────────────────────────
+  ["mi discharge look different", "my discharge looks different unusual discharge"],
+  ["mi discharge change", "my discharge has changed unusual discharge"],
+  ["mi discharge nuh normal", "my discharge is not normal unusual discharge"],
+
+  // ── Breast symptoms ───────────────────────────────────────────────────────
+  ["mi breast dem sore", "my breasts are sore breast tenderness"],
+  ["mi breast sore", "my breasts are sore breast tenderness"],
+  ["mi breast hurt", "my breasts hurt breast tenderness"],
+  ["mi nipple sore", "my nipples are sore breast tenderness"],
+
+  // ── Headache ──────────────────────────────────────────────────────────────
+  ["mi head a hurt bad", "i have a severe headache head pain"],
+  ["mi head a hurt", "i have a headache head pain"],
+  ["mi head hurt bad", "my head hurts badly head pain"],
+  ["mi head hurt", "my head hurts head pain"],
+
+  // ── Skin / hormonal symptoms ──────────────────────────────────────────────
+  ["mi face a bruk out", "my face is breaking out acne skin hormones"],
+  ["mi face bruk out bad", "my face is breaking out badly acne skin hormones"],
+  ["mi skin a bruk out", "my skin is breaking out acne hormones"],
+
+  // ── Bloating / swelling ───────────────────────────────────────────────────
+  ["mi belly swell up", "my stomach is swollen bloated bloating"],
+  ["mi belly swell", "my stomach is swollen bloated bloating"],
+  ["mi feel bloated", "i feel bloated bloating"],
+
+  // ── Mood / emotional ──────────────────────────────────────────────────────
+  ["mi mood all over di place", "my mood is all over the place mood swings mood changes"],
+  ["mi mood swing bad", "my mood swings are bad mood swings"],
+  ["mi mood nuh stable", "my mood is not stable mood swings"],
+
+  // ── Understanding / confusion (triggers clarification repair) ────────────
+  ["mi nuh understand wah yuh mean", "i don't understand what you mean"],
+  ["mi nuh understand", "i don't understand"],
+
+  // ── App help ─────────────────────────────────────────────────────────────
+  ["how mi log period", "how do i log my period log period"],
+  ["how mi log mi period", "how do i log my period log period"],
+  ["how mi use di calendar", "how do i use the calendar app help"],
+  ["how mi use calendar", "how do i use the calendar app help"],
+  ["weh mi dashboard mean", "what does my dashboard mean app help"],
+  ["how fi export mi data", "how to export my data app help"],
+  ["how fi download mi data", "how to download my data app help"],
+
+  // ── What can Bloomie do ───────────────────────────────────────────────────
+  ["weh yuh can do", "what can you do"],
+  ["weh yuh can help mi wid", "what can you help with"],
+  ["weh yuh know bout", "what do you know about"],
+
+  // ── Seeking social / professional support ─────────────────────────────────
+  ["mi need fi talk to somebody", "i need to talk to someone support help"],
+  ["mi need fi talk to someone", "i need to talk to someone support help"],
+  ["mi waan talk to somebody", "i want to talk to someone support help"],
+
 ];
+
 
 
 
@@ -1050,91 +1144,15 @@ export function fuzzyCorrect(input) {
   return result;
 }
 
-// ─── 4. INTENT BOOSTERS ───────────────────────────────────────────────────────
-// After normalization, append extra scoring keywords for patterns that are
-// hard to capture with word-swaps alone.
-
-const INTENT_BOOSTERS = [
-  {
-    // NOTE: boost uses "late period" not "late missed period". "missed period"
-    // in boosted text activates scoreSignals' pregnancy signal via
-    // /unprotected|missed.*period/ → false PREGNANCY_ENTRY on pure-late inputs.
-    patterns: [/period.*not.*come|period.*late|missed.*period|\bno\b.*period/i],
-    boost: " late period",
-  },
-  {
-    // NOTE: boost must NOT include "pain" - combined with "severe" it triggers
-    // extractUrgency's severe.*pain pattern causing false escalation.
-    patterns: [/cramp|pelvic pain|stomach pain|belly pain|lower abdom/i],
-    boost: " cramp pelvic",
-  },
-  {
-    patterns: [/spotting|light bleed|brown discharge|pink discharge/i],
-    boost: " spotting light stain",
-  },
-  {
-    // NOTE: "missed period" removed from boost - it activated sym.late prematurely,
-    // causing the late+pregnancy combo rule to fire before spotting+pregnancy rules.
-    patterns: [/pregnant|pregnancy|positive test|might be pregnant/i],
-    boost: " pregnant pregnancy",
-  },
-  {
-    patterns: [/heavy bleed|soaking through|bleed through|passing clots/i],
-    boost: " heavy bleeding soaking",
-  },
-  {
-    patterns: [/mood|irritable|anxious|sad|overwhelmed|low mood|cry/i],
-    boost: " mood anxious sad irritable",
-  },
-  {
-    // NOTE: boost must NOT include "faint" - it is in extractUrgency's regex and
-    // causes false escalation when the user only mentions weakness (not fainting).
-    // "dizziness" and "lightheaded" are NOT urgency keywords so they are safe.
-    patterns: [/faint|dizzy|lightheaded|pass out/i],
-    boost: " dizzy lightheaded",
-  },
-  {
-    // Amenorrhea - periods missing for extended time
-    patterns: [/amenorrhea|period.*months|months.*period|period.*stopped|period.*absent|not.*had.*period|missed.*more.*period|period.*gone/i],
-    boost: " amenorrhea missing period months absent",
-  },
-  {
-    // TTC - trying to conceive context
-    patterns: [/trying to conceive|ttc|trying to get pregnant|want.*pregnant|fertile days|ovulation.*test/i],
-    boost: " ttc trying to conceive ovulation fertile",
-  },
-  {
-    // Postpartum context
-    patterns: [/postpartum|gave birth|had.*baby|after.*baby|breastfeeding|period.*return/i],
-    boost: " postpartum after birth breastfeeding",
-  },
-  {
-    // Lifestyle change signals that delay periods
-    patterns: [/stressed|stress|lost weight|gained weight|exercise.*intense|intensely|been sick|illness|travel|sleep.*poor|not sleeping/i],
-    boost: " lifestyle change stress weight exercise",
-  },
-  {
-    // Birth control context
-    patterns: [/birth control|on the pill|started pill|stopped pill|iud|implant|coil|bc/i],
-    boost: " birth control pill contraception",
-  },
-  {
-    // Emotional distress / fear
-    patterns: [/scared|afraid|worried|ashamed|embarrassed|frightened|fear|nervous.*about.*health/i],
-    boost: " scared worried emotional distress",
-  },
-];
-
-// ─── 5. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
+// ─── 4. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
 
 /**
  * normalizePatois(rawText) → String
  *
- * Full 4-stage preprocessing pipeline:
+ * Full preprocessing pipeline:
  *   Stage 1: Phrase-level exact matching
  *   Stage 2: Word-level exact matching
  *   Stage 3: Fuzzy matching (Levenshtein) for near-miss Patois tokens
- *   Stage 4: Intent boosters
  *
  * @param  {string} rawText  - Raw text from the chat input
  * @returns {string}          - Normalized English text
@@ -1182,14 +1200,7 @@ export function normalizePatois(rawText) {
   // canonical pipeline order (normalizePatois → fuzzyCorrect → extractEntities).
   text = fuzzyCorrect(text) ?? text;
 
-  // ── Stage 4: intent boosters ──────────────────────────────────────────────
-  for (const booster of INTENT_BOOSTERS) {
-    if (booster.patterns.some((rx) => rx.test(text))) {
-      text += booster.boost;
-    }
-  }
-
-  return text;
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /**

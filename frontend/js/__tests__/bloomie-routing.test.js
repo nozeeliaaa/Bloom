@@ -12,8 +12,11 @@ import {
   scoreSignals,
   resolveSignals,
   computeRouteConfidence,
+  detectCriticalRisk,
+  detectCriticalRiskDetail,
   INTENT_TO_NODE,
 } from "../bloomie-routing.js";
+import { normalizeBloomieText } from "../bloomie-normalize.js";
 
 function getRegisteredNodeIds() {
   const envBase = {
@@ -57,6 +60,11 @@ describe("normalizeText", () => {
     expect(normalizeText("  Heavy BLEEDING  ")).toBe("heavy bleeding");
   });
 
+  it("stays semantically pure for heavy bleeding phrasing", () => {
+    expect(normalizeText("Heavy BLEEDING")).toBe("heavy bleeding");
+    expect(normalizeText("my period late")).toBe("my period late");
+  });
+
   it("strips special chars except apostrophe", () => {
     expect(normalizeText("it's late!!")).toBe("it's late");
   });
@@ -64,6 +72,12 @@ describe("normalizeText", () => {
   it("handles null/undefined", () => {
     expect(normalizeText(null)).toBe("");
     expect(normalizeText(undefined)).toBe("");
+  });
+
+  it("matches the shared Bloomie normalizer in routing mode", () => {
+    expect(normalizeText("  Heavy BLEEDING!!  ")).toBe(
+      normalizeBloomieText("  Heavy BLEEDING!!  ", { stripSpecialChars: true })
+    );
   });
 });
 
@@ -257,6 +271,16 @@ describe("resolveSignals - safety-critical combinations", () => {
 // ─── computeRouteConfidence - new fields: route, competitors, ambiguous ───────
 
 describe("computeRouteConfidence - route field", () => {
+  it("uses strict normalized thresholds and withholds routes for weak partial matches", () => {
+    const conf = computeRouteConfidence(
+      { late: 2, heavy: 0, spot: 0, mood: 0, pelvic: 0, pregnancy: 0, discharge: 0, late_check: 0, red_flag: 0 },
+      {}
+    );
+    expect(conf.score).toBeLessThan(0.4);
+    expect(conf.tier).toBe("low");
+    expect(conf.route).toBeNull();
+  });
+
   it("maps primaryIntent to the correct entry node", () => {
     const { sig } = scoreSignals("my period is very late and i missed it last month");
     const conf = computeRouteConfidence(sig, {});
@@ -286,6 +310,38 @@ describe("computeRouteConfidence - route field", () => {
     if (conf.primaryIntent === "late") {
       expect(conf.route).toBe("LATE_INTRO");
     }
+  });
+});
+
+describe("detectCriticalRisk - hard safety override", () => {
+  it("detects severe emergency symptoms from text", () => {
+    expect(detectCriticalRisk({}, "i can't breathe and my chest hurts")).toBe(true);
+    const detail = detectCriticalRiskDetail({}, "i can't breathe and my chest hurts");
+    expect(detail.route).toBe("EMERGENCY_REDIRECT");
+    expect(detail.reason).toMatch(/critical|breathing|chest/i);
+  });
+
+  it("detects heavy bleeding as critical urgent risk", () => {
+    const detail = detectCriticalRiskDetail({}, "i am bleeding heavily right now");
+    expect(detail.critical).toBe(true);
+    expect(detail.route).toBe("HEAVY_URGENT");
+    expect(detail.reason).toMatch(/bleeding/i);
+  });
+
+  it("detects downplaying alongside serious symptoms", () => {
+    const detail = detectCriticalRiskDetail(
+      { symptoms: { heavy: true }, severity: "severe", urgent: false },
+      "probably nothing but the bleeding is not that bad"
+    );
+    expect(detail.critical).toBe(true);
+    expect(detail.reason).toMatch(/downplaying/i);
+  });
+
+  it("does not escalate ordinary mild symptoms", () => {
+    expect(detectCriticalRisk(
+      { symptoms: { pelvic: true }, severity: "mild", urgent: false },
+      "mild cramps before my period"
+    )).toBe(false);
   });
 });
 

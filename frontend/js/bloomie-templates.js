@@ -114,6 +114,22 @@ const SITUATION = {
     "You're experiencing mood changes, low energy, or emotional heaviness.",
   pregnancy_concern:
     "You have a concern related to possible pregnancy.",
+  discharge_clear_watery:
+    "Okay 🩷 I see what you're describing - that sudden wet or \"gush\" feeling with clear or stringy discharge can definitely catch you off guard.",
+  discharge_thick_clumpy:
+    "Thick, clumpy discharge can look like small white pieces or feel heavier than your usual discharge.",
+  discharge_concern:
+    "I hear you 🩷 - discharge with a noticeable yellow, green, or gray color, or a strong smell, can feel worrying.",
+  discharge_brown_blood_tinged:
+    "Brown or slightly blood-tinged discharge is usually older blood mixing with cervical fluid.",
+  blood_colour_bright_red:
+    "Bright or fresh red blood usually means the blood is newer and flowing more actively.",
+  blood_colour_dark_old:
+    "Darker blood - deep red, brown, or almost black - usually means the blood has taken longer to leave the body.",
+  blood_colour_pink:
+    "Pink blood is usually a lighter mix of blood and cervical fluid.",
+  blood_colour_concern:
+    "Orange-tinted or gray-looking blood is less common, especially if it appears with unusual discharge, smell, or discomfort.",
   urgent:
     "You've described symptoms that may need prompt medical attention.",
   perimenopause_concern: () => {
@@ -193,6 +209,22 @@ const MEANING = {
     "The hormonal changes that come with menopause are real - estrogen levels drop, and that affects many systems in the body. Symptoms like hot flashes, sleep disruption, and vaginal changes are well-documented and treatable.",
   pregnancy_concern:
     "Pregnancy concerns are best addressed with clear information and a test when the timing is right.",
+  discharge_clear_watery:
+    "Clear, stretchy, or very watery discharge is often cervical mucus, and it commonly shows up around ovulation or when estrogen is higher. Sometimes it comes out all at once when you stand or move, which can make it feel like your period suddenly started.",
+  discharge_thick_clumpy:
+    "This pattern can sometimes be linked to yeast overgrowth, especially when it comes with itching, burning, irritation, or soreness.",
+  discharge_concern:
+    "Your body is usually pretty consistent with discharge, so color or smell changes like this are worth paying attention to. It does not automatically mean something serious, but it can point to an imbalance or infection that is better checked.",
+  discharge_brown_blood_tinged:
+    "This can happen before or after a period, or sometimes around ovulation. It is generally common unless it keeps recurring, becomes heavier, or comes with other symptoms.",
+  blood_colour_bright_red:
+    "This is most common at the start of a period or on heavier flow days, and it can be a normal part of bleeding.",
+  blood_colour_dark_old:
+    "This is very common toward the end of a period or when flow is slower.",
+  blood_colour_pink:
+    "It can happen with light spotting, at the start of a period, or sometimes around ovulation.",
+  blood_colour_concern:
+    "That color can sometimes happen when blood mixes with discharge, but gray or orange changes are worth checking if they are new for you.",
   urgent:
     "Symptoms like heavy bleeding with dizziness, severe one-sided pain, fainting, or fever alongside bleeding can signal that your body needs prompt support.",
 };
@@ -234,6 +266,22 @@ const NEXT_STEPS = {
     "Discuss bone health, cardiovascular changes, and ongoing symptoms with a provider. Lifestyle support (movement, sleep, nutrition) and medical options are both worth exploring - there are real options, not just 'pushing through it'.",
   pregnancy_concern:
     "A pregnancy test is the clearest first step. Test timing matters - the day after a missed period or later gives the most accurate result.",
+  discharge_clear_watery:
+    "If there is no strong smell, itching, pain, or unusual color, this is usually just your body doing its thing. If any of those show up later, it would be worth checking.",
+  discharge_thick_clumpy:
+    "If you are not feeling discomfort, you can keep an eye on it. If itching, burning, soreness, or irritation is present, it would be a good idea to get checked.",
+  discharge_concern:
+    "A provider can help confirm whether it is an infection or imbalance and guide treatment if needed. If itching, irritation, pelvic pain, or discomfort is also present, that makes it more important to check in.",
+  discharge_brown_blood_tinged:
+    "Track when it happens, the color, and whether it lines up with your period or ovulation timing. If it keeps happening outside your usual pattern, mention it to a provider.",
+  blood_colour_bright_red:
+    "Track the amount and how quickly you are changing products. If the flow is very heavy or comes with dizziness, that needs more support.",
+  blood_colour_dark_old:
+    "Keep tracking the color and flow. If dark bleeding has a strong smell, severe pain, or happens unexpectedly outside your usual pattern, it is worth checking.",
+  blood_colour_pink:
+    "Track whether it stays light, how long it lasts, and where you are in your cycle. If it becomes heavy or comes with pain, dizziness, or a strong smell, get support.",
+  blood_colour_concern:
+    "It would be a good idea to get this checked, especially if there is a strong smell, itching, pelvic pain, fever, or the color keeps showing up.",
   urgent:
     "Please seek medical care as soon as possible - a clinic, urgent care, or emergency service. You can use the care map to find nearby options.",
 };
@@ -280,6 +328,22 @@ const URGENT_SIGNS = {
     "you develop heavy or irregular bleeding after periods have stopped, or have bone pain, chest pain, or severe mood changes - these warrant prompt medical evaluation.",
   pregnancy_concern:
     "you develop severe one-sided pain, heavy bleeding, or feel faint - seek emergency care immediately.",
+  discharge_clear_watery:
+    "you notice a strong smell, itching, pelvic pain, green or gray color, or the discharge feels very different from your usual pattern.",
+  discharge_thick_clumpy:
+    "itching, burning, soreness, pelvic pain, fever, or a strong smell is present.",
+  discharge_concern:
+    "you have pelvic pain, fever, worsening irritation, or the discharge is green or gray with a strong smell.",
+  discharge_brown_blood_tinged:
+    "bleeding becomes heavy, pain is severe, you feel faint, or the spotting keeps happening outside your usual pattern.",
+  blood_colour_bright_red:
+    "you are soaking through protection quickly, passing large clots, feeling dizzy, or bleeding is not slowing.",
+  blood_colour_dark_old:
+    "dark bleeding comes with a strong smell, severe pain, dizziness, or heavy flow.",
+  blood_colour_pink:
+    "spotting becomes heavy bleeding, lasts more than a few days, or comes with pain, fever, or unusual discharge.",
+  blood_colour_concern:
+    "gray blood, strong smell, pelvic pain, fever, or worsening discomfort is present.",
   urgent:
     "symptoms are present - please seek care now. Go to the nearest emergency department or call emergency services (119 in Jamaica).",
   default:
@@ -315,7 +379,10 @@ const REASON_TO_SCENARIO = {
   "spotting+discharge":            "spotting_with_symptoms",
   "spot+discharge":                "spotting_with_symptoms",
   "spot+pregnancy":                "spotting_pregnancy",
-  "discharge_only":                "spotting_with_symptoms",
+  "DISCHARGE_CONCERN":             "discharge_concern",
+  "URGENT_SYMPTOM_CHECK":          "urgent",
+  "discharge_concern":             "discharge_concern",
+  "urgent_symptom_check":          "urgent",
   "nausea+late":                   "late_with_pregnancy_chance",
   "mood+before_period":            "mood_before_period",
   "late+pregnancy_chance":         "late_with_pregnancy_chance",
@@ -347,9 +414,144 @@ const REASON_TO_SCENARIO = {
 // Scenarios where tone-wording adjustments must NEVER be applied (emergency/safety).
 const SAFETY_SCENARIOS = new Set(["urgent", "heavy_with_dizziness", "heavy_long"]);
 
+const DISCHARGE_COLOR_FLAGS = new Set(["yellow", "green", "gray"]);
+const BLOOD_COLOUR_CONCERN_FLAGS = new Set(["orange_tinge", "gray"]);
+
+function resolveDischargeScenario(entities) {
+  const selections = entities?.domainSelections?.discharge || [];
+  const has = (code) => selections.includes(code);
+  const hasColorFlag = selections.some((code) => DISCHARGE_COLOR_FLAGS.has(code));
+
+  if (has("green") || has("gray") || (has("foul_smell") && hasColorFlag)) return "discharge_concern";
+  if (has("yellow") || has("foul_smell")) return "discharge_concern";
+  if (has("thick_clumpy")) return "discharge_thick_clumpy";
+  if (has("brown") || has("blood_tinged")) return "discharge_brown_blood_tinged";
+  if (has("watery") || has("eggwhite") || has("increased_volume") || has("creamy")) return "discharge_clear_watery";
+  return "discharge_clear_watery";
+}
+
+function resolveBloodColourScenario(entities) {
+  const selections = entities?.domainSelections?.blood_colour || [];
+  const symptoms = entities?.symptoms || {};
+  const raw = String(entities?.raw || "").toLowerCase();
+  const has = (code) => selections.includes(code);
+
+  if (/\b(gray|grey|orange)\b/.test(raw)) {
+    return "blood_colour_concern";
+  }
+  if (has("bright_red") || has("light_red") || symptoms.blood_colour_bright) {
+    return "blood_colour_bright_red";
+  }
+  if (has("pink") || symptoms.blood_colour_pink) {
+    return "blood_colour_pink";
+  }
+  if (/\b(black|brown|dark red|deep red|wine color|wine colour|wine red)\b/.test(raw)) {
+    return "blood_colour_dark_old";
+  }
+  if (has("dark_red") || has("brown") || has("black") || symptoms.blood_colour_dark) {
+    return "blood_colour_dark_old";
+  }
+  if (selections.some((code) => BLOOD_COLOUR_CONCERN_FLAGS.has(code)) || symptoms.blood_colour_concern) {
+    return "blood_colour_concern";
+  }
+  return "blood_colour_dark_old";
+}
+
+function hasDischargeContext(entities) {
+  const s = entities?.symptoms || {};
+  return Boolean(
+    entities?.domainSelections?.discharge?.length ||
+    s.discharge || s.unusual_discharge || s.discharge_eggwhite ||
+    s.discharge_creamy || s.discharge_sticky
+  );
+}
+
+const CATALOG_CATEGORY_GUIDANCE = {
+  bleeding: "Bleeding changes are worth tracking closely, especially if the amount, timing, or color is shifting from your usual pattern.",
+  blood_colour: "Blood color can change across a cycle, and it often makes more sense when you look at timing, flow, and any other symptoms alongside it.",
+  pain: "Pain symptoms deserve to be taken seriously, especially if they keep returning, feel stronger than usual, or start interfering with your day.",
+  digestion: "Digestive symptoms can sometimes cluster around cycle shifts, stress, sleep changes, or other body changes, so they are useful to track together.",
+  stool: "Bowel changes can show up alongside other cycle-related symptoms, so timing and recurrence matter.",
+  discharge: "Discharge changes are often easiest to understand when you track color, texture, smell, and where they show up in your cycle.",
+  energy: "Energy shifts are real body signals, and they are often more useful when tracked as a pattern instead of a one-off day.",
+  physical: "Body changes like this can be worth tracking over time, especially if they keep showing up around the same part of your cycle.",
+  urinary: "Urinary symptoms are worth paying attention to, especially if they cluster with pain, nausea, or discharge changes.",
+  skin: "Skin changes can absolutely shift with hormones, stress, and cycle timing, so patterns matter more than any one day.",
+  hair: "Hair changes usually make the most sense when tracked over time rather than judged from one moment alone.",
+  temperature: "Temperature-related changes can be meaningful when they cluster with cycle timing, sleep shifts, or other symptoms.",
+  mood: "Mood shifts are real body experiences, not overreactions, and they can be worth tracking alongside your cycle and energy.",
+  mind: "Mind and focus changes are real too, and they often make more sense when you look at energy, sleep, and cycle timing together.",
+  sleep: "Sleep changes can affect everything else, so it helps to notice whether they are showing up on their own or alongside mood, pain, or energy changes.",
+  social: "Social energy can shift with hormones, stress, and how your body is feeling overall, so it counts as a real symptom worth noticing.",
+  cravings: "Cravings can be part of broader body shifts, and they often make more sense when logged with mood, energy, or timing.",
+  fertility: "Fertility-related body signs are often most useful when tracked as a repeating pattern across a few cycles.",
+  cycle: "Cycle-related symptoms are usually easiest to understand when you track timing, flow, and what else was happening in your body.",
+  weight: "Weight and body-composition shifts usually make more sense as patterns over time than as a one-day signal.",
+};
+
+function formatCatalogLabelList(labels = []) {
+  if (!labels.length) return "";
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+}
+
+function buildCatalogSymptomGuidance(entities, cycleCtx = null) {
+  const matches = Array.isArray(entities?.catalogMatches) ? entities.catalogMatches : [];
+  if (!matches.length) return null;
+
+  const topMatches = matches.slice(0, 3);
+  const labels = topMatches.map((match) => String(match.label || "").toLowerCase());
+  const categories = [...new Set(topMatches.map((match) => String(match.category || "")))];
+  const normalizedCategories = categories.map((category) =>
+    String(category || "").trim().toLowerCase().replace(/\s+/g, "_")
+  );
+
+  const primaryCategory = normalizedCategories[0] || "symptoms";
+  const categoryLine = CATALOG_CATEGORY_GUIDANCE[primaryCategory]
+    || "That kind of symptom is worth paying attention to, especially if it keeps showing up or starts clustering with other changes.";
+
+  const categoryPhrase = categories.length === 1
+    ? `${categories[0].toLowerCase()} changes`
+    : `${categories.slice(0, 2).map((category) => category.toLowerCase()).join(" and ")} changes`;
+
+  const situation = labels.length === 1
+    ? `I hear you 🩷 You mentioned ${labels[0]}.`
+    : `I hear you 🩷 You mentioned ${formatCatalogLabelList(labels)}.`;
+
+  const meaning = labels.length === 1
+    ? `That fits under ${categoryPhrase}, and it is a real symptom worth noticing. ${categoryLine}`
+    : `That sounds like a mix of ${categoryPhrase}, and those symptoms often make more sense together than in isolation. ${categoryLine}`;
+
+  const nextSteps = cycleCtx?.dayOfCycle
+    ? `Try to note when this is showing up, how strong it feels, and what else is happening in your cycle around day ${cycleCtx.dayOfCycle}. If it keeps repeating, that pattern becomes much more useful.`
+    : "Try to note when this is showing up, how strong it feels, and what else is happening alongside it. If it keeps repeating, that pattern becomes much more useful.";
+
+  const urgentSigns = primaryCategory === "pain"
+    ? "the symptom becomes severe, sudden, one-sided, or starts interfering with normal activity."
+    : primaryCategory === "bleeding" || primaryCategory === "blood_colour" || primaryCategory === "discharge"
+    ? "you develop heavy bleeding, severe pain, dizziness, a strong smell, or the pattern suddenly feels much more intense than usual."
+    : "the symptom becomes severe, sudden, or is showing up with other concerning changes like pain, dizziness, fainting, or fever.";
+
+  return {
+    scenario: "catalog_symptom_support",
+    lines: [
+      `${situation} ${meaning}`,
+      `What might help: ${nextSteps}`,
+      `One thing to watch for: if ${urgentSigns}`,
+      "This is educational info, not a diagnosis - you know your body best 🩷",
+    ],
+    structured: { situation, meaning, nextSteps, urgentSigns },
+  };
+}
+
 export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx = null, tone = null, extraFooter = []) {
   const scenario = resolveScenario(entities, inferredReason);
-  if (!scenario) return null;
+  if (!scenario) {
+    const catalogFallback = buildCatalogSymptomGuidance(entities, cycleCtx);
+    if (!catalogFallback) return null;
+    if (extraFooter.length) catalogFallback.lines.push(...extraFooter);
+    return catalogFallback;
+  }
 
   const situation   = resolve(SITUATION[scenario], cycleCtx)  || null;
   const meaning     = resolve(MEANING[scenario],   cycleCtx)  || null;
@@ -477,9 +679,18 @@ export function buildGuidanceResponse(entities, inferredReason = null, cycleCtx 
  * 2. Entity-based scenario detection (fallback)
  */
 function resolveScenario(entities, inferredReason) {
+  const reason = inferredReason || "";
+
+  if (reason === "DISCHARGE_EXPLANATION" || reason === "discharge_explanation" || reason === "discharge_only") {
+    return resolveDischargeScenario(entities || {});
+  }
+  if (reason === "BLOOD_COLOUR_EXPLANATION" || reason === "blood_colour_explanation") {
+    return resolveBloodColourScenario(entities || {});
+  }
+
   // Priority 1: use the reason string from inferRoute
-  if (inferredReason && REASON_TO_SCENARIO[inferredReason]) {
-    return REASON_TO_SCENARIO[inferredReason];
+  if (reason && REASON_TO_SCENARIO[reason]) {
+    return REASON_TO_SCENARIO[reason];
   }
 
   // Priority 2: derive from entities directly
@@ -488,6 +699,8 @@ function resolveScenario(entities, inferredReason) {
   const s = symptoms || {};
 
   if (urgent)                                           return "urgent";
+  if (entities?.domainSelections?.blood_colour?.length || s.blood_colour_any) return resolveBloodColourScenario(entities);
+  if (hasDischargeContext(entities))                    return resolveDischargeScenario(entities);
   if (s.heavy && s.dizziness)                          return "heavy_with_dizziness";
   if (s.late && pregnancy?.chance && !pregnancy.testedYet) return "late_with_pregnancy_chance";
   if (s.late && severity === "severe" && s.pelvic)     return "late_with_pain";

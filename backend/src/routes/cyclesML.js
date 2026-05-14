@@ -102,6 +102,17 @@ function normalizeFlowValue(rawFlowLevel, rawFlow) {
   return "light";
 }
 
+function mergeLogSnapByDate(target, snap, mapper, { override = true } = {}) {
+  if (!snap?.docs) return;
+  snap.forEach((doc) => {
+    const row = doc.data() || {};
+    const dateKey = row.dateKey || doc.id;
+    if (!dateKey) return;
+    if (!override && target[dateKey]) return;
+    target[dateKey] = mapper(row, dateKey);
+  });
+}
+
 function isPeriodDayEntry(entry) {
   if (!entry || typeof entry !== "object") return false;
   const flow = normalizeFlowValue(entry.flowLevel, entry.flow);
@@ -116,6 +127,12 @@ function getLastPeriodDayFromLogs(logsObj = {}) {
     .filter((dateKey) => isPeriodDayEntry(logsObj[dateKey]))
     .sort()
     .pop() ?? null;
+}
+
+function getPeriodCacheSignatureFromLogs(logsObj = {}) {
+  const days = expandPeriodDaysBackend(logsObj);
+  if (!days.length) return null;
+  return `${days[days.length - 1]}|${days.length}`;
 }
 
 // ── Fallback: rule-based weighted average ────────────────────
@@ -209,62 +226,52 @@ async function fetchUserLogs(uid, daysBack = 180, cycleLogsOverride = null) {
         flow: normalizeFlowValue(row.flowLevel, row.flow),
       };
     }
-  } else if (cycleSnap && !cycleSnap.empty) {
-    cycleSnap.forEach((doc) => {
-      const row = doc.data() || {};
-      const dateKey = row.dateKey;
-      if (!dateKey) return;
-      cycleLogs[dateKey] = {
-        ...row,
-        flow: normalizeFlowValue(row.flowLevel, row.flow),
-      };
-    });
   } else if (!hasCycleOverride) {
     const legacySnap = await db.collection('cycleLogs').doc(uid).collection('entries')
       .where('dateKey', '>=', cutoffKey)
       .orderBy('dateKey', 'asc')
       .get();
-    legacySnap.forEach((doc) => {
-      const row = doc.data() || {};
-      const dateKey = row.dateKey;
-      if (!dateKey) return;
-      cycleLogs[dateKey] = {
-        ...row,
-        flow: normalizeFlowValue(row.flowLevel, row.flow),
-      };
+    const mapCycle = (row, dateKey) => ({
+      ...row,
+      dateKey,
+      flow: normalizeFlowValue(row.flowLevel, row.flow),
     });
+    mergeLogSnapByDate(cycleLogs, legacySnap, mapCycle);
+    mergeLogSnapByDate(cycleLogs, cycleSnap, mapCycle);
   }
 
   const symptomLogs = {};
-  if (!symptomSnap.empty) {
-    symptomSnap.forEach(doc => { symptomLogs[doc.data().dateKey] = doc.data(); });
-  } else {
-    const legacySnap = await db.collection('symptomLogs').doc(uid).collection('entries')
-      .where('dateKey', '>=', cutoffKey)
-      .orderBy('dateKey', 'asc')
-      .get();
-    legacySnap.forEach(doc => { symptomLogs[doc.data().dateKey] = doc.data(); });
-  }
+  const legacySymptomSnap = await db.collection('symptomLogs').doc(uid).collection('entries')
+    .where('dateKey', '>=', cutoffKey)
+    .orderBy('dateKey', 'asc')
+    .get();
+  const mapGeneric = (row, dateKey) => ({ ...row, dateKey });
+  mergeLogSnapByDate(symptomLogs, legacySymptomSnap, mapGeneric);
+  mergeLogSnapByDate(symptomLogs, symptomSnap, mapGeneric);
 
   const biometricLogs = {};
-  if (!biometricSnap.empty) {
-    biometricSnap.forEach(doc => { biometricLogs[doc.data().dateKey] = doc.data(); });
-  } else {
-    const legacySnap = await db.collection('biometricLogs').doc(uid).collection('entries')
-      .where('dateKey', '>=', cutoffKey)
-      .orderBy('dateKey', 'asc')
-      .get();
-    legacySnap.forEach(doc => { biometricLogs[doc.data().dateKey] = doc.data(); });
-  }
+  const legacyBiometricSnap = await db.collection('biometricLogs').doc(uid).collection('entries')
+    .where('dateKey', '>=', cutoffKey)
+    .orderBy('dateKey', 'asc')
+    .get();
+  mergeLogSnapByDate(biometricLogs, legacyBiometricSnap, mapGeneric);
+  mergeLogSnapByDate(biometricLogs, biometricSnap, mapGeneric);
 
   let phaseFeedback = feedbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  if (!phaseFeedback.length) {
-    const legacySnap = await db.collection('phaseFeedback').doc(uid).collection('entries')
-      .orderBy('createdAt', 'desc')
-      .limit(10)
-      .get();
-    phaseFeedback = legacySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  }
+  const legacyFeedbackSnap = await db.collection('phaseFeedback').doc(uid).collection('entries')
+    .orderBy('createdAt', 'desc')
+    .limit(10)
+    .get();
+  const feedbackById = new Map();
+  legacyFeedbackSnap.docs.forEach(doc => feedbackById.set(doc.id, { id: doc.id, ...doc.data() }));
+  phaseFeedback.forEach(entry => feedbackById.set(entry.id, entry));
+  phaseFeedback = [...feedbackById.values()]
+    .sort((a, b) => {
+      const at = a.createdAt?.toMillis?.() ?? (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const bt = b.createdAt?.toMillis?.() ?? (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      return bt - at;
+    })
+    .slice(0, 10);
 
   return { cycleLogs, symptomLogs, biometricLogs, phaseFeedback };
 }
@@ -467,7 +474,7 @@ function buildDisplay(estimatedPhase, confidenceLevel, conflictDetected, quality
   if (conflictDetected) {
     return {
       mode: 'soft',
-      message: `Bloom is picking up mixed signals — you may be transitioning into your ${label} phase.`,
+      message: `Bloom is picking up mixed signals - you may be transitioning into your ${label} phase.`,
     };
   }
   if (quality.lowHistory) {
@@ -518,7 +525,7 @@ function buildExplanation(phaseData, symptomScore, biometricScore, estimatedPhas
   }
 
   if (symptomScore.contradictions.length > 0) {
-    details.push('Some conflicting signals were detected — logging more data will improve accuracy.');
+    details.push('Some conflicting signals were detected - logging more data will improve accuracy.');
   }
 
   if (quality.lowHistory) {
@@ -550,9 +557,7 @@ function todayDateKey() {
 }
 
 function getPeriodClustersBackend(logs) {
-  const periodDays = Object.keys(logs)
-    .filter((k) => isPeriodDayEntry(logs[k]))
-    .sort();
+  const periodDays = expandPeriodDaysBackend(logs);
   if (!periodDays.length) return [];
   const clusters = [];
   let start = periodDays[0], end = periodDays[0];
@@ -567,18 +572,63 @@ function getPeriodClustersBackend(logs) {
   return clusters;
 }
 
+function expandPeriodDaysBackend(logs = {}) {
+  const days = new Set();
+
+  for (const [dateKey, entry] of Object.entries(logs || {})) {
+    if (!isPeriodDayEntry(entry)) continue;
+
+    const explicitPeriodDay = Number(entry?.periodDay);
+    if (Number.isInteger(explicitPeriodDay) && explicitPeriodDay > 1 && explicitPeriodDay <= 10) {
+      const start = dateStrAddDays(dateKey, -(explicitPeriodDay - 1));
+      for (let i = 0; i < explicitPeriodDay; i++) {
+        days.add(dateStrAddDays(start, i));
+      }
+      continue;
+    }
+
+    days.add(dateKey);
+  }
+
+  return [...days].sort();
+}
+
+function periodClusterDuration(cluster) {
+  return Math.round(
+    (new Date(cluster.end + 'T00:00:00') - new Date(cluster.start + 'T00:00:00')) / 86400000
+  ) + 1;
+}
+
+function estimatePeriodDurationBackend(clusters, profileDuration = null) {
+  // Use the user's completed bleeding clusters when available. A lone start
+  // date is intentionally not treated as a 1-day period; if duration history is
+  // sparse, Bloom falls back to 5 days so menstrual phase and calendar overlays
+  // continue through the expected bleed even without daily logs.
+  const loggedDurations = clusters
+    .map(periodClusterDuration)
+    .filter((duration) => Number.isFinite(duration) && duration >= 2 && duration <= 10);
+
+  const profileDays = Number(profileDuration);
+  const rawDuration = loggedDurations.length
+    ? loggedDurations.reduce((sum, duration) => sum + duration, 0) / loggedDurations.length
+    : (Number.isFinite(profileDays) && profileDays >= 2 && profileDays <= 10 ? profileDays : 5);
+
+  return Math.max(3, Math.min(8, Math.round(rawDuration)));
+}
+
 function buildFutureCyclesBackend(lastPeriodStart, predictedLength, periodDuration, monthsAhead, windowDays) {
   const cycles = [];
   let chainStart = lastPeriodStart;
+  const cycleLengthDays = Math.max(21, Math.min(45, Math.round(Number(predictedLength) || 28)));
   for (let i = 0; i < monthsAhead; i++) {
-    const periodStart  = dateStrAddDays(chainStart, predictedLength);
+    const periodStart  = dateStrAddDays(chainStart, cycleLengthDays);
     const periodEnd    = dateStrAddDays(periodStart, periodDuration - 1);
     const ovulationDay = dateStrAddDays(periodStart, -14);
     const fertileStart = dateStrAddDays(ovulationDay, -5);
     const fertileEnd   = dateStrAddDays(ovulationDay, 1);
     const grow = windowDays * (i + 1);
     cycles.push({
-      cycleLength: predictedLength, periodStart, periodEnd, ovulationDay,
+      cycleLength: cycleLengthDays, periodStart, periodEnd, ovulationDay,
       fertileWindow: { start: fertileStart, end: fertileEnd },
       earliestStart: dateStrAddDays(periodStart, -grow),
       latestStart:   dateStrAddDays(periodStart,  grow),
@@ -588,6 +638,8 @@ function buildFutureCyclesBackend(lastPeriodStart, predictedLength, periodDurati
   }
   return cycles;
 }
+
+const FUTURE_CYCLES_TO_PROJECT = 10;
 
 function buildConfidenceObj(confidenceStr, cycleCount) {
   const map = {
@@ -600,7 +652,19 @@ function buildConfidenceObj(confidenceStr, cycleCount) {
   return map[confidenceStr] ?? map.low;
 }
 
-function buildCalendarOverlays(futureCycles, clusterStarts) {
+function phaseLabelForDisplay(phaseKey, fallback = 'Unknown') {
+  const labels = {
+    menstrual: 'Menstrual',
+    follicular: 'Follicular',
+    ovulation: 'Ovulatory',
+    ovulatory: 'Ovulatory',
+    luteal: 'Luteal',
+    late_luteal: 'Late Luteal',
+  };
+  return labels[String(phaseKey || '').toLowerCase()] || fallback;
+}
+
+function buildCalendarOverlays(futureCycles, clusterStarts, loggedPeriodDays = new Set()) {
   const today = todayDateKey();
   const predictedPeriodDays = [];
   const futureOvulationDates = [];
@@ -619,13 +683,64 @@ function buildCalendarOverlays(futureCycles, clusterStarts) {
       : 5;
     for (let i = 0; i < duration; i++) predictedPeriodDays.push(dateStrAddDays(c.periodStart, i));
     if (!nextPeriodDate) nextPeriodDate = c.periodStart;
-    if (c.ovulationDay) futureOvulationDates.push(c.ovulationDay);
+    // Only add ovulation/fertile days that don't fall on a confirmed period day
+    if (c.ovulationDay && !loggedPeriodDays.has(c.ovulationDay)) {
+      futureOvulationDates.push(c.ovulationDay);
+    }
     if (c.fertileWindow?.start && c.fertileWindow?.end) {
       let d = c.fertileWindow.start;
-      while (d <= c.fertileWindow.end) { allFertileDays.push(d); d = dateStrAddDays(d, 1); }
+      while (d <= c.fertileWindow.end) {
+        if (!loggedPeriodDays.has(d)) allFertileDays.push(d);
+        d = dateStrAddDays(d, 1);
+      }
     }
   }
   return { predictedPeriodDays, futureOvulationDates, allFertileDays, nextPeriodDate };
+}
+
+function hasLoggedPeriodResolvingPrediction(clusterStarts, periodStart, windowDays = 14) {
+  if (!periodStart) return false;
+  const predMs = new Date(periodStart + 'T00:00:00').getTime();
+  return clusterStarts.some(
+    s => Math.abs(new Date(s + 'T00:00:00').getTime() - predMs) <= windowDays * 86400000
+  );
+}
+
+function buildPeriodPredictionStatus(futureCycles, clusterStarts) {
+  const today = todayDateKey();
+  const unresolvedPastCycles = (futureCycles || [])
+    .filter(c =>
+      c?.periodStart &&
+      c.periodStart < today &&
+      !hasLoggedPeriodResolvingPrediction(clusterStarts, c.periodStart)
+    )
+    .sort((a, b) => a.periodStart.localeCompare(b.periodStart));
+
+  const latestOverdue = unresolvedPastCycles[unresolvedPastCycles.length - 1] ?? null;
+  if (!latestOverdue) {
+    return {
+      status: 'upcoming',
+      predictedStart: null,
+      predictedEnd: null,
+      daysLate: 0,
+      message: '',
+    };
+  }
+
+  const daysLate = Math.max(1, Math.round(
+    (new Date(today + 'T00:00:00') - new Date(latestOverdue.periodStart + 'T00:00:00')) / 86400000
+  ));
+
+  // Stale predictions are not presented as future dates. The old expected
+  // window stays attached to the shared state so dashboard and calendar can say
+  // "expected around May 1-May 5" or "late by 8 days" consistently.
+  return {
+    status: 'overdue',
+    predictedStart: latestOverdue.periodStart,
+    predictedEnd: latestOverdue.periodEnd ?? latestOverdue.periodStart,
+    daysLate,
+    message: `Period is late by ${daysLate} day${daysLate === 1 ? '' : 's'}.`,
+  };
 }
 
 // ── Core estimation function ──────────────────────────────────
@@ -635,12 +750,12 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
   const mlTimeoutMs = Number(options.mlTimeoutMs ?? Math.min(PYTHON_TIMEOUT_MS, 1200));
   const allowML = options.allowML !== false;
 
-  // 1 — Fetch all logs from Firestore
+  // 1 - Fetch all logs from Firestore
   const { cycleLogs, symptomLogs, biometricLogs, phaseFeedback } = await fetchUserLogs(uid, 180, cycleLogsOverride);
   const userDoc = await db.collection('users').doc(uid).get();
   const userData = userDoc.exists ? userDoc.data() || {} : {};
 
-  // 2 — Derive period clusters from cycle logs
+  // 2 - Derive period clusters from cycle logs
   const clusters = getPeriodClustersBackend(cycleLogs);
 
   if (!clusters.length) {
@@ -707,7 +822,6 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
   const clusterStarts = clusters.map(c => c.start);
   const lastCluster   = clusters[clusters.length - 1];
   const lastStart     = lastCluster.start;
-  const lastEnd       = lastCluster.end;
 
   // Cycle lengths from cluster intervals
   const rawCycleLengths = [];
@@ -733,7 +847,7 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
     recentFeedbackCount: phaseFeedback.length,
   };
 
-  // 3 — ML-predicted cycle length
+  // 3 - ML-predicted cycle length
   let predictedCycleLength = avgLen;
   let predMethod = 'avg';
 
@@ -756,39 +870,61 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
     predMethod = 'weighted-avg';
   }
 
-  // 4 — Phase via cyclePhaseEngine
+  // 4 - Phase via cyclePhaseEngine
   const phaseData = computeCyclePhaseML(cycleLogs, predictedCycleLength);
 
-  // 5 — Score symptoms and biometrics
+  // 5 - Score symptoms and biometrics
   const symptomScore   = scoreSymptoms(symptomLogs);
   const biometricScore = scoreBiometrics(biometricLogs);
 
-  // 6 — Fuse all signals
+  // 6 - Fuse all signals
   const fusion = fuseSignals(phaseData, symptomScore, biometricScore, quality);
 
-  // 7 — Build display + explanation
+  // 7 - Build display + explanation
   const display     = buildDisplay(fusion.estimatedPhase, fusion.confidence.level, fusion.agreement.conflictDetected, quality);
   const explanation = buildExplanation(phaseData, symptomScore, biometricScore, fusion.estimatedPhase, quality);
 
-  // 8 — Confidence + calendar overlays
-  const periodDuration = Math.max(1,
-    Math.round((new Date(lastEnd + 'T00:00:00') - new Date(lastStart + 'T00:00:00')) / 86400000) + 1
+  // 8 - Confidence + calendar overlays
+  const periodDuration = estimatePeriodDurationBackend(
+    clusters,
+    userData.healthProfile?.periodDuration
   );
   const confidence  = buildConfidenceObj(phaseData.confidence, cycleLengths.length);
-  const futureCycles = buildFutureCyclesBackend(lastStart, predictedCycleLength, periodDuration, 3, confidence.windowDays);
-  const overlays    = buildCalendarOverlays(futureCycles, clusterStarts);
+  const futureCycles = buildFutureCyclesBackend(
+    lastStart,
+    predictedCycleLength,
+    periodDuration,
+    FUTURE_CYCLES_TO_PROJECT,
+    confidence.windowDays
+  );
+  const loggedPeriodDays = new Set(expandPeriodDaysBackend(cycleLogs));
+  const overlays    = buildCalendarOverlays(futureCycles, clusterStarts, loggedPeriodDays);
+  const periodPrediction = buildPeriodPredictionStatus(futureCycles, clusterStarts);
+  const displayPhaseKey = fusion.estimatedPhase;
+  const displayPhaseLabel = phaseLabelForDisplay(displayPhaseKey, phaseData.phaseLabel);
+  let currentOvulationDate = phaseData.ovulationDate;
+  let currentFertileStart = phaseData.fertileStart;
+  let currentFertileEnd = phaseData.fertileEnd;
+  const todayKey = todayDateKey();
+  const displaySaysPostOvulation = ['luteal', 'late_luteal'].includes(String(displayPhaseKey || '').toLowerCase());
+  if (displaySaysPostOvulation && currentOvulationDate && currentOvulationDate >= todayKey) {
+    currentOvulationDate = null;
+    currentFertileStart = null;
+    currentFertileEnd = null;
+  }
 
-  // 9 — Build full phaseEstimation object (Jahzara's spec)
+  // 9 - Build full phaseEstimation object (Jahzara's spec)
   const phaseEstimation = {
-    estimatedPhase: fusion.estimatedPhase,
+    estimatedPhase: displayPhaseKey,
     confidence: fusion.confidence,
     display,
     timingContext: {
       cycleDay:               phaseData.dayInCycle,
       predictedCycleLength,
       predictedNextPeriodDate: overlays.nextPeriodDate ?? phaseData.nextPeriodDate,
-      estimatedOvulationWindow: phaseData.fertileStart && phaseData.fertileEnd
-        ? { start: phaseData.fertileStart, end: phaseData.fertileEnd }
+      periodPrediction,
+      estimatedOvulationWindow: currentFertileStart && currentFertileEnd
+        ? { start: currentFertileStart, end: currentFertileEnd }
         : null,
     },
     signals:     fusion.signals,
@@ -808,16 +944,18 @@ async function computeFullEstimation(uid, cycleLogsOverride = null, options = {}
 
   const state = {
     ready:                true,
-    phase:                fusion.estimatedPhase,
-    phaseLabel:           phaseData.phaseLabel,
+    phase:                displayPhaseKey,
+    phaseLabel:           displayPhaseLabel,
     dayInCycle:           phaseData.dayInCycle,
     avgCycleLength:       phaseData.avgCycleLength ?? avgLen,
     predictedCycleLength,
     confidence,
     nextPeriodDate:       overlays.nextPeriodDate ?? phaseData.nextPeriodDate,
-    ovulationDate:        phaseData.ovulationDate,
-    fertileStart:         phaseData.fertileStart,
-    fertileEnd:           phaseData.fertileEnd,
+    periodPrediction,
+    averagePeriodDuration: periodDuration,
+    ovulationDate:        currentOvulationDate,
+    fertileStart:         currentFertileStart,
+    fertileEnd:           currentFertileEnd,
     cyclesLogged:         clusterStarts.length,
     cycleLengths,
     predictedPeriodDays:  overlays.predictedPeriodDays,
@@ -876,7 +1014,7 @@ router.post('/predict', requireAuth, async (req, res) => {
 });
 
 // ── Route: POST /api/cycles/state ────────────────────────────
-// No body needed — reads all logs from Firestore using req.user.uid
+// No body needed - reads all logs from Firestore using req.user.uid
 
 router.post('/state', requireAuth, async (req, res) => {
   try {
@@ -886,6 +1024,7 @@ router.post('/state', requireAuth, async (req, res) => {
     // Check cache
     const requestLogs = (req.body && typeof req.body === "object") ? (req.body.logs || {}) : {};
     const requestLastPeriodDay = getLastPeriodDayFromLogs(requestLogs);
+    const requestPeriodSignature = getPeriodCacheSignatureFromLogs(requestLogs);
     await ensureUserDocument(uid);
     const userDoc = await db.collection('users').doc(uid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
@@ -895,7 +1034,9 @@ router.post('/state', requireAuth, async (req, res) => {
       userData?.phaseProfile?.lastPeriodStart ??
       'none';
 
-    const cached = _getCachedState(uid, lastPeriodDay);
+    const todayKey = todayDateKey();
+    const cacheKey = `${requestPeriodSignature ?? lastPeriodDay}|${todayKey}`;
+    const cached = _getCachedState(uid, cacheKey);
     if (cached) {
       console.log(`[cyclesML/state] cache hit uid=${uid}`);
       return res.json({ ok: true, state: cached });
@@ -910,7 +1051,7 @@ router.post('/state', requireAuth, async (req, res) => {
     );
 
     // Cache + persist to Firestore (non-blocking)
-    _setCachedState(uid, lastStart ?? 'none', state);
+    _setCachedState(uid, cacheKey ?? `${lastStart ?? 'none'}|${todayKey}`, state);
 
     if (db) {
       // Persist full state to cycleState/current
@@ -960,7 +1101,7 @@ router.post('/feedback', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `userResponse must be one of: ${VALID_RESPONSES.join(', ')}` });
     }
 
-    // 1 — Store feedback doc in phaseFeedback subcollection
+    // 1 - Store feedback doc in phaseFeedback subcollection
     await ensureUserDocument(uid);
 
     const feedbackRef = db.collection('users').doc(uid).collection('phaseFeedback').doc();
@@ -985,14 +1126,14 @@ router.post('/feedback', requireAuth, async (req, res) => {
     await feedbackRef.set(feedbackDoc);
     await legacyFeedbackRef.set(feedbackDoc);
 
-    // 2 — If strong correction (bleeding confirmed or explicit phase given), re-estimate
+    // 2 - If strong correction (bleeding confirmed or explicit phase given), re-estimate
     const isStrongCorrection = correction === 'bleeding' || (userResponse === 'no' && correction);
 
     if (!isStrongCorrection) {
       return res.json({ ok: true, reestimated: false, message: 'Feedback saved.' });
     }
 
-    // 3 — If bleeding correction, update lastPeriodStart to today
+    // 3 - If bleeding correction, update lastPeriodStart to today
     if (correction === 'bleeding') {
       const today = todayDateKey();
       await db.collection('users').doc(uid).set(
@@ -1005,11 +1146,11 @@ router.post('/feedback', requireAuth, async (req, res) => {
       );
     }
 
-    // 4 — Clear cache and re-run estimation
+    // 4 - Clear cache and re-run estimation
     _clearCache(uid);
     const { state, lastStart } = await computeFullEstimation(uid);
 
-    // 5 — If bleeding, override the estimated phase
+    // 5 - If bleeding, override the estimated phase
     if (correction === 'bleeding' && state.phaseEstimation) {
       state.phaseEstimation.estimatedPhase = 'menstrual';
       state.phaseEstimation.confidence     = { level: 'high', score: 0.9 };
@@ -1025,7 +1166,7 @@ router.post('/feedback', requireAuth, async (req, res) => {
       state.phaseLabel = 'Menstrual';
     }
 
-    // 6 — Persist updated state
+    // 6 - Persist updated state
     _setCachedState(uid, lastStart ?? 'none', state);
 
     if (db) {

@@ -13,18 +13,17 @@ import {
 
 
 export const SYMPTOM_CATEGORIES = {
-  BLEEDING:     ["VAGINAL_BLEEDING", "SPOTTING", "HEAVY_FLOW", "LARGE_CLOTS"],
   PAIN:         ["CRAMPS", "PELVIC_PAIN", "OVULATION_PAIN", "HEADACHE", "JOINT_PAIN", "BREAST_TENDERNESS"],
   DIGESTIVE:    ["BLOATING", "GASSY", "HEARTBURN", "NAUSEA", "CONSTIPATION", "DIARRHEA"],
   DISCHARGE:    ["DISCHARGE_NONE", "DISCHARGE_STICKY", "DISCHARGE_CREAMY", "DISCHARGE_EGGWHITE", "UNUSUAL_DISCHARGE"],
-  PHYSICAL:     ["FATIGUE", "FLUID_RETENTION", "FREQUENT_URINATION", "WEIGHT_CHANGE", "NASAL_CONGESTION", "SMELL_SENSITIVITY"],
+  PHYSICAL:     ["FATIGUE", "FLUID_RETENTION", "FREQUENT_URINATION", "NASAL_CONGESTION", "SMELL_SENSITIVITY"],
   SKIN_HAIR:    ["ACNE", "DRY_SKIN", "HAIR_THINNING"],
   TEMPERATURE:  ["HOT_FLASHES", "NIGHT_SWEATS", "COLD_FLASHES", "BBT_SHIFT"],
   COGNITIVE:    ["BRAIN_FOG", "FORGETFUL", "POOR_CONCENTRATION"],
   MOOD:         ["MOOD_SWINGS", "IRRITABILITY", "ANXIETY", "DEPRESSION", "CRYING_SPELLS", "CALM", "STRESSED"],
   SLEEP:        ["INSOMNIA"],
   APPETITE:     ["CRAVING_SWEET", "CRAVING_SALTY", "CRAVING_GREASY", "CRAVING_SPICY", "APPETITE_INCREASE", "APPETITE_DECREASE"],
-  REPRODUCTIVE: ["INCREASED_LIBIDO", "DECREASED_LIBIDO", "CERVICAL_MUCUS_CHANGE", "VAGINAL_DRYNESS", "PAIN_DURING_SEX", "MISSED_PERIOD", "IRREGULAR_PERIOD"],
+  REPRODUCTIVE: ["INCREASED_LIBIDO", "DECREASED_LIBIDO", "CERVICAL_MUCUS_CHANGE", "VAGINAL_DRYNESS", "PAIN_DURING_SEX"],
 };
 
 /** Flat list of all 60 valid symptom codes */
@@ -37,7 +36,6 @@ export const ALL_SYMPTOM_CODES = Object.values(SYMPTOM_CATEGORIES).flat();
 export const SYMPTOM_PHASE_MAP = {
   menstrual: {
     expected: [
-      "VAGINAL_BLEEDING", "HEAVY_FLOW", "LARGE_CLOTS",
       "CRAMPS", "PELVIC_PAIN", "FATIGUE",
       "BLOATING", "MOOD_SWINGS", "DEPRESSION", "HEADACHE",
       "NAUSEA", "DIARRHEA", "CONSTIPATION",
@@ -55,19 +53,16 @@ export const SYMPTOM_PHASE_MAP = {
       "CALM", "INCREASED_LIBIDO", "APPETITE_DECREASE",
     ],
     unexpected: [
-      "VAGINAL_BLEEDING", "HEAVY_FLOW", "LARGE_CLOTS",
       "MOOD_SWINGS", "DEPRESSION", "CRYING_SPELLS",
     ],
   },
   ovulation: {
     expected: [
       "DISCHARGE_EGGWHITE", "OVULATION_PAIN", "BBT_SHIFT",
-      "INCREASED_LIBIDO", "SPOTTING", "CERVICAL_MUCUS_CHANGE",
+      "INCREASED_LIBIDO", "CERVICAL_MUCUS_CHANGE",
       "CALM", "BREAST_TENDERNESS",
     ],
-    unexpected: [
-      "VAGINAL_BLEEDING", "HEAVY_FLOW", "LARGE_CLOTS",
-    ],
+    unexpected: [],
   },
   luteal: {
     expected: [
@@ -79,7 +74,6 @@ export const SYMPTOM_PHASE_MAP = {
       "DECREASED_LIBIDO", "STRESSED",
     ],
     unexpected: [
-      "HEAVY_FLOW", "LARGE_CLOTS",
       "DISCHARGE_EGGWHITE", "OVULATION_PAIN", "UNUSUAL_DISCHARGE",
     ],
   },
@@ -102,24 +96,24 @@ const PMS_CLUSTER = [
   "CRAVING_SWEET", "CRAVING_SALTY", "HEADACHE", "INSOMNIA",
 ];
 
-/** Menstrual cluster - VAGINAL_BLEEDING required, then ≥2 of these */
+/** Menstrual cluster - requires ≥2 of these */
 const MENSTRUAL_CLUSTER_SUPPORT = [
   "CRAMPS", "FATIGUE", "BLOATING", "MOOD_SWINGS", "HEADACHE", "NAUSEA",
 ];
 
 /** Ovulation cluster - DISCHARGE_EGGWHITE required, then ≥1 of these */
 const OVULATION_CLUSTER_SUPPORT = [
-  "OVULATION_PAIN", "BBT_SHIFT", "INCREASED_LIBIDO", "SPOTTING",
+  "OVULATION_PAIN", "BBT_SHIFT", "INCREASED_LIBIDO",
 ];
 
 /** Perimenopause cluster - requires ≥3 of these */
 const PERIMENOPAUSE_CLUSTER = [
   "HOT_FLASHES", "NIGHT_SWEATS", "INSOMNIA", "MOOD_SWINGS",
-  "IRREGULAR_PERIOD", "VAGINAL_DRYNESS", "BRAIN_FOG", "DECREASED_LIBIDO",
+  "VAGINAL_DRYNESS", "BRAIN_FOG", "DECREASED_LIBIDO",
 ];
 
 /** Hormonal pattern (PCOS-adjacent) - requires ≥2 of set A + ≥1 of set B */
-const HORMONAL_CLUSTER_A = ["ACNE", "HAIR_THINNING", "WEIGHT_CHANGE", "IRREGULAR_PERIOD"];
+const HORMONAL_CLUSTER_A = ["ACNE", "HAIR_THINNING"];
 const HORMONAL_CLUSTER_B = ["FATIGUE", "MOOD_SWINGS", "BLOATING"];
 
 
@@ -153,8 +147,7 @@ const FORECAST_MAX_HISTORY_CYCLES    = 6;
  * warrants clinical attention.
  */
 const FORECAST_EXCLUDED_CODES = new Set([
-  "HEAVY_FLOW", "LARGE_CLOTS", "UNUSUAL_DISCHARGE",
-  "MISSED_PERIOD", "IRREGULAR_PERIOD", "VAGINAL_BLEEDING",
+  "UNUSUAL_DISCHARGE",
 ]);
 
 /**
@@ -185,7 +178,6 @@ const FORECAST_SYMPTOM_LABELS = {
   DISCHARGE_CREAMY:      "creamy discharge",
   OVULATION_PAIN:        "ovulation discomfort",
   CERVICAL_MUCUS_CHANGE: "changes in discharge",
-  SPOTTING:              "light spotting",
   NAUSEA:                "nausea",
   DEPRESSION:            "low mood",
   CRYING_SPELLS:         "feeling emotional",
@@ -200,7 +192,6 @@ const FORECAST_SYMPTOM_LABELS = {
   JOINT_PAIN:            "joint discomfort",
   DRY_SKIN:              "dry skin",
   HAIR_THINNING:         "hair thinning",
-  WEIGHT_CHANGE:         "weight changes",
   STRESSED:              "feeling stressed",
   BBT_SHIFT:             "temperature shift",
   FREQUENT_URINATION:    "frequent urination",
@@ -574,7 +565,13 @@ export function groupSymptomsByCycleWindow(symptomHistory, cycleStarts) {
         for (const item of entry.items) {
           if (!item?.code) continue;
           if (!byCode.has(item.code)) byCode.set(item.code, []);
-          byCode.get(item.code).push({ cycleIndex: i, dayOfCycle, phase, dateKey: entry.dateKey });
+          byCode.get(item.code).push({
+            cycleIndex: i,
+            dayOfCycle,
+            phase,
+            dateKey: entry.dateKey,
+            severity: Number(item.severity) || 0,
+          });
         }
         break; // entry belongs to exactly one cycle
       }
@@ -654,13 +651,16 @@ export function getSymptomForecastCandidates(
     if (FORECAST_EXCLUDED_CODES.has(code))  continue; // safety-sensitive
     if (loggedTodayCodes.has(code))          continue; // already logged today
 
-    const phaseSupport  = currentPhase !== null
-      ? countCyclesSupportingPhase(occurrences, currentPhase)
-      : 0;
+    const phaseMatches = currentPhase !== null
+      ? occurrences.filter(o => o.cycleIndex !== 0 && o.phase === currentPhase)
+      : [];
 
-    const windowSupport = currentDayOfCycle !== null
-      ? countCyclesSupportingDayWindow(occurrences, currentDayOfCycle, dayWindowHalf)
-      : 0;
+    const windowMatches = currentDayOfCycle !== null
+      ? occurrences.filter(o => o.cycleIndex !== 0 && Math.abs(o.dayOfCycle - currentDayOfCycle) <= dayWindowHalf)
+      : [];
+
+    const phaseSupport  = new Set(phaseMatches.map(o => o.cycleIndex)).size;
+    const windowSupport = new Set(windowMatches.map(o => o.cycleIndex)).size;
 
     const phaseOk  = phaseSupport  >= minSupportingCycles;
     const windowOk = windowSupport >= minSupportingCycles;
@@ -669,6 +669,14 @@ export function getSymptomForecastCandidates(
     const basis = (phaseOk && windowOk) ? "combined"
                 : phaseOk               ? "phase"
                 :                         "day_window";
+    const supportingOccurrences = [...phaseMatches, ...windowMatches]
+      .filter((o, idx, arr) =>
+        arr.findIndex(x => x.cycleIndex === o.cycleIndex && x.dateKey === o.dateKey) === idx
+      );
+    const severities = supportingOccurrences
+      .map(o => Number(o.severity) || 0)
+      .filter(n => n > 0);
+    const severityEstimate = severities.length ? median(severities) : null;
 
     candidates.push({
       code,
@@ -676,6 +684,8 @@ export function getSymptomForecastCandidates(
       supportingCycles: Math.max(phaseSupport, windowSupport),
       phaseSupport,
       windowSupport,
+      severityEstimate,
+      severitySamples: severities.length,
     });
   }
 
@@ -720,6 +730,16 @@ export function formatSymptomForecastList(labels) {
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
+function formatSeverityEstimate(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n >= 4.5) return "severe";
+  if (n >= 3.5) return "high";
+  if (n >= 2.5) return "moderate";
+  if (n >= 1.5) return "mild";
+  return "light";
+}
+
 /**
  * Compose the forecast message body using safe, future-framed language.
  * Never uses certainty language; always frames as personal pattern observation.
@@ -728,10 +748,19 @@ export function formatSymptomForecastList(labels) {
  * @param {string|null} phase
  * @param {number|null} dayOfCycle
  * @param {string}      basis  - "phase" | "day_window" | "combined"
+ * @param {number|null} severityEstimate
+ * @param {number}      supportingCycles
  * @returns {string}
  */
-export function buildForecastMessage(labels, phase, dayOfCycle, basis) {
+export function buildForecastMessage(labels, phase, dayOfCycle, basis, severityEstimate = null, supportingCycles = 0) {
   const symptomStr = formatSymptomForecastList(labels);
+  const severityLabel = formatSeverityEstimate(severityEstimate);
+  const supportText = supportingCycles > 0
+    ? ` This is based on ${supportingCycles} previous cycle${supportingCycles === 1 ? "" : "s"} in your logs.`
+    : "";
+  const severityText = severityLabel
+    ? ` When this has shown up before, your logged severity was usually ${severityLabel}.`
+    : "";
   const PHASE_LABELS = {
     menstrual:  "around your period",
     follicular: "during the follicular phase",
@@ -741,15 +770,15 @@ export function buildForecastMessage(labels, phase, dayOfCycle, basis) {
 
   if ((basis === "combined" || basis === "day_window") && dayOfCycle !== null) {
     const phaseSuffix = phase ? ` (${PHASE_LABELS[phase] ?? `in your ${phase} phase`})` : "";
-    return `Based on your past logs, you often notice ${symptomStr} around day ${dayOfCycle} of your cycle${phaseSuffix}.`;
+    return `Based on your past logs, you often notice ${symptomStr} around day ${dayOfCycle} of your cycle${phaseSuffix}.${supportText}${severityText}`;
   }
 
   if (phase) {
     const phaseLabel = PHASE_LABELS[phase] ?? `during your ${phase} phase`;
-    return `Based on your past logs, you often notice ${symptomStr} ${phaseLabel}.`;
+    return `Based on your past logs, you often notice ${symptomStr} ${phaseLabel}.${supportText}${severityText}`;
   }
 
-  return `Based on your past logs, you often notice ${symptomStr} around this point in your cycle.`;
+  return `Based on your past logs, you often notice ${symptomStr} around this point in your cycle.${supportText}${severityText}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -906,7 +935,7 @@ export function detectSymptomPatternSignal({
   }
 
   // ── Menstrual pattern ─────────────────────────────────────────────────────
-  if (codes.has("VAGINAL_BLEEDING")) {
+  {
     const menstrualSupport = MENSTRUAL_CLUSTER_SUPPORT.filter(c => codes.has(c));
     if (menstrualSupport.length >= 2) {
       return makeSignal({
@@ -1110,7 +1139,7 @@ export function detectReproductiveGuidanceSignal({
   const pregnancySymptoms = ["NAUSEA", "FATIGUE", "BREAST_TENDERNESS", "FREQUENT_URINATION", "SMELL_SENSITIVITY"];
   const pregnancyMatches  = pregnancySymptoms.filter(c => codes.has(c));
 
-  if ((missedPeriod || codes.has("MISSED_PERIOD")) && pregnancyMatches.length > 0) {
+  if (missedPeriod && pregnancyMatches.length > 0) {
     return makeSignal({
       code: "PREGNANCY_TEST_TIMING_RELEVANT",
       level: "medium",
@@ -1139,44 +1168,6 @@ export function detectReproductiveGuidanceSignal({
     });
   }
 
-  // ── SPOTTING_CONTEXT_NOTE ─────────────────────────────────────────────────
-  if (codes.has("SPOTTING")) {
-    // Spotting with pain or unusual discharge → elevate
-    if (codes.has("PELVIC_PAIN") || codes.has("UNUSUAL_DISCHARGE")) {
-      return makeSignal({
-        code: "SPOTTING_CONTEXT_NOTE",
-        level: "medium",
-        show: true,
-        title: "Spotting with other symptoms - worth a check",
-        message: "Spotting alongside pelvic pain or unusual discharge is worth getting checked by a provider, especially if it's new or different for you.",
-        guidance: "If the spotting is light and you feel well, monitor for 48 hours. If it's accompanied by pain or changes, seek a provider's input.",
-        debug: { phase, hasPain: codes.has("PELVIC_PAIN"), hasDischarge: codes.has("UNUSUAL_DISCHARGE") },
-      });
-    }
-    if (phase === "follicular") {
-      return makeSignal({
-        code: "SPOTTING_CONTEXT_NOTE",
-        level: "low",
-        show: true,
-        title: "Spotting in the follicular phase",
-        message: "Light spotting in the follicular phase can have hormonal causes and is often not urgent, but it's worth noting.",
-        guidance: "Log the duration and any other symptoms. If it recurs across cycles or is heavier than spotting, mention it to a provider.",
-        debug: { phase },
-      });
-    }
-    if (phase === "luteal") {
-      return makeSignal({
-        code: "SPOTTING_CONTEXT_NOTE",
-        level: "low",
-        show: true,
-        title: "Spotting in the luteal phase",
-        message: "Spotting in the luteal phase can happen for various hormonal reasons, including around the time of implantation if applicable.",
-        guidance: "Keep logging - if this becomes a regular pattern, it's worth mentioning to a provider.",
-        debug: { phase },
-      });
-    }
-  }
-
   // ── CYCLE_PHASE_SHIFT_POSSIBLE ────────────────────────────────────────────
   // Detect when dominant symptoms suggest a different phase than predicted
   if (phase === "luteal" && codes.has("DISCHARGE_EGGWHITE")) {
@@ -1190,18 +1181,6 @@ export function detectReproductiveGuidanceSignal({
       debug: { phase, marker: "DISCHARGE_EGGWHITE_IN_LUTEAL" },
     });
   }
-  if (phase === "follicular" && codes.has("VAGINAL_BLEEDING") && codes.has("CRAMPS")) {
-    return makeSignal({
-      code: "CYCLE_PHASE_SHIFT_POSSIBLE",
-      level: "low",
-      show: true,
-      title: "Cycle timing may have shifted",
-      message: "Bloom noticed bleeding and cramps logged in what appears to be your follicular phase. Your period may have started earlier than predicted.",
-      guidance: "Update your last period date in the dashboard to keep your predictions accurate.",
-      debug: { phase, marker: "BLEEDING_IN_FOLLICULAR" },
-    });
-  }
-
   return makeSignal({
     code: "SPOTTING_CONTEXT_NOTE",
     level: "low",
@@ -1238,66 +1217,7 @@ export function detectSafetyEscalationSignal({
 
   // ── SEEK_URGENT_CARE (level: high) - highest priority ────────────────────
 
-  // Rule 1: Heavy flow severe + fatigue (dizziness-adjacent)
-  if (codes.has("HEAVY_FLOW") && sev("HEAVY_FLOW") >= SEVERITY_SEVERE && codes.has("FATIGUE")) {
-    return makeSignal({
-      code: "SEEK_URGENT_CARE",
-      level: "high",
-      show: true,
-      title: "This needs attention today",
-      message: "Heavy flow at this level combined with significant fatigue needs same-day attention.",
-      guidance: "Please seek care today - these symptoms together should be assessed by a clinician.",
-      category: "safety",
-      debug: {
-        triggers:   ["HEAVY_FLOW", "FATIGUE"],
-        severities: { HEAVY_FLOW: sev("HEAVY_FLOW"), FATIGUE: sev("FATIGUE") },
-        daysLogged: 1,
-      },
-    });
-  }
-
-  // Rule 2: Heavy flow + large clots at elevated severity
-  if (codes.has("HEAVY_FLOW") && codes.has("LARGE_CLOTS") && sev("LARGE_CLOTS") >= SEVERITY_ELEVATED) {
-    return makeSignal({
-      code: "SEEK_URGENT_CARE",
-      level: "high",
-      show: true,
-      title: "This needs attention today",
-      message: "Heavy bleeding with large clots at this intensity needs same-day assessment.",
-      guidance: "Please seek care today - heavy flow with large clots should not be managed at home without guidance.",
-      category: "safety",
-      debug: {
-        triggers:   ["HEAVY_FLOW", "LARGE_CLOTS"],
-        severities: { HEAVY_FLOW: sev("HEAVY_FLOW"), LARGE_CLOTS: sev("LARGE_CLOTS") },
-        daysLogged: 1,
-      },
-    });
-  }
-
-  // Rule 3: Ectopic risk indicator - cramps + spotting + missed period
-  if (
-    codes.has("CRAMPS") && sev("CRAMPS") >= SEVERITY_SEVERE &&
-    codes.has("SPOTTING") &&
-    codes.has("MISSED_PERIOD")
-  ) {
-    return makeSignal({
-      code: "SEEK_URGENT_CARE",
-      level: "high",
-      show: true,
-      title: "This needs attention today",
-      message: "Severe cramping alongside spotting and a missed period needs to be checked urgently. In rare cases this combination can indicate something that needs prompt assessment.",
-      guidance: "Please seek care today - do not wait to see if this resolves on its own.",
-      category: "safety",
-      debug: {
-        triggers:   ["CRAMPS", "SPOTTING", "MISSED_PERIOD"],
-        severities: { CRAMPS: sev("CRAMPS") },
-        note:       "ectopic_risk_indicator",
-        daysLogged: 1,
-      },
-    });
-  }
-
-  // Rule 4: Severe pelvic pain with fever proxy
+  // Rule: Severe pelvic pain with fever proxy
   const hasFeverProxy = codes.has("NIGHT_SWEATS") && codes.has("COLD_FLASHES");
   if (sev("PELVIC_PAIN") >= SEVERITY_SEVERE && hasFeverProxy) {
     return makeSignal({
@@ -1360,11 +1280,9 @@ export function detectSafetyEscalationSignal({
 
   // ── URGENT_SYMPTOM_COMBINATION (level: high) ──────────────────────────────
   const urgentMarkers = [
-    codes.has("HEAVY_FLOW") && sev("HEAVY_FLOW") >= SEVERITY_ELEVATED,
     codes.has("PELVIC_PAIN") && sev("PELVIC_PAIN") >= SEVERITY_ELEVATED,
     codes.has("UNUSUAL_DISCHARGE"),
     codes.has("NIGHT_SWEATS") && codes.has("PELVIC_PAIN"),
-    codes.has("LARGE_CLOTS"),
   ].filter(Boolean);
 
   if (urgentMarkers.length >= 2) {
@@ -1379,11 +1297,9 @@ export function detectSafetyEscalationSignal({
       debug: {
         urgentMarkerCount: urgentMarkers.length,
         triggers: [
-          codes.has("HEAVY_FLOW") && sev("HEAVY_FLOW") >= SEVERITY_ELEVATED ? `HEAVY_FLOW(${sev("HEAVY_FLOW")})` : null,
           codes.has("PELVIC_PAIN") && sev("PELVIC_PAIN") >= SEVERITY_ELEVATED ? `PELVIC_PAIN(${sev("PELVIC_PAIN")})` : null,
           codes.has("UNUSUAL_DISCHARGE") ? "UNUSUAL_DISCHARGE" : null,
           codes.has("NIGHT_SWEATS") && codes.has("PELVIC_PAIN") ? "NIGHT_SWEATS+PELVIC_PAIN" : null,
-          codes.has("LARGE_CLOTS") ? "LARGE_CLOTS" : null,
         ].filter(Boolean),
       },
     });
@@ -1403,24 +1319,6 @@ export function detectSafetyEscalationSignal({
         triggers:        ["NIGHT_SWEATS", "COLD_FLASHES"],
         pelvicSymptoms:  [codes.has("PELVIC_PAIN") ? "PELVIC_PAIN" : null, codes.has("UNUSUAL_DISCHARGE") ? "UNUSUAL_DISCHARGE" : null].filter(Boolean),
         note:            "fever_proxy_combination",
-      },
-    });
-  }
-
-  // ── DIZZINESS_WITH_BLEEDING (level: high) ─────────────────────────────────
-  if (codes.has("HEAVY_FLOW") && sev("FATIGUE") >= SEVERITY_ELEVATED) {
-    return makeSignal({
-      code: "DIZZINESS_WITH_BLEEDING",
-      level: "high",
-      show: true,
-      title: "Heavy bleeding with significant fatigue",
-      message: "Heavy bleeding with significant fatigue or dizziness needs same-day attention.",
-      guidance: "Please seek care today - heavy bleeding combined with fatigue can indicate anaemia or other conditions that need assessment.",
-      category: "safety",
-      debug: {
-        triggers:   ["HEAVY_FLOW", "FATIGUE"],
-        severities: { HEAVY_FLOW: sev("HEAVY_FLOW"), FATIGUE: sev("FATIGUE") },
-        daysLogged: 1,
       },
     });
   }
@@ -1445,19 +1343,15 @@ export function detectSafetyEscalationSignal({
     });
   }
 
-  // ── HEAVY_BLEEDING_FLAG (level: medium) ───────────────────────────────────
-  if (codes.has("HEAVY_FLOW") || codes.has("LARGE_CLOTS")) {
+  // ── HEAVY_BLEEDING_FLAG (level: medium) - kept for legacy signal compatibility
+  if (false) {
     return makeSignal({
       code: "HEAVY_BLEEDING_FLAG",
       level: "medium",
-      show: true,
-      title: "Heavy flow logged",
-      message: "Bloom noticed heavy flow or clots in your log. Heavy flow is worth monitoring.",
-      guidance: "If you're soaking through protection quickly or passing large clots, seek care sooner rather than later.",
-      category: "safety",
+      show: false,
       debug: {
-        triggers:   [codes.has("HEAVY_FLOW") ? "HEAVY_FLOW" : null, codes.has("LARGE_CLOTS") ? "LARGE_CLOTS" : null].filter(Boolean),
-        severities: { HEAVY_FLOW: sev("HEAVY_FLOW"), LARGE_CLOTS: sev("LARGE_CLOTS") },
+        triggers:   [],
+        severities: {},
         daysLogged: 1,
       },
     });
@@ -1713,26 +1607,43 @@ export function detectSymptomForecastSignal({
   const { selected, labels, basis } = selectForecastableSymptoms(candidates, maxSymptoms);
   const forecastCodes   = selected.map(c => c.code);
   const topSupporting   = selected[0]?.supportingCycles ?? 0;
-  const message         = buildForecastMessage(labels, phase, dayOfCycle, basis);
+  const topSeverityEstimate = selected[0]?.severityEstimate ?? null;
+  const message         = buildForecastMessage(labels, phase, dayOfCycle, basis, topSeverityEstimate, topSupporting);
 
-  return makeSignal({
+  return {
+    ...makeSignal({
     code:     "SYMPTOM_FORECAST",
     level:    "low",
     show:     true,
     title:    "A familiar pattern may be approaching",
     message,
-    guidance: "Keep logging over the next few days so Bloom can keep learning your pattern.",
+    guidance: "If these symptoms show up, log severity too so Bloom can confirm whether this cycle matches your usual pattern.",
     category: "symptom",
     debug: {
       forecastSymptoms:            forecastCodes,
       forecastBasis:               basis,
       supportingCycles:            topSupporting,
+      estimatedSeverity:           topSeverityEstimate,
+      estimatedSeverityLabel:      formatSeverityEstimate(topSeverityEstimate),
       currentPhase:                phase,
       currentDayOfCycle:           dayOfCycle,
       totalCyclesAnalyzed:         cycleStarts.length,
       excludedAlreadyLoggedToday:  [...loggedTodayCodes],
       candidatesBeforeSelection:   candidates.length,
     },
+    }),
+    priority: 4,
+  };
+}
+
+function sortSymptomSignals(signals = []) {
+  const priorityOrder = { high: 3, medium: 2, low: 1 };
+  return [...signals].sort((a, b) => {
+    const byLevel = (priorityOrder[b.level] || 0) - (priorityOrder[a.level] || 0);
+    if (byLevel !== 0) return byLevel;
+    const byPriority = (Number(b.priority) || 0) - (Number(a.priority) || 0);
+    if (byPriority !== 0) return byPriority;
+    return String(a.code).localeCompare(String(b.code));
   });
 }
 
@@ -1857,15 +1768,7 @@ export function generateSymptomSignals({
     signals = signals.filter(s => !redundant.has(s.code));
   }
 
-  const priorityOrder = { high: 3, medium: 2, low: 1 };
-
-  return signals
-    .filter(s => s.show)
-    .sort((a, b) => {
-      const byLevel = (priorityOrder[b.level] || 0) - (priorityOrder[a.level] || 0);
-      if (byLevel !== 0) return byLevel;
-      return String(a.code).localeCompare(String(b.code));
-    });
+  return sortSymptomSignals(signals.filter(s => s.show));
 }
 
 /* ------------------------------------------------------------------ */
@@ -1878,13 +1781,8 @@ export function generateSymptomSignals({
  * @returns {SymptomSignal|null}
  */
 export function getHighestPrioritySymptomSignal(signals = []) {
-  const priority = { high: 3, medium: 2, low: 1 };
   if (!Array.isArray(signals) || signals.length === 0) return null;
-  return [...signals].sort((a, b) => {
-    const byLevel = (priority[b.level] || 0) - (priority[a.level] || 0);
-    if (byLevel !== 0) return byLevel;
-    return String(a.code).localeCompare(String(b.code));
-  })[0];
+  return sortSymptomSignals(signals)[0];
 }
 
 /* ------------------------------------------------------------------ */
@@ -2160,6 +2058,8 @@ for (const [group, codes] of Object.entries(SYMPTOM_GROUPS)) {
 
 /** Numeric priority per code - higher wins deduplication within a group */
 const ADVSYM_PRIORITIES = {
+  PERSONAL_CURRENT_SYMPTOM_CONTEXT: 10,
+  PERSONAL_SYMPTOM_CHANGE_TYPE:    9,
   DYSMENORRHEA_PATTERN:         5,
   PAINFUL_PERIOD_PATTERN:       4,
   MENSTRUAL_DISCOMFORT_PATTERN: 3,
@@ -2192,8 +2092,6 @@ const _ADVSYM_LABELS = {
   HEADACHE:             "headache",
   MOOD_SWINGS:          "mood swings",
   DEPRESSION:           "low mood",
-  HEAVY_FLOW:           "heavy flow",
-  LARGE_CLOTS:          "clotting",
   BREAST_TENDERNESS:    "breast tenderness",
   IRRITABILITY:         "irritability",
   ANXIETY:              "anxiety",
@@ -2215,6 +2113,49 @@ function _advSevLabel(sev) {
   if (sev >= 3) return "moderate";
   if (sev >= 2) return "mild";
   return "light";
+}
+
+function _avgSeverityLabel(items = []) {
+  const values = items.map(i => Number(i?.severity) || 0).filter(n => n > 0);
+  if (!values.length) return "unrated";
+  return formatSeverityEstimate(values.reduce((sum, n) => sum + n, 0) / values.length) || "unrated";
+}
+
+function _resolveCurrentDateKey(symptomHistory = [], currentDateKey = null, today = new Date()) {
+  if (currentDateKey) return currentDateKey;
+  const latest = [...(symptomHistory || [])]
+    .map(e => e?.dateKey)
+    .filter(Boolean)
+    .sort()
+    .pop();
+  return latest || toDateKey(today);
+}
+
+function _historyBeforeDate(symptomHistory = [], currentDateKey = null) {
+  const currentKey = currentDateKey || _resolveCurrentDateKey(symptomHistory);
+  return (symptomHistory || []).filter(e => e?.dateKey && e.dateKey < currentKey);
+}
+
+function _codeOccurrenceStats(symptomHistory = [], code) {
+  const entries = (symptomHistory || []).filter(e =>
+    Array.isArray(e?.items) && e.items.some(i => i.code === code)
+  );
+  const severities = entries
+    .flatMap(e => e.items || [])
+    .filter(i => i.code === code)
+    .map(i => Number(i.severity) || 0)
+    .filter(n => n > 0);
+  return {
+    count: entries.length,
+    avgSeverity: severities.length ? severities.reduce((sum, n) => sum + n, 0) / severities.length : null,
+    lastDateKey: entries.map(e => e.dateKey).filter(Boolean).sort().pop() || null,
+  };
+}
+
+function _formatSymptomWithSeverity(item) {
+  const sev = Number(item?.severity) || 0;
+  const severity = formatSeverityEstimate(sev);
+  return `${_advSympLabel(item?.code)}${severity ? ` (${severity})` : ""}`;
 }
 
 /**
@@ -2262,8 +2203,8 @@ function _detectDysmenorrhea({ loggedSymptoms, severityMap, phase, symptomHistor
   if (phase !== "menstrual") return null;
 
   const PRIMARY   = ["CRAMPS", "PELVIC_PAIN"];
-  const SUPPORT   = ["NAUSEA", "FATIGUE", "DIARRHEA", "HEAVY_FLOW", "MOOD_SWINGS",
-                     "BLOATING", "HEADACHE", "LARGE_CLOTS", "CONSTIPATION"];
+  const SUPPORT   = ["NAUSEA", "FATIGUE", "DIARRHEA", "MOOD_SWINGS",
+                     "BLOATING", "HEADACHE", "CONSTIPATION"];
 
   const codes      = new Set(loggedSymptoms.map(s => s.code));
   const primaryHit = PRIMARY.find(c => codes.has(c) && (severityMap[c] ?? 0) >= 3);

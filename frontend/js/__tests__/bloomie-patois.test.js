@@ -113,6 +113,11 @@ describe("normalizePatois - Patois normalisation still works", () => {
     expect(result).toMatch(/period/);
     expect(result).toMatch(/stomach|cramp/i);
   });
+
+  it("does not append synthetic routing boosters to the normalized text", () => {
+    expect(normalizePatois("Heavy BLEEDING")).toBe("heavy bleeding");
+    expect(normalizePatois("my period late")).toBe("my period late");
+  });
 });
 
 // ─── detectPatois ─────────────────────────────────────────────────────────────

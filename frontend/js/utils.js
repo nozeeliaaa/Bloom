@@ -5,6 +5,7 @@ import { isAccountMode, isAnonMode } from "./mode.js";
 import { getUser } from "./auth.js";
 import { startSessionTimeoutGuard } from "./session-timeout.js";
 import { initTheme } from "./theme-manager.js";
+import { isOnboardingCompleteLocal } from "./onboarding.js";
 
 // Single source of truth for this key
 export const MODE_BANNER_ONCE_KEY = "bloom_show_mode_banner_once";
@@ -14,8 +15,10 @@ initTheme();
 
 // Load symptom catalog at runtime so static hosting (Firebase web.app) does
 // not try to execute JSON as a JavaScript module.
-const SYMPTOM_DATA_CACHE_KEY = "bloom_symptom_catalog_v1";
-const SYMPTOM_DATA_URL = "/data/symptoms.json";
+const SYMPTOM_DATA_CACHE_KEY = "bloom_symptom_catalog_v2";
+// Resolve via Vite so the JSON is emitted to dist even with publicDir disabled.
+const SYMPTOM_DATA_URL = new URL("../data/symptoms.json", import.meta.url).href;
+const BLOOM_LOGO_URL = new URL("../assets/bloom-logo.png", import.meta.url).href;
 
 async function loadSymptomCatalog() {
   try {
@@ -102,7 +105,7 @@ export function renderNav(activePage = "") {
   nav.innerHTML = `
     <div class="navbar-inner">
       <a href="/index.html" class="navbar-brand" aria-label="Bloom home">
-        <img src="/assets/bloom-logo.png" alt="Bloom" class="navbar-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
+        <img src="${BLOOM_LOGO_URL}" alt="Bloom" class="navbar-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
         <span class="navbar-brand-text" style="display:none;">${icon("flower", 28)} Bloom</span>
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
@@ -319,13 +322,13 @@ export function renderFooter() {
     <p class="footer-disclaimer">${icon("shield", 14)} Bloom is an educational tool and does not provide medical diagnoses. Always consult a qualified healthcare provider for medical advice.</p>
     <nav class="footer-legal" aria-label="Legal links">
       <a href="/pages/privacy.html">Privacy Policy</a>
-      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <span class="footer-legal-sep" aria-hidden="true">&middot;</span>
       <a href="/pages/terms.html">Terms of Use</a>
-      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <span class="footer-legal-sep" aria-hidden="true">&middot;</span>
       <a href="/pages/accessibility.html">Accessibility</a>
-      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <span class="footer-legal-sep" aria-hidden="true">&middot;</span>
       <a href="/pages/cookie-policy.html">Cookie Policy</a>
-      <span class="footer-legal-sep" aria-hidden="true">·</span>
+      <span class="footer-legal-sep" aria-hidden="true">&middot;</span>
       <a href="/pages/about-us.html">About Us</a>
     </nav>
   `;
@@ -395,11 +398,6 @@ export const SYMPTOM_CATEGORIES = symptoms.reduce((acc, symptom) => {
 
 /** Emoji icon for each symptom label - no external dependency */
 export const SYMPTOM_ICONS = {
-  // Bleeding
-  "Vaginal bleeding":           "🩸",
-  "Spotting":                   "🩷",
-  "Heavy flow":                 "🔴",
-  "Large clots":                "🩸",
   // Blood Colour - coloured circles to match the actual shade
   "Bright red blood":           "🔴",
   "Dark red blood":             "🟥",
@@ -582,7 +580,6 @@ export const SYMPTOM_ICONS = {
   "Frequent urination":         "🚿",
   "Smell sensitivity":          "👃",
   "Nasal congestion":           "🤧",
-  "Weight change":              "⚖️",
   // Urinary
   "Urinary urgency":            "🚿",
   "Burning urination":          "🔥",
@@ -614,9 +611,6 @@ export const SYMPTOM_ICONS = {
   "Feeling isolated":           "😔",
   "Affectionate":               "💕",
   "Distant":                    "🚶",
-  // Cycle
-  "Missed period":              "📅",
-  "Irregular period":           "📆",
   // Fertility
   "Increased libido":           "💕",
   "Decreased libido":           "💔",
@@ -630,8 +624,7 @@ export const SYMPTOMS = Object.values(SYMPTOM_CATEGORIES).flat();
 export const FLOW_OPTIONS = ["none", "spotting", "light", "medium", "heavy"];
 
 export function getPostAuthRoute() {
-  const onboarded = localStorage.getItem("bloom_onboarded") === "1";
-  return onboarded ? "/pages/dashboard.html" : "/pages/survey.html";
+  return isOnboardingCompleteLocal() ? "/pages/dashboard.html" : "/pages/survey.html";
 }
 
 /* ===== MODAL HELPERS ===== */
@@ -689,6 +682,7 @@ style.textContent = `@keyframes slideIn { from { transform: translateY(20px); op
 document.head.appendChild(style);
 
 export function renderBloomieFab() {
+  if (isAnonMode()) return;
   if (document.getElementById("bloomie-fab")) return;
 
   const fab = document.createElement("button");
@@ -704,15 +698,19 @@ export function renderBloomieFab() {
   modal.innerHTML = `
     <div class="bloomie-modal-backdrop" data-close="1"></div>
     <div class="bloomie-modal-panel" role="dialog" aria-modal="true">
-      <button class="bloomie-close" data-close="1" aria-label="Close">✕</button>
-      <iframe class="bloomie-frame" src="/pages/assistant.html" title="Bloomie chat"></iframe>
+      <button class="bloomie-close" data-close="1" aria-label="Close">&times;</button>
+      <iframe class="bloomie-frame" title="Bloomie chat" loading="lazy"></iframe>
     </div>
   `;
 
   document.body.appendChild(modal);
   document.body.appendChild(fab);
 
-  function open() { modal.classList.add("open"); }
+  function open() {
+    const frame = modal.querySelector(".bloomie-frame");
+    if (frame && !frame.src) frame.src = "/pages/assistant.html?embed=1";
+    modal.classList.add("open");
+  }
   function close() { modal.classList.remove("open"); }
 
   fab.addEventListener("click", open);

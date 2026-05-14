@@ -12,6 +12,8 @@ describe("repair / clarification classifier", () => {
   it("classifies patois confusion variants", () => {
     expect(classifyRepairClarification("mi nuh get it")?.label).toBe("clarification");
     expect(classifyRepairClarification("seh that again")?.label).toBe("clarification");
+    expect(classifyRepairClarification("what dat mean")?.label).toBe("clarification");
+    expect(classifyRepairClarification("weh yuh mean")?.label).toBe("clarification");
   });
 
   it("classifies mismatch feedback as frustration", () => {

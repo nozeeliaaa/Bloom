@@ -1,48 +1,15 @@
 [
   {
-    "key": "VAGINAL_BLEEDING",
-    "label": "Vaginal bleeding",
-    "category": "Bleeding",
-    "description": "Period flow present today",
-    "teenSafe": true,
-    "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
-  },
-  {
-    "key": "SPOTTING",
-    "label": "Spotting",
-    "category": "Bleeding",
-    "description": "Light bleeding outside of period",
-    "teenSafe": true,
-    "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
-  },
-  {
-    "key": "HEAVY_FLOW",
-    "label": "Heavy flow",
-    "category": "Bleeding",
-    "description": "Soaking a pad or tampon quickly",
-    "teenSafe": true,
-    "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
-  },
-  {
-    "key": "LARGE_CLOTS",
-    "label": "Large clots",
-    "category": "Bleeding",
-    "description": "Passing clots larger than a quarter - consider speaking to a provider",
-    "teenSafe": true,
-    "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
-  },
-  {
     "key": "BRIGHT_RED",
     "label": "Bright red blood",
     "category": "Blood Colour",
     "description": "Fresh, bright red menstrual blood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DARK_RED",
@@ -51,7 +18,10 @@
     "description": "Dark red menstrual blood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LIGHT_RED",
@@ -60,7 +30,10 @@
     "description": "Light red menstrual blood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PINK_BLOOD",
@@ -69,7 +42,10 @@
     "description": "Pink-tinged menstrual blood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BROWN_BLOOD",
@@ -78,7 +54,10 @@
     "description": "Brown or old blood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BLACK_BLOOD",
@@ -87,7 +66,10 @@
     "description": "Very dark or black blood - often old blood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ORANGE_TINGE",
@@ -96,7 +78,10 @@
     "description": "Blood with an orange tinge - may indicate infection",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "GRAY_BLOOD",
@@ -105,7 +90,10 @@
     "description": "Gray-colored blood - consider speaking to a provider",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAMPS",
@@ -114,7 +102,10 @@
     "description": "Pelvic or uterine cramping",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PELVIC_PAIN",
@@ -123,7 +114,10 @@
     "description": "Pain or pressure in the lower abdomen",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOWER_ABDOMINAL_CRAMPS",
@@ -132,7 +126,10 @@
     "description": "Cramping in the lower abdomen",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SHARP_PELVIC_PAIN",
@@ -141,7 +138,10 @@
     "description": "Sharp or stabbing pain in the pelvic area",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DULL_PELVIC_ACHE",
@@ -150,7 +150,10 @@
     "description": "Dull, ongoing ache in the pelvic area",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOWER_BACK_PAIN",
@@ -159,7 +162,10 @@
     "description": "Pain or aching in the lower back",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LEG_PAIN",
@@ -168,7 +174,10 @@
     "description": "Pain or aching in the legs",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BREAST_PAIN",
@@ -177,7 +186,10 @@
     "description": "Pain in the breasts",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "NIPPLE_SENSITIVITY",
@@ -186,7 +198,10 @@
     "description": "Increased sensitivity or tenderness in the nipples",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "OVULATION_PAIN",
@@ -195,7 +210,10 @@
     "description": "Mild one-sided pain around mid-cycle (mittelschmerz)",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HEADACHE",
@@ -204,7 +222,10 @@
     "description": "Head pain or pressure",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "MIGRAINE",
@@ -213,7 +234,10 @@
     "description": "Severe headache often with sensitivity to light or sound",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "JOINT_PAIN",
@@ -222,7 +246,10 @@
     "description": "Aches in joints or muscles",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "STABBING_PAIN",
@@ -231,7 +258,10 @@
     "description": "Sharp, stabbing pain",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "THROBBING_PAIN",
@@ -240,7 +270,10 @@
     "description": "Rhythmic, throbbing pain",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "RADIATING_PAIN",
@@ -249,7 +282,10 @@
     "description": "Pain that spreads from one area to another",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PAIN_ONE_SIDE",
@@ -258,7 +294,10 @@
     "description": "Pain localized to one side of the body",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PAIN_WITH_MOVEMENT",
@@ -267,7 +306,10 @@
     "description": "Pain that increases when moving",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PAIN_DURING_BOWEL",
@@ -276,7 +318,10 @@
     "description": "Pain or discomfort when passing stools",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PAIN_DURING_URINATION",
@@ -285,7 +330,10 @@
     "description": "Burning or pain when urinating",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BREAST_TENDERNESS",
@@ -294,7 +342,10 @@
     "description": "Sore or tender breasts",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BLOATING",
@@ -303,7 +354,10 @@
     "description": "Feeling of fullness or swelling in the abdomen",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "GASSY",
@@ -312,7 +366,10 @@
     "description": "Increased gas or wind",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HEARTBURN",
@@ -321,7 +378,10 @@
     "description": "Burning sensation in the chest or throat",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "NAUSEA",
@@ -330,7 +390,10 @@
     "description": "Feeling of sickness or urge to vomit",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "VOMITING",
@@ -339,7 +402,10 @@
     "description": "Actually vomiting",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOSS_OF_APPETITE",
@@ -348,7 +414,10 @@
     "description": "Reduced desire to eat",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "INCREASED_APPETITE",
@@ -357,7 +426,10 @@
     "description": "Feeling hungrier than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "STOMACH_CRAMPS",
@@ -366,7 +438,10 @@
     "description": "Cramping pain in the stomach area",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "INDIGESTION",
@@ -375,7 +450,10 @@
     "description": "Discomfort or pain after eating",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ACID_REFLUX",
@@ -384,7 +462,10 @@
     "description": "Stomach acid rising into the throat",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BURPING",
@@ -393,7 +474,10 @@
     "description": "Burping more than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ABDOMINAL_PRESSURE",
@@ -402,7 +486,10 @@
     "description": "Feeling of pressure or heaviness in the abdomen",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "EARLY_FULLNESS",
@@ -411,7 +498,10 @@
     "description": "Feeling full quickly after eating a small amount",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CONSTIPATION",
@@ -420,7 +510,10 @@
     "description": "Difficulty passing stools",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DIARRHEA",
@@ -429,7 +522,10 @@
     "description": "Loose or frequent stools",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HARD_STOOL",
@@ -438,7 +534,10 @@
     "description": "Dry, hard stools that are difficult to pass",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOOSE_STOOL",
@@ -447,7 +546,10 @@
     "description": "Softer than normal stools",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FREQUENT_BOWEL",
@@ -456,7 +558,10 @@
     "description": "Going to the toilet more often than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "INCOMPLETE_EVACUATION",
@@ -465,7 +570,10 @@
     "description": "Feeling like you haven't fully emptied your bowels",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PAINFUL_BOWEL",
@@ -474,7 +582,10 @@
     "description": "Pain when passing stools",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "MUCUS_IN_STOOL",
@@ -483,7 +594,10 @@
     "description": "Mucus present in bowel movements",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "URGENCY_TO_GO",
@@ -492,7 +606,10 @@
     "description": "Sudden, urgent need to use the toilet",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DARK_STOOL",
@@ -501,7 +618,10 @@
     "description": "Unusually dark bowel movements",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LIGHT_STOOL",
@@ -510,7 +630,10 @@
     "description": "Unusually pale or light-colored stools",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_NONE",
@@ -519,7 +642,10 @@
     "description": "No vaginal discharge today",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_STICKY",
@@ -528,7 +654,10 @@
     "description": "Dry or sticky vaginal discharge",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_CREAMY",
@@ -537,7 +666,10 @@
     "description": "White or creamy vaginal discharge",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_EGGWHITE",
@@ -546,7 +678,10 @@
     "description": "Clear, stretchy discharge - often a sign of ovulation",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "UNUSUAL_DISCHARGE",
@@ -555,7 +690,10 @@
     "description": "Discharge that looks or smells different from normal",
     "teenSafe": true,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_WATERY",
@@ -564,7 +702,10 @@
     "description": "Thin, watery vaginal discharge",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_THICK_CLUMPY",
@@ -573,7 +714,10 @@
     "description": "Thick, lumpy discharge - may indicate infection",
     "teenSafe": true,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_YELLOW",
@@ -582,7 +726,10 @@
     "description": "Yellow-colored discharge - consider speaking to a provider",
     "teenSafe": true,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_GREEN",
@@ -591,7 +738,10 @@
     "description": "Green discharge - consider speaking to a provider",
     "teenSafe": true,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_GRAY",
@@ -600,7 +750,10 @@
     "description": "Gray discharge - may indicate bacterial vaginosis",
     "teenSafe": true,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_BROWN",
@@ -609,7 +762,10 @@
     "description": "Brown discharge - often old blood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_BLOOD_TINGED",
@@ -618,7 +774,10 @@
     "description": "Discharge with traces of blood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_FOUL_SMELL",
@@ -627,7 +786,10 @@
     "description": "Discharge with an unpleasant odor - consider speaking to a provider",
     "teenSafe": true,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_INCREASED",
@@ -636,7 +798,10 @@
     "description": "More discharge than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISCHARGE_DECREASED",
@@ -645,7 +810,10 @@
     "description": "Less discharge than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FATIGUE",
@@ -654,7 +822,10 @@
     "description": "Feeling tired or low on energy",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "VERY_LOW_ENERGY",
@@ -663,7 +834,10 @@
     "description": "Feeling extremely depleted of energy",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOW_ENERGY",
@@ -672,7 +846,10 @@
     "description": "Feeling below your normal energy level",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "NORMAL_ENERGY",
@@ -681,7 +858,10 @@
     "description": "Feeling your usual level of energy",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HIGH_ENERGY",
@@ -690,7 +870,10 @@
     "description": "Feeling more energetic than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BURST_OF_ENERGY",
@@ -699,7 +882,10 @@
     "description": "A sudden surge of energy",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ENERGY_CRASH",
@@ -708,7 +894,10 @@
     "description": "Sudden drop in energy levels",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FATIGUE_AFTER_MEALS",
@@ -717,7 +906,10 @@
     "description": "Feeling tired or sluggish after eating",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FLUID_RETENTION",
@@ -726,7 +918,10 @@
     "description": "Feeling puffy or swollen, especially in hands or feet",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FREQUENT_URINATION",
@@ -735,7 +930,10 @@
     "description": "Needing to urinate more often than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "URINARY_URGENCY",
@@ -744,7 +942,10 @@
     "description": "Sudden strong urge to urinate",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BURNING_URINATION",
@@ -753,7 +954,10 @@
     "description": "Burning or stinging when urinating",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "URINARY_LEAKAGE",
@@ -762,7 +966,10 @@
     "description": "Unintentional leaking of urine",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ACNE",
@@ -771,7 +978,10 @@
     "description": "Breakouts or skin flare-ups",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DRY_SKIN",
@@ -780,7 +990,10 @@
     "description": "Skin feeling dry or tight",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "OILY_SKIN",
@@ -789,7 +1002,10 @@
     "description": "Skin feeling greasy or producing excess oil",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "GLOWING_SKIN",
@@ -798,7 +1014,10 @@
     "description": "Skin looking healthy and radiant",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SKIN_SENSITIVITY",
@@ -807,7 +1026,10 @@
     "description": "Skin feeling more sensitive or reactive than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SKIN_RASH",
@@ -816,7 +1038,10 @@
     "description": "Rash or irritation on the skin",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CYSTIC_ACNE",
@@ -825,7 +1050,10 @@
     "description": "Deep, painful acne cysts",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HORMONAL_BREAKOUTS",
@@ -834,7 +1062,10 @@
     "description": "Breakouts along the jawline or chin linked to hormones",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SKIN_DULLNESS",
@@ -843,7 +1074,10 @@
     "description": "Skin looking flat or lacking radiance",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HAIR_THINNING",
@@ -852,7 +1086,10 @@
     "description": "Noticeable hair loss or thinning",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HAIR_SHEDDING",
@@ -861,7 +1098,10 @@
     "description": "More hair falling out than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "OILY_HAIR",
@@ -870,7 +1110,10 @@
     "description": "Hair feeling greasy or producing excess oil",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DRY_HAIR",
@@ -879,7 +1122,10 @@
     "description": "Hair feeling dry or brittle",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HOT_FLASHES",
@@ -888,7 +1134,10 @@
     "description": "Sudden feeling of intense heat",
     "teenSafe": false,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "NIGHT_SWEATS",
@@ -897,7 +1146,10 @@
     "description": "Sweating heavily during sleep",
     "teenSafe": false,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "COLD_FLASHES",
@@ -906,7 +1158,10 @@
     "description": "Sudden feeling of intense cold",
     "teenSafe": false,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BBT_SHIFT",
@@ -915,7 +1170,10 @@
     "description": "Slight rise in basal body temperature - often indicates ovulation has occurred",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ELEVATED_BBT",
@@ -924,7 +1182,10 @@
     "description": "Basal body temperature higher than your baseline",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOWER_BBT",
@@ -933,7 +1194,10 @@
     "description": "Basal body temperature lower than your baseline",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FEELING_HOT",
@@ -942,7 +1206,10 @@
     "description": "Generally feeling warmer than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FEELING_COLD",
@@ -951,7 +1218,10 @@
     "description": "Generally feeling colder than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CHILLS",
@@ -960,7 +1230,10 @@
     "description": "Shivering or feeling cold with possible fever",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "MOOD_SWINGS",
@@ -969,7 +1242,10 @@
     "description": "Rapid or unexpected changes in mood",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "IRRITABILITY",
@@ -978,7 +1254,10 @@
     "description": "Feeling easily annoyed or frustrated",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ANXIETY",
@@ -987,7 +1266,10 @@
     "description": "Feeling worried, nervous, or on edge",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DEPRESSION",
@@ -996,7 +1278,10 @@
     "description": "Feeling down, hopeless, or emotionally flat",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRYING_SPELLS",
@@ -1005,7 +1290,10 @@
     "description": "Feeling tearful or crying more than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CALM",
@@ -1014,7 +1302,10 @@
     "description": "Feeling settled and at ease",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "STRESSED",
@@ -1023,7 +1314,10 @@
     "description": "Feeling under pressure or overwhelmed",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BRAIN_FOG",
@@ -1032,7 +1326,10 @@
     "description": "Difficulty thinking clearly or concentrating",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FORGETFUL",
@@ -1041,7 +1338,10 @@
     "description": "Having trouble remembering things",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "POOR_CONCENTRATION",
@@ -1050,7 +1350,10 @@
     "description": "Difficulty focusing on tasks",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ANXIOUS_MIND",
@@ -1059,7 +1362,10 @@
     "description": "Racing or anxious thoughts",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "OVERWHELMED",
@@ -1068,7 +1374,10 @@
     "description": "Feeling like too much is happening at once",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "IRRITABLE_MIND",
@@ -1077,7 +1386,10 @@
     "description": "Feeling mentally on edge or easily triggered",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOW_MOOD",
@@ -1086,7 +1398,10 @@
     "description": "Feeling emotionally down",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "EMOTIONAL_SENSITIVE",
@@ -1095,7 +1410,10 @@
     "description": "Feeling more emotionally reactive than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "UNMOTIVATED",
@@ -1104,7 +1422,10 @@
     "description": "Lacking drive or motivation",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "RESTLESS",
@@ -1113,7 +1434,10 @@
     "description": "Unable to relax or sit still",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "MENTALLY_FOCUSED",
@@ -1122,7 +1446,10 @@
     "description": "Feeling sharp and able to concentrate",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISTRACTED",
@@ -1131,7 +1458,10 @@
     "description": "Easily losing focus or getting sidetracked",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "INTRUSIVE_THOUGHTS",
@@ -1140,7 +1470,10 @@
     "description": "Unwanted or distressing thoughts",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PANIC_FEELINGS",
@@ -1149,7 +1482,10 @@
     "description": "Sudden feeling of fear or panic",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "EMOTIONAL_NUMBNESS",
@@ -1158,7 +1494,10 @@
     "description": "Feeling disconnected from emotions",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HYPERSENSITIVITY",
@@ -1167,7 +1506,10 @@
     "description": "Feeling intensely sensitive to everything",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SELF_CRITICAL",
@@ -1176,7 +1518,10 @@
     "description": "Being harder on yourself than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "INSOMNIA",
@@ -1185,7 +1530,10 @@
     "description": "Difficulty falling or staying asleep",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DIFFICULTY_FALLING_ASLEEP",
@@ -1194,7 +1542,10 @@
     "description": "Taking a long time to fall asleep",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FREQUENT_WAKING",
@@ -1203,7 +1554,10 @@
     "description": "Waking up multiple times during the night",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "OVERSLEEPING",
@@ -1212,7 +1566,10 @@
     "description": "Sleeping much more than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "RESTLESS_SLEEP",
@@ -1221,7 +1578,10 @@
     "description": "Tossing and turning during sleep",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "VIVID_DREAMS",
@@ -1230,7 +1590,10 @@
     "description": "Having unusually vivid or intense dreams",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "WAKING_SAME_TIME",
@@ -1239,7 +1602,10 @@
     "description": "Consistently waking up at the same time each night",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DIFFICULTY_STAYING_ASLEEP",
@@ -1248,7 +1614,10 @@
     "description": "Waking and struggling to get back to sleep",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "NIGHTMARES",
@@ -1257,7 +1626,10 @@
     "description": "Disturbing or frightening dreams",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HORMONAL_INSOMNIA",
@@ -1266,7 +1638,10 @@
     "description": "Sleep disruption linked to hormonal changes",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SOCIABLE",
@@ -1275,7 +1650,10 @@
     "description": "Feeling outgoing and connected to others",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "WITHDRAWN",
@@ -1284,7 +1662,10 @@
     "description": "Wanting to avoid social interaction",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CLINGY",
@@ -1293,7 +1674,10 @@
     "description": "Needing more closeness or reassurance from others",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SEEKING_REASSURANCE",
@@ -1302,7 +1686,10 @@
     "description": "Needing more validation or comfort than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "EASILY_ANNOYED",
@@ -1311,7 +1698,10 @@
     "description": "Getting irritated by others more quickly than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CONFLICT_AVOIDANT",
@@ -1320,7 +1710,10 @@
     "description": "Actively avoiding disagreements or tense situations",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOW_SOCIAL_ENERGY",
@@ -1329,7 +1722,10 @@
     "description": "Not feeling up to socializing",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HIGH_SOCIAL_ENERGY",
@@ -1338,7 +1734,10 @@
     "description": "Feeling very sociable and energized by others",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FEELING_ISOLATED",
@@ -1347,7 +1746,10 @@
     "description": "Feeling alone or disconnected from others",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "AFFECTIONATE",
@@ -1356,7 +1758,10 @@
     "description": "Feeling warm and loving toward others",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DISTANT",
@@ -1365,7 +1770,10 @@
     "description": "Feeling emotionally detached from people around you",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_SWEET",
@@ -1374,7 +1782,10 @@
     "description": "Strong desire for sweet foods",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_SALTY",
@@ -1383,7 +1794,10 @@
     "description": "Strong desire for salty foods",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_GREASY",
@@ -1392,7 +1806,10 @@
     "description": "Strong desire for fried or greasy foods",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_SPICY",
@@ -1401,7 +1818,10 @@
     "description": "Strong desire for spicy foods",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "APPETITE_INCREASE",
@@ -1410,7 +1830,10 @@
     "description": "Feeling hungrier than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "APPETITE_DECREASE",
@@ -1419,7 +1842,10 @@
     "description": "Less interest in eating than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_CHOCOLATE",
@@ -1428,7 +1854,10 @@
     "description": "Strong desire for chocolate",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_CARBS",
@@ -1437,7 +1866,10 @@
     "description": "Strong desire for bread, pasta, or rice",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_DAIRY",
@@ -1446,7 +1878,10 @@
     "description": "Strong desire for dairy products",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_COLD",
@@ -1455,7 +1890,10 @@
     "description": "Desire for cold foods or drinks",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_WARM",
@@ -1464,7 +1902,10 @@
     "description": "Desire for warm, comforting foods",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CRAVING_CAFFEINE",
@@ -1473,7 +1914,10 @@
     "description": "Strong desire for coffee or caffeinated drinks",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "NO_CRAVINGS",
@@ -1482,7 +1926,10 @@
     "description": "No particular food cravings today",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "RANDOM_CRAVINGS",
@@ -1491,7 +1938,10 @@
     "description": "Unusual or hard-to-explain food cravings",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "INCREASED_LIBIDO",
@@ -1500,7 +1950,10 @@
     "description": "Heightened sexual desire - common around ovulation",
     "teenSafe": false,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DECREASED_LIBIDO",
@@ -1509,7 +1962,10 @@
     "description": "Reduced sexual desire",
     "teenSafe": false,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CERVICAL_MUCUS_CHANGE",
@@ -1518,7 +1974,10 @@
     "description": "Noticeable change in vaginal discharge related to fertility",
     "teenSafe": false,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "VAGINAL_DRYNESS",
@@ -1527,7 +1986,10 @@
     "description": "Dryness or discomfort in the vaginal area",
     "teenSafe": false,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PAIN_DURING_SEX",
@@ -1536,34 +1998,10 @@
     "description": "Discomfort or pain during sexual intercourse",
     "teenSafe": false,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
-  },
-  {
-    "key": "MISSED_PERIOD",
-    "label": "Missed period",
-    "category": "Cycle",
-    "description": "Expected period did not arrive",
-    "teenSafe": true,
-    "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
-  },
-  {
-    "key": "IRREGULAR_PERIOD",
-    "label": "Irregular period",
-    "category": "Cycle",
-    "description": "Period came earlier or later than expected",
-    "teenSafe": true,
-    "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
-  },
-  {
-    "key": "WEIGHT_CHANGE",
-    "label": "Weight change",
-    "category": "Weight",
-    "description": "Noticeable change in body weight",
-    "teenSafe": true,
-    "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "WEIGHT_GAIN",
@@ -1572,7 +2010,10 @@
     "description": "Increase in body weight",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "WEIGHT_LOSS",
@@ -1581,7 +2022,10 @@
     "description": "Decrease in body weight",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "WATER_RETENTION",
@@ -1590,7 +2034,10 @@
     "description": "Feeling bloated or swollen from retained fluid",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FEELING_PUFFY",
@@ -1599,7 +2046,10 @@
     "description": "Feeling swollen or puffier than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SMELL_SENSITIVITY",
@@ -1608,7 +2058,10 @@
     "description": "Heightened sensitivity to smells",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "NASAL_CONGESTION",
@@ -1617,7 +2070,10 @@
     "description": "Stuffy or blocked nose",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HEART_RACING",
@@ -1626,7 +2082,10 @@
     "description": "Heart beating faster than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PALPITATIONS",
@@ -1635,7 +2094,10 @@
     "description": "Noticeable or irregular heartbeat",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "CHEST_TIGHTNESS",
@@ -1644,7 +2106,10 @@
     "description": "Feeling of pressure or tightness in the chest",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SHORTNESS_OF_BREATH",
@@ -1653,7 +2118,10 @@
     "description": "Difficulty breathing or feeling breathless",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DIZZINESS",
@@ -1662,7 +2130,10 @@
     "description": "Feeling dizzy or unsteady",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LIGHTHEADED",
@@ -1671,7 +2142,10 @@
     "description": "Feeling faint or woozy",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FAINT_FEELING",
@@ -1680,7 +2154,10 @@
     "description": "Feeling like you might faint",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BREAST_SWELLING",
@@ -1689,7 +2166,10 @@
     "description": "Breasts feeling swollen or enlarged",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BREAST_FULLNESS",
@@ -1698,7 +2178,10 @@
     "description": "Breasts feeling heavy or full",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "NIPPLE_DISCHARGE",
@@ -1707,7 +2190,10 @@
     "description": "Any discharge from the nipple - consider speaking to a provider",
     "teenSafe": true,
     "sensitive": true,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "INCREASED_SWEATING",
@@ -1716,7 +2202,10 @@
     "description": "Sweating more than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "BODY_TEMP_CHANGE",
@@ -1725,7 +2214,10 @@
     "description": "Noticeable change in body temperature",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FACIAL_PUFFINESS",
@@ -1734,7 +2226,10 @@
     "description": "Face looking or feeling puffy or swollen",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "HIGHLY_PRODUCTIVE",
@@ -1743,7 +2238,10 @@
     "description": "Getting a lot done and feeling on top of things",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "LOW_PRODUCTIVITY",
@@ -1752,7 +2250,10 @@
     "description": "Struggling to get things done",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "PROCRASTINATING",
@@ -1761,7 +2262,10 @@
     "description": "Putting off tasks more than usual",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "MENTALLY_CLEAR",
@@ -1770,7 +2274,10 @@
     "description": "Feeling sharp and clear-headed",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "OVERWHELMED_TASKS",
@@ -1779,7 +2286,10 @@
     "description": "Feeling like there's too much to do",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "DECISION_FATIGUE",
@@ -1788,7 +2298,10 @@
     "description": "Struggling to make decisions",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "SORE_THROAT",
@@ -1797,7 +2310,10 @@
     "description": "Pain or irritation in the throat",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FEVER",
@@ -1806,7 +2322,10 @@
     "description": "Elevated body temperature",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "ILLNESS_CHILLS",
@@ -1815,7 +2334,10 @@
     "description": "Shivering or feeling cold associated with feeling unwell",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "RUNNY_NOSE",
@@ -1824,7 +2346,10 @@
     "description": "Nose running or dripping",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "COUGH",
@@ -1833,7 +2358,10 @@
     "description": "Persistent or recurring cough",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "FEELING_SICK",
@@ -1842,7 +2370,10 @@
     "description": "Generally feeling unwell",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   },
   {
     "key": "RECOVERING",
@@ -1851,6 +2382,9 @@
     "description": "Getting better after being sick",
     "teenSafe": true,
     "sensitive": false,
-    "severityScale": { "min": 0, "max": 5 }
+    "severityScale": {
+      "min": 0,
+      "max": 5
+    }
   }
 ]

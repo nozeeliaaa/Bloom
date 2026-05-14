@@ -26,7 +26,13 @@ export function showBloomLoader({ message = "Preparing Bloom", sub = "Getting th
   startFallingFlowers(document.getElementById("bloomFall"));
 }
 
-export function runBloomLoader({ targetUrl, minMs = 900 } = {}) {
+export function runBloomLoader({
+  targetUrl,
+  minMs = 900,
+  tickMs = 220,
+  stepMin = 6,
+  stepMax = 15,
+} = {}) {
   return new Promise((resolve) => {
     let progress = 0;
     const bar = document.getElementById("loaderBar");
@@ -34,7 +40,9 @@ export function runBloomLoader({ targetUrl, minMs = 900 } = {}) {
     const startTime = Date.now();
 
     const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 6; // 6-15
+      const min = Math.max(1, Number(stepMin) || 1);
+      const max = Math.max(min, Number(stepMax) || min);
+      progress += Math.floor(Math.random() * (max - min + 1)) + min;
       if (progress >= 100) progress = 100;
 
       if (bar) bar.style.width = progress + "%";
@@ -51,7 +59,7 @@ export function runBloomLoader({ targetUrl, minMs = 900 } = {}) {
           resolve();
         }, wait);
       }
-    }, 220);
+    }, tickMs);
   });
 }
 

@@ -3,7 +3,7 @@
  * ============================
  * Monthly comparison and change detection engine for Bloom.
  *
- * Extends bloom-cycle-engine.js — does NOT duplicate its logic.
+ * Extends bloom-cycle-engine.js - does NOT duplicate its logic.
  * Uses the existing signal detectors and adds structured monthly diff output.
  *
  * Output is consumed by:
@@ -11,7 +11,7 @@
  *   - Bloomie explanations
  *   - PDF health reports
  *
- * COMP3901: Educational output only — not medical advice.
+ * COMP3901: Educational output only - not medical advice.
  */
 
 import {

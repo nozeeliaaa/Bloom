@@ -28,6 +28,20 @@ function legacyBiometricLogRef(uid, dateKey) {
   return db.collection("biometricLogs").doc(uid).collection("entries").doc(dateKey);
 }
 
+function mergeDocsByDateKey(...snaps) {
+  const byDate = new Map();
+  for (const snap of snaps) {
+    if (!snap?.docs) continue;
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      const dateKey = data.dateKey || doc.id;
+      if (!dateKey) continue;
+      byDate.set(dateKey, { id: doc.id, dateKey, ...data });
+    }
+  }
+  return [...byDate.values()].sort((a, b) => String(b.dateKey).localeCompare(String(a.dateKey)));
+}
+
 // PUT /api/biometric-logs/:dateKey
 router.put("/:dateKey", requireAuth, async (req, res) => {
   try {
@@ -164,26 +178,22 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const uid = req.user.uid;
 
-    let snap = await db
+    const canonicalSnapPromise = db
       .collection("users")
       .doc(uid)
       .collection("biometricLogs")
       .orderBy("dateKey", "desc")
       .get();
 
-    if (snap.empty) {
-      snap = await db
-        .collection("biometricLogs")
-        .doc(uid)
-        .collection("entries")
-        .orderBy("dateKey", "desc")
-        .get();
-    }
+    const legacySnapPromise = db
+      .collection("biometricLogs")
+      .doc(uid)
+      .collection("entries")
+      .orderBy("dateKey", "desc")
+      .get();
 
-    const biometricLogs = snap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const [legacySnap, canonicalSnap] = await Promise.all([legacySnapPromise, canonicalSnapPromise]);
+    const biometricLogs = mergeDocsByDateKey(legacySnap, canonicalSnap);
 
     return res.json({ ok: true, biometricLogs });
   } catch (err) {

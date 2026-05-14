@@ -79,8 +79,9 @@ router.post("/", analyticsLimiter, async (req, res) => {
   try {
     const { eventType, payload = {}, meta = {}, ts } = req.body ?? {};
 
-    if (!VALID_EVENT_TYPES.has(eventType)) {
-      return res.status(400).json({ error: "Invalid event type" });
+    if (!eventType || !VALID_EVENT_TYPES.has(eventType)) {
+      // Unknown event types are silently discarded - logging must never block the chat
+      return res.json({ ok: true });
     }
 
     const uid = await resolveUid(req);

@@ -56,6 +56,9 @@ export const VALID_INTENT_TAGS = new Set([
   "spotting",
   "heavy_bleeding",
   "discharge",
+  "discharge_explanation",
+  "discharge_concern",
+  "blood_colour_explanation",
   "itching",
   "pregnancy_concern",
   "cycle_irregularity",
@@ -63,6 +66,7 @@ export const VALID_INTENT_TAGS = new Set([
   "clarification",
   "frustration",
   "red_flag",
+  "urgent_symptom_check",
 ]);
 
 export const INTENT_TO_ROUTE = {
@@ -77,6 +81,37 @@ export const INTENT_TO_ROUTE = {
   else:       "ELSE_INTRO",
 };
 
+export const REPAIR_CLARIFICATION_PATTERNS = [
+  /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
+  /^\s*cho man\s*$/i,
+  /^\s*i am frustrated(?:\s+what)?\s*$/i,
+  /^\s*wait hold on\s*$/i,
+  /^\s*look yah(?:\s+nuh)?\s*$/i,
+  /^\s*seh wah\s*\??\s*$/i,
+  /^\s*(what|huh)\s*\??\s*$/i,
+  /\b(what are you saying|what you mean|what do you mean|what dat mean|what that mean|weh yuh mean|weh you mean|wah yuh mean|wah you mean|seh dat again|seh that again|seh it again|say that again|explain that|explain that again|explain simpler)\b/i,
+  /\b(mi|me)\s+(nuh|no|don'?t|do not)\s+(understand|get it)\b/i,
+  /\byou lost me\b/i,
+  /\bnot what i mean\b/i,
+  /\bthat'?s not what i meant\b/i,
+  /\bno not that\b/i,
+];
+
+export const REPAIR_FRUSTRATION_PATTERNS = [
+  /\bnot what i asked\b/i,
+  /\bthis (isn't|is not|not) what i asked\b/i,
+  /\byou (don't|do not) understand\b/i,
+  /\b(kmt|cho man)\b/i,
+  /\bthat'?s not what i meant\b/i,
+  /\bno not that\b/i,
+];
+
+export function matchesRepairClarification(normalizedText) {
+  const t = String(normalizedText || "").toLowerCase().trim();
+  if (!t) return false;
+  return REPAIR_CLARIFICATION_PATTERNS.some((rx) => rx.test(t));
+}
+
 /**
  * Deterministic repair / clarification classifier.
  * Input must be canonical normalized text from assistant.js.
@@ -86,29 +121,11 @@ export function classifyRepairClarification(normalizedText) {
   const t = String(normalizedText || "").toLowerCase().trim();
   if (!t) return null;
 
-  const clarificationPatterns = [
-    /^\s*kmt(?:\s+what)?\s*\??\s*$/i,
-    /^\s*cho man\s*$/i,
-    /^\s*i am frustrated(?:\s+what)?\s*$/i,
-    /^\s*wait hold on\s*$/i,
-    /^\s*look yah(?:\s+nuh)?\s*$/i,
-    /^\s*(what|huh)\s*\??\s*$/i,
-    /\b(what are you saying|what you mean|what do you mean|seh that again|say that again|explain that|explain that again|explain simpler)\b/i,
-    /\b(mi|me)\s+(nuh|no|don'?t|do not)\s+(understand|get it)\b/i,
-    /\byou lost me\b/i,
-    /\bnot what i mean\b/i,
-  ];
-  if (clarificationPatterns.some((rx) => rx.test(t))) {
+  if (matchesRepairClarification(t)) {
     return { label: "clarification", confidence: 0.92 };
   }
 
-  const frustrationPatterns = [
-    /\bnot what i asked\b/i,
-    /\bthis (isn't|is not|not) what i asked\b/i,
-    /\byou (don't|do not) understand\b/i,
-    /\b(kmt|cho man)\b/i,
-  ];
-  if (frustrationPatterns.some((rx) => rx.test(t))) {
+  if (REPAIR_FRUSTRATION_PATTERNS.some((rx) => rx.test(t))) {
     return { label: "frustration", confidence: 0.86 };
   }
 
@@ -124,6 +141,8 @@ export function extractMultiIntentTags(normalizedText, entities = {}, { repair =
   const t = String(normalizedText || "").toLowerCase().trim();
   const sym = entities?.symptoms || {};
   const pregnancy = entities?.pregnancy || {};
+  const dischargeOptions = entities?.domainSelections?.discharge || [];
+  const bloodColourOptions = entities?.domainSelections?.blood_colour || [];
   const tags = new Set();
 
   if (sym.late || sym.implicit_late) tags.add("late_period");
@@ -136,9 +155,15 @@ export function extractMultiIntentTags(normalizedText, entities = {}, { repair =
   if (sym.breast_tender) tags.add("breast_tenderness");
   if (sym.spotting) tags.add("spotting");
   if (sym.heavy) tags.add("heavy_bleeding");
-  if (sym.discharge || sym.unusual_discharge || sym.discharge_eggwhite || sym.discharge_creamy || sym.discharge_sticky) {
+  if (sym.discharge || sym.unusual_discharge || sym.discharge_eggwhite || sym.discharge_creamy || sym.discharge_sticky || dischargeOptions.length) {
     tags.add("discharge");
+    if (dischargeOptions.some((code) => ["yellow", "green", "gray", "foul_smell", "thick_clumpy"].includes(code))) {
+      tags.add("discharge_concern");
+    } else {
+      tags.add("discharge_explanation");
+    }
   }
+  if (bloodColourOptions.length) tags.add("blood_colour_explanation");
   if (/\bitch|itching\b/.test(t)) tags.add("itching");
   if (pregnancy.chance || /\b(pregnan|unprotected sex|pregnancy test|positive test|negative test)\b/.test(t)) {
     tags.add("pregnancy_concern");
@@ -151,6 +176,7 @@ export function extractMultiIntentTags(normalizedText, entities = {}, { repair =
   if (repair?.label === "frustration") tags.add("frustration");
   if (entities?.urgent || (sym.heavy && (sym.large_clots || sym.dizziness)) || /\b(faint|can'?t breathe|severe pain)\b/.test(t)) {
     tags.add("red_flag");
+    tags.add("urgent_symptom_check");
   }
 
   const canonicalTags = [...tags].filter((tag) => VALID_INTENT_TAGS.has(tag));
@@ -196,7 +222,17 @@ const HEALTH_GATE = new RegExp(
   "smell(?:ing|s)?\\s+(?:off|different|weird|bad)|" +
   // Worried + vague concern
   "(?:worried|scared|concerned)\\s+(?:about\\s+)?(?:something|my body|what.?s)|" +
-  "something.*(?:wrong|off|not right).*(?:me|my body|my cycle|my period)",
+  "something.*(?:wrong|off|not right).*(?:me|my body|my cycle|my period)|" +
+  // ── Tier 3: conversational in-context replies (typed instead of clicking) ─
+  // "all the time", "always", frequency replies to pending timing questions
+  "all the time|always feel|feel (?:like )?this (?:all the time|always|constantly)|" +
+  "this always happens|happens all the time|feel (?:like )?this every day|" +
+  // "it's random", "no clear pattern" replies
+  "no (?:clear )?pattern|no (?:clear )?link|not connected to|all over the place|" +
+  // "before my period", "during my period" as typed timing answers
+  "before my period|during my period|right before (?:my )?period|" +
+  // General "feel like this" catch-all when in a health conversation
+  "feel like this|feel (?:this|it) (?:all|every)|this is (?:how i|my) (?:always|always feel)",
   "i"
 );
 

@@ -119,18 +119,24 @@ function renderTable(docs) {
     const typeBadge = typeBadgeClass(d.type);
     const riskBadge = riskBadgeClass(d.riskLevel);
 
-    // Route column: urgent_trigger/oos_fallback → d.route; escalation → d.fromNode
-    const routeText = d.route || d.fromNode || "-";
+    // Route column: prefer explicit route, then fromNode; for oos_fallback fall
+    // back to the OOS category so the column is never just "-".
+    const routeText = d.route || d.fromNode
+      || (d.type === "oos_fallback" ? d.category || "oos" : "-");
+
+    // Topic column: use stored topic; for oos_fallback derive a hint from category.
+    const topicText = d.topic
+      || (d.type === "oos_fallback" && d.category ? `[${d.category}]` : "-");
 
     return `
       <tr data-id="${esc(d.id)}">
         <td class="col-ts">${esc(ts)}</td>
         <td>
-          <span class="admin-badge ${esc(typeBadge)}">${esc(d.type || "-")}</span>
+          <span class="admin-badge ${esc(typeBadge)}">${esc(friendlyType(d.type))}</span>
         </td>
         <td class="col-input" title="${esc(d.input || "")}">${esc(truncate(d.input, 90))}</td>
         <td class="col-route"><code>${esc(routeText)}</code></td>
-        <td>${esc(d.topic || "-")}</td>
+        <td>${esc(topicText)}</td>
         <td>
           ${d.riskLevel
             ? `<span class="admin-badge ${esc(riskBadge)}">${esc(d.riskLevel)}</span>`
@@ -208,6 +214,13 @@ function typeBadgeClass(type) {
   if (type === "urgent_trigger") return "admin-badge--danger";
   if (type === "escalation")     return "admin-badge--warning";
   return "admin-badge--neutral";
+}
+
+function friendlyType(type) {
+  if (type === "urgent_trigger") return "Urgent Trigger";
+  if (type === "escalation")     return "Escalation";
+  if (type === "oos_fallback")   return "OOS Fallback";
+  return type || "-";
 }
 
 function riskBadgeClass(level) {

@@ -41,29 +41,30 @@ router.get("/clinics", async (req, res) => {
 });
 
 // ─── GET /catalog/symptoms ───────────────────────────────────────────────────
-// Returns symptom catalog, filtered by teenSafe and sensitive flags
+// Returns symptom catalog, filtered by teenSafe and sensitive flags.
+// Fetches all documents then filters in JS — avoids requiring a composite
+// Firestore index for the teenSafe + sensitive compound query.
 router.get("/symptoms", requireAuth, async (req, res) => {
   try {
     const { teenSafe, excludeSensitive } = req.query;
 
-    let q = db.collection("symptomCatalog");
+    const snap = await db.collection("symptomCatalog").get();
+    let symptoms = snap.docs.map((d) => ({ id: d.id, key: d.id, ...d.data() }));
 
-    // Filter for teen-safe symptoms if requested
     if (teenSafe === "true") {
-      q = q.where("teenSafe", "==", true);
+      symptoms = symptoms.filter((s) => s.teenSafe === true);
     }
-
-    // Exclude sensitive symptoms if requested
     if (excludeSensitive === "true") {
-      q = q.where("sensitive", "==", false);
+      symptoms = symptoms.filter((s) => s.sensitive !== true);
     }
 
-    const snap = await q.get();
-    const symptoms = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // Only include items that have both a label and a category
+    symptoms = symptoms.filter((s) => s.label && s.category);
 
-    // Sort by category then label client-side (avoids needing extra index)
+    // Sort by category then label
     symptoms.sort((a, b) =>
-      a.category.localeCompare(b.category) || a.label.localeCompare(b.label)
+      String(a.category).localeCompare(String(b.category)) ||
+      String(a.label).localeCompare(String(b.label))
     );
 
     return res.json({ ok: true, symptoms });
@@ -78,9 +79,26 @@ router.get("/symptoms", requireAuth, async (req, res) => {
 // Query: fromLat, fromLng, toLat, toLng, mode (driving-car|foot-walking)
 router.get("/route", async (req, res) => {
   const { fromLat, fromLng, toLat, toLng, mode = "driving-car" } = req.query;
+  const allowedModes = new Set(["driving-car", "foot-walking"]);
 
   if (!fromLat || !fromLng || !toLat || !toLng) {
     return res.status(400).json({ error: "Missing coordinates" });
+  }
+
+  const from = { lat: Number(fromLat), lng: Number(fromLng) };
+  const to = { lat: Number(toLat), lng: Number(toLng) };
+
+  if (
+    !Number.isFinite(from.lat) || !Number.isFinite(from.lng) ||
+    !Number.isFinite(to.lat) || !Number.isFinite(to.lng) ||
+    Math.abs(from.lat) > 90 || Math.abs(to.lat) > 90 ||
+    Math.abs(from.lng) > 180 || Math.abs(to.lng) > 180
+  ) {
+    return res.status(400).json({ error: "Invalid coordinates" });
+  }
+
+  if (!allowedModes.has(mode)) {
+    return res.status(400).json({ error: "Invalid route mode" });
   }
 
   const apiKey = process.env.ORS_API_KEY;
@@ -89,7 +107,7 @@ router.get("/route", async (req, res) => {
   }
 
   try {
-    const url = `https://api.heigit.org/openrouteservice/v2/directions/${mode}/geojson`;
+    const url = `https://api.openrouteservice.org/v2/directions/${mode}/geojson`;
 
     const orsRes = await fetch(url, {
       method: "POST",
@@ -99,7 +117,7 @@ router.get("/route", async (req, res) => {
         "Accept": "application/json, application/geo+json",
       },
       body: JSON.stringify({
-        coordinates: [[Number(fromLng), Number(fromLat)], [Number(toLng), Number(toLat)]],
+        coordinates: [[from.lng, from.lat], [to.lng, to.lat]],
         radiuses: [-1, -1],
       }),
     });
@@ -122,6 +140,7 @@ router.get("/route", async (req, res) => {
       distance_km: +(distance / 1000).toFixed(2),
       duration_min: Math.round(duration / 60),
       coords,
+      source: "openrouteservice",
     });
   } catch (err) {
     console.error("GET /catalog/route error:", err.message);

@@ -12,6 +12,16 @@ function isValidDateKey(dateKey) {
   return typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
 }
 
+function addDays(dateKey, days) {
+  const d = new Date(`${dateKey}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function toBool(val) {
+  return val === true || val === "true";
+}
+
 const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
 
 function normalizeBiometricLevel(value) {
@@ -54,6 +64,20 @@ function legacyCycleLogRef(uid, dateKey) {
   return db.collection("cycleLogs").doc(uid).collection("entries").doc(dateKey);
 }
 
+function mergeDocsByDateKey(...snaps) {
+  const byDate = new Map();
+  for (const snap of snaps) {
+    if (!snap?.docs) continue;
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      const dateKey = data.dateKey || doc.id;
+      if (!dateKey) continue;
+      byDate.set(dateKey, { dateKey, ...data });
+    }
+  }
+  return [...byDate.values()].sort((a, b) => String(b.dateKey).localeCompare(String(a.dateKey)));
+}
+
 // Canonical path: users/{uid}/cycleLogs/{dateKey}
 // Legacy mirror: cycleLogs/{uid}/entries/{dateKey}
 
@@ -91,6 +115,8 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       sleepScore: normalizeSleepScore(req.body.sleepScore),
       stressLevel: normalizeBiometricLevel(req.body.stressLevel),
       activityLevel: normalizeBiometricLevel(req.body.activityLevel),
+      hadSex: toBool(req.body.hadSex),
+      contraceptionUsed: toBool(req.body.contraceptionUsed),
       notes:
         typeof req.body.notes === "string"
           ? req.body.notes.trim().slice(0, 500)
@@ -109,7 +135,7 @@ router.put("/:dateKey", requireAuth, async (req, res) => {
       updatedAt: serverTimestamp(),
     };
     if (periodDay !== null && periodDay > 0) {
-      userUpdate.lastPeriodStart = dateKey;
+      userUpdate.lastPeriodStart = addDays(dateKey, -(periodDay - 1));
     }
     await db.collection("users").doc(uid).set(userUpdate, { merge: true });
 
@@ -132,9 +158,9 @@ router.get("/:dateKey", requireAuth, async (req, res) => {
     }
 
     let doc = await canonicalCycleLogRef(uid, dateKey).get();
-    if (!doc.exists) doc = await legacyCycleLogRef(uid, dateKey).get();
+    if (!doc?.exists) doc = await legacyCycleLogRef(uid, dateKey).get();
 
-    if (!doc.exists) return res.json(null);
+    if (!doc?.exists) return res.json(null);
     return res.json(doc.data());
   } catch (err) {
     console.error("GET /cycle-logs/:dateKey error:", err);
@@ -163,17 +189,13 @@ router.get("/", requireAuth, async (req, res) => {
     // Only apply a cap when filtering by range - not on full history fetch
     if (start || end) q = q.limit(3650);
 
-    let snap = await q.get();
-    let items = snap.docs.map((d) => d.data());
+    let legacy = db.collection("cycleLogs").doc(uid).collection("entries").orderBy("dateKey", "desc");
+    if (start) legacy = legacy.where("dateKey", ">=", start);
+    if (end) legacy = legacy.where("dateKey", "<=", end);
+    if (start || end) legacy = legacy.limit(3650);
 
-    if (items.length === 0) {
-      let legacy = db.collection("cycleLogs").doc(uid).collection("entries").orderBy("dateKey", "desc");
-      if (start) legacy = legacy.where("dateKey", ">=", start);
-      if (end) legacy = legacy.where("dateKey", "<=", end);
-      if (start || end) legacy = legacy.limit(3650);
-      snap = await legacy.get();
-      items = snap.docs.map((d) => d.data());
-    }
+    const [legacySnap, canonicalSnap] = await Promise.all([legacy.get(), q.get()]);
+    const items = mergeDocsByDateKey(legacySnap, canonicalSnap);
 
     return res.json({ ok: true, items });
   } catch (err) {

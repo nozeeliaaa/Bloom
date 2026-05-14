@@ -7,15 +7,16 @@
  * - GET    /api/logs
  * - PUT    /api/logs/:dateKey
  * - DELETE /api/logs/:dateKey
- * - GET    /api/symptom-logs
- * - PUT    /api/symptom-logs/:dateKey
- * - DELETE /api/symptom-logs/:dateKey
+ * - GET    /api/symptoms
+ * - PUT    /api/symptoms/:dateKey
+ * - DELETE /api/symptoms/:dateKey
  */
 
 import { getIdToken } from "./auth.js";
 import { isAccountMode } from "./mode.js";
 import { MODE_BANNER_ONCE_KEY } from "./utils.js";
 import { bloomieDiagnostic } from "./bloomie-logger.js";
+import { clearSyncIssue, notifySyncIssue } from "./sync-status.js";
 import {
   loadBloomieMemoryLocal,
   saveBloomieMemoryLocal,
@@ -32,7 +33,6 @@ const ASSIST_KEY = "bloom_assistant_session";
 
 // Set in firebaseConfig.js: window.BLOOM_API_BASE = "" (uses Vite proxy → localhost:4000)
 const API_BASE = window.BLOOM_API_BASE || "";
-const SYMPTOM_LOGS_PATH = "/api/symptom-logs";
 const BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
 
 // --------------------
@@ -63,11 +63,7 @@ let _symptomCatalogCache = null;
 let _symptomCatalogFetchedAt = 0;
 let _symptomCatalogByCode = new Map();
 let _symptomCatalogByLabel = new Map();
-let _profileCache = null;
-let _profileCacheFetchedAt = 0;
-let _profileInFlight = null;
 const SYMPTOM_CATALOG_TTL_MS = 10 * 60 * 1000;
-const PROFILE_CACHE_TTL_MS = 3 * 60 * 1000;
 
 export function invalidateLogsCache() {
   _logsCache = null;
@@ -76,6 +72,10 @@ export function invalidateLogsCache() {
 }
 
 function showSyncWarning() {
+  notifySyncIssue({
+    source: "cloud-save",
+    message: "Cloud sync could not save that change. Bloom kept it on this device for now.",
+  });
   // Show a toast warning that cloud save failed - data is local only
   if (document.getElementById("db-sync-warn")) return; // already showing
   const el = document.createElement("div");
@@ -102,6 +102,46 @@ async function authHeaders() {
 
 function apiUrl(path) {
   return `${API_BASE}${path}`;
+}
+
+function normalizeNickname(value) {
+  const nickname = typeof value === "string" ? value.trim() : "";
+  return nickname ? nickname.slice(0, 40) : null;
+}
+
+function extractNickname(payload = null) {
+  return normalizeNickname(
+    payload?.nickname ??
+    payload?.profile?.nickname ??
+    payload?.user?.nickname ??
+    payload?.displayName ??
+    null
+  );
+}
+
+function loadLocalNickname() {
+  try {
+    const profile = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
+    return extractNickname(profile) || normalizeNickname(localStorage.getItem("bloom_user_name"));
+  } catch {
+    return normalizeNickname(localStorage.getItem("bloom_user_name"));
+  }
+}
+
+function cacheLocalNickname(nickname, profile = null) {
+  const clean = normalizeNickname(nickname);
+  if (!clean) return;
+  localStorage.setItem("bloom_user_name", clean);
+  try {
+    const existing = JSON.parse(localStorage.getItem("bloom_profile") || "{}");
+    localStorage.setItem("bloom_profile", JSON.stringify({
+      ...existing,
+      ...(profile && typeof profile === "object" ? profile : {}),
+      nickname: clean,
+    }));
+  } catch {
+    localStorage.setItem("bloom_profile", JSON.stringify({ nickname: clean }));
+  }
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
@@ -199,6 +239,11 @@ export async function getSymptomCatalog({ timeoutMs = 3500, force = false } = {}
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
       console.warn("Symptom catalog fetch failed:", res.status, txt);
+      notifySyncIssue({
+        source: "symptom-catalog",
+        message: "Bloom could not refresh the symptom catalog. Saved data is still available.",
+        detail: txt,
+      });
       return _symptomCatalogCache || [];
     }
 
@@ -210,6 +255,11 @@ export async function getSymptomCatalog({ timeoutMs = 3500, force = false } = {}
     return symptoms;
   } catch (e) {
     console.warn("Symptom catalog fetch error:", e);
+    notifySyncIssue({
+      source: "symptom-catalog",
+      message: "Bloom could not refresh the symptom catalog. Saved data is still available.",
+      detail: e?.message || "",
+    });
     return _symptomCatalogCache || [];
   }
 }
@@ -256,6 +306,7 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
       ...(merged[dateKey] || {}),
       date: dateKey,
       flow: flowStr,
+      periodDay: Number.isFinite(Number(entry.periodDay)) ? Number(entry.periodDay) : null,
       sleepScore: normalizeSleepScore(entry.sleepScore),
       stressLevel: normalizeBiometricLevel(entry.stressLevel),
       activityLevel: normalizeBiometricLevel(entry.activityLevel),
@@ -314,6 +365,59 @@ function mergeCloudLogs(cycleItems = [], symptomItems = []) {
   return merged;
 }
 
+function mergeLocalAndCloudLogs(localLogs = {}, cloudLogs = {}) {
+  const merged = { ...(localLogs || {}) };
+
+  for (const [dateKey, cloudEntry] of Object.entries(cloudLogs || {})) {
+    const localEntry = merged[dateKey] || {};
+    merged[dateKey] = {
+      ...localEntry,
+      ...(cloudEntry || {}),
+    };
+
+    // Do not let an incomplete cloud row erase a local period marker. This can
+    // happen during migrations where older canonical docs lack period fields
+    // while legacy/local data still has the user's historical flow logs.
+    if (isPeriodEntry(localEntry) && !isPeriodEntry(cloudEntry)) {
+      if (localEntry.flow !== undefined) merged[dateKey].flow = localEntry.flow;
+      if (localEntry.flowLevel !== undefined) merged[dateKey].flowLevel = localEntry.flowLevel;
+      if (localEntry.periodDay !== undefined) merged[dateKey].periodDay = localEntry.periodDay;
+    }
+  }
+
+  return merged;
+}
+
+function addDays(dateKey, n) {
+  const d = new Date(dateKey + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function isPeriodEntry(entry) {
+  if (!entry) return false;
+  if (entry.flow && entry.flow !== "none") return true;
+  if (typeof entry.flowLevel === "number" && entry.flowLevel > 0) return true;
+  if (Number.isFinite(Number(entry.periodDay)) && Number(entry.periodDay) > 0) return true;
+  return entry.periodDay === true;
+}
+
+function derivePeriodDay(allLogs, dateKey) {
+  const explicit = Number(allLogs?.[dateKey]?.periodDay);
+  if (Number.isInteger(explicit) && explicit > 0) return explicit;
+  if (!isPeriodEntry(allLogs?.[dateKey])) return null;
+
+  let start = dateKey;
+  while (isPeriodEntry(allLogs?.[addDays(start, -1)])) {
+    start = addDays(start, -1);
+  }
+
+  return Math.max(
+    1,
+    Math.round((new Date(dateKey + "T00:00:00") - new Date(start + "T00:00:00")) / 86400000) + 1
+  );
+}
+
 // --------------------
 // Logs API (hybrid)
 // --------------------
@@ -338,6 +442,7 @@ export async function saveDailyLog(dateKey, log) {
     },
   };
   writeJSON(LOGS_KEY, all);
+  invalidateLogsCache();
 
   if (!isAccountMode()) return all[dateKey];
 
@@ -355,12 +460,14 @@ export async function saveDailyLog(dateKey, log) {
     const flowNum = localEntry.flow && localEntry.flow !== "none"
       ? (FLOW_TO_NUM[localEntry.flow] ?? null)
       : null;
+    const periodDay = derivePeriodDay(all, dateKey);
 
     // 1) Save cycle data
     const cycleRes = await fetch(apiUrl(`/api/logs/${encodeURIComponent(dateKey)}`), {
       method: "PUT",
       headers,
       body: JSON.stringify({
+        periodDay,
         flowLevel: flowNum,
         sleepScore: normalizeSleepScore(localEntry.sleepScore),
         stressLevel: normalizeBiometricLevel(localEntry.stressLevel),
@@ -393,7 +500,7 @@ export async function saveDailyLog(dateKey, log) {
           .filter((it) => it.text)
       : [];
 
-    if (symptomsArray.length > 0 || otherSymptomsArray.length > 0) {
+    if (symptomsArray.length > 0) {
       const symptomCodeMap = {};
       const items = symptomsArray.map((symptom) => ({
         code: (() => {
@@ -416,7 +523,7 @@ export async function saveDailyLog(dateKey, log) {
         writeJSON(LOGS_KEY, all);
       }
 
-      const symptomRes = await fetch(apiUrl(`${SYMPTOM_LOGS_PATH}/${encodeURIComponent(dateKey)}`), {
+      const symptomRes = await fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
         method: "PUT",
         headers,
         body: JSON.stringify({ items, otherSymptoms: otherSymptomsArray }),
@@ -429,7 +536,7 @@ export async function saveDailyLog(dateKey, log) {
     } else {
       // If user removed all symptoms for that day, delete backend symptom entry
       const symptomDeleteRes = await fetch(
-        apiUrl(`${SYMPTOM_LOGS_PATH}/${encodeURIComponent(dateKey)}`),
+        apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`),
         {
           method: "DELETE",
           headers,
@@ -479,19 +586,29 @@ export async function getAllLogs({ timeoutMs = 4500 } = {}) {
 
       const [cycleRes, symptomRes] = await Promise.all([
         fetchWithTimeout(apiUrl("/api/logs"), { headers }, timeoutMs),
-        fetchWithTimeout(apiUrl(SYMPTOM_LOGS_PATH), { headers }, timeoutMs),
+        fetchWithTimeout(apiUrl("/api/symptoms"), { headers }, timeoutMs),
       ]);
       await catalogPromise;
 
       if (!cycleRes.ok) {
         const txt = await cycleRes.text().catch(() => "");
         console.warn("Cycle cloud fetch failed:", cycleRes.status, txt);
+        notifySyncIssue({
+          source: "cycle-logs",
+          message: "Bloom could not load your cloud cycle logs. Showing saved local data for now.",
+          detail: txt,
+        });
         return local;
       }
 
       if (!symptomRes.ok) {
         const txt = await symptomRes.text().catch(() => "");
         console.warn("Symptom cloud fetch failed:", symptomRes.status, txt);
+        notifySyncIssue({
+          source: "symptom-logs",
+          message: "Bloom could not load your cloud symptom logs. Showing saved local data for now.",
+          detail: txt,
+        });
         return local;
       }
 
@@ -510,14 +627,16 @@ export async function getAllLogs({ timeoutMs = 4500 } = {}) {
 
       const symptomItems = Array.isArray(symptomData?.items) ? symptomData.items : [];
 
-      const logs = mergeCloudLogs(cycleItems, symptomItems);
+      const cloudLogs = mergeCloudLogs(cycleItems, symptomItems);
+      const logs = mergeLocalAndCloudLogs(local, cloudLogs);
 
       // Only overwrite local cache if cloud actually returned data.
       // If cloud is empty but local has entries, keep local to avoid
       // wiping logs that were saved before a sync had a chance to run.
-      if (Object.keys(logs).length > 0) {
+      if (Object.keys(cloudLogs).length > 0) {
         writeJSON(LOGS_KEY, logs);
         setCloudSyncedBanner();
+        clearSyncIssue("logs");
         _logsCache = logs;
         _logsCacheMode = "account";
         return logs;
@@ -526,6 +645,11 @@ export async function getAllLogs({ timeoutMs = 4500 } = {}) {
       return local;
     } catch (e) {
       console.warn("Cloud fetch error:", e);
+      notifySyncIssue({
+        source: "logs",
+        message: "Bloom could not reach cloud sync. Showing saved local data for now.",
+        detail: e?.message || "",
+      });
       return local;
     } finally {
       _logsInFlight = null;
@@ -539,6 +663,7 @@ export async function deleteDailyLog(dateKey) {
   const all = readJSON(LOGS_KEY, {});
   delete all[dateKey];
   writeJSON(LOGS_KEY, all);
+  invalidateLogsCache();
 
   if (!isAccountMode()) return;
 
@@ -551,7 +676,7 @@ export async function deleteDailyLog(dateKey) {
         method: "DELETE",
         headers,
       }),
-      fetch(apiUrl(`${SYMPTOM_LOGS_PATH}/${encodeURIComponent(dateKey)}`), {
+      fetch(apiUrl(`/api/symptoms/${encodeURIComponent(dateKey)}`), {
         method: "DELETE",
         headers,
       }),
@@ -629,11 +754,16 @@ export async function loadBloomieMemory() {
         reason: `backend returned ${res.status}`,
         fallbackTarget: "local_memory",
       });
+      notifySyncIssue({
+        source: "bloomie-memory",
+        message: "Bloomie could not load cloud memory. The chat will use what is saved on this device.",
+      });
       return local;
     }
     const data = await res.json();
     if (data && typeof data === "object") {
-      return saveBloomieMemoryLocal(data, { replace: true });
+      const merged = mergeBloomieMemoryForContinuity(local, data);
+      return saveBloomieMemoryLocal(merged, { replace: true });
     }
     return local;
   } catch (err) {
@@ -643,8 +773,61 @@ export async function loadBloomieMemory() {
       reason: err?.message ?? "network error",
       fallbackTarget: "local_memory",
     });
+    notifySyncIssue({
+      source: "bloomie-memory",
+      message: "Bloomie could not load cloud memory. The chat will use what is saved on this device.",
+      detail: err?.message || "",
+    });
     return local;
   }
+}
+
+function hasMeaningfulBloomieMemory(memory) {
+  if (!memory || typeof memory !== "object") return false;
+  return Boolean(
+    memory.lastSessionDate ||
+    memory.lastIntent ||
+    memory.lastPatternSummary ||
+    memory.lastGreetingUsed ||
+    (Array.isArray(memory.lastSymptoms) && memory.lastSymptoms.length > 0) ||
+    (Array.isArray(memory.recentTopics) && memory.recentTopics.length > 0) ||
+    (Array.isArray(memory.reportedConditions) && memory.reportedConditions.length > 0) ||
+    Number(memory.sessionCount || 0) > 0
+  );
+}
+
+function mergeBloomieMemoryForContinuity(local, remote) {
+  const remoteHasMemory = hasMeaningfulBloomieMemory(remote);
+  const localHasMemory = hasMeaningfulBloomieMemory(local);
+  if (!remoteHasMemory && localHasMemory) return local;
+
+  const merged = { ...(local || {}), ...(remote || {}) };
+  const arrayFields = [
+    "lastSymptoms",
+    "lastSymptomTopics",
+    "recentTopics",
+    "contentSuggestionsShown",
+    "declinedSuggestions",
+    "reportedConditions",
+  ];
+  for (const key of arrayFields) {
+    const remoteArr = Array.isArray(remote?.[key]) ? remote[key] : [];
+    const localArr = Array.isArray(local?.[key]) ? local[key] : [];
+    merged[key] = remoteArr.length ? remoteArr : localArr;
+  }
+
+  const localSessionCount = Number(local?.sessionCount || 0);
+  const remoteSessionCount = Number(remote?.sessionCount || 0);
+  merged.sessionCount = Math.max(localSessionCount, remoteSessionCount);
+
+  if (!remote?.lastSessionDate && local?.lastSessionDate) {
+    merged.lastSessionDate = local.lastSessionDate;
+  }
+  if (!remote?.lastSymptomsAt && local?.lastSymptomsAt) {
+    merged.lastSymptomsAt = local.lastSymptomsAt;
+  }
+
+  return merged;
 }
 
 // Save a compact memory snapshot. Always writes to localStorage,
@@ -658,16 +841,29 @@ export async function saveBloomieMemory(memoryData) {
   try {
     const headers = await authHeaders();
     if (!headers) return;
-    await fetch(apiUrl("/api/bloomie-memory"), {
+    const res = await fetch(apiUrl("/api/bloomie-memory"), {
       method: "PUT",
       headers,
       body: JSON.stringify(memoryData),
     });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      notifySyncIssue({
+        source: "bloomie-memory",
+        message: "Bloomie could not save memory to cloud. This chat is still active on this device.",
+        detail: txt,
+      });
+    }
   } catch (err) {
     bloomieDiagnostic("cache_write_failed", {
       module: "db",
       stage:  "saveBloomieMemory",
       reason: err?.message ?? "network error",
+    });
+    notifySyncIssue({
+      source: "bloomie-memory",
+      message: "Bloomie could not save memory to cloud. This chat is still active on this device.",
+      detail: err?.message || "",
     });
   }
 }
@@ -675,66 +871,56 @@ export async function saveBloomieMemory(memoryData) {
 // Load the authenticated user's profile (nickname) from the backend.
 // Returns { nickname: string | null }. Never throws.
 export async function loadUserProfile() {
-  const localProfile = readJSON("bloom_profile", {}) || {};
-  const localNickname =
-    typeof localProfile?.nickname === "string" && localProfile.nickname.trim()
-      ? localProfile.nickname.trim()
-      : null;
-  const localFallback = { nickname: localNickname };
-
-  if (!isAccountMode()) return localFallback;
-
-  const now = Date.now();
-  if (_profileCache && now - _profileCacheFetchedAt < PROFILE_CACHE_TTL_MS) {
-    return _profileCache;
-  }
-  if (_profileInFlight) return _profileInFlight;
-
-  _profileInFlight = (async () => {
-    try {
-      const headers = await authHeaders();
-      if (!headers) return localFallback;
-
-      const res = await fetchWithTimeout(
-        apiUrl("/api/user/profile"),
-        { headers },
-        4500
-      );
-
-      if (!res.ok) return localFallback;
-
-      const data = await res.json().catch(() => ({}));
-      const nicknameRaw =
-        (typeof data?.nickname === "string" ? data.nickname : null) ??
-        (typeof data?.profile?.nickname === "string" ? data.profile.nickname : null) ??
-        localNickname;
-
-      const nickname = nicknameRaw && String(nicknameRaw).trim()
-        ? String(nicknameRaw).trim()
-        : null;
-
-      const resolved = { nickname };
-      _profileCache = resolved;
-      _profileCacheFetchedAt = Date.now();
-      return resolved;
-    } catch (_) {
-      return localFallback;
-    } finally {
-      _profileInFlight = null;
+  try {
+    const headers = await authHeaders();
+    if (!headers) return { nickname: loadLocalNickname() };
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 3000)
+    );
+    const request = fetch(apiUrl("/api/user/profile"), { headers });
+    const res = await Promise.race([request, timeout]);
+    if (!res.ok) {
+      bloomieDiagnostic("profile_sync_failed", {
+        module: "db",
+        stage:  "loadUserProfile",
+        reason: `backend returned ${res.status}`,
+      });
+      notifySyncIssue({
+        source: "profile",
+        message: "Bloom could not refresh your cloud profile. Using saved local details for now.",
+      });
+      return { nickname: loadLocalNickname() };
     }
-  })();
-
-  return _profileInFlight;
+    const data = await res.json();
+    const profile = data?.profile || data || null;
+    const nickname = extractNickname(data);
+    cacheLocalNickname(nickname, profile);
+    return { nickname, profile };
+  } catch (err) {
+    bloomieDiagnostic("profile_sync_failed", {
+      module: "db",
+      stage:  "loadUserProfile",
+      reason: err?.message ?? "network error or timeout",
+    });
+    notifySyncIssue({
+      source: "profile",
+      message: "Bloom could not refresh your cloud profile. Using saved local details for now.",
+      detail: err?.message || "",
+    });
+    return { nickname: loadLocalNickname() };
+  }
 }
 
 export async function deleteAllLocalData() {
   localStorage.removeItem(LOGS_KEY);
   localStorage.removeItem(ASSIST_KEY);
   clearBloomieMemoryLocal();
+  invalidateLogsCache();
 }
 
 export async function clearAllLogs() {
   writeJSON(LOGS_KEY, {});
+  invalidateLogsCache();
 
   if (!isAccountMode()) return;
 
@@ -744,7 +930,7 @@ export async function clearAllLogs() {
 
     const [cycleRes, symptomRes] = await Promise.all([
       fetch(apiUrl("/api/logs"), { headers }),
-      fetch(apiUrl(SYMPTOM_LOGS_PATH), { headers }),
+      fetch(apiUrl("/api/symptoms"), { headers }),
     ]);
 
     if (cycleRes.ok) {
@@ -778,7 +964,7 @@ export async function clearAllLogs() {
         symptomItems
           .filter((entry) => entry?.dateKey)
           .map((entry) =>
-            fetch(apiUrl(`${SYMPTOM_LOGS_PATH}/${encodeURIComponent(entry.dateKey)}`), {
+            fetch(apiUrl(`/api/symptoms/${encodeURIComponent(entry.dateKey)}`), {
               method: "DELETE",
               headers,
             })

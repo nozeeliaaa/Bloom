@@ -134,7 +134,7 @@ function ensureModal() {
   root.innerHTML = `
     <div class="session-timeout-card">
       <h3 class="session-timeout-title">Session timeout warning</h3>
-      <p class="session-timeout-message">You’ve been inactive. You’ll be logged out soon for your security.</p>
+      <p class="session-timeout-message">You have been inactive for 4 minutes. Bloom will log you out at 5 minutes for your security.</p>
       <p class="session-timeout-countdown" id="session-timeout-countdown">Logging out in 60s...</p>
       <div class="session-timeout-actions">
         <button type="button" class="session-timeout-btn" id="session-timeout-logout-now">Log out now</button>
@@ -204,10 +204,7 @@ function scheduleFromActivity(lastActivityTs) {
   const logoutAt = warnAt + graceMs;
 
   if (elapsed >= inactivityMs + graceMs) {
-    // Preserve UX: always show a short warning instead of abrupt logout.
-    const shortGraceMs = 8000;
-    showWarning(now + shortGraceMs);
-    _logoutTimer = setTimeout(() => void forceSessionLogout("inactivity"), shortGraceMs);
+    void forceSessionLogout("inactivity");
     return;
   }
 
@@ -246,7 +243,7 @@ function activateAccountTimeoutGuard({ resetActivity = false } = {}) {
   scheduleFromActivity(getLastActivityTs());
 }
 
-function shouldTreatAsExpiredSession(url, init, response) {
+async function shouldTreatAsExpiredSession(url, init, response) {
   if (!isAccountMode()) return false;
   if (!response) return false;
   if (response.status !== 401 && response.status !== 403) return false;
@@ -259,7 +256,23 @@ function shouldTreatAsExpiredSession(url, init, response) {
     init?.headers || (typeof Request !== "undefined" && url instanceof Request ? url.headers : undefined)
   );
   const hasAuthHeader = Boolean(headers.get("authorization"));
-  if (response.status === 401 && hasAuthHeader) return true;
+  if (response.status === 401 && hasAuthHeader) {
+    let body = null;
+    try {
+      body = await response.clone().json();
+    } catch (_) {}
+
+    const error = String(body?.error || "").toLowerCase();
+    const code = String(body?.code || "").toLowerCase();
+    return (
+      error === "missing token" ||
+      error === "invalid token" ||
+      code === "auth/id-token-expired" ||
+      code === "auth/id-token-revoked" ||
+      code === "auth/argument-error" ||
+      code === "auth/invalid-token"
+    );
+  }
 
   return false;
 }
@@ -272,7 +285,7 @@ function patchFetchForExpiry() {
   window.fetch = async (input, init) => {
     const res = await baseFetch(input, init);
     const reqUrl = typeof input === "string" ? input : input?.url;
-    if (shouldTreatAsExpiredSession(reqUrl, init, res)) {
+    if (await shouldTreatAsExpiredSession(reqUrl, init, res)) {
       // Fire-and-forget so callers still receive their original response.
       void forceSessionLogout("expired");
     }
@@ -329,6 +342,14 @@ export function startSessionTimeoutGuard() {
   };
   window.addEventListener("storage", storageListener);
   _cleanupFns.push(() => window.removeEventListener("storage", storageListener));
+
+  const resyncListener = () => {
+    if (isAccountMode()) scheduleFromActivity(getLastActivityTs());
+  };
+  window.addEventListener("focus", resyncListener);
+  document.addEventListener("visibilitychange", resyncListener);
+  _cleanupFns.push(() => window.removeEventListener("focus", resyncListener));
+  _cleanupFns.push(() => document.removeEventListener("visibilitychange", resyncListener));
 
   if (!_authWatchStarted) {
     _authWatchStarted = true;

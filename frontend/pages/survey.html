@@ -25,7 +25,7 @@
      const params = new URLSearchParams(window.location.search);
      const force = params.get("force") === "1";
      if (!force && localStorage.getItem("bloom_onboarded") === "1") {
-        window.location.replace("/pages/pdashboard.html");
+        window.location.replace("/pages/dashboard.html");
       }
     </script>
 

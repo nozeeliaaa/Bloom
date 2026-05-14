@@ -289,10 +289,6 @@ function updateSeverityPanel() {
 // Related terms for each symptom label. Lets users find symptoms using
 // everyday language even when the exact label isn't in the list.
 const SYMPTOM_SYNONYMS = {
-  "Vaginal bleeding":      ["period", "menstruation", "bleeding", "blood", "flow", "menstrual"],
-  "Spotting":              ["light bleeding", "breakthrough bleeding", "implantation bleeding", "pink discharge"],
-  "Heavy flow":            ["heavy period", "menorrhagia", "flooding", "heavy bleeding", "excessive bleeding"],
-  "Large clots":           ["blood clots", "clotting", "clots"],
   "Cramps":                ["period cramps", "menstrual cramps", "uterine cramps", "abdominal pain", "stomach pain", "tummy pain", "tummy ache", "dysmenorrhea", "stomach cramps"],
   "Pelvic pain":           ["lower abdominal pain", "hip pain", "groin pain", "lower back pain", "pelvic pressure"],
   "Ovulation pain":        ["mittelschmerz", "ovulation cramps", "mid-cycle pain", "one-sided pain", "side pain"],
@@ -339,11 +335,8 @@ const SYMPTOM_SYNONYMS = {
   "Frequent urination":    ["peeing a lot", "urinary frequency", "need to pee more", "bladder", "bathroom a lot"],
   "Smell sensitivity":     ["hyperosmia", "sensitive to smells", "smell aversion", "strong smells", "scent sensitivity"],
   "Nasal congestion":      ["stuffy nose", "blocked nose", "runny nose", "congestion", "sinus"],
-  "Weight change":         ["weight gain", "weight loss", "scale change", "gained weight", "lost weight"],
   "Sociable":              ["social", "outgoing", "extroverted", "talkative", "friendly"],
   "Withdrawn":             ["antisocial", "isolated", "introverted", "reclusive", "avoiding people", "wanting to be alone"],
-  "Missed period":         ["late period", "no period", "skipped period", "amenorrhea", "period late", "period missing"],
-  "Irregular period":      ["irregular cycle", "unpredictable period", "cycle changes", "erratic period"],
   "Increased libido":      ["high sex drive", "horny", "aroused", "increased desire", "wanting sex"],
   "Decreased libido":      ["low sex drive", "low desire", "not interested in sex", "no libido"],
   "Cervical mucus change": ["cm change", "discharge change", "mucus change", "cervical fluid"],

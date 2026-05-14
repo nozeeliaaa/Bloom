@@ -200,6 +200,8 @@ describe("computeRouteConfidence - tier rules (real implementation)", () => {
     );
     expect(conf.tier).toBe("low");
     expect(conf.ambiguous).toBe(true);
+    expect(conf.score).toBeLessThan(0.4);
+    expect(conf.route).toBeNull();
   });
 
   it("zero signals → low tier, null route", () => {
@@ -217,6 +219,8 @@ describe("computeRouteConfidence - tier rules (real implementation)", () => {
       {}
     );
     expect(conf.tier).toBe("medium");
+    expect(conf.score).toBeGreaterThanOrEqual(0.4);
+    expect(conf.score).toBeLessThan(0.75);
     expect(conf.ambiguous).toBe(true);
     expect(conf.confidenceNote).toBeTruthy();
   });
@@ -227,6 +231,8 @@ describe("computeRouteConfidence - tier rules (real implementation)", () => {
       {}
     );
     expect(conf.tier).toBe("low");
+    expect(conf.score).toBeLessThan(0.4);
+    expect(conf.route).toBeNull();
   });
 
   it("dominant single signal → high tier, ambiguous false", () => {
@@ -235,6 +241,7 @@ describe("computeRouteConfidence - tier rules (real implementation)", () => {
       {}
     );
     expect(conf.tier).toBe("high");
+    expect(conf.score).toBeGreaterThanOrEqual(0.75);
     expect(conf.ambiguous).toBe(false);
     expect(conf.route).toBe("LATE_INTRO");
   });
@@ -405,6 +412,17 @@ describe("confidence router - MEDIUM tier", () => {
     // Unrelated follow-up must not consume/route using stale pendingRoute.
     sendMessage("hmm");
     expect(chat.getState().state).not.toBe(expectedRoute);
+  });
+
+  it("critical-risk override skips confidence scoring and normal routing", () => {
+    computeRouteConfidence.mockClear();
+    inferRoute.mockClear();
+
+    sendMessage("i can't breathe and i feel like i might pass out");
+
+    expect(chat.getState().state).toBe("EMERGENCY_REDIRECT");
+    expect(computeRouteConfidence).not.toHaveBeenCalled();
+    expect(inferRoute).not.toHaveBeenCalled();
   });
 });
 

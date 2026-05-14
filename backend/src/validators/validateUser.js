@@ -1,6 +1,6 @@
 // src/validators/validateUser.js
 
-const VALID_GOALS = ["period", "track_symptoms", "ttc", "perimenopause", "pregnancy"];
+const VALID_GOALS = ["period", "track_symptoms", "no_period", "ttc", "perimenopause", "pregnancy"];
 const VALID_MODES = ["account", "guest"];
 const VALID_ROLES = ["user", "teen", "guardian", "admin"];
 const VALID_BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
@@ -155,6 +155,18 @@ export function validateUserProfile(body, existingProfile = null) {
 
   if (body.remindersEnabled !== undefined && typeof body.remindersEnabled !== "boolean") {
     return { valid: false, error: "remindersEnabled must be a boolean" };
+  }
+
+  if (body.onboardingCompleted !== undefined && typeof body.onboardingCompleted !== "boolean") {
+    return { valid: false, error: "onboardingCompleted must be a boolean" };
+  }
+
+  if (
+    body.onboardingCompletedAt !== undefined &&
+    body.onboardingCompletedAt !== null &&
+    typeof body.onboardingCompletedAt !== "string"
+  ) {
+    return { valid: false, error: "onboardingCompletedAt must be a string timestamp" };
   }
 
   // --- reminderTime: simple HH:MM format check ---

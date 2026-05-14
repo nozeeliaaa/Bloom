@@ -1,458 +1,1654 @@
 [
   {
-    "name": "St. Ann's Bay Regional Hospital",
-    "type": "hospital",
-    "parish": "St. Ann",
-    "region": "NERHA",
-    "address": "1 Seville Road, St. Ann's Bay, St. Ann",
-    "phones": ["876-972-0150", "876-972-0151", "876-972-0152", "876-972-2272", "876-972-2273"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "Surgery", "MentalHealth", "Pharmacy", "Radiology", "Laboratory", "Physiotherapy", "Orthopaedics"],
-    "hours": "24 hours (Administration: Mon-Thu 8:30am-5:00pm, Fri 8:30am-4:00pm)",
-    "source": { "provider": "NERHA", "url": "https://www.nerha.gov.jm/hospitals" },
-    "status": "active"
-  },
-  {
-    "name": "Annotto Bay Hospital",
-    "type": "hospital",
-    "parish": "St. Mary",
-    "region": "NERHA",
-    "address": "Annotto Bay, St. Mary",
-    "phones": ["876-613-8300", "876-996-2222", "876-996-2223", "876-996-9883"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "Surgery", "MentalHealth", "Pharmacy", "Radiology", "Laboratory"],
-    "hours": "24 hours (Administration: Mon-Thu 8:30am-5:00pm, Fri 8:30am-4:00pm)",
-    "source": { "provider": "NERHA", "url": "https://www.nerha.gov.jm/hospitals" },
-    "status": "active"
-  },
-  {
-    "name": "Port Maria Hospital",
-    "type": "hospital",
-    "parish": "St. Mary",
-    "region": "NERHA",
-    "address": "Port Maria, St. Mary",
-    "phones": ["876-613-8500", "876-994-9979"],
-    "services": ["Maternity", "Paediatrics", "Emergency", "GeneralMedicine", "Pharmacy", "Radiology", "Laboratory"],
-    "hours": "24 hours (Administration: Mon-Thu 8:30am-5:00pm, Fri 8:30am-4:00pm)",
-    "source": { "provider": "NERHA", "url": "https://www.nerha.gov.jm/hospitals" },
-    "status": "active"
-  },
-  {
-    "name": "Port Antonio Hospital",
-    "type": "hospital",
-    "parish": "Portland",
-    "region": "NERHA",
-    "address": "Naylors Hill, Port Antonio, Portland",
-    "phones": ["876-613-8400", "876-993-2646", "876-993-2647", "876-993-2648"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "Surgery", "Pharmacy", "Radiology", "Laboratory"],
-    "hours": "24 hours (Administration: Mon-Thu 8:30am-5:00pm, Fri 8:30am-4:00pm)",
-    "source": { "provider": "NERHA", "url": "https://www.nerha.gov.jm/hospitals" },
-    "status": "active"
-  },
-  {
-    "name": "Mandeville Regional Hospital",
-    "type": "hospital",
-    "parish": "Manchester",
-    "region": "SRHA",
-    "address": "Mandeville, Manchester",
-    "phones": ["876-962-8232"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "Surgery", "Pharmacy", "Radiology", "Laboratory"],
-    "hours": "24 hours",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
-  },
-  {
-    "name": "Spalding Health Centre",
-    "type": "health_center",
-    "parish": "Clarendon",
-    "region": "SRHA",
-    "address": "Spalding, Clarendon",
-    "phones": [],
-    "services": ["FamilyPlanning", "Maternity", "Paediatrics", "GeneralMedicine"],
+    "id": "frankfield_health_centre",
     "hours": "Mon-Fri 8:00am-4:00pm",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
-  },
-  {
-    "name": "Frankfield Health Centre",
-    "type": "health_center",
-    "parish": "Clarendon",
-    "region": "SRHA",
     "address": "Frankfield, Clarendon",
-    "phones": [],
-    "services": ["FamilyPlanning", "Maternity", "Paediatrics", "GeneralMedicine"],
-    "hours": "Mon-Fri 8:00am-4:00pm",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
-  },
-  {
-    "name": "May Pen Health Centre",
-    "type": "health_center",
     "parish": "Clarendon",
+    "name": "Frankfield Health Centre",
+    "phones": [],
+    "services": [
+      "FamilyPlanning",
+      "Maternity",
+      "Paediatrics",
+      "GeneralMedicine"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
     "region": "SRHA",
+    "type": "health_center",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.2,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Frankfield Health Centre, Frankfield, Jamaica",
+      "label": "Cross Keys Health Centre Road, MA, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405240,
+        "_nanoseconds": 810000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405240,
+      "_nanoseconds": 810000000
+    }
+  },
+  {
+    "id": "may_pen_health_centre",
+    "hours": "Mon-Fri 8:00am-4:00pm",
     "address": "Denbigh, May Pen, Clarendon",
+    "parish": "Clarendon",
+    "name": "May Pen Health Centre",
     "phones": [],
-    "services": ["FamilyPlanning", "Maternity", "Paediatrics", "GeneralMedicine"],
-    "hours": "Mon-Fri 8:00am-4:00pm",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
-  },
-  {
-    "name": "Mandeville Health Centre",
+    "services": [
+      "FamilyPlanning",
+      "Maternity",
+      "Paediatrics",
+      "GeneralMedicine"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
+    "region": "SRHA",
     "type": "health_center",
-    "parish": "Manchester",
-    "region": "SRHA",
-    "address": "Mandeville, Manchester",
-    "phones": [],
-    "services": ["FamilyPlanning", "Maternity", "Paediatrics", "GeneralMedicine"],
-    "hours": "Mon-Fri 8:00am-4:00pm",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -77.244637,
+    "geocoding": {
+      "score": 1,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "May Pen Health Centre, Denbigh, May Pen, Clarendon, Clarendon, Jamaica",
+      "label": "May Pen Medical Centre, CL, Jamaica",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405295,
+        "_nanoseconds": 424000000
+      }
+    },
+    "latitude": 17.970996,
+    "lat": 17.970996,
+    "longitude": -77.244637,
+    "updatedAt": {
+      "_seconds": 1778405295,
+      "_nanoseconds": 424000000
+    }
   },
   {
-    "name": "Black River Health Centre",
+    "id": "spalding_health_centre",
+    "hours": "Mon-Fri 8:00am-4:00pm",
+    "address": "Spalding, Clarendon",
+    "parish": "Clarendon",
+    "name": "Spalding Health Centre",
+    "phones": [],
+    "services": [
+      "FamilyPlanning",
+      "Maternity",
+      "Paediatrics",
+      "GeneralMedicine"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
+    "region": "SRHA",
     "type": "health_center",
-    "parish": "St. Elizabeth",
-    "region": "SRHA",
-    "address": "Black River, St. Elizabeth",
-    "phones": [],
-    "services": ["FamilyPlanning", "Maternity", "Paediatrics", "GeneralMedicine"],
-    "hours": "Mon-Fri 8:00am-4:00pm",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.2,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Spalding Health Centre, Spalding, Jamaica",
+      "label": "Cross Keys Health Centre Road, MA, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405367,
+        "_nanoseconds": 508000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405367,
+      "_nanoseconds": 508000000
+    }
   },
   {
-    "name": "Santa Cruz Health Centre",
-    "type": "health_center",
-    "parish": "St. Elizabeth",
-    "region": "SRHA",
-    "address": "Santa Cruz, St. Elizabeth",
-    "phones": [],
-    "services": ["FamilyPlanning", "Maternity", "Paediatrics", "GeneralMedicine"],
-    "hours": "Mon-Fri 8:00am-4:00pm",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
-  },
-  {
-    "name": "Christiana Health Centre",
-    "type": "health_center",
-    "parish": "Manchester",
-    "region": "SRHA",
-    "address": "Christiana, Manchester",
-    "phones": [],
-    "services": ["FamilyPlanning", "Maternity", "Paediatrics", "GeneralMedicine"],
-    "hours": "Mon-Fri 8:00am-4:00pm",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Sara Grace Lawrence",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "Maternity", "FamilyPlanning", "TeenFriendly"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Robyn Khemlani",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "HighRiskObstetrics", "FamilyPlanning"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Leslie Samuels",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "Maternity", "FamilyPlanning"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Michael Abrahams - Ruthven Medical Centre",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Ruthven Medical Centre, Kingston",
-    "phones": [],
-    "services": ["OBGYN", "FamilyPlanning", "Maternity"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Sharmaine Mitchell",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "Maternity", "FamilyPlanning"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. John Harriott",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "Maternity", "FamilyPlanning"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Kimberlee Lewis-Patten - Prime Medical",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Prime Medical, Kingston",
-    "phones": [],
-    "services": ["OBGYN", "Maternity", "FamilyPlanning"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Donette Simms-Stewart",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "GynecologicOncology", "Maternity", "FamilyPlanning"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Daryl Daley - 3D Gynaecology Ltd.",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "MinimallyInvasive", "CosmeticGynecology", "FamilyPlanning"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Ian Bambury",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "MinimallyInvasive", "Laparoscopy", "FamilyPlanning"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "Dr. Ryan Halsall",
-    "type": "private",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Kingston, Jamaica",
-    "phones": [],
-    "services": ["OBGYN", "MinimallyInvasive", "Laparoscopy", "Ultrasound"],
-    "hours": "By appointment",
-    "source": { "provider": "JARanks", "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston" },
-    "status": "active"
-  },
-  {
-    "name": "NERHA Toll Free Line",
-    "type": "hotline",
-    "parish": "St. Ann",
-    "region": "NERHA",
-    "address": "Ocean Village Shopping Centre, Ocho Rios, St. Ann",
-    "phones": ["1-888-429-5646"],
-    "services": ["HealthInformation", "Referral"],
-    "hours": "Business hours",
-    "source": { "provider": "NERHA", "url": "https://www.nerha.gov.jm/directory" },
-    "status": "active"
-  },
-  {
-    "name": "SRHA Regional Office",
-    "type": "hotline",
-    "parish": "Manchester",
-    "region": "SRHA",
-    "address": "3 Brumalia Road, Mandeville, Manchester",
-    "phones": ["876-962-8232"],
-    "services": ["HealthInformation", "Referral"],
-    "hours": "Business hours",
-    "source": { "provider": "SRHA", "url": "https://www.srha.gov.jm/healthhc.php" },
-    "status": "active"
-  },
-  {
-    "name": "Kingston Public Hospital",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "North Street, Kingston",
-    "phones": ["876-922-0210", "876-548-4902"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "Surgery", "MentalHealth", "Pharmacy", "Radiology", "Laboratory"],
+    "id": "andrews_memorial_hospital",
     "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.serha.gov.jm/hospitals/kph" },
-    "status": "active"
-  },
-  {
-    "name": "Victoria Jubilee Hospital",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "North Street, Kingston",
-    "phones": ["876-922-0210", "876-922-0211", "876-922-0212", "876-922-0213"],
-    "services": ["Maternity", "OBGYN", "Midwifery", "Paediatrics", "Emergency"],
-    "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.serha.gov.jm/victoria-jubilee-hospital" },
-    "status": "active"
-  },
-  {
-    "name": "University Hospital of the West Indies",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Mona, Kingston 7",
-    "phones": ["876-927-1620", "876-977-2607"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "Surgery", "MentalHealth", "Pharmacy", "Radiology", "Laboratory", "Oncology"],
-    "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.uhwi.gov.jm" },
-    "status": "active"
-  },
-  {
-    "name": "Bustamante Hospital for Children",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "Arthur Wint Drive, Kingston 5",
-    "phones": ["876-926-5721", "876-926-5722", "876-926-5723", "876-926-5725"],
-    "services": ["Paediatrics", "Emergency", "Surgery", "Pharmacy", "Radiology", "Laboratory"],
-    "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.serha.gov.jm" },
-    "status": "active"
-  },
-  {
-    "name": "Andrews Memorial Hospital",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
     "address": "27 Hope Road, Kingston 10",
-    "phones": ["876-926-7401", "876-926-7402", "876-929-3821"],
-    "services": ["OBGYN", "Maternity", "Surgery", "Emergency", "Pharmacy", "Radiology", "Laboratory"],
-    "hours": "24 hours",
-    "source": { "provider": "jamaicans.com", "url": "https://jamaicans.com/jamaica-hospitals/" },
-    "status": "active"
+    "parish": "Kingston",
+    "name": "Andrews Memorial Hospital",
+    "phones": [
+      "876-926-7401",
+      "876-926-7402",
+      "876-929-3821"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Surgery",
+      "Emergency",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "jamaicans.com",
+      "url": "https://jamaicans.com/jamaica-hospitals/"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.787547,
+    "geocoding": {
+      "score": 0.62,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Andrews Memorial Hospital, Jamaica",
+      "label": "Andrews Memorial Hospital, SD, Jamaica",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405091,
+        "_nanoseconds": 684000000
+      }
+    },
+    "latitude": 18.013465,
+    "lat": 18.013465,
+    "longitude": -76.787547,
+    "updatedAt": {
+      "_seconds": 1778405091,
+      "_nanoseconds": 684000000
+    }
   },
   {
-    "name": "Medical Associates Hospital",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "18 Tangerine Place, Kingston",
-    "phones": ["876-926-1400"],
-    "services": ["OBGYN", "Maternity", "Surgery", "Emergency", "Pharmacy", "Radiology", "Laboratory"],
+    "id": "bellevue_hospital",
     "hours": "24 hours",
-    "source": { "provider": "jamaicamedicine", "url": "https://jamaicamedicine.tumblr.com/Hospitals" },
-    "status": "active"
-  },
-  {
-    "name": "Nuttall Memorial Hospital",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "6 Caledonia Avenue, Kingston 5",
-    "phones": ["876-926-2139", "876-926-8770"],
-    "services": ["OBGYN", "Surgery", "Emergency", "Pharmacy", "Radiology", "Laboratory"],
-    "hours": "24 hours",
-    "source": { "provider": "jamaicamedicine", "url": "https://jamaicamedicine.tumblr.com/Hospitals" },
-    "status": "active"
-  },
-  {
-    "name": "St. Joseph's Hospital",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
-    "address": "22 Deanery Road, Kingston 3",
-    "phones": ["876-928-4955", "876-928-4956"],
-    "services": ["OBGYN", "Maternity", "Surgery", "Emergency", "Pharmacy", "Radiology", "Laboratory", "Oncology"],
-    "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.stjosephshospitaljm.org" },
-    "status": "active"
-  },
-  {
-    "name": "Bellevue Hospital",
-    "type": "hospital",
-    "parish": "Kingston",
-    "region": "SERHA",
     "address": "16½ Windward Road, Kingston 2",
-    "phones": ["876-926-1380", "876-926-1381"],
-    "services": ["MentalHealth", "Psychiatry", "Emergency"],
-    "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.serha.gov.jm" },
-    "status": "active"
-  },
-  {
-    "name": "Heart Institute of the Caribbean",
-    "type": "hospital",
     "parish": "Kingston",
+    "name": "Bellevue Hospital",
+    "phones": [
+      "876-926-1380",
+      "876-926-1381"
+    ],
+    "services": [
+      "MentalHealth",
+      "Psychiatry",
+      "Emergency"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.serha.gov.jm"
+    },
     "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.7704888,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.1570394422394589,
+      "query": "Bellevue Hospital, 16½ Windward Road, Jamaica",
+      "label": "Bellevue Hospital, 16, Windward Road, Manley Meadows, Rollington Town, Kingston, Surrey County, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405095,
+        "_nanoseconds": 571000000
+      }
+    },
+    "latitude": 17.9704641,
+    "lat": 17.9704641,
+    "longitude": -76.7704888,
+    "updatedAt": {
+      "_seconds": 1778405095,
+      "_nanoseconds": 571000000
+    }
+  },
+  {
+    "id": "bustamante_hospital_for_children",
+    "hours": "24 hours",
+    "address": "Arthur Wint Drive, Kingston 5",
+    "parish": "Kingston",
+    "name": "Bustamante Hospital for Children",
+    "phones": [
+      "876-926-5721",
+      "876-926-5722",
+      "876-926-5723",
+      "876-926-5725"
+    ],
+    "services": [
+      "Paediatrics",
+      "Emergency",
+      "Surgery",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.serha.gov.jm"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.779138,
+    "geocoding": {
+      "score": 0.62,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Bustamante Hospital for Children, Jamaica",
+      "label": "Bustamante Children Hospital, SD, Jamaica",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405116,
+        "_nanoseconds": 234000000
+      }
+    },
+    "latitude": 17.999713,
+    "lat": 17.999713,
+    "longitude": -76.779138,
+    "updatedAt": {
+      "_seconds": 1778405116,
+      "_nanoseconds": 234000000
+    }
+  },
+  {
+    "id": "dr_daryl_daley_3d_gynaecology_ltd",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "MinimallyInvasive",
+      "CosmeticGynecology",
+      "FamilyPlanning"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "name": "Dr. Daryl Daley - 3D Gynaecology Ltd.",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "Dr. Daryl Daley - 3D Gynaecology Ltd., Jamaica",
+      "label": "Jamaica Street, SD, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405135,
+        "_nanoseconds": 897000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405135,
+      "_nanoseconds": 897000000
+    }
+  },
+  {
+    "id": "dr_donette_simms_stewart",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "name": "Dr. Donette Simms-Stewart",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "GynecologicOncology",
+      "Maternity",
+      "FamilyPlanning"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "nominatim",
+      "confidence": 0.6542825655134804,
+      "query": "Kingston, Kingston, Jamaica",
+      "label": "Kingston, Surrey County, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "city",
+      "updatedAt": {
+        "_seconds": 1778405145,
+        "_nanoseconds": 0
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405145,
+      "_nanoseconds": 0
+    }
+  },
+  {
+    "id": "dr_ian_bambury",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "name": "Dr. Ian Bambury",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "MinimallyInvasive",
+      "Laparoscopy",
+      "FamilyPlanning"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Dr. Ian Bambury, Jamaica",
+      "label": "Ian Fleming International Airport, SM, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405154,
+        "_nanoseconds": 17000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405154,
+      "_nanoseconds": 17000000
+    }
+  },
+  {
+    "id": "dr_john_harriott",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "name": "Dr. John Harriott",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "FamilyPlanning"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "Dr. John Harriott, Jamaica",
+      "label": "Dr. J.O. Lasisi, SD, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405163,
+        "_nanoseconds": 191000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405163,
+      "_nanoseconds": 191000000
+    }
+  },
+  {
+    "id": "dr_kimberlee_lewis_patten_prime_medical",
+    "hours": "By appointment",
+    "address": "Prime Medical, Kingston",
+    "parish": "Kingston",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "FamilyPlanning"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "name": "Dr. Kimberlee Lewis-Patten - Prime Medical",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "Prime Medical, Kingston, Kingston, Jamaica",
+      "label": "Downtown Medical Centre, Kingston, SD, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405173,
+        "_nanoseconds": 998000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405173,
+      "_nanoseconds": 998000000
+    }
+  },
+  {
+    "id": "dr_leslie_samuels",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "name": "Dr. Leslie Samuels",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "FamilyPlanning"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "Dr. Leslie Samuels, Kingston, Jamaica, Kingston, Jamaica",
+      "label": "Leslie Drive, SC, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405183,
+        "_nanoseconds": 101000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405183,
+      "_nanoseconds": 101000000
+    }
+  },
+  {
+    "id": "dr_michael_abrahams_ruthven_medical_centre",
+    "hours": "By appointment",
+    "address": "Ruthven Medical Centre, Kingston",
+    "parish": "Kingston",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "FamilyPlanning",
+      "Maternity"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "name": "Dr. Michael Abrahams - Ruthven Medical Centre",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Dr. Michael Abrahams - Ruthven Medical Centre, Ruthven Medical Centre, Kingston, Kingston, Jamaica",
+      "label": "Thames Medical Centre Parking Lot, SE, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405193,
+        "_nanoseconds": 978000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405193,
+      "_nanoseconds": 978000000
+    }
+  },
+  {
+    "id": "dr_robyn_khemlani",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "name": "Dr. Robyn Khemlani",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "HighRiskObstetrics",
+      "FamilyPlanning"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Dr. Robyn Khemlani, Jamaica",
+      "label": "Khemlani Mart, SJ, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405202,
+        "_nanoseconds": 983000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405202,
+      "_nanoseconds": 983000000
+    }
+  },
+  {
+    "id": "dr_ryan_halsall",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "name": "Dr. Ryan Halsall",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "MinimallyInvasive",
+      "Laparoscopy",
+      "Ultrasound"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "Dr. Ryan Halsall, Kingston, Jamaica, Kingston, Jamaica",
+      "label": "Ryan Crescent, SC, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405211,
+        "_nanoseconds": 967000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405211,
+      "_nanoseconds": 967000000
+    }
+  },
+  {
+    "id": "dr_sara_grace_lawrence",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "name": "Dr. Sara Grace Lawrence",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "FamilyPlanning",
+      "TeenFriendly"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "Dr. Sara Grace Lawrence, Kingston, Jamaica, Kingston, Jamaica",
+      "label": "Grace Baptist Church, SE, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405221,
+        "_nanoseconds": 82000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405221,
+      "_nanoseconds": 82000000
+    }
+  },
+  {
+    "id": "dr_sharmaine_mitchell",
+    "hours": "By appointment",
+    "address": "Kingston, Jamaica",
+    "parish": "Kingston",
+    "name": "Dr. Sharmaine Mitchell",
+    "phones": [],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "FamilyPlanning"
+    ],
+    "source": {
+      "provider": "JARanks",
+      "url": "https://www.jaranks.com/lists/best-obgyns-in-kingston"
+    },
+    "region": "SERHA",
+    "type": "private",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "nominatim",
+      "confidence": 0.6542825655134804,
+      "query": "Kingston, Kingston, Jamaica",
+      "label": "Kingston, Surrey County, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "city",
+      "updatedAt": {
+        "_seconds": 1778405230,
+        "_nanoseconds": 69000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405230,
+      "_nanoseconds": 69000000
+    }
+  },
+  {
+    "id": "heart_institute_of_the_caribbean",
+    "hours": "24 hours",
     "address": "23 Balmoral Avenue, Kingston 10",
-    "phones": ["876-906-2105", "876-906-2106", "876-906-2107", "876-906-2108"],
-    "services": ["Cardiology", "Surgery", "Emergency", "Pharmacy", "Radiology", "Laboratory"],
-    "hours": "24 hours",
-    "source": { "provider": "jamaicans.com", "url": "https://jamaicans.com/jamaica-hospitals/" },
-    "status": "active"
+    "parish": "Kingston",
+    "name": "Heart Institute of the Caribbean",
+    "phones": [
+      "876-906-2105",
+      "876-906-2106",
+      "876-906-2107",
+      "876-906-2108"
+    ],
+    "services": [
+      "Cardiology",
+      "Surgery",
+      "Emergency",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "jamaicans.com",
+      "url": "https://jamaicans.com/jamaica-hospitals/"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.28,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Heart Institute of the Caribbean, 23 Balmoral Avenue, Kingston 10, Kingston, Jamaica",
+      "label": "20 Balmoral Avenue, SD, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "address",
+      "updatedAt": {
+        "_seconds": 1778405263,
+        "_nanoseconds": 462000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405263,
+      "_nanoseconds": 462000000
+    }
   },
   {
-    "name": "Spanish Town Hospital",
-    "type": "hospital",
-    "parish": "St. Catherine",
-    "region": "SERHA",
-    "address": "Burke Road, Spanish Town, St. Catherine",
-    "phones": ["876-984-3031", "876-984-3032", "876-984-3033"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "Surgery", "Pharmacy", "Radiology", "Laboratory"],
+    "id": "kingston_public_hospital",
     "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.serha.gov.jm" },
-    "status": "active"
+    "address": "North Street, Kingston",
+    "parish": "Kingston",
+    "name": "Kingston Public Hospital",
+    "phones": [
+      "876-922-0210",
+      "876-548-4902"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "Surgery",
+      "MentalHealth",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.serha.gov.jm/hospitals/kph"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.7954584,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.22489365626900393,
+      "query": "Kingston Public Hospital, Kingston, Jamaica",
+      "label": "Kingston Public Hospital, West Street, Denham Town, Kingston, Surrey County, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405267,
+        "_nanoseconds": 201000000
+      }
+    },
+    "latitude": 17.9758723,
+    "lat": 17.9758723,
+    "longitude": -76.7954584,
+    "updatedAt": {
+      "_seconds": 1778405267,
+      "_nanoseconds": 201000000
+    }
   },
   {
-    "name": "Linstead Hospital",
-    "type": "hospital",
-    "parish": "St. Catherine",
+    "id": "medical_associates_hospital",
+    "hours": "24 hours",
+    "address": "18 Tangerine Place, Kingston",
+    "parish": "Kingston",
+    "name": "Medical Associates Hospital",
+    "phones": [
+      "876-926-1400"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Surgery",
+      "Emergency",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "jamaicamedicine",
+      "url": "https://jamaicamedicine.tumblr.com/Hospitals"
+    },
     "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.7930475,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.00006977416647588338,
+      "query": "Medical Associates Hospital, 18 Tangerine Place, Kingston, Kingston, Jamaica",
+      "label": "Medical Associates Hospital, 18, Tangerine Place, Half Way Tree, Saint Andrew, Surrey County, Jamaica",
+      "layer": "clinic",
+      "updatedAt": {
+        "_seconds": 1778405296,
+        "_nanoseconds": 725000000
+      }
+    },
+    "latitude": 18.0065808,
+    "lat": 18.0065808,
+    "longitude": -76.7930475,
+    "updatedAt": {
+      "_seconds": 1778405296,
+      "_nanoseconds": 725000000
+    }
+  },
+  {
+    "id": "nuttall_memorial_hospital",
+    "hours": "24 hours",
+    "address": "6 Caledonia Avenue, Kingston 5",
+    "parish": "Kingston",
+    "name": "Nuttall Memorial Hospital",
+    "phones": [
+      "876-926-2139",
+      "876-926-8770"
+    ],
+    "services": [
+      "OBGYN",
+      "Surgery",
+      "Emergency",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "jamaicamedicine",
+      "url": "https://jamaicamedicine.tumblr.com/Hospitals"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.6,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Nuttall Memorial Hospital, 6 Caledonia Avenue, Kingston 5, Kingston, Jamaica",
+      "label": "6 Caledonia Avenue, SD, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "address",
+      "updatedAt": {
+        "_seconds": 1778405330,
+        "_nanoseconds": 315000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405330,
+      "_nanoseconds": 315000000
+    }
+  },
+  {
+    "id": "st_joseph_s_hospital",
+    "hours": "24 hours",
+    "address": "22 Deanery Road, Kingston 3",
+    "parish": "Kingston",
+    "name": "St. Joseph's Hospital",
+    "phones": [
+      "876-928-4955",
+      "876-928-4956"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Surgery",
+      "Emergency",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory",
+      "Oncology"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.stjosephshospitaljm.org"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.7720997,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.00006977416647588338,
+      "query": "St. Joseph's Hospital, 22 Deanery Road, Jamaica",
+      "label": "St. Joseph's Hospital Complex, 22, Deanery Road, Vineyard Town, Kingston, Surrey County, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405396,
+        "_nanoseconds": 90000000
+      }
+    },
+    "latitude": 17.9803852,
+    "lat": 17.9803852,
+    "longitude": -76.7720997,
+    "updatedAt": {
+      "_seconds": 1778405396,
+      "_nanoseconds": 90000000
+    }
+  },
+  {
+    "id": "university_hospital_of_the_west_indies",
+    "hours": "24 hours",
+    "address": "Mona, Kingston 7",
+    "parish": "Kingston",
+    "name": "University Hospital of the West Indies",
+    "phones": [
+      "876-927-1620",
+      "876-977-2607"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "Surgery",
+      "MentalHealth",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory",
+      "Oncology"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.uhwi.gov.jm"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.7444856,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.00006977416647588338,
+      "query": "University Hospital of the West Indies, Mona, Jamaica",
+      "label": "University Hospital Of The West Indies, Aqueduct Way, Mona, Saint Andrew, Surrey County, KGN7, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405398,
+        "_nanoseconds": 564000000
+      }
+    },
+    "latitude": 18.0110212,
+    "lat": 18.0110212,
+    "longitude": -76.7444856,
+    "updatedAt": {
+      "_seconds": 1778405398,
+      "_nanoseconds": 564000000
+    }
+  },
+  {
+    "id": "victoria_jubilee_hospital",
+    "hours": "24 hours",
+    "address": "North Street, Kingston",
+    "parish": "Kingston",
+    "name": "Victoria Jubilee Hospital",
+    "phones": [
+      "876-922-0210",
+      "876-922-0211",
+      "876-922-0212",
+      "876-922-0213"
+    ],
+    "services": [
+      "Maternity",
+      "OBGYN",
+      "Midwifery",
+      "Paediatrics",
+      "Emergency"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.serha.gov.jm/victoria-jubilee-hospital"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.6,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Victoria Jubilee Hospital, North Street, Jamaica",
+      "label": "North Street, CL, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405409,
+        "_nanoseconds": 138000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405409,
+      "_nanoseconds": 138000000
+    }
+  },
+  {
+    "id": "christiana_health_centre",
+    "hours": "Mon-Fri 8:00am-4:00pm",
+    "address": "Christiana, Manchester",
+    "parish": "Manchester",
+    "name": "Christiana Health Centre",
+    "phones": [],
+    "services": [
+      "FamilyPlanning",
+      "Maternity",
+      "Paediatrics",
+      "GeneralMedicine"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
+    "region": "SRHA",
+    "type": "health_center",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.2,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Christiana Health Centre, Christiana, Manchester, Manchester, Jamaica",
+      "label": "Cross Keys Health Centre Road, MA, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405126,
+        "_nanoseconds": 917000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405126,
+      "_nanoseconds": 917000000
+    }
+  },
+  {
+    "id": "mandeville_health_centre",
+    "hours": "Mon-Fri 8:00am-4:00pm",
+    "address": "Mandeville, Manchester",
+    "parish": "Manchester",
+    "name": "Mandeville Health Centre",
+    "phones": [],
+    "services": [
+      "FamilyPlanning",
+      "Maternity",
+      "Paediatrics",
+      "GeneralMedicine"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
+    "region": "SRHA",
+    "type": "health_center",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.2,
+      "provider": "openrouteservice",
+      "confidence": 1,
+      "query": "Mandeville Health Centre, Mandeville, Manchester, Manchester, Jamaica",
+      "label": "Cross Keys Health Centre Road, MA, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "street",
+      "updatedAt": {
+        "_seconds": 1778405279,
+        "_nanoseconds": 303000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405279,
+      "_nanoseconds": 303000000
+    }
+  },
+  {
+    "id": "mandeville_regional_hospital",
+    "hours": "24 hours",
+    "address": "Mandeville, Manchester",
+    "parish": "Manchester",
+    "name": "Mandeville Regional Hospital",
+    "phones": [
+      "876-962-8232"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "Surgery",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
+    "region": "SRHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -77.509557,
+    "geocoding": {
+      "score": 1,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "Mandeville Regional Hospital, Mandeville, Manchester, Manchester, Jamaica",
+      "label": "Mandeville Public Hospital, MA, Jamaica",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405287,
+        "_nanoseconds": 389000000
+      }
+    },
+    "latitude": 18.042329,
+    "lat": 18.042329,
+    "longitude": -77.509557,
+    "updatedAt": {
+      "_seconds": 1778405287,
+      "_nanoseconds": 389000000
+    }
+  },
+  {
+    "id": "srha_regional_office",
+    "hours": "Business hours",
+    "address": "3 Brumalia Road, Mandeville, Manchester",
+    "parish": "Manchester",
+    "name": "SRHA Regional Office",
+    "phones": [
+      "876-962-8232"
+    ],
+    "services": [
+      "HealthInformation",
+      "Referral"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
+    "region": "SRHA",
+    "type": "hotline",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.38533733340962845,
+      "provider": "nominatim",
+      "confidence": 0.05337333409628439,
+      "query": "3 Brumalia Road, Mandeville, Manchester, Manchester, Jamaica",
+      "label": "Brumalia Road, Mandeville, Manchester, Middlesex County, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "residential",
+      "updatedAt": {
+        "_seconds": 1778405387,
+        "_nanoseconds": 488000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405387,
+      "_nanoseconds": 488000000
+    }
+  },
+  {
+    "id": "port_antonio_hospital",
+    "hours": "24 hours (Administration: Mon-Thu 8:30am-5:00pm, Fri 8:30am-4:00pm)",
+    "address": "Naylors Hill, Port Antonio, Portland",
+    "parish": "Portland",
+    "name": "Port Antonio Hospital",
+    "phones": [
+      "876-613-8400",
+      "876-993-2646",
+      "876-993-2647",
+      "876-993-2648"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "Surgery",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "NERHA",
+      "url": "https://www.nerha.gov.jm/hospitals"
+    },
+    "region": "NERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.4561721,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.000048844892042374573,
+      "query": "Port Antonio Hospital, Portland, Jamaica",
+      "label": "Port Antonio Hospital, Rice Piece Road, Port Antonio, Portland, Surrey County, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405334,
+        "_nanoseconds": 46000000
+      }
+    },
+    "latitude": 18.1763841,
+    "lat": 18.1763841,
+    "longitude": -76.4561721,
+    "updatedAt": {
+      "_seconds": 1778405334,
+      "_nanoseconds": 46000000
+    }
+  },
+  {
+    "id": "nerha_toll_free_line",
+    "hours": "Business hours",
+    "address": "Ocean Village Shopping Centre, Ocho Rios, St. Ann",
+    "parish": "St. Ann",
+    "name": "NERHA Toll Free Line",
+    "phones": [
+      "1-888-429-5646"
+    ],
+    "services": [
+      "HealthInformation",
+      "Referral"
+    ],
+    "source": {
+      "provider": "NERHA",
+      "url": "https://www.nerha.gov.jm/directory"
+    },
+    "region": "NERHA",
+    "type": "hotline",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -77.1056,
+    "geocoding": {
+      "rejectionReason": "low-score",
+      "score": 1,
+      "provider": "manual-web-check",
+      "confidence": 0.95,
+      "query": "Ocean Village Shopping Centre, Ocho Rios",
+      "label": "Ocean Village Shopping Centre, Ocho Rios, Jamaica",
+      "layer": "manual:shopping-centre-address",
+      "updatedAt": {
+        "_seconds": 1778405870,
+        "_nanoseconds": 294000000
+      }
+    },
+    "latitude": 18.4073,
+    "lat": 18.4073,
+    "longitude": -77.1056,
+    "updatedAt": {
+      "_seconds": 1778405870,
+      "_nanoseconds": 294000000
+    }
+  },
+  {
+    "id": "st_ann_s_bay_regional_hospital",
+    "hours": "24 hours (Administration: Mon-Thu 8:30am-5:00pm, Fri 8:30am-4:00pm)",
+    "address": "1 Seville Road, St. Ann's Bay, St. Ann",
+    "parish": "St. Ann",
+    "name": "St. Ann's Bay Regional Hospital",
+    "phones": [
+      "876-972-0150",
+      "876-972-0151",
+      "876-972-0152",
+      "876-972-2272",
+      "876-972-2273"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "Surgery",
+      "MentalHealth",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory",
+      "Physiotherapy",
+      "Orthopaedics"
+    ],
+    "source": {
+      "provider": "NERHA",
+      "url": "https://www.nerha.gov.jm/hospitals"
+    },
+    "region": "NERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -77.2136902,
+    "geocoding": {
+      "score": 0.9853383118181125,
+      "provider": "nominatim",
+      "confidence": 0.05338311818112455,
+      "query": "1 Seville Road, St. Ann's Bay, St. Ann, St. Ann, Jamaica",
+      "label": "Seville Heritage Park Road, St Ann's Bay, Saint Ann, Middlesex County, Jamaica",
+      "layer": "residential",
+      "updatedAt": {
+        "_seconds": 1778405393,
+        "_nanoseconds": 625000000
+      }
+    },
+    "latitude": 18.4389378,
+    "lat": 18.4389378,
+    "longitude": -77.2136902,
+    "updatedAt": {
+      "_seconds": 1778405393,
+      "_nanoseconds": 625000000
+    }
+  },
+  {
+    "id": "linstead_hospital",
+    "hours": "24 hours",
     "address": "Rodney Hall Road, Linstead, St. Catherine",
-    "phones": ["876-538-8474", "876-538-5637"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "GeneralMedicine", "Pharmacy"],
-    "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.serha.gov.jm" },
-    "status": "active"
+    "parish": "St. Catherine",
+    "name": "Linstead Hospital",
+    "phones": [
+      "876-538-8474",
+      "876-538-5637"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "GeneralMedicine",
+      "Pharmacy"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.serha.gov.jm"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -77.0316493,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.000050987258716670745,
+      "query": "Linstead Hospital, Rodney Hall Road, Linstead, St. Catherine, St. Catherine, Jamaica",
+      "label": "Linstead Hospital, 7, Rodney Hall Road, Puss Gully, Linstead, Saint Catherine, Middlesex County, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405268,
+        "_nanoseconds": 496000000
+      }
+    },
+    "latitude": 18.1330342,
+    "lat": 18.1330342,
+    "longitude": -77.0316493,
+    "updatedAt": {
+      "_seconds": 1778405268,
+      "_nanoseconds": 496000000
+    }
   },
   {
-    "name": "Princess Margaret Hospital",
-    "type": "hospital",
-    "parish": "St. Thomas",
-    "region": "SERHA",
-    "address": "54 Lyssons Road, Morant Bay, St. Thomas",
-    "phones": ["876-982-2304", "876-982-2306"],
-    "services": ["OBGYN", "Maternity", "Paediatrics", "Emergency", "GeneralMedicine", "Pharmacy", "Radiology", "Laboratory"],
+    "id": "spanish_town_hospital",
     "hours": "24 hours",
-    "source": { "provider": "SERHA", "url": "https://www.serha.gov.jm" },
-    "status": "active"
+    "address": "Burke Road, Spanish Town, St. Catherine",
+    "parish": "St. Catherine",
+    "name": "Spanish Town Hospital",
+    "phones": [
+      "876-984-3031",
+      "876-984-3032",
+      "876-984-3033"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "Surgery",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.serha.gov.jm"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.9470843,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.1570394422394589,
+      "query": "Spanish Town Hospital, Burke Road, Spanish Town, St. Catherine, St. Catherine, Jamaica",
+      "label": "Spanish Town Hospital, Burke Road, De la Vega City, Spanish Town, Saint Catherine, Middlesex County, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405368,
+        "_nanoseconds": 913000000
+      }
+    },
+    "latitude": 17.9917665,
+    "lat": 17.9917665,
+    "longitude": -76.9470843,
+    "updatedAt": {
+      "_seconds": 1778405368,
+      "_nanoseconds": 913000000
+    }
+  },
+  {
+    "id": "black_river_health_centre",
+    "hours": "Mon-Fri 8:00am-4:00pm",
+    "address": "Black River, St. Elizabeth",
+    "parish": "St. Elizabeth",
+    "name": "Black River Health Centre",
+    "phones": [],
+    "services": [
+      "FamilyPlanning",
+      "Maternity",
+      "Paediatrics",
+      "GeneralMedicine"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
+    "region": "SRHA",
+    "type": "health_center",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "nominatim",
+      "confidence": 0.37838153675224867,
+      "query": "Black River, St. Elizabeth, St. Elizabeth, Jamaica",
+      "label": "Black River, Saint Elizabeth, Cornwall County, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "village",
+      "updatedAt": {
+        "_seconds": 1778405106,
+        "_nanoseconds": 441000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405106,
+      "_nanoseconds": 441000000
+    }
+  },
+  {
+    "id": "santa_cruz_health_centre",
+    "hours": "Mon-Fri 8:00am-4:00pm",
+    "address": "Santa Cruz, St. Elizabeth",
+    "parish": "St. Elizabeth",
+    "name": "Santa Cruz Health Centre",
+    "phones": [],
+    "services": [
+      "FamilyPlanning",
+      "Maternity",
+      "Paediatrics",
+      "GeneralMedicine"
+    ],
+    "source": {
+      "provider": "SRHA",
+      "url": "https://www.srha.gov.jm/healthhc.php"
+    },
+    "region": "SRHA",
+    "type": "health_center",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0,
+      "provider": "openrouteservice",
+      "confidence": 0.8,
+      "query": "Santa Cruz Health Centre, Santa Cruz, Jamaica",
+      "label": "Santa Cruz Transport Centre #2, SE, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "venue",
+      "updatedAt": {
+        "_seconds": 1778405356,
+        "_nanoseconds": 767000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405356,
+      "_nanoseconds": 767000000
+    }
+  },
+  {
+    "id": "annotto_bay_hospital",
+    "hours": "24 hours (Administration: Mon-Thu 8:30am-5:00pm, Fri 8:30am-4:00pm)",
+    "address": "Annotto Bay, St. Mary",
+    "parish": "St. Mary",
+    "name": "Annotto Bay Hospital",
+    "phones": [
+      "876-613-8300",
+      "876-996-2222",
+      "876-996-2223",
+      "876-996-9883"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "Surgery",
+      "MentalHealth",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "NERHA",
+      "url": "https://www.nerha.gov.jm/hospitals"
+    },
+    "region": "NERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.7618358,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.000040000762951049326,
+      "query": "Annotto Bay Hospital, Annotto Bay, St. Mary, St. Mary, Jamaica",
+      "label": "Annotto Bay Hospital, Hospital Road, Annotto Bay, Saint Mary, Middlesex County, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405093,
+        "_nanoseconds": 104000000
+      }
+    },
+    "latitude": 18.2729352,
+    "lat": 18.2729352,
+    "longitude": -76.7618358,
+    "updatedAt": {
+      "_seconds": 1778405093,
+      "_nanoseconds": 104000000
+    }
+  },
+  {
+    "id": "port_maria_hospital",
+    "hours": "24 hours (Administration: Mon-Thu 8:30am-5:00pm, Fri 8:30am-4:00pm)",
+    "address": "Port Maria, St. Mary",
+    "parish": "St. Mary",
+    "name": "Port Maria Hospital",
+    "phones": [
+      "876-613-8500",
+      "876-994-9979"
+    ],
+    "services": [
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "GeneralMedicine",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "NERHA",
+      "url": "https://www.nerha.gov.jm/hospitals"
+    },
+    "region": "NERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "geocoded",
+    "lng": -76.8951513,
+    "geocoding": {
+      "score": 1,
+      "provider": "nominatim",
+      "confidence": 0.000040000762951049326,
+      "query": "Port Maria Hospital, Port Maria, St. Mary, St. Mary, Jamaica",
+      "label": "Port Maria Hospital, Hospital Road, Port Maria, Saint Mary, Middlesex County, Jamaica",
+      "layer": "hospital",
+      "updatedAt": {
+        "_seconds": 1778405335,
+        "_nanoseconds": 338000000
+      }
+    },
+    "latitude": 18.3584915,
+    "lat": 18.3584915,
+    "longitude": -76.8951513,
+    "updatedAt": {
+      "_seconds": 1778405335,
+      "_nanoseconds": 338000000
+    }
+  },
+  {
+    "id": "princess_margaret_hospital",
+    "hours": "24 hours",
+    "address": "54 Lyssons Road, Morant Bay, St. Thomas",
+    "parish": "St. Thomas",
+    "name": "Princess Margaret Hospital",
+    "phones": [
+      "876-982-2304",
+      "876-982-2306"
+    ],
+    "services": [
+      "OBGYN",
+      "Maternity",
+      "Paediatrics",
+      "Emergency",
+      "GeneralMedicine",
+      "Pharmacy",
+      "Radiology",
+      "Laboratory"
+    ],
+    "source": {
+      "provider": "SERHA",
+      "url": "https://www.serha.gov.jm"
+    },
+    "region": "SERHA",
+    "type": "hospital",
+    "status": "active",
+    "coordinateStatus": "needs_review",
+    "geocoding": {
+      "score": 0.38533733340962845,
+      "provider": "nominatim",
+      "confidence": 0.05337333409628439,
+      "query": "54 Lyssons Road, St. Thomas, Jamaica",
+      "label": "Lyssons Road, Top Retreat, Oxford, Port Morant, Leith Hall, Saint Thomas, Surrey County, Jamaica",
+      "rejectionReason": "low-score",
+      "layer": "primary",
+      "updatedAt": {
+        "_seconds": 1778405345,
+        "_nanoseconds": 949000000
+      }
+    },
+    "updatedAt": {
+      "_seconds": 1778405345,
+      "_nanoseconds": 949000000
+    }
   }
 ]

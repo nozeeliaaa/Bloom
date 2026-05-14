@@ -349,7 +349,7 @@ export function createPregnancyNodes(env, helpers) {
         "You can keep details brief and ask for confidential care.",
       ],
       choices: [
-        { id: "map",  label: "Find emergency care now", next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find emergency care now", next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "menu", label: pickMainLabel(),            next: "START_MENU" },
       ],
     },

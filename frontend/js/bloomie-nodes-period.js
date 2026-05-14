@@ -28,7 +28,29 @@ export function createPeriodNodes(env, helpers) {
     SYMPTOM_TO_CATALOG_KEYS, CATALOG_LABELS,
     CONCERN_PRIORITY,
   } = env;
-  const { pickCloseLabel, pickMainLabel, CLOSE_TEXT, INTRO } = helpers;
+  const {
+    pickCloseLabel,
+    pickMainLabel,
+    CLOSE_TEXT,
+    INTRO,
+    syncBleedingConversationState,
+    markBleedingQuestionAsked,
+    setBleedingConversationAnswer,
+    getBleedingConversationState,
+    syncHeavyFlagsFromConversationState,
+    getNextBleedingFollowUp,
+  } = helpers;
+
+  function getHeavyFollowUpNode(fallback = null, options = {}) {
+    syncBleedingConversationState();
+    syncHeavyFlagsFromConversationState();
+    const next = getNextBleedingFollowUp(options);
+    if (next === "clots_size") return "HEAVY_CORE_CLOTS";
+    if (next === "heavy_flow_check") return "HEAVY_INTRO";
+    if (next === "symptom_check") return "HEAVY_CORE_SYMPTOMS";
+    if (next === "pregnancy_check") return "HEAVY_SHARED_CORE";
+    return fallback;
+  }
 
   return {
     /* ---------------- HEAVY OR UNUSUAL BLEEDING ---------------- */
@@ -39,11 +61,13 @@ export function createPeriodNodes(env, helpers) {
         ctx.heavyFlags = {};
         return null;
       },
-      say: [
-        "I hear you 🩷",
-        "Heavy flow can happen, but soaking every hour is a key signal we should check quickly; keep sipping fluids while we sort this.",
-        "During your heaviest moments, are you soaking through a pad or tampon every hour for two or more hours in a row?",
-      ],
+      say() {
+        return [
+          "I hear you 🩷",
+          "Heavy flow can happen, but soaking every hour is a key signal we should check quickly; keep sipping fluids while we sort this.",
+          "During your heaviest moments, are you soaking through a pad or tampon every hour for two or more hours in a row?",
+        ];
+      },
       choices: [
         { id: "yes", label: "Yes", next: "HEAVY_A_SOAK_YES", primary: true },
         { id: "no",  label: "No",  next: "HEAVY_A_RATE" },
@@ -52,6 +76,7 @@ export function createPeriodNodes(env, helpers) {
     HEAVY_A_SOAK_YES: {
       autoNext(ctx) {
         (ctx.heavyFlags = ctx.heavyFlags || {}).rapidSoaking = true;
+        setBleedingConversationAnswer("heavyFlow", true);
         return "HEAVY_SHARED_CORE";
       },
     },
@@ -74,6 +99,8 @@ export function createPeriodNodes(env, helpers) {
     HEAVY_ROUTE_B: {
       autoNext(ctx) {
         ctx.heavyFlags = {};
+        setBleedingConversationAnswer("heavyFlow", true);
+        syncBleedingConversationState();
         return null;
       },
       say: [
@@ -130,6 +157,8 @@ export function createPeriodNodes(env, helpers) {
     HEAVY_ROUTE_C: {
       autoNext(ctx) {
         ctx.heavyFlags = {};
+        setBleedingConversationAnswer("heavyFlow", true);
+        syncBleedingConversationState();
         return null;
       },
       say: [
@@ -146,6 +175,7 @@ export function createPeriodNodes(env, helpers) {
     HEAVY_C_SYM_YES: {
       autoNext(ctx) {
         (ctx.heavyFlags = ctx.heavyFlags || {}).symptomatic = true;
+        setBleedingConversationAnswer("symptomatic", true);
         return "HEAVY_SHARED_CORE";
       },
     },
@@ -163,6 +193,7 @@ export function createPeriodNodes(env, helpers) {
     HEAVY_C_SOAK_YES: {
       autoNext(ctx) {
         (ctx.heavyFlags = ctx.heavyFlags || {}).rapidSoaking = true;
+        setBleedingConversationAnswer("heavyFlow", true);
         return "HEAVY_SHARED_CORE";
       },
     },
@@ -170,34 +201,78 @@ export function createPeriodNodes(env, helpers) {
     // ── Shared decision core ──────────────────────────────────────────────────
     // Step 1: pregnancy checkpoint
     HEAVY_SHARED_CORE: {
-      say: [
-        "One important thing to check 🩷",
-        "Is there any chance you could be pregnant, or have you recently been pregnant, had a miscarriage, or given birth?",
-      ],
+      autoNext() {
+        syncBleedingConversationState();
+        syncHeavyFlagsFromConversationState();
+        const state = getBleedingConversationState();
+        if (state.symptoms.possiblePregnancy !== undefined || state.asked.pregnancyCheck) {
+          return getHeavyFollowUpNode("HEAVY_DECIDE", { skip: ["pregnancy_check", "heavy_flow_check"] });
+        }
+        return null;
+      },
+      say() {
+        return [
+          "One important thing to check 🩷",
+          "Is there any chance you could be pregnant, or have you recently been pregnant, had a miscarriage, or given birth?",
+        ];
+      },
       choices: [
         { id: "yes", label: "Yes, or I'm not sure", next: "HEAVY_PREG_YES", primary: true },
-        { id: "no",  label: "No",                   next: "HEAVY_CORE_CLOTS" },
+        { id: "no",  label: "No",                   next: "HEAVY_PREG_NO" },
       ],
     },
     HEAVY_PREG_YES: {
       autoNext(ctx) {
         (ctx.heavyFlags = ctx.heavyFlags || {}).possiblePregnancy = true;
+        setBleedingConversationAnswer("possiblePregnancy", true);
+        return "HEAVY_CORE_CLOTS";
+      },
+    },
+    HEAVY_PREG_NO: {
+      autoNext() {
+        setBleedingConversationAnswer("possiblePregnancy", false);
         return "HEAVY_CORE_CLOTS";
       },
     },
 
     // Step 2: clot size check
     HEAVY_CORE_CLOTS: {
-      say: ["Are you passing clots larger than a 50-cent coin or a quarter?"],
+      autoNext() {
+        syncBleedingConversationState();
+        syncHeavyFlagsFromConversationState();
+        const state = getBleedingConversationState();
+        if (state.symptoms.clots === false) return getHeavyFollowUpNode("HEAVY_DECIDE", { skip: ["clots_size", "heavy_flow_check"] });
+        if (state.symptoms.clotsLarge !== undefined || state.asked.clotsSize) {
+          return getHeavyFollowUpNode("HEAVY_DECIDE", { skip: ["clots_size", "heavy_flow_check"] });
+        }
+        return null;
+      },
+      say() {
+        const state = getBleedingConversationState();
+        return [
+          state.symptoms.clots === true
+            ? "You mentioned clots, so one quick check will help me guide you better 🩷 Are they larger than a 50-cent coin or a quarter?"
+            : "Are you passing clots larger than a 50-cent coin or a quarter?",
+        ];
+      },
       choices: [
         { id: "yes", label: "Yes",      next: "HEAVY_CLOTS_YES",     primary: true },
-        { id: "no",  label: "No",       next: "HEAVY_CORE_SYMP_GATE" },
+        { id: "no",  label: "No",       next: "HEAVY_CLOTS_NO" },
         { id: "ns",  label: "Not sure", next: "HEAVY_CORE_SYMP_GATE" },
       ],
     },
     HEAVY_CLOTS_YES: {
       autoNext(ctx) {
         (ctx.heavyFlags = ctx.heavyFlags || {}).largeClots = true;
+        setBleedingConversationAnswer("clots", true);
+        setBleedingConversationAnswer("clotsLarge", true);
+        return "HEAVY_CORE_SYMP_GATE";
+      },
+    },
+    HEAVY_CLOTS_NO: {
+      autoNext() {
+        setBleedingConversationAnswer("clots", false);
+        setBleedingConversationAnswer("clotsLarge", false);
         return "HEAVY_CORE_SYMP_GATE";
       },
     },
@@ -205,7 +280,12 @@ export function createPeriodNodes(env, helpers) {
     // Step 3: symptom check skipped if Route C already captured symptoms
     HEAVY_CORE_SYMP_GATE: {
       autoNext(ctx) {
-        return (ctx.heavyFlags || {}).symptomatic ? "HEAVY_DECIDE" : "HEAVY_CORE_SYMP_ENT_CHECK";
+        syncBleedingConversationState();
+        syncHeavyFlagsFromConversationState();
+        const state = getBleedingConversationState();
+        if ((ctx.heavyFlags || {}).symptomatic || state.symptoms.symptomatic === true) return "HEAVY_DECIDE";
+        if (state.symptoms.symptomatic === false || state.asked.symptomCheck) return "HEAVY_DECIDE";
+        return "HEAVY_CORE_SYMP_ENT_CHECK";
       },
     },
     // Gate: skip dizziness question if already mentioned in this session
@@ -225,15 +305,33 @@ export function createPeriodNodes(env, helpers) {
       choices: [],
     },
     HEAVY_CORE_SYMPTOMS: {
-      say: ["Are you feeling dizzy, faint, short of breath, or very weak?"],
+      autoNext() {
+        syncBleedingConversationState();
+        syncHeavyFlagsFromConversationState();
+        const state = getBleedingConversationState();
+        if (state.symptoms.symptomatic !== undefined || state.asked.symptomCheck) {
+          return getHeavyFollowUpNode("HEAVY_DECIDE", { skip: ["symptom_check", "heavy_flow_check"] });
+        }
+        return null;
+      },
+      say() {
+        return ["Are you feeling dizzy, faint, short of breath, or very weak?"];
+      },
       choices: [
         { id: "yes", label: "Yes", next: "HEAVY_SYMP_YES", primary: true },
-        { id: "no",  label: "No",  next: "HEAVY_DECIDE" },
+        { id: "no",  label: "No",  next: "HEAVY_SYMP_NO" },
       ],
     },
     HEAVY_SYMP_YES: {
       autoNext(ctx) {
         (ctx.heavyFlags = ctx.heavyFlags || {}).symptomatic = true;
+        setBleedingConversationAnswer("symptomatic", true);
+        return "HEAVY_DECIDE";
+      },
+    },
+    HEAVY_SYMP_NO: {
+      autoNext() {
+        setBleedingConversationAnswer("symptomatic", false);
         return "HEAVY_DECIDE";
       },
     },
@@ -333,8 +431,63 @@ export function createPeriodNodes(env, helpers) {
     },
 
     /* ---------------- LATE OR MISSED PERIOD ---------------- */
+    LATE_PHASE_MISMATCH: {
+      say() {
+        const phase = getCurrentPhase();
+        const isFollicular = phase?.phase === "follicular";
+        if (isFollicular) {
+          return [
+            "Looking at your cycle log, it seems your period came and ended recently 🩷",
+            "Just want to make sure I help with the right thing - what's going on?",
+          ];
+        }
+        // menstrual phase
+        return [
+          "Looking at your cycle log, it shows your period may have already started 🩷",
+          "I want to make sure I help with the right thing - what's going on?",
+        ];
+      },
+      choices() {
+        const phase = getCurrentPhase();
+        const isFollicular = phase?.phase === "follicular";
+        if (isFollicular) {
+          return [
+            { id: "late_prev",  label: "That cycle came later than usual",          next: "LATE_NO_GUIDANCE", primary: true },
+            { id: "diff",       label: "That period felt different / off",           next: "PERIOD_TRIAGE" },
+            { id: "not_here",   label: "Actually my next period hasn't come yet",    next: "LATE_INTRO_BYPASS" },
+            { id: "else",       label: "Something else",                             next: "ELSE_INTRO" },
+          ];
+        }
+        // menstrual phase — period is active right now
+        return [
+          { id: "diff",       label: "This period feels different or off",           next: "PERIOD_TRIAGE", primary: true },
+          { id: "just_late",  label: "It came late but it's here now",              next: "LATE_NO_GUIDANCE" },
+          { id: "not_here",   label: "My period hasn't actually started",            next: "LATE_INTRO_BYPASS" },
+          { id: "log_wrong",  label: "My log might have the wrong date",            next: "LATE_INTRO_BYPASS" },
+        ];
+      },
+    },
+
+    // Re-entry to LATE_INTRO that skips the phase-mismatch check
+    LATE_INTRO_BYPASS: {
+      say: ["Got it 🩷 Let's look at your cycle timing."],
+      autoNext() {
+        ctx._skipPhaseMismatch = true;
+        return "LATE_INTRO";
+      },
+    },
+
     LATE_INTRO: {
       autoNext(ctx) {
+        // Phase-mismatch guard: if cycle data shows period is active or recently ended,
+        // surface a clarifying question rather than generic "late period" guidance.
+        if (!ctx._skipPhaseMismatch) {
+          const phase = getCurrentPhase();
+          if (phase?.phase === "menstrual") return "LATE_PHASE_MISMATCH";
+          if (phase?.phase === "follicular" && (phase.days ?? 0) <= 4) return "LATE_PHASE_MISMATCH";
+        }
+        ctx._skipPhaseMismatch = false;
+
         // MEMORY AUDIT FIX: was re-asking "more than 7 days late?" - now checks
         // ctx.entityHistory for duration already extracted from the user's message.
         const lastEnt = ctx.entityHistory?.at?.(-1) ?? ctx.entityHistory?.[ctx.entityHistory.length - 1];
@@ -585,7 +738,7 @@ export function createPeriodNodes(env, helpers) {
         "Would you like help finding nearby clinics, gynecologists, or family planning services?",
       ],
       choices: [
-        { id: "map",  label: "Find care near me",          next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map",  label: "Find care near me",          next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "log",  label: "Log this in my dashboard",   next: "START_MENU",
           action: "LOG_SYMPTOM", logData: { type: "pregnancy_positive", note: "Positive test confirmed in chat" } },
         { id: "menu", label: pickMainLabel(),               next: "START_MENU" },
@@ -795,7 +948,7 @@ export function createPeriodNodes(env, helpers) {
         "If symptoms worsen, fever starts, bleeding gets heavier, or you feel weak/faint, treat that as urgent.",
       ],
       choices: [
-        { id: "map", label: "Find care near me",    next: "START", action: "OPEN_MAP", primary: true },
+        { id: "map", label: "Find care near me",    next: "START_MENU", action: "OPEN_MAP", primary: true },
         { id: "log", label: "Log spotting symptom", next: "START_MENU",
           action: "LOG_SYMPTOM", logData: { type: "spotting", note: "Logged from Bloomie chat" } },
         { id: "sum", label: "Help me summarize",    next: "SPOT_SUMMARY_DONE", action: "REQUEST_PDF" },

@@ -64,12 +64,24 @@ export function createCoreNodes(env, helpers) {
         { id: "pain",     label: "Pain or cramps",                    next: "PELVIC_INTRO" },
         { id: "mood",     label: "Mood, energy or sleep",             next: "MOOD_INTRO" },
         { id: "dis",      label: "Discharge or odour",                next: "ELSE_DISCHARGE" },
-        { id: "preg",     label: "Pregnancy concern",                 next: "PREGNANCY_ENTRY" },
+        ...(!ctx.isMinor ? [{ id: "preg",   label: "Pregnancy concern",                  next: "PREGNANCY_ENTRY" }] : []),
         { id: "hormones", label: "Hormones and skin",                 next: "HORMONES_SKIN_TRIAGE" },
-        { id: "contra",   label: "Contraception or sexual health",    next: "EDUC_CONTRACEPTION" },
+        ...(!ctx.isMinor ? [{ id: "contra", label: "Contraception or sexual health",     next: "EDUC_CONTRACEPTION" }] : []),
         { id: "else",     label: "Something else",                    next: "ELSE_INTRO" },
       ],
     },
+    MINOR_PREGNANCY_GATE: {
+      say: [
+        "I hear you 🩷 Pregnancy-related questions are something a doctor, school nurse, or trusted adult can help you with properly.",
+        "If you're worried about something urgent, please speak with a healthcare provider or a trusted adult as soon as possible - they can give you confidential support.",
+        "Your school nurse or a local clinic are great starting points if you need to talk to someone privately.",
+      ],
+      choices: [
+        { id: "map",  label: "Find a clinic near me", next: "START_MENU", action: "OPEN_MAP", primary: true },
+        { id: "menu", label: "Back to main menu",     next: "START_MENU" },
+      ],
+    },
+
     POLICY_MINOR_CONSENT_REQUIRED: {
       say: [
         "I want to support you safely 🩷",
@@ -118,7 +130,7 @@ export function createCoreNodes(env, helpers) {
               { id: "period", label: "Period hasn't returned yet",     next: "LATE_INTRO" },
               { id: "pain",   label: "Pain or cramps",                 next: "PELVIC_INTRO" },
               { id: "dis",    label: "Discharge or odour",             next: "ELSE_DISCHARGE" },
-              { id: "contra", label: "Contraception",                  next: "EDUC_CONTRACEPTION" },
+              ...(!ctx.isMinor ? [{ id: "contra", label: "Contraception", next: "EDUC_CONTRACEPTION" }] : []),
               { id: "else",   label: "Something else",                 next: "ELSE_INTRO" },
             ];
           }
@@ -128,9 +140,9 @@ export function createCoreNodes(env, helpers) {
             { id: "pain",     label: "Pain or cramps",                   next: "PELVIC_INTRO" },
             { id: "mood",     label: "Mood, energy or sleep",            next: "MOOD_INTRO" },
             { id: "dis",      label: "Discharge or odour",               next: "ELSE_DISCHARGE" },
-            { id: "preg",     label: "Pregnancy concern",                next: "PREGNANCY_ENTRY" },
+            ...(!ctx.isMinor ? [{ id: "preg",   label: "Pregnancy concern",                  next: "PREGNANCY_ENTRY" }] : []),
             { id: "hormones", label: "Hormones and skin",                next: "HORMONES_SKIN_TRIAGE" },
-            { id: "contra",   label: "Contraception or sexual health",   next: "EDUC_CONTRACEPTION" },
+            ...(!ctx.isMinor ? [{ id: "contra", label: "Contraception or sexual health",     next: "EDUC_CONTRACEPTION" }] : []),
             { id: "else",     label: "Something else",                   next: "ELSE_INTRO" },
           ];
         })();
@@ -245,7 +257,7 @@ export function createCoreNodes(env, helpers) {
         { id: "heavy",  label: "Bleeding or flow",        next: "HEAVY_INTRO"      },
         { id: "pain",   label: "Pain or cramps",          next: "PELVIC_INTRO"     },
         { id: "mood",   label: "Mood or energy",          next: "MOOD_INTRO"       },
-        { id: "preg",   label: "Pregnancy concern",       next: "PREGNANCY_ENTRY"  },
+        ...(!ctx.isMinor ? [{ id: "preg", label: "Pregnancy concern", next: "PREGNANCY_ENTRY" }] : []),
         { id: "dis",    label: "Discharge",               next: "ELSE_DISCHARGE"   },
         { id: "else",   label: "Something else",          next: "ELSE_INTRO"       },
       ],
@@ -343,9 +355,8 @@ export function createCoreNodes(env, helpers) {
         { id: "pain",      label: "Pain",               next: "PELVIC_INTRO", primary: true, onSelect() { ctx.topic = "pelvic_pain"; } },
         { id: "bleeding",  label: "Bleeding",           next: "HEAVY_INTRO", onSelect() { ctx.topic = "heavy_bleeding"; } },
         { id: "discharge", label: "Discharge",          next: "ELSE_DISCHARGE_ENTRY", onSelect() { ctx.topic = "discharge"; } },
-        { id: "missed",    label: "Missed period",      next: "LATE_INTRO", onSelect() { ctx.topic = "late_period"; } },
         { id: "mood",      label: "Mood",               next: "MOOD_SAFETY_CHECK", onSelect() { ctx.topic = "mood_changes"; } },
-        { id: "preg",      label: "Pregnancy concern",  next: "PREGNANCY_ENTRY", onSelect() { ctx.topic = "pregnancy"; } },
+        ...(!ctx.isMinor ? [{ id: "preg", label: "Pregnancy concern", next: "PREGNANCY_ENTRY", onSelect() { ctx.topic = "pregnancy"; } }] : []),
         { id: "other",     label: "Other",              next: "ELSE_NOT_SURE_ROUTE" },
       ],
     },
@@ -381,12 +392,14 @@ export function createCoreNodes(env, helpers) {
         "I can't diagnose from chat, but we can reduce uncertainty step by step: check timing, consider a test window, and watch for any urgent symptoms.",
         "If severe one-sided pain, very heavy bleeding, dizziness, or fainting shows up, seek urgent care right away.",
       ],
-      choices: [
-        { id: "test", label: "Help me with test timing", next: "TEST_INTRO", primary: true },
-        { id: "late", label: "My period is late", next: "LATE_INTRO" },
-        { id: "preg", label: "Pregnancy concern options", next: "PREGNANCY_ENTRY" },
-        { id: "menu", label: pickMainLabel(), next: "START_MENU" },
-      ],
+      choices() {
+        return [
+          ...(!ctx.isMinor ? [{ id: "test", label: "Help me with test timing", next: "TEST_INTRO", primary: true }] : []),
+          { id: "late", label: "My period is late", next: "LATE_INTRO", primary: ctx.isMinor },
+          ...(!ctx.isMinor ? [{ id: "preg", label: "Pregnancy concern options", next: "PREGNANCY_ENTRY" }] : []),
+          { id: "menu", label: pickMainLabel(), next: "START_MENU" },
+        ];
+      },
     },
 
     /* ─────────────── SAFETY & CRITICAL REDIRECT NODES ─────────────── */
@@ -727,13 +740,15 @@ export function createCoreNodes(env, helpers) {
     // Crisis support  mental health / suicidal ideation / self-harm
     CRISIS_SUPPORT: {
       say: [
-        "What you're feeling right now matters 🩷 I'm not able to give you the support you deserve but real, caring help is available.",
-        "Jamaica Crisis Hotline: 888-NEW-LIFE (888-639-5433), confidential, 24/7.",
-        "You can also go to your nearest hospital emergency department and tell them how you're feeling.",
-        "You're not alone in this, and reaching out even here took strength.",
+        "I hear you, and what you're feeling right now really matters 🩷",
+        "Bloomie isn't equipped to give you the level of care you deserve for this, but real, confidential help is available right now.",
+        "**Jamaica Crisis Hotline: 888-NEW-LIFE (888-639-5433)** — free, confidential, 24/7.",
+        "You can also walk into any hospital emergency department and tell them how you're feeling — they will help you.",
+        "You don't have to carry this alone. Reaching out, even here, took real strength 🩷",
       ],
       choices: [
-        { id: "ok",   label: "I'll reach out", next: "CLOSE", primary: true },
+        { id: "map",  label: "Find a clinic near me",       next: "CLOSE", action: "OPEN_MAP", primary: true },
+        { id: "ok",   label: "Thank you, I'll reach out",   next: "CLOSE" },
         { id: "more", label: "I also have a health question", next: "START_MENU" },
       ],
     },
@@ -948,7 +963,7 @@ export function createCoreNodes(env, helpers) {
         { id: "period",   label: "My period",              next: "PERIOD_TRIAGE",    primary: true },
         { id: "pain",     label: "Pain or cramps",          next: "PELVIC_INTRO" },
         { id: "mood",     label: "Mood or energy",          next: "MOOD_INTRO" },
-        { id: "preg",     label: "Pregnancy or TTC",        next: "PREGNANCY_ENTRY" },
+        ...(!ctx.isMinor ? [{ id: "preg", label: "Pregnancy or TTC", next: "PREGNANCY_ENTRY" }] : []),
         { id: "app_help", label: "Help using the app",      next: "APP_HELP" },
         { id: "else",     label: "Something else",          next: "ELSE_INTRO" },
       ],
@@ -963,7 +978,7 @@ export function createCoreNodes(env, helpers) {
         { id: "log_period",   label: "Log my period",              next: "APP_LOG_PERIOD",  primary: true },
         { id: "log_symptom",  label: "Log a symptom",              next: "APP_LOG_SYMPTOM" },
         { id: "log_cycle",    label: "Set my cycle length",        next: "APP_LOG_CYCLE" },
-        { id: "switch_mode",  label: "Switch to pregnancy / TTC",  next: "APP_SWITCH_MODE" },
+        ...(!ctx.isMinor ? [{ id: "switch_mode", label: "Switch to pregnancy / TTC", next: "APP_SWITCH_MODE" }] : []),
         { id: "menu",         label: "Back to health questions",   next: "START_MENU" },
       ],
     },

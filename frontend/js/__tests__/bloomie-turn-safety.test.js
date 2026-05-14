@@ -97,6 +97,18 @@ function sendMessage(text) {
   vi.advanceTimersByTime(10_000);
 }
 
+function clickButton(choiceId, { advance = true } = {}) {
+  const btn = document.querySelector(`button[data-choice="${choiceId}"]`);
+  if (!btn) {
+    const available = [...document.querySelectorAll("button[data-choice]")]
+      .map(b => b.dataset.choice)
+      .join(", ");
+    throw new Error(`Button "${choiceId}" not found. Available: ${available}`);
+  }
+  btn.click();
+  if (advance) vi.advanceTimersByTime(10_000);
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   toneDeferreds.length = 0;
@@ -230,5 +242,34 @@ describe("clarifier de-duplication", () => {
     expect(prompts.length).toBeGreaterThanOrEqual(2);
     const lastTwo = prompts.slice(-2);
     expect(lastTwo[0]).not.toBe(lastTwo[1]);
+  });
+});
+
+describe("typed and suggested-route handoff", () => {
+  it("queues a typed message submitted while a clicked route is still responding", () => {
+    clickButton("mood", { advance: false });
+    expect(chat.getState().lastUserTurnMode).toBe("choice");
+
+    const $input = document.getElementById("chat-input");
+    const $form  = document.getElementById("chat-form");
+    $input.value = "i have yellow discharge";
+    $form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+
+    expect(chat.getState().history.some((m) => m.from === "user" && m.text === "i have yellow discharge")).toBe(false);
+
+    vi.advanceTimersByTime(10_000);
+    expect(chat.getState().history.some((m) => m.from === "user" && m.text === "i have yellow discharge")).toBe(true);
+    expect(chat.getState().lastUserTurnMode).toBe("typed");
+  });
+
+  it("lets a typed new topic take over after the user clicked a yes/no suggestion", () => {
+    clickButton("mood");
+    clickButton("no");
+
+    sendMessage("actually i have yellow discharge");
+
+    const state = chat.getState();
+    expect(state.state).not.toMatch(/^MOOD_/);
+    expect(state.entityHistory.at(-1)?.symptoms?.discharge).toBe(true);
   });
 });

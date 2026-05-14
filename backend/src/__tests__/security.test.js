@@ -88,10 +88,10 @@ vi.mock("../firebaseAdmin.js", () => {
       }),
     },
     admin: {
-      firestore: { FieldValue: { serverTimestamp: vi.fn(() => "SERVER_TS") } },
+      firestore: { FieldValue: { serverTimestamp: vi.fn(() => "SERVER_TS"), delete: vi.fn(() => "DELETE_FIELD") } },
     },
     default: {
-      firestore: { FieldValue: { serverTimestamp: vi.fn(() => "SERVER_TS") } },
+      firestore: { FieldValue: { serverTimestamp: vi.fn(() => "SERVER_TS"), delete: vi.fn(() => "DELETE_FIELD") } },
       apps: [{}],
     },
   };
@@ -99,7 +99,7 @@ vi.mock("../firebaseAdmin.js", () => {
 
 vi.mock("firebase-admin", () => ({
   default: {
-    firestore: { FieldValue: { serverTimestamp: vi.fn(() => "SERVER_TS") } },
+    firestore: { FieldValue: { serverTimestamp: vi.fn(() => "SERVER_TS"), delete: vi.fn(() => "DELETE_FIELD") } },
     apps: [{}],
     initializeApp: vi.fn(),
     credential: { cert: vi.fn() },
@@ -222,7 +222,7 @@ describe("unauthenticated request → 401", () => {
   it("POST /user/profile without token returns 401", async () => {
     const res = await request(app)
       .post("/user/profile")
-      .send({ goal: "track_cycle" });
+      .send({ goal: "period" });
     expect(res.status).toBe(401);
     expect(res.body.error).toBe("Missing token");
   });
@@ -341,7 +341,7 @@ describe("cross-user data isolation", () => {
     const res = await request(app)
       .post("/user/profile")
       .set("Authorization", `Bearer ${USER_B_TOKEN}`)
-      .send({ uid: USER_A_UID, goal: "track_cycle" });
+      .send({ uid: USER_A_UID, goal: "period" });
 
     expect(res.status).toBe(200);
 
@@ -396,11 +396,11 @@ describe("input sanitization", () => {
       expect(result.error).toMatch(/yearOfBirth/);
     });
 
-    it("rejects a yearOfBirth that makes the user under 13", () => {
-      const tooYoung = currentYear - 10;
+    it("rejects a yearOfBirth that makes the user under 10", () => {
+      const tooYoung = currentYear - 5;
       const result = validateUserProfile({ yearOfBirth: tooYoung });
       expect(result.valid).toBe(false);
-      expect(result.error).toMatch(/at least 13/);
+      expect(result.error).toMatch(/at least 10/);
     });
 
     it("blocks changing a yearOfBirth that is already set (edit-once lock)", () => {
@@ -444,7 +444,7 @@ describe("input sanitization", () => {
 
     it("accepts a fully valid payload", () => {
       const result = validateUserProfile({
-        goal:             "track_cycle",
+        goal:             "period",
         mode:             "account",
         yearOfBirth:      1995,
         remindersEnabled: true,
@@ -457,18 +457,19 @@ describe("input sanitization", () => {
 
   // ── 4b. Nickname HTML stripping - end-to-end through GET /api/user/profile ─
   describe("nickname sanitization", () => {
-    // Seeds the two sequential mockDbDocGet calls needed:
+    // Seeds the two sequential users/{uid} reads needed:
     // 1st - requireAuth user-doc lookup
-    // 2nd - subDoc call is mockSubDocGet (different fn)
+    // 2nd - userProfile route nickname lookup
     function seedNicknameRequest(rawNickname) {
       mockVerifyIdToken.mockResolvedValueOnce({
         uid: USER_A_UID, email: "alice@bloom.test", email_verified: true,
       });
-      mockDbDocGet.mockResolvedValueOnce(USER_A_DOC);     // auth middleware
-      mockSubDocGet.mockResolvedValueOnce({               // userProfile route
-        exists: true,
-        data:   () => ({ nickname: rawNickname }),
-      });
+      mockDbDocGet
+        .mockResolvedValueOnce(USER_A_DOC)
+        .mockResolvedValueOnce({
+          exists: true,
+          data:   () => ({ profile: { nickname: rawNickname } }),
+        });
     }
 
     it("strips <script> tags and returns only the safe text", async () => {
@@ -516,8 +517,9 @@ describe("input sanitization", () => {
       mockVerifyIdToken.mockResolvedValueOnce({
         uid: USER_A_UID, email: "alice@bloom.test", email_verified: true,
       });
-      mockDbDocGet.mockResolvedValueOnce(USER_A_DOC);
-      mockSubDocGet.mockResolvedValueOnce(EMPTY_DOC);
+      mockDbDocGet
+        .mockResolvedValueOnce(USER_A_DOC)
+        .mockResolvedValueOnce(EMPTY_DOC);
 
       const res = await request(app)
         .get("/api/user/profile")
@@ -555,7 +557,7 @@ describe("input sanitization", () => {
       expect(res.body.error).toMatch(/mode must be one of/);
     });
 
-    it("rejects a yearOfBirth that is too recent (under-13)", async () => {
+    it("rejects a yearOfBirth that is too recent (under-10)", async () => {
       seedAuthA();
       mockDbDocGet.mockResolvedValueOnce(EMPTY_DOC);
 
@@ -565,7 +567,7 @@ describe("input sanitization", () => {
         .send({ yearOfBirth: new Date().getFullYear() - 5 });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/at least 13/);
+      expect(res.body.error).toMatch(/at least 10/);
     });
   });
 });

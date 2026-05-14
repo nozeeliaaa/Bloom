@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/bloom-logo.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bloomie - Bloom</title>
 
@@ -174,6 +175,7 @@
 
     .chat-input {
       flex: 1;
+      min-width: 0;
       padding: 0.7rem 1rem;
       border-radius: 999px;
       border: 1.5px solid var(--color-border);
@@ -206,6 +208,7 @@
 
     .chat-send-btn--text {
       width: auto;
+      min-width: 76px;
       border-radius: 999px;
       padding: 0 1.25rem;
       font: inherit;
@@ -311,22 +314,6 @@
       background: #fff;
     }
 
-    .chat-setting-links {
-      margin-top: 0.35rem;
-      border-top: 1px dashed rgba(212, 116, 154, 0.24);
-      padding-top: 0.45rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.28rem;
-    }
-
-    .chat-setting-links a {
-      color: #a44e74;
-      font-size: 0.79rem;
-      text-decoration: none;
-      font-weight: 700;
-    }
-
     .chat-setting-close {
       margin-top: 0.45rem;
       width: 100%;
@@ -404,25 +391,6 @@
       100% { transform: scale(1.2); opacity: 0; }
     }
 
-    .chat-footer-links {
-      display: flex;
-      justify-content: center;
-      gap: 0.7rem;
-      margin-top: 0.5rem;
-      font-size: 0.74rem;
-      opacity: 0.72;
-    }
-
-    .chat-footer-links a {
-      color: var(--color-text-muted);
-      text-decoration: none;
-    }
-
-    .chat-footer-links a:hover {
-      opacity: 1;
-      text-decoration: underline;
-    }
-
     .tiny-note {
       font-size: 0.76rem;
       text-align: center;
@@ -450,8 +418,100 @@
       .chat-settings-panel { min-width: 205px; right: -0.2rem; }
     }
 
-    /* Hide footer entirely on this page */
-    .footer { display: none; }
+    html.bloomie-embed,
+    html.bloomie-embed body {
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    html.bloomie-embed .navbar,
+    html.bloomie-embed #banner-area,
+    html.bloomie-embed .footer {
+      display: none !important;
+    }
+
+    html.bloomie-embed main {
+      min-height: 100%;
+      padding: 0;
+    }
+
+    html.bloomie-embed .bloomie-shell {
+      max-width: none;
+      height: 100vh;
+      padding: 0;
+    }
+
+    html.bloomie-embed .bloomie-card {
+      height: 100vh;
+      min-height: 0;
+      border-radius: 16px;
+      box-shadow: none;
+    }
+
+    html.bloomie-embed .chat-box {
+      min-height: 0;
+      padding: 1rem;
+      gap: 0.75rem;
+    }
+
+    html.bloomie-embed .bubble {
+      max-width: min(92%, 620px);
+    }
+
+    html.bloomie-embed .choices {
+      gap: 0.35rem;
+    }
+
+    html.bloomie-embed .reply {
+      max-width: 100%;
+      padding: 0.38rem 0.75rem;
+      white-space: normal;
+    }
+
+    html.bloomie-embed .chat-input-area {
+      padding: 0.75rem 1rem 0.95rem;
+    }
+
+    html.bloomie-embed .chat-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 0.45rem;
+      width: 100%;
+    }
+
+    html.bloomie-embed .chat-input {
+      width: 100%;
+    }
+
+    html.bloomie-embed .chat-send-btn--text {
+      min-width: 72px;
+      padding: 0 1rem;
+    }
+
+    @media (max-width: 430px) {
+      html.bloomie-embed .bloomie-chat-topbar {
+        padding: 0.65rem 0.75rem;
+      }
+
+      html.bloomie-embed .chat-box {
+        padding: 0.85rem 0.8rem;
+      }
+
+      html.bloomie-embed .chat-input-area {
+        padding: 0.7rem 0.75rem 0.9rem;
+      }
+
+      html.bloomie-embed .chat-mic-btn {
+        width: 40px;
+        height: 40px;
+      }
+
+      html.bloomie-embed .chat-send-btn--text {
+        min-width: 66px;
+        padding: 0 0.8rem;
+      }
+    }
 
     /* Navbar scroll-fade */
     .navbar {
@@ -480,7 +540,7 @@
             </div>
           </div>
           <div class="chat-settings-wrap" id="chat-settings-wrap">
-            <button class="chat-settings-btn" id="chat-settings-btn" type="button" aria-label="Chat settings">⋯</button>
+            <button class="chat-settings-btn" id="chat-settings-btn" type="button" aria-label="Chat settings">&hellip;</button>
             <div class="chat-settings-panel" id="chat-settings-panel" role="dialog" aria-label="Chat settings">
               <label class="chat-setting-row">
                 <span>Sound</span>
@@ -497,10 +557,6 @@
                   <option value="en-jm">English (Jamaica)</option>
                 </select>
               </label>
-              <div class="chat-setting-links">
-                <a href="/pages/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
-                <a href="/pages/terms.html" target="_blank" rel="noopener">Terms of Use</a>
-              </div>
               <button class="chat-setting-close" id="chat-setting-close" type="button">Close</button>
             </div>
           </div>
@@ -513,19 +569,14 @@
               class="chat-input"
               id="chat-input"
               type="text"
-              placeholder="Type your question…"
+              placeholder="Type your question..."
               autocomplete="off"
               maxlength="240"
             />
-            <button class="chat-mic-btn" id="chat-mic-btn" type="button" aria-label="Tap to speak" title="Tap to speak">🎙️</button>
+            <button class="chat-mic-btn" id="chat-mic-btn" type="button" aria-label="Tap to speak" title="Tap to speak">&#127897;</button>
             <button class="chat-send-btn chat-send-btn--text" type="submit" aria-label="Send message">Send</button>
           </form>
           <div class="chat-mic-status" id="chat-mic-status" aria-live="polite">Tap to speak</div>
-          <div class="chat-footer-links" aria-label="Legal links">
-            <a href="/pages/privacy.html" target="_blank" rel="noopener">Privacy</a>
-            <span>·</span>
-            <a href="/pages/terms.html" target="_blank" rel="noopener">Terms</a>
-          </div>
         </div>
       </section>
     </div>
@@ -539,6 +590,7 @@
     import { mountChat } from '/js/assistant.js';
     import { fetchCycleState } from '/js/cycle-state.js';
     import { isAnonMode } from '/js/mode.js';
+    import { mountSyncStatusBanner } from '/js/sync-status.js';
 
     function parseDateKey(dateKey) {
       return new Date(`${dateKey}T00:00:00`);
@@ -576,9 +628,17 @@
       return { cycleStarts: starts, cycleLengths: lengths, avgCycleLength: avg, nextPeriodDate: next };
     }
 
-    renderNav('assistant');
-    renderFooter();
-    renderModeBanner(document.getElementById('banner-area'));
+    const isEmbeddedChat = window.self !== window.top || new URLSearchParams(window.location.search).get('embed') === '1';
+    if (isEmbeddedChat) document.documentElement.classList.add('bloomie-embed');
+
+    if (!isEmbeddedChat) {
+      renderNav('assistant');
+      renderFooter();
+      renderModeBanner(document.getElementById('banner-area'));
+      mountSyncStatusBanner(document.getElementById('banner-area'), {
+        message: "Bloomie is having trouble reaching cloud sync. You can keep chatting, but some saved context may be local for now.",
+      });
+    }
 
     const CHAT_PREFS_KEY = 'bloom_chat_prefs';
 
@@ -714,7 +774,7 @@
         lastFinalChunk = '';
 
         recognition = new SR();
-        recognition.lang = (loadChatPrefs().chatLanguage === 'en-jm') ? 'en-JM' : 'en-US';
+        recognition.lang = 'en-US';
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
         recognition.continuous = false;
@@ -747,14 +807,22 @@
 
         recognition.onerror = (event) => {
           const code = event?.error || '';
-          if (code === 'not-allowed' || code === 'service-not-allowed') {
-            setMicError('Microphone permission was denied.');
-          } else if (code === 'no-speech') {
-            setMicError('No speech detected. Try again.');
-          } else if (code === 'audio-capture') {
-            setMicError('No microphone was found.');
-          } else if (code === 'aborted' && userStopped) {
+          if (code === 'aborted' && userStopped) {
+            // User manually stopped — onend will fire and handle the transcript
             setMicState('processing', 'Transcribing...');
+            return;
+          }
+          // For all genuine errors, mark as handled so onend doesn't overwrite
+          endHandled = true;
+          recognition = null;
+          if (code === 'not-allowed' || code === 'service-not-allowed') {
+            setMicError('Microphone permission was denied. Please allow it in your browser settings.');
+          } else if (code === 'no-speech') {
+            setMicError('No speech detected. Tap the mic and speak clearly.');
+          } else if (code === 'audio-capture') {
+            setMicError('No microphone found. Check your device settings.');
+          } else if (code === 'network') {
+            setMicError('Network error during transcription. Check your connection and try again.');
           } else {
             setMicError('Could not transcribe right now. Please try again.');
           }
@@ -763,19 +831,19 @@
         recognition.onend = () => {
           if (endHandled) return;
           endHandled = true;
-
-          const transcript = (finalTranscript || '').trim();
           recognition = null;
 
+          const transcript = (finalTranscript || '').trim();
+
           if (!transcript) {
-            if (userStopped) setMicError('No transcript captured. Try speaking a little longer.');
-            else setMicError('No speech detected. Try again.');
+            if (userStopped) setMicError('Nothing captured. Try speaking a little longer and tap again to stop.');
+            else setMicError('No speech detected. Tap the mic and speak clearly.');
             return;
           }
 
           input.value = transcript;
           input.focus();
-          setMicState('ready', 'Transcript ready. Edit if needed, then tap Send.');
+          setMicState('ready', 'Got it! Review and tap Send.');
         };
 
         try {
@@ -792,6 +860,10 @@
           setMicState('processing', 'Transcribing...');
           try { recognition.stop(); } catch (_) { setMicError('Could not stop recording cleanly.'); }
           return;
+        }
+        // If in "ready" state, clear the input and start fresh
+        if (micState === 'ready') {
+          input.value = '';
         }
         startRecognition();
       });
@@ -886,14 +958,22 @@
         try {
           const token = await getIdToken();
           const apiBase = window.BLOOM_API_BASE ?? '';
-          const res = await fetch(`${apiBase}/api/user/profile`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const data = await res.json();
+          const [profileRes, consentRes] = await Promise.allSettled([
+            fetch(`${apiBase}/api/user/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${apiBase}/api/consent/status`,  { headers: { 'Authorization': `Bearer ${token}` } }),
+          ]);
+          if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
+            const data = await profileRes.value.json();
             profilePayload = data?.profile || data || null;
             const nickname = profilePayload?.nickname || '';
             if (nickname) enrichedUser = { ...user, nickname };
+          }
+          // Cache the guardian consent status in localStorage so readGuardianConsent picks it up
+          if (consentRes.status === 'fulfilled' && consentRes.value.ok) {
+            const cd = await consentRes.value.json().catch(() => null);
+            if (cd?.status === 'approved' && user?.uid) {
+              localStorage.setItem(`bloom_consent_status_${user.uid}`, 'approved');
+            }
           }
         } catch (_) { /* fall back to user.displayName */ }
       }

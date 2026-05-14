@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/bloom-logo.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Create Account - Bloom</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -181,7 +182,7 @@
   </main>
 
   <script type="module">
-    import { register, getPasswordStrength, validatePassword } from '/js/auth.js';
+    import { register, getPasswordStrength, validatePassword, getIdToken } from '/js/auth.js';
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
@@ -268,9 +269,26 @@
     }
 
     function showSuccess(msg) {
-      successMsg.textContent = msg;
+      successMsg.innerHTML = msg;
       successMsg.classList.remove('hidden');
       errorMsg.classList.add('hidden');
+    }
+
+    function getMailboxUrl(email) {
+      const domain = (email || '').split('@')[1]?.toLowerCase() || '';
+      if (domain === 'gmail.com' || domain === 'googlemail.com') return 'https://mail.google.com';
+      if (domain === 'yahoo.com' || domain.startsWith('yahoo.'))  return 'https://mail.yahoo.com';
+      if (['outlook.com','hotmail.com','live.com','msn.com','hotmail.co.uk','live.co.uk'].includes(domain)) return 'https://outlook.live.com';
+      if (['icloud.com','me.com','mac.com'].includes(domain)) return 'https://www.icloud.com/mail';
+      if (domain === 'aol.com') return 'https://mail.aol.com';
+      if (domain === 'protonmail.com' || domain === 'proton.me') return 'https://mail.proton.me';
+      return null;
+    }
+
+    function openInboxLink(email) {
+      const url = getMailboxUrl(email);
+      if (!url) return '';
+      return ` <a href="${url}" target="_blank" rel="noopener" style="font-weight:700;">Open my inbox &rarr;</a>`;
     }
 
     form.addEventListener('submit', async (e) => {
@@ -311,20 +329,54 @@
       registerBtn.textContent = 'Creating account...';
 
       try {
-        await register(email, password);
+        const isMinorUser = userAge !== null && userAge < 18;
 
-        // If minor, redirect to guardian consent pending page
-        if (userAge < 18) {
-          sessionStorage.setItem('bloom_guardian_email', guardianEmail.value.trim());
-          sessionStorage.setItem('bloom_user_yob', yob);
-          window.location.href = '/pages/consent-pending.html';
+        if (isMinorUser) {
+          // Minor flow: backend creates a DISABLED account and sends the guardian email.
+          // The teen cannot log in until the guardian approves.
+          const guardianEmailVal = guardianEmail.value.trim();
+          registerBtn.textContent = 'Sending guardian request…';
+          const apiBase = window.BLOOM_API_BASE ?? '';
+          const res = await fetch(`${apiBase}/api/auth/register-minor`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              password,
+              yearOfBirth: Number(yob),
+              guardianEmail: guardianEmailVal,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            showError(data.error || 'Registration failed. Please try again.');
+            registerBtn.disabled = false;
+            registerBtn.textContent = 'Create Account';
+            return;
+          }
+          // Show success - teen does NOT get logged in
+          form.style.display = 'none';
+          showSuccess(
+            `✅ Request sent! We've emailed your guardian at ${guardianEmailVal}. ` +
+            `Once they approve, you'll receive an email with a link to log in.`
+          );
+          registerBtn.style.display = 'none';
           return;
         }
+
+        // Adult flow: normal Firebase registration
+        await register(email, password);
+
+        // Persist YOB so the onboarding survey doesn't ask for it again
+        const existingProfile = JSON.parse(localStorage.getItem('bloom_profile') || '{}');
+        localStorage.setItem('bloom_profile', JSON.stringify({ ...existingProfile, yearOfBirth: yob }));
+        sessionStorage.setItem('bloom_user_yob', String(yob));
 
         form.style.display = 'none';
         showSuccess(
           `✅ Account created! A verification email has been sent to ${email}. ` +
-          `Please check your inbox and verify before logging in.`
+          `Please check your inbox and verify before logging in.` +
+          openInboxLink(email)
         );
         registerBtn.style.display = 'none';
 

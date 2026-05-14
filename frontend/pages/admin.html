@@ -21,10 +21,6 @@
         <h1>Admin Panel</h1>
         <p class="text-muted" id="admin-subtitle">Loading…</p>
       </div>
-      <div class="admin-header-actions">
-        <a class="btn btn-outline btn-sm" href="/pages/admin-safety.html">Safety Review</a>
-        <button class="btn btn-outline btn-sm" id="admin-refresh-btn" type="button">Refresh</button>
-      </div>
     </div>
 
     <nav class="admin-tabs" role="tablist">
@@ -33,6 +29,7 @@
       <button class="admin-tab" data-tab="pamphlets" role="tab" aria-selected="false" type="button">Pamphlets</button>
       <button class="admin-tab" data-tab="clinics" role="tab" aria-selected="false" type="button">Clinics</button>
       <button class="admin-tab" data-tab="support" role="tab" aria-selected="false" type="button">Support</button>
+      <button class="admin-tab" data-tab="reviews" role="tab" aria-selected="false" type="button">Reviews</button>
     </nav>
 
     <!-- Overview tab -->
@@ -115,7 +112,11 @@
     <div class="admin-tab-panel" id="tab-users" role="tabpanel" hidden>
       <div class="admin-row admin-tab-header">
         <h2 class="no-margin">Users</h2>
-        <button class="btn btn-outline btn-sm" id="users-refresh" type="button">Refresh</button>
+        <div class="admin-toolbar">
+          <input class="admin-search" id="users-search" type="search" placeholder="Search users by email, UID, or role" />
+          <button class="btn btn-primary btn-sm" id="admin-create-user-btn" type="button">+ Create Admin</button>
+          <button class="btn btn-outline btn-sm" id="users-refresh" type="button">Refresh</button>
+        </div>
       </div>
       <div class="admin-list" id="users-list">
         <p class="text-muted">Select the Users tab to load.</p>
@@ -127,7 +128,10 @@
     <div class="admin-tab-panel" id="tab-pamphlets" role="tabpanel" hidden>
       <div class="admin-row admin-tab-header">
         <h2 class="no-margin">Pamphlets</h2>
-        <button class="btn btn-primary btn-sm" id="pamphlet-add-btn" type="button">+ Add Pamphlet</button>
+        <div class="admin-toolbar">
+          <input class="admin-search" id="pamphlets-search" type="search" placeholder="Search pamphlets" />
+          <button class="btn btn-primary btn-sm" id="pamphlet-add-btn" type="button">+ Add Pamphlet</button>
+        </div>
       </div>
       <div class="admin-list" id="pamphlets-list">
         <p class="text-muted">Select the Pamphlets tab to load.</p>
@@ -138,7 +142,10 @@
     <div class="admin-tab-panel" id="tab-clinics" role="tabpanel" hidden>
       <div class="admin-row admin-tab-header">
         <h2 class="no-margin">Clinics</h2>
-        <button class="btn btn-primary btn-sm" id="clinic-add-btn" type="button">+ Add Clinic</button>
+        <div class="admin-toolbar">
+          <input class="admin-search" id="clinics-search" type="search" placeholder="Search clinics" />
+          <button class="btn btn-primary btn-sm" id="clinic-add-btn" type="button">+ Add Clinic</button>
+        </div>
       </div>
       <div class="admin-list" id="clinics-list">
         <p class="text-muted">Select the Clinics tab to load.</p>
@@ -149,23 +156,55 @@
     <div class="admin-tab-panel" id="tab-support" role="tabpanel" hidden>
       <div class="admin-row admin-tab-header">
         <h2 class="no-margin">Support Inbox</h2>
-        <div class="admin-tab-header-actions">
+        <div class="admin-toolbar">
+          <input class="admin-search" id="support-search" type="search" placeholder="Search support requests" />
           <select id="support-status-filter" class="admin-select">
             <option value="">All statuses</option>
-            <option value="new">New</option>
-            <option value="open">Open</option>
+            <option value="not_started">Not started</option>
+            <option value="in_progress">In progress</option>
             <option value="resolved">Resolved</option>
           </select>
           <button class="btn btn-outline btn-sm" id="support-refresh-btn" type="button">Refresh</button>
         </div>
       </div>
       <div class="support-summary" id="support-summary" hidden>
-        <span class="support-summary-pill support-summary-pill--new">New <strong id="support-count-new">0</strong></span>
-        <span class="support-summary-pill support-summary-pill--open">Open <strong id="support-count-open">0</strong></span>
+        <span class="support-summary-pill support-summary-pill--new">Not started <strong id="support-count-new">0</strong></span>
+        <span class="support-summary-pill support-summary-pill--open">In progress <strong id="support-count-open">0</strong></span>
         <span class="support-summary-pill support-summary-pill--resolved">Resolved <strong id="support-count-resolved">0</strong></span>
       </div>
       <div class="admin-list support-list" id="support-list">
         <p class="text-muted">Select the Support tab to load.</p>
+      </div>
+    </div>
+
+    <!-- Reviews tab -->
+    <div class="admin-tab-panel" id="tab-reviews" role="tabpanel" hidden>
+      <div class="admin-row admin-tab-header">
+        <h2 class="no-margin">Reviews</h2>
+        <div class="admin-toolbar">
+          <button class="btn btn-outline btn-sm" id="reviews-refresh-btn" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="admin-review-grid">
+        <section class="admin-section-card">
+          <div class="admin-section-card-header">
+            <h3>Bloomie Reviews</h3>
+            <input class="admin-search admin-search--compact" id="bloomie-reviews-search" type="search" placeholder="Search Bloomie reviews" />
+          </div>
+          <div class="admin-list" id="bloomie-reviews-list">
+            <p class="text-muted">Select the Reviews tab to load.</p>
+          </div>
+        </section>
+
+        <section class="admin-section-card">
+          <div class="admin-section-card-header">
+            <h3>Phase Feedback Reviews</h3>
+            <input class="admin-search admin-search--compact" id="phase-reviews-search" type="search" placeholder="Search phase feedback" />
+          </div>
+          <div class="admin-list" id="phase-reviews-list">
+            <p class="text-muted">Select the Reviews tab to load.</p>
+          </div>
+        </section>
       </div>
     </div>
   </main>
@@ -283,8 +322,45 @@
     </div>
   </div>
 
+  <!-- Create admin modal -->
+  <div class="admin-modal-overlay" id="create-admin-modal" hidden>
+    <div class="admin-modal admin-modal--sm">
+      <div class="admin-modal-header">
+        <h2>Create Admin Account</h2>
+        <button class="admin-modal-close" data-close="create-admin-modal" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="new-admin-email">Email <span class="req">*</span></label>
+            <input class="form-input" id="new-admin-email" type="email" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-admin-password">Temporary password <span class="req">*</span></label>
+            <input class="form-input" id="new-admin-password" type="password" minlength="8" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-admin-display-name">Display name</label>
+            <input class="form-input" id="new-admin-display-name" type="text" maxlength="80" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-admin-role">Role</label>
+            <select class="form-input" id="new-admin-role">
+              <option value="admin">admin</option>
+            </select>
+          </div>
+        </div>
+        <p class="admin-error" id="create-admin-error" hidden></p>
+      </div>
+      <div class="admin-modal-footer">
+        <button class="btn btn-outline" data-close="create-admin-modal" type="button">Cancel</button>
+        <button class="btn btn-primary" id="create-admin-save-btn" type="button">Create Account</button>
+      </div>
+    </div>
+  </div>
+
   <!-- User modal -->
-  <div class="admin-modal-overlay admin-modal--sm" id="user-modal" hidden>
+  <div class="admin-modal-overlay" id="user-modal" hidden>
     <div class="admin-modal admin-modal--sm">
       <div class="admin-modal-header">
         <h2>Manage User</h2>
@@ -292,7 +368,10 @@
       </div>
       <div class="admin-modal-body">
         <input type="hidden" id="user-modal-uid" />
-        <p class="admin-modal-user-email"><strong id="user-modal-email"></strong></p>
+        <div class="admin-user-summary">
+          <strong id="user-modal-email"></strong>
+          <span>UID: <span id="user-modal-uid-display"></span></span>
+        </div>
         <div class="form-group">
           <label class="form-label" for="user-modal-role">Role</label>
           <select class="form-input" id="user-modal-role">
@@ -304,9 +383,35 @@
       </div>
       <div class="admin-modal-footer">
         <button class="btn btn-outline" data-close="user-modal" type="button">Cancel</button>
-        <button class="btn btn-sm btn-danger" id="user-disable-btn" type="button">Disable</button>
-        <button class="btn btn-sm btn-outline" id="user-enable-btn" type="button">Enable</button>
+        <button class="btn btn-sm btn-danger btn-danger-soft" id="user-delete-btn" type="button">Delete User</button>
         <button class="btn btn-primary" id="user-save-btn" type="button">Save Role</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Support response modal -->
+  <div class="admin-modal-overlay" id="support-response-modal" hidden>
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h2>Respond to Support Request</h2>
+        <button class="admin-modal-close" data-close="support-response-modal" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="admin-modal-body">
+        <input type="hidden" id="support-response-id" />
+        <p class="admin-item-meta" id="support-response-context"></p>
+        <div class="form-group">
+          <label class="form-label" for="support-response-message">Response</label>
+          <textarea class="form-input" id="support-response-message" rows="8" maxlength="2000" placeholder="Type the response that should be saved to Firestore and sent to the user when an email is available."></textarea>
+        </div>
+        <label class="admin-checkbox-label">
+          <input type="checkbox" id="support-response-send-email" checked />
+          Send by email when this request has a reply address
+        </label>
+        <p class="admin-error" id="support-response-error" hidden></p>
+      </div>
+      <div class="admin-modal-footer">
+        <button class="btn btn-outline" data-close="support-response-modal" type="button">Cancel</button>
+        <button class="btn btn-primary" id="support-response-save-btn" type="button">Save Response</button>
       </div>
     </div>
   </div>

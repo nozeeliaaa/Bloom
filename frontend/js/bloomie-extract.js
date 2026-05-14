@@ -5,10 +5,8 @@
  *
  * WHERE IT RUNS
  * ─────────────
- * Called from assistant.js immediately after normalizedText is produced and
- * route-confidence scoring has fired (same pipeline position as
- * resolveIntentAssist). It runs in parallel with the synchronous routing
- * pipeline and its result is stored on ctx.aiSignals.
+ * Called from assistant.js when local rule extraction is weak. Its validated,
+ * canonical signals can enrich the current entity object before routing.
  *
  * WHY IT IS SAFE
  * ──────────────
@@ -17,10 +15,9 @@
  * 2. Every returned value is validated against a fixed allowlist on BOTH the
  *    backend (server-side first defence) and here (client-side second defence).
  * 3. Extracted signals NEVER override Bloomie's rule-based urgent routing.
- *    The caller in assistant.js must check `entities.urgent` and `ctx.urgency`
- *    before applying any signal; this module does not enforce that itself but
- *    documents the contract.
- * 4. The result is purely advisory - if it is null (any failure path), Bloomie
+ *    The caller only applies them when local extraction found no explicit
+ *    canonical health signal.
+ * 4. The result is assistive - if it is null (any failure path), Bloomie
  *    behaves exactly as it does today with zero observable difference.
  *
  * HOW FALLBACK WORKS
@@ -51,11 +48,8 @@
  *
  * MAPPING TO INTERNAL FIELDS
  * ──────────────────────────
- * Symptom codes are intentionally aligned with bloomie-inference.js entity
- * keys (e.g. "late", "heavy", "spotting", "pelvic") so the caller can
- * optionally enrich mergedEntities without a translation layer. The caller
- * (assistant.js) decides whether and how to apply them; this module only
- * delivers the validated signals.
+ * Symptom codes are canonicalized to Bloomie entity vocabulary before return
+ * (e.g. "dizzy" → "dizziness", "cramps" → "pelvic").
  *
  * API calls go through the backend at /api/bloomie/ai/extract.
  * ANTHROPIC_API_KEY lives on the server only.
@@ -78,13 +72,30 @@ const CONFIDENCE_THRESHOLD = 0.55;
 // ── Client-side allowlists (second line of defence after server validation) ───
 // These MUST stay in sync with VALID_EXTRACT_* constants in bloomieAI.js.
 const VALID_SYMPTOMS = new Set([
-  "late", "heavy", "large_clots", "spotting", "cramps", "pelvic",
+  "late", "heavy", "large_clots", "spotting", "pelvic",
   "one_sided_pain", "ovulation_pain", "pain_during_sex",
-  "nausea", "dizzy", "fatigue", "breast_pain",
+  "nausea", "dizziness", "fatigue", "breast_tender",
   "mood", "anxiety", "depression", "irritability",
-  "night_sweats", "discharge", "unusual_discharge", "odor",
-  "bloating", "headache", "migraine", "back_pain",
+  "night_sweats", "discharge", "unusual_discharge", "discharge_foul_smell",
+  "bloating", "headache", "joint_pain",
 ]);
+
+// Backward-compatible aliases for older backend responses or cached tests.
+// Returned signals are canonicalized before callers see them.
+const SYMPTOM_ALIASES = {
+  cramps: "pelvic",
+  dizzy: "dizziness",
+  odor: "discharge_foul_smell",
+  breast_pain: "breast_tender",
+  migraine: "headache",
+  back_pain: "joint_pain",
+};
+
+function canonicalSymptom(code) {
+  if (typeof code !== "string") return null;
+  const canonical = SYMPTOM_ALIASES[code] || code;
+  return VALID_SYMPTOMS.has(canonical) ? canonical : null;
+}
 
 const VALID_TIMING = new Set([
   "late_period", "missed_period", "early_period", "irregular",
@@ -122,7 +133,7 @@ const HEALTH_GATE = /\b(period|bleed(?:ing)?|blood|late|missed|spotting|spot|cra
  * @param  {object} parsed - Raw JSON body from /api/bloomie/ai/extract
  * @returns {ExtractedSignals|null}
  */
-function validateExtractedSignals(parsed) {
+export function validateExtractedSignals(parsed) {
   if (!parsed || typeof parsed !== "object") return null;
 
   const confidence = typeof parsed.confidence === "number"
@@ -132,7 +143,7 @@ function validateExtractedSignals(parsed) {
   if (confidence < CONFIDENCE_THRESHOLD) return null;
 
   const symptoms = Array.isArray(parsed.symptoms)
-    ? parsed.symptoms.filter(s => typeof s === "string" && VALID_SYMPTOMS.has(s))
+    ? [...new Set(parsed.symptoms.map(canonicalSymptom).filter(Boolean))]
     : [];
 
   const timing = Array.isArray(parsed.timing)
@@ -146,7 +157,7 @@ function validateExtractedSignals(parsed) {
   const repair = !!parsed.repair;
 
   const pregnancySignals = Array.isArray(parsed.pregnancySignals)
-    ? parsed.pregnancySignals.filter(s => typeof s === "string" && VALID_SYMPTOMS.has(s))
+    ? [...new Set(parsed.pregnancySignals.map(canonicalSymptom).filter(Boolean))]
     : [];
 
   // redFlags: validated but never forwarded to rule-based routing.

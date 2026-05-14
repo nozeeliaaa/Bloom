@@ -187,19 +187,38 @@
 
     // ── Poll for status changes ──
     let pollInterval = null;
+    let currentConsentId = null; // populated on first successful status poll
 
-    async function checkStatus(token, uid) {
+    async function checkStatus(uid) {
       try {
-        const apiBase = window.BLOOM_API_BASE ?? '';
-        const res     = await fetch(`${apiBase}/api/consent/status`, {
-          headers: { 'Authorization': `Bearer ${token}` },
+        const apiBase    = window.BLOOM_API_BASE ?? '';
+        const freshToken = await getIdToken(true);
+        const res = await fetch(`${apiBase}/api/consent/status`, {
+          headers: { 'Authorization': `Bearer ${freshToken}` },
         });
+
+        if (res.status === 403) {
+          clearInterval(pollInterval);
+          const data = await res.json().catch(() => ({}));
+          if (data.code === 'EMAIL_NOT_VERIFIED') {
+            errorMsg.textContent = 'Please verify your email address first, then refresh this page.';
+            errorMsg.classList.remove('hidden');
+          }
+          return;
+        }
+
         if (!res.ok) return;
         const data = await res.json();
+
+        // Store consentId so the resend button can use it
+        if (data.consentId) currentConsentId = data.consentId;
 
         if (data.status === 'approved') {
           clearInterval(pollInterval);
           localStorage.setItem(`bloom_consent_status_${uid}`, 'approved');
+          // Force-refresh the Firebase token so email_verified:true is picked up
+          // before any API calls are made on the next page
+          try { await getIdToken(true); } catch (_) {}
           window.location.href = '/pages/consent-approved.html';
         } else if (data.status === 'denied') {
           clearInterval(pollInterval);
@@ -215,11 +234,9 @@
         return;
       }
 
-      const token = await getIdToken();
-
       // Check immediately, then poll every 8 seconds
-      await checkStatus(token, user.uid);
-      pollInterval = setInterval(() => checkStatus(token, user.uid), 8000);
+      await checkStatus(user.uid);
+      pollInterval = setInterval(() => checkStatus(user.uid), 8000);
 
       // ── Resend ──
       resendBtn.addEventListener('click', async () => {
@@ -228,10 +245,17 @@
         resendBtn.textContent = 'Sending…';
 
         try {
-          const apiBase = window.BLOOM_API_BASE ?? '';
-          const res     = await fetch(`${apiBase}/api/consent/resend`, {
+          if (!currentConsentId) {
+            showError('Consent request not found. Please wait a moment and try again.');
+            resendBtn.disabled = false;
+            return;
+          }
+
+          const apiBase    = window.BLOOM_API_BASE ?? '';
+          const freshToken = await getIdToken(true);
+          const res = await fetch(`${apiBase}/api/consent/resend/${currentConsentId}`, {
             method:  'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${freshToken}` },
           });
           const data = await res.json();
 

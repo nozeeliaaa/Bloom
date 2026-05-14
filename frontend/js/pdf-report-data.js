@@ -12,6 +12,11 @@
  *   alerts              - ordered by severity (cycle outliers before lateness)
  */
 
+import {
+  generateIntegratedSignals,
+  getBloomieSymptomContext,
+} from "./algorithms/bloom-symptom-engine.js";
+
 // ── Sorting utilities (exported for testing) ──────────────────────────────────
 
 /** Sort ISO date strings descending (most recent first). */
@@ -89,13 +94,21 @@ function isPeriodFlow(flow) {
   );
 }
 
+function isLoggedPeriodDay(entry) {
+  if (!entry) return false;
+  if (isPeriodFlow(entry.flow)) return true;
+  if (typeof entry.flowLevel === "number" && entry.flowLevel > 0) return true;
+  if (Number.isFinite(Number(entry.periodDay)) && Number(entry.periodDay) > 0) return true;
+  return entry.periodDay === true;
+}
+
 // ── Period-start detection ────────────────────────────────────────────────────
 // A period "start" is a day with period flow that has no period flow the day
 // before it. This mirrors the logic in phase.js and report.js exactly.
 
 function getPeriodStarts(logsByDate) {
   const allDays = Object.keys(logsByDate || {})
-    .filter((d) => isPeriodFlow(logsByDate[d]?.flow))
+    .filter((d) => isLoggedPeriodDay(logsByDate[d]))
     .sort();
   const daySet = new Set(allDays);
   return allDays.filter((d) => !daySet.has(addDays(d, -1)));
@@ -108,7 +121,7 @@ function getPeriodStarts(logsByDate) {
 function computePeriodLength(start, logsByDate) {
   let n = 0;
   let d = start;
-  while (isPeriodFlow(logsByDate[d]?.flow) && n < 14) {
+  while (isLoggedPeriodDay(logsByDate[d]) && n < 14) {
     n++;
     d = addDays(d, 1);
   }
@@ -298,6 +311,129 @@ function buildAlerts({ completedCycles, nextPeriodDate }) {
 
 // ── "What This Means For You" interpretation ─────────────────────────────────
 // 3-4 sentences interpreting consistency, length context, and notable patterns.
+
+const SIGNAL_PRIORITY = { high: 3, medium: 2, low: 1 };
+
+function symptomLabelToCode(label) {
+  return String(label || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function buildEngineSymptomHistory(logsByDate) {
+  return Object.entries(logsByDate || {})
+    .filter(([, log]) => Array.isArray(log?.symptoms) && log.symptoms.length > 0)
+    .map(([dateKey, log]) => ({
+      dateKey,
+      items: (log.symptoms || [])
+        .map((label) => {
+          const mapped = String(
+            log?.symptomCodes?.[label] ||
+            log?.symptomCodes?.[symptomLabelToCode(label)] ||
+            ""
+          ).trim().toUpperCase();
+          const code = mapped || symptomLabelToCode(label);
+          if (!code) return null;
+          const severity = Number(
+            log?.symptomSeverity?.[label] ??
+            log?.symptomSeverity?.[mapped] ??
+            log?.symptomSeverity?.[code] ??
+            3
+          );
+          return { code, severity: Number.isFinite(severity) ? severity : 3 };
+        })
+        .filter(Boolean),
+    }))
+    .filter((entry) => entry.items.length > 0)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
+function cleanSignalText(value) {
+  return String(value || "")
+    .replace(/\bdetected\b/gi, "noticed")
+    .trim();
+}
+
+function cleanSignal(signal) {
+  if (!signal) return null;
+  const level = String(signal.level || "low").toLowerCase();
+  const normalizedLevel = ["high", "medium", "low"].includes(level) ? level : "low";
+  const guidance = cleanSignalText(signal.guidance || (
+    normalizedLevel === "high"
+      ? "Track what happens next and consider checking in with a healthcare professional if this feels unusual for your body."
+      : ""
+  ));
+
+  return {
+    code: String(signal.code || ""),
+    level: normalizedLevel,
+    title: cleanSignalText(signal.title || "Bloom noticed something"),
+    message: cleanSignalText(signal.message || ""),
+    guidance,
+    category: signal.category || "cycle",
+  };
+}
+
+function buildSignalSummary({ logsByDate, cycleState, cycleLengths, lastPeriodStart, cyclesTracked }) {
+  const symptomHistory = buildEngineSymptomHistory(logsByDate);
+  if (!symptomHistory.length && !cycleLengths.length) {
+    return { signals: [], patternLine: null, guidanceLines: [] };
+  }
+
+  const today = new Date();
+  const todayKeyValue = todayKey();
+  const latestWithSymptoms = symptomHistory.find((entry) => entry.dateKey === todayKeyValue)
+    ?? symptomHistory[symptomHistory.length - 1]
+    ?? null;
+  const loggedSymptoms = latestWithSymptoms?.items || [];
+  const nextPeriodDate = cycleState?.nextPeriodDate ?? null;
+  const expectedNextPeriodWindow = nextPeriodDate
+    ? {
+        start: new Date(addDays(nextPeriodDate, -2) + "T00:00:00"),
+        end:   new Date(addDays(nextPeriodDate, 2) + "T00:00:00"),
+      }
+    : null;
+  const phaseMap = { late_luteal: "luteal", ovulatory: "ovulation" };
+  const phase = phaseMap[cycleState?.phase] ?? cycleState?.phase ?? null;
+
+  const integrated = generateIntegratedSignals({
+    expectedNextPeriodWindow,
+    today,
+    lastPeriodStart: lastPeriodStart ? new Date(lastPeriodStart + "T00:00:00") : null,
+    cycleLengths,
+    loggedSymptoms,
+    phase,
+    dayOfCycle: cycleState?.dayInCycle ?? null,
+    cycleCount: cyclesTracked,
+    symptomHistory,
+  });
+
+  const visible = [
+    ...(integrated?.cycleSignals || []),
+    ...(integrated?.symptomSignals || []),
+  ]
+    .filter((signal) => signal?.show !== false)
+    .map(cleanSignal)
+    .filter(Boolean)
+    .sort((a, b) => (SIGNAL_PRIORITY[b.level] || 0) - (SIGNAL_PRIORITY[a.level] || 0));
+
+  const mediumHigh = visible.filter((signal) => signal.level === "medium" || signal.level === "high");
+  const signals = (mediumHigh.length ? mediumHigh : visible.slice(0, 1)).slice(0, 3);
+  const bloomieContext = getBloomieSymptomContext(integrated?.symptomSignals || []);
+  const patternSignal = signals.find((signal) => String(signal.code).startsWith("SYMPTOMS_MATCH_"));
+
+  return {
+    signals,
+    patternLine: patternSignal
+      ? `${patternSignal.title}: ${patternSignal.message}`
+      : bloomieContext.patternDetected
+        ? `Bloom noticed ${String(bloomieContext.patternDetected).replace(/_/g, " ").toLowerCase()}.`
+        : null,
+    guidanceLines: [...new Set(signals.map((signal) => signal.guidance).filter(Boolean))].slice(0, 4),
+  };
+}
 
 function buildInterpretation(d) {
   if (!d.cyclesTracked) return null;
@@ -555,6 +691,13 @@ export function buildReportData(logsByDate, cycleState, userName = null) {
   const patternInsight  = buildPatternInsight({ cyclesTracked, regularity, avgCycleLength, topSymptoms });
 
   const alerts = buildAlerts({ completedCycles, nextPeriodDate });
+  const signalSummary = buildSignalSummary({
+    logsByDate,
+    cycleState: cyclePhase,
+    cycleLengths,
+    lastPeriodStart,
+    cyclesTracked,
+  });
 
   return {
     // Meta
@@ -593,5 +736,6 @@ export function buildReportData(logsByDate, cycleState, userName = null) {
 
     // Alerts (only populated when warranted)
     alerts,
+    signalSummary,
   };
 }

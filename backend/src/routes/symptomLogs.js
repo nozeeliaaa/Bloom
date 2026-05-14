@@ -67,6 +67,20 @@ function legacySymptomLogRef(uid, dateKey) {
   return db.collection("symptomLogs").doc(uid).collection("entries").doc(dateKey);
 }
 
+function mergeDocsByDateKey(...snaps) {
+  const byDate = new Map();
+  for (const snap of snaps) {
+    if (!snap?.docs) continue;
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      const dateKey = data.dateKey || doc.id;
+      if (!dateKey) continue;
+      byDate.set(dateKey, { dateKey, ...data });
+    }
+  }
+  return [...byDate.values()].sort((a, b) => String(b.dateKey).localeCompare(String(a.dateKey)));
+}
+
 // Canonical path: users/{uid}/symptomLogs/{dateKey}
 // Legacy mirror: symptomLogs/{uid}/entries/{dateKey}
 // Each doc holds an items[] array - multiple catalog symptoms per day.
@@ -187,17 +201,13 @@ router.get("/", requireAuth, async (req, res) => {
 
     if (start || end) q = q.limit(3650);
 
-    let snap = await q.get();
-    let items = snap.docs.map((d) => d.data());
+    let legacy = db.collection("symptomLogs").doc(uid).collection("entries").orderBy("dateKey", "desc");
+    if (start) legacy = legacy.where("dateKey", ">=", start);
+    if (end) legacy = legacy.where("dateKey", "<=", end);
+    if (start || end) legacy = legacy.limit(3650);
 
-    if (items.length === 0) {
-      let legacy = db.collection("symptomLogs").doc(uid).collection("entries").orderBy("dateKey", "desc");
-      if (start) legacy = legacy.where("dateKey", ">=", start);
-      if (end) legacy = legacy.where("dateKey", "<=", end);
-      if (start || end) legacy = legacy.limit(3650);
-      snap = await legacy.get();
-      items = snap.docs.map((d) => d.data());
-    }
+    const [legacySnap, canonicalSnap] = await Promise.all([legacy.get(), q.get()]);
+    const items = mergeDocsByDateKey(legacySnap, canonicalSnap);
 
     return res.json({ ok: true, items });
   } catch (err) {

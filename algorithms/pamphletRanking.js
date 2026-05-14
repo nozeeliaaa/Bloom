@@ -3,7 +3,7 @@
  * ==========================
  * Personalized pamphlet ranking algorithm for Bloom.
  *
- * This is NOT a filter — it is a ranking system.
+ * This is NOT a filter - it is a ranking system.
  * All pamphlets remain accessible. This only controls
  * what appears first based on user context.
  *
@@ -18,7 +18,7 @@
  *   +3  matches cycle pattern
  *   -10 safety suppression (minor + explicit content)
  *
- * COMP3901: Educational content only — not medical advice.
+ * COMP3901: Educational content only - not medical advice.
  */
 
 /* ------------------------------------------------------------------ */

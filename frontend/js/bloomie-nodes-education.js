@@ -24,7 +24,6 @@ export function createEducationNodes(env, helpers) {
       choices: [
         { id: "heavy",      label: "Heavy bleeding",                 next: "EDUC_HEAVY", primary: true },
         { id: "cramps",     label: "Cramps and pelvic pain",         next: "EDUC_CRAMPS" },
-        { id: "spot",       label: "Spotting between periods",       next: "EDUC_SPOTTING" },
         { id: "mood",       label: "Mood and energy changes",        next: "EDUC_MOOD" },
         { id: "late",       label: "Late or irregular periods",      next: "EDUC_LATE" },
         { id: "cervical",   label: "Discharge and cervical mucus",   next: "EDUC_CERVICAL_MUCUS" },
@@ -183,7 +182,7 @@ export function createEducationNodes(env, helpers) {
         `${consent()} how bad does it get for you?`,
       ],
       choices: [
-        { id: "mild",    label: "Manageable but annoying",     next: "MOOD_GUIDE", primary: true },
+        { id: "mild",    label: "Manageable but annoying",     next: "ELSE_PAIN_IMPROVING_YES", primary: true },
         { id: "severe",  label: "Stops my daily life",         next: "PELVIC_INTRO" },
         { id: "outside", label: "Happens outside my period",   next: "PELVIC_SEX_INTRO" },
         { id: "endo",    label: "Could this be endometriosis?",next: "EDUC_ENDO" },
@@ -252,7 +251,6 @@ export function createEducationNodes(env, helpers) {
       choices: [
         { id: "mine",   label: "I'm noticing this now",              next: "ELSE_DISCHARGE_ENTRY", primary: true },
         { id: "ovul",   label: "How this relates to ovulation",      next: "EDUC_OVULATION" },
-        { id: "spot",   label: "Difference from spotting",           next: "EDUC_SPOTTING" },
         { id: "more",   label: "Learn another symptom",              next: "SYMPTOM_EDUCATION" },
         { id: "menu",   label: pickMainLabel(),                        next: "START_MENU" },
       ],
@@ -269,7 +267,6 @@ export function createEducationNodes(env, helpers) {
       choices: [
         { id: "mine",  label: "My bleeding feels different",  next: "HEAVY_INTRO", primary: true },
         { id: "clots", label: "What about clots?",            next: "EDUC_CLOTS" },
-        { id: "spot",  label: "Is this spotting?",            next: "EDUC_SPOTTING" },
         { id: "more",  label: "Learn another symptom",        next: "SYMPTOM_EDUCATION" },
         { id: "menu",  label: pickMainLabel(),                  next: "START_MENU" },
       ],
@@ -422,7 +419,6 @@ export function createEducationNodes(env, helpers) {
       choices: [
         { id: "mine",  label: "This is happening to me",            next: "PERIOD_TRIAGE", primary: true },
         { id: "contra",label: "General contraception overview",     next: "EDUC_CONTRACEPTION" },
-        { id: "spot",  label: "Is this spotting normal?",           next: "EDUC_SPOTTING" },
         { id: "more",  label: "Learn another symptom",              next: "SYMPTOM_EDUCATION" },
         { id: "menu",  label: pickMainLabel(),                        next: "START_MENU" },
       ],

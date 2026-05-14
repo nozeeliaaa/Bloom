@@ -152,6 +152,160 @@
   line-height: 1.6;
 }
 
+.bloom-signal-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+}
+
+@media (min-width: 780px) {
+  .bloom-signal-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bloom-signal-card {
+  border: 1px solid #ead7e1;
+  border-radius: 8px;
+  background: #fffdfd;
+  padding: 0.85rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.bloom-signal-card--medium {
+  background: #fffafb;
+  border-color: #e7bfd2;
+  box-shadow: inset 3px 0 0 rgba(212, 24, 122, 0.35);
+}
+
+.bloom-signal-card--low {
+  background: #fffdfb;
+  border-color: #eadfdc;
+}
+
+.bloom-signal-card--high {
+  background: #fff7ed;
+  border-color: #e2a65f;
+  box-shadow: inset 3px 0 0 #a45f16;
+}
+
+.bloom-signal-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 800;
+  color: var(--color-primary-dark);
+  line-height: 1.35;
+}
+
+.bloom-signal-card--high .bloom-signal-heading {
+  color: #7a4612;
+}
+
+.bloom-signal-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  font-weight: 900;
+  background: rgba(212, 24, 122, 0.08);
+  color: var(--color-primary);
+}
+
+.bloom-signal-card--high .bloom-signal-icon {
+  background: #f7d8ac;
+  color: #7a4612;
+}
+
+.bloom-signal-message {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.bloom-signal-summary {
+  color: var(--color-text);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.bloom-signal-more {
+  border-top: 1px solid rgba(144, 92, 120, 0.14);
+  padding-top: 0.45rem;
+}
+
+.bloom-signal-more summary {
+  cursor: pointer;
+  color: #9a3f70;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.3;
+  width: max-content;
+}
+
+.bloom-signal-more summary:hover,
+.bloom-signal-more[open] summary {
+  color: var(--color-primary-dark);
+}
+
+.bloom-signal-more-body {
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 0.55rem;
+}
+
+.bloom-signal-details {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bloom-signal-details li {
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  padding-left: 0.85rem;
+  position: relative;
+}
+
+.bloom-signal-details li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: rgba(154, 63, 112, 0.45);
+}
+
+.bloom-signal-guidance {
+  color: #8a4f76;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.bloom-signal-guidance--inside {
+  color: #7f5269;
+  padding: 0.55rem 0 0;
+  border-top: 1px solid rgba(144, 92, 120, 0.12);
+}
+
+.bloom-signal-card--high .bloom-signal-guidance {
+  color: #6f3f0f;
+  font-weight: 800;
+  font-style: normal;
+}
+
 .phase-badge {
   display: inline-flex;
   align-items: center;
@@ -232,4 +386,4 @@
 }
 
 .dot-period{ background: #ff5c93; }
-.dot-fertile{ background: #4aa3ff; }
+.dot-fertile{ background: #7EC8C8; }

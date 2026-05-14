@@ -3,7 +3,7 @@
  *
  * POST /api/contact
  *   Saves the submission to Firestore (contactMessages collection) and
- *   sends an email notification to bloomhelpdesk@outlook.com.
+ *   sends an email notification to bloomhelpdesk1@gmail.com.
  *   Returns a requestId (BLM-YYYY-XXXXX) to show the user.
  *
  * Rate-limited to 5 requests per 15 minutes per IP.
@@ -78,7 +78,7 @@ router.post("/", limiter, async (req, res) => {
         replyEmail: safeEmail   || null,
         name:       safeName    || null,
         userId:     safeUserId  || null,
-        status:     "new",
+        status:     "not_started",
         source:     "contact-form",
         createdAt:  FieldValue.serverTimestamp(),
       });
@@ -126,10 +126,12 @@ router.post("/", limiter, async (req, res) => {
       return res.status(503).json({
         error: "Helpdesk inbox is temporarily unavailable. Please try again shortly.",
         requestId,
+        delivered: false,
+        stored,
       });
     }
 
-    res.json({ ok: true, requestId, stored });
+    res.json({ ok: true, requestId, stored, delivered: true });
   } catch (e) {
     console.error("[contact] POST error:", e);
     res.status(500).json({ error: "Failed to send message. Please try again." });
