@@ -3,66 +3,842 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bloom — Help</title>
+  <title>Help & Resources - Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
 
-<link rel="stylesheet" href="../css/base.css">
-<link rel="stylesheet" href="../css/main.css">
-<link rel="stylesheet" href="../css/pages.css">
+  <style>
+    /* â”€â”€ Tab nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .help-tabs {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+      border-bottom: 2px solid var(--color-border);
+      margin-bottom: 1.5rem;
+    }
+    .help-tab {
+      padding: 0.6rem 1.1rem;
+      border: none;
+      background: none;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: var(--radius-sm, 6px) var(--radius-sm, 6px) 0 0;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .help-tab:hover { color: var(--color-primary); }
+    .help-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
 
+    .help-panel { display: none; }
+    .help-panel.active { display: block; }
+
+    /* â”€â”€ How to Use steps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .how-section { margin-bottom: 1.75rem; }
+    .how-section h3 { margin-bottom: 0.75rem; font-size: 1rem; }
+    .step-list { list-style: none; padding: 0; margin: 0; counter-reset: steps; }
+    .step-list li {
+      counter-increment: steps;
+      display: flex;
+      gap: 0.9rem;
+      align-items: flex-start;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--color-border);
+      font-size: 0.93rem;
+    }
+    .step-list li:last-child { border-bottom: none; }
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* â”€â”€ FAQ accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .faq-item {
+      border-bottom: 1px solid var(--color-border);
+    }
+    .faq-q {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.85rem 0;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.93rem;
+      gap: 0.5rem;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .faq-q .faq-icon {
+      font-size: 1.1rem;
+      font-weight: 400;
+      color: var(--color-text-muted);
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    .faq-item.open .faq-icon { transform: rotate(45deg); }
+    .faq-a {
+      display: none;
+      padding: 0 0 0.85rem;
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      line-height: 1.6;
+    }
+    .faq-item.open .faq-a { display: block; }
+
+    /* â”€â”€ Glossary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .gloss-search-wrap {
+      position: relative;
+      margin-bottom: 1rem;
+    }
+    .gloss-search {
+      width: 100%;
+      padding: 0.65rem 1rem 0.65rem 2.4rem;
+      border: 1.5px solid var(--color-border);
+      border-radius: 99px;
+      font: inherit;
+      font-size: 0.92rem;
+      background: var(--color-bg-card);
+      color: var(--color-text);
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+    .gloss-search:focus { outline: none; border-color: var(--color-primary); }
+    .gloss-search-icon {
+      position: absolute;
+      left: 0.85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-text-muted);
+      pointer-events: none;
+      font-size: 0.95rem;
+    }
+    .gloss-alpha-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .gloss-alpha-btn {
+      padding: 0.25rem 0.5rem;
+      border: 1.5px solid var(--color-border);
+      border-radius: 6px;
+      background: none;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      line-height: 1;
+    }
+    .gloss-alpha-btn:hover,
+    .gloss-alpha-btn.active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+    .gloss-letter-group { margin-bottom: 0.5rem; }
+    .gloss-letter-heading {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--color-primary);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.4rem 0 0.3rem;
+      border-bottom: 1.5px solid var(--color-primary);
+      margin-bottom: 0.6rem;
+    }
+    .gloss-cards { display: flex; flex-direction: column; gap: 0.6rem; }
+    .gloss-card {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+    }
+    .gloss-card-term {
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: var(--color-primary);
+      margin-bottom: 0.3rem;
+    }
+    .gloss-card-def {
+      font-size: 0.88rem;
+      color: var(--color-text-muted);
+      line-height: 1.6;
+      margin: 0;
+    }
+    .gloss-empty {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--color-text-muted);
+      font-size: 0.92rem;
+    }
+    .gloss-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .gloss-page-btn {
+      padding: 0.35rem 0.7rem;
+      border: 1.5px solid var(--color-border);
+      border-radius: 8px;
+      background: none;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      line-height: 1;
+    }
+    .gloss-page-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .gloss-page-btn.active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+    .gloss-page-btn:disabled { opacity: 0.35; cursor: default; }
+
+    /* â”€â”€ Resources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .resource-cards { display: flex; flex-direction: column; gap: 1rem; }
+    .resource-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius, 12px);
+      padding: 1rem 1.1rem;
+      background: var(--color-bg-card);
+    }
+    .resource-card.urgent {
+      border-color: #e05c7a;
+      background: #fff5f7;
+    }
+    .resource-name {
+      font-weight: 800;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+    }
+    .resource-card.urgent .resource-name { color: #c0304a; }
+    .resource-desc {
+      font-size: 0.86rem;
+      color: var(--color-text-muted);
+      margin-bottom: 0.5rem;
+      line-height: 1.5;
+    }
+    .resource-details {
+      font-size: 0.84rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 1rem;
+    }
+    .resource-details span { color: var(--color-text-muted); }
+    .resource-details strong { color: var(--color-text); }
+
+    /* â”€â”€ Contact form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .contact-form { display: flex; flex-direction: column; gap: 1rem; max-width: 540px; }
+    .contact-form label { font-weight: 700; font-size: 0.88rem; display: block; margin-bottom: 0.3rem; }
+    .contact-form select,
+    .contact-form textarea,
+    .contact-form input[type="text"],
+    .contact-form input[type="email"] {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-sm, 8px);
+      background: var(--color-bg);
+      font: inherit;
+      font-size: 0.92rem;
+      box-sizing: border-box;
+      transition: border-color 0.15s;
+    }
+    .contact-form select:focus,
+    .contact-form textarea:focus,
+    .contact-form input[type="text"]:focus,
+    .contact-form input[type="email"]:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(212,116,154,0.1);
+    }
+    .contact-form textarea { resize: vertical; min-height: 120px; }
+    .contact-hint { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 0.2rem; }
+    .contact-success {
+      padding: 0.9rem 1rem;
+      background: #f0faf4;
+      border: 1px solid #6bcb77;
+      border-radius: var(--radius-sm, 8px);
+      color: #1a5c2a;
+      font-size: 0.92rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    .contact-error {
+      padding: 0.8rem 0.9rem;
+      border: 1px solid #d47c95;
+      background: #fff5f8;
+      color: #8f2448;
+      border-radius: var(--radius-sm, 8px);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    /* â”€â”€ Shared â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    .section-intro {
+      font-size: 0.92rem;
+      color: var(--color-text-muted);
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+    }
+    .resource-clinic-btn { margin-top: 0.4rem; font-size: 0.85rem; }
+    .contact-email-hint  { font-weight: 400; color: var(--color-text-muted); }
+    .resources-footnote  { margin-top: 1.25rem; }
+  </style>
 </head>
 <body>
   <div id="banner-area"></div>
 
-  <main class="page">
-    <header class="page-header">
-      <div class="page-title">
-        <span class="title-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 17a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 19zm1.4-6.7c-.9.6-1.1.9-1.1 1.7v.3h-2v-.5c0-1.6.7-2.4 2-3.2.9-.6 1.4-1 1.4-1.8 0-.8-.6-1.3-1.5-1.3-1 0-1.6.6-1.7 1.6l-2-.2c.2-2 1.7-3.3 3.8-3.3 2.2 0 3.6 1.2 3.6 3.2 0 1.7-1 2.6-2.5 3.5z"/></svg>
-        </span>
-        <h1>Help</h1>
+  <main>
+    <div class="page-header">
+      <h1>Help &amp; Resources</h1>
+      <p>Guides, answers, definitions, and Jamaican health resources.</p>
+    </div>
+
+    <div class="card">
+      <!-- Tab bar -->
+      <nav class="help-tabs" role="tablist" aria-label="Help sections">
+        <button type="button" class="help-tab active" data-tab="how"     role="tab" aria-selected="true">How to Use</button>
+        <button type="button" class="help-tab"        data-tab="faq"     role="tab" aria-selected="false">FAQ</button>
+        <button type="button" class="help-tab"        data-tab="glossary" role="tab" aria-selected="false">Glossary</button>
+        <button type="button" class="help-tab"        data-tab="resources" role="tab" aria-selected="false">Resources</button>
+        <button type="button" class="help-tab"        data-tab="contact" role="tab" aria-selected="false">Contact</button>
+      </nav>
+
+      <!-- â”€â”€ How to Use â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+      <div class="help-panel active" id="tab-how" role="tabpanel">
+        <p class="section-intro">Step-by-step guides for the most common actions in Bloom.</p>
+
+        <div class="how-section">
+          <h3>Log a period day</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span>Open <strong>Calendar</strong> from the navigation bar.</span></li>
+            <li><span class="step-num">2</span><span>Tap or click the day you want to log.</span></li>
+            <li><span class="step-num">3</span><span>In the day panel, select your <strong>flow intensity</strong> (light, medium, heavy, or spotting).</span></li>
+            <li><span class="step-num">4</span><span>Optionally add symptoms, a mood, and a note.</span></li>
+            <li><span class="step-num">5</span><span>Press <strong>Save</strong>. The day will be coloured on the calendar and your cycle stats will update.</span></li>
+          </ol>
+        </div>
+
+        <div class="how-section">
+          <h3>Switch your health goal</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span>Open <strong>Settings</strong> from your profile page.</span></li>
+            <li><span class="step-num">2</span><span>Find the <strong>Health Goal</strong> section and select your goal (Track my cycle, Get pregnant, I am pregnant, or Manage symptoms).</span></li>
+            <li><span class="step-num">3</span><span>Save. The Dashboard will immediately adapt its cards and insights to your chosen goal.</span></li>
+          </ol>
+        </div>
+
+        <div class="how-section">
+          <h3>Read the Dashboard</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span>The top card shows your <strong>current cycle day</strong> and estimated phase (menstrual, follicular, ovulation, luteal).</span></li>
+            <li><span class="step-num">2</span><span>Below that, goal-specific cards appear - for example, a fertile window for TTC users or a due date for pregnancy.</span></li>
+            <li><span class="step-num">3</span><span>The <strong>Cycle History</strong> section shows a chart and table of your past cycles. Use <strong>Export as PDF</strong> to download a report.</span></li>
+            <li><span class="step-num">4</span><span>Advanced Insights (account mode only) flags any unusual patterns Bloom has noticed.</span></li>
+          </ol>
+        </div>
+
+        <div class="how-section">
+          <h3>Use Bloomie (chat assistant)</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span>Tap <strong>Bloomie</strong> in the nav or the pink chat button on any page.</span></li>
+            <li><span class="step-num">2</span><span>Type a question or choose a quick-reply button to start.</span></li>
+            <li><span class="step-num">3</span><span>Bloomie gives educational responses. It is not a doctor - for medical concerns, always consult a healthcare provider.</span></li>
+          </ol>
+        </div>
+
+        <div class="how-section">
+          <h3>Switch between Anonymous and Account mode</h3>
+          <ol class="step-list">
+            <li><span class="step-num">1</span><span><strong>Anonymous mode</strong> stores all data on your device only. Good for privacy, but data is lost if you clear your browser.</span></li>
+            <li><span class="step-num">2</span><span><strong>Account mode</strong> backs data up securely to the cloud and unlocks advanced features. You must be 18+.</span></li>
+            <li><span class="step-num">3</span><span>To upgrade from anonymous, go to <strong>Profile</strong> and tap <strong>Create Account</strong>.</span></li>
+          </ol>
+        </div>
       </div>
-      <p class="page-subtitle">Quick answers to common questions about using Bloom.</p>
-    </header>
 
-    <section class="card">
-      <h2>FAQs</h2>
+      <!-- â”€â”€ FAQ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+      <div class="help-panel" id="tab-faq" role="tabpanel">
+        <p class="section-intro">Common questions about Bloom.</p>
 
-      <div class="stack stack-margin-top">
         <div class="faq-item">
-          <div class="faq-q"><strong>How do I log my period?</strong><span class="muted">+</span></div>
-          <div class="faq-a">Go to <strong>Calendar</strong>, tap a day, choose your flow, symptoms, then save.</div>
+          <div class="faq-q">How do I log my period?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Go to <strong>Calendar</strong>, tap a day, select your flow intensity (light, medium, heavy, or spotting), optionally add symptoms, then press <strong>Save</strong>.</div>
         </div>
 
         <div class="faq-item">
-          <div class="faq-q"><strong>How is my cycle length calculated?</strong><span class="muted">+</span></div>
-          <div class="faq-a">Bloom detects your period <strong>start days</strong> from your flow logs, then measures the days between starts.</div>
+          <div class="faq-q">How is my cycle length calculated?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Bloom detects your period <strong>start days</strong> from your flow logs, then counts the days between consecutive starts. You need at least two period starts before a cycle length can be calculated.</div>
         </div>
 
         <div class="faq-item">
-          <div class="faq-q"><strong>Is my data private?</strong><span class="muted">+</span></div>
-          <div class="faq-a">Your logs stay on your device in this demo (localStorage). In a full version, we’d add secure storage + consent controls.</div>
+          <div class="faq-q">Is my data private?<span class="faq-icon">+</span></div>
+          <div class="faq-a">In <strong>Anonymous mode</strong> your data never leaves your device - it is stored in your browser's local storage. In <strong>Account mode</strong> data is encrypted and stored securely. We never sell your data. See our <a href="/pages/privacy.html">Privacy Policy</a> for details.</div>
         </div>
 
         <div class="faq-item">
-          <div class="faq-q"><strong>How do I download a report?</strong><span class="muted">+</span></div>
-          <div class="faq-a">Open <strong>Report for Doctor</strong> and click <strong>Download Health Report</strong>.</div>
+          <div class="faq-q">How do I download a health report?<span class="faq-icon">+</span></div>
+          <div class="faq-a">From the <strong>Dashboard</strong>, press <strong>Export as PDF</strong> in the Cycle History section. The report downloads immediately without leaving the page.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">What do the cycle phases mean?<span class="faq-icon">+</span></div>
+          <div class="faq-a"><strong>Menstrual</strong> - bleeding days. <strong>Follicular</strong> - after your period ends, leading up to ovulation. <strong>Ovulation</strong> - estimated peak fertile day. <strong>Luteal</strong> - after ovulation until your next period. See the Glossary tab for full definitions.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">Can Bloom predict my next period?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Yes - once you have logged at least two cycles, Bloom estimates your next period start based on your average cycle length. The more cycles you log, the more accurate the prediction. Predictions are educational estimates only.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">What if I have irregular cycles?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Bloom will flag cycle variability in Advanced Insights and give lower-confidence predictions. Keep logging - even irregular data builds a useful record over time. If irregularity is persistent or concerning, speak with a healthcare provider.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">How do I switch my health goal?<span class="faq-icon">+</span></div>
+          <div class="faq-a">Go to <strong>Profile &rarr; Settings &rarr; Health Goal</strong> and select a new goal. The Dashboard adapts immediately.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">Why did my cycle data disappear?<span class="faq-icon">+</span></div>
+          <div class="faq-a">In Anonymous mode, data is stored in your browser. Clearing your browser history or cache can erase it. To protect your data, create a free account to enable cloud backup.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">Is Bloom a substitute for medical advice?<span class="faq-icon">+</span></div>
+          <div class="faq-a">No. Bloom is an educational tool only. It does not diagnose conditions or replace a doctor. Always consult a qualified healthcare provider for medical concerns.</div>
         </div>
       </div>
-    </section>
+
+      <!-- â”€â”€ Glossary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+      <div class="help-panel" id="tab-glossary" role="tabpanel">
+        <p class="section-intro">Definitions for terms used in Bloom and reproductive health.</p>
+
+        <div class="gloss-search-wrap">
+          <span class="gloss-search-icon">&#128269;</span>
+          <input class="gloss-search" id="gloss-search" type="search" placeholder="Search terms..." autocomplete="off" />
+        </div>
+
+        <div class="gloss-alpha-bar" id="gloss-alpha-bar"></div>
+
+        <div id="gloss-results"></div>
+
+        <div class="gloss-pagination" id="gloss-pagination"></div>
+      </div>
+
+      <!-- â”€â”€ Resources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+      <div class="help-panel" id="tab-resources" role="tabpanel">
+        <p class="section-intro">Trusted Jamaican and international reproductive health organisations.</p>
+
+        <div class="resource-cards">
+
+          <div class="resource-card urgent">
+            <div class="resource-name">National Domestic Violence Hotline - Jamaica</div>
+            <div class="resource-desc">Free, confidential support for people experiencing domestic or gender-based violence. Available 24 hours.</div>
+            <div class="resource-details">
+              <span>Hotline: <strong>888-CRISIS (888-274-747)</strong></span>
+              <span>Ministry of Culture, Gender, Entertainment and Sport</span>
+            </div>
+          </div>
+
+          <div class="resource-card">
+            <div class="resource-name">National Family Planning Board (NFPB)</div>
+            <div class="resource-desc">Jamaica's lead agency for reproductive health services. Offers family planning, STI screening, cervical cancer screening, and health education island-wide.</div>
+            <div class="resource-details">
+              <span>Phone: <strong>(876) 926-6635 / 926-6637</strong></span>
+              <span>Email: <strong>nfpb@nfpb.gov.jm</strong></span>
+              <span>Location: 11-15 Oxford Road, Kingston 5</span>
+            </div>
+          </div>
+
+          <div class="resource-card">
+            <div class="resource-name">Jamaica Cancer Society</div>
+            <div class="resource-desc">Provides cancer education, cervical cancer screening, and patient support services. Cervical cancer is one of the leading cancers affecting Jamaican women - early screening saves lives.</div>
+            <div class="resource-details">
+              <span>Phone: <strong>(876) 927-7383</strong></span>
+              <span>Email: <strong>info@jamaicacancer.org</strong></span>
+              <span>Location: 16 Lady Musgrave Road, Kingston 5</span>
+            </div>
+          </div>
+
+          <div class="resource-card">
+            <div class="resource-name">Clinic Finder - Bloom</div>
+            <div class="resource-desc">Browse reproductive health clinics across Jamaica directly in the app. Filter by parish and see contact details.</div>
+            <div class="resource-details">
+              <a href="/pages/clinics.html" class="btn btn-outline resource-clinic-btn">Open Clinic Map</a>
+            </div>
+          </div>
+
+          <div class="resource-card">
+            <div class="resource-name">Ministry of Health &amp; Wellness - Jamaica</div>
+            <div class="resource-desc">Official source for public health information, sexual and reproductive health guidelines, and health facility listings for Jamaica.</div>
+            <div class="resource-details">
+              <span>Phone: <strong>(876) 633-7443</strong></span>
+              <span>Website: <strong>moh.gov.jm</strong></span>
+            </div>
+          </div>
+
+        </div>
+
+        <p class="form-hint resources-footnote">
+          These resources are provided for informational purposes. Bloom is not affiliated with any listed organisation.
+          Always verify contact details directly with the organisation.
+        </p>
+      </div>
+
+      <!-- â”€â”€ Contact â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+      <div class="help-panel" id="tab-contact" role="tabpanel">
+        <p class="section-intro">Have a question, report an issue, or send us feedback. We read every message.</p>
+
+        <div id="contact-success" class="contact-success hidden">
+          <strong>Message sent successfully.</strong>
+          <p class="contact-success-body">We have received your message and will get back to you if a reply is needed.</p>
+          <p id="contact-request-id" class="contact-request-id"></p>
+          <button type="button" id="contact-send-another" class="btn btn-outline btn-sm contact-send-another">Send another message</button>
+        </div>
+
+        <div id="contact-error" class="contact-error hidden"></div>
+
+        <form class="contact-form" id="contact-form" novalidate>
+          <div>
+            <label for="contact-name">Your name <span class="contact-email-hint">(optional)</span></label>
+            <input type="text" id="contact-name" name="name" placeholder="e.g. Jane" autocomplete="given-name" maxlength="100" />
+          </div>
+
+          <div>
+            <label for="contact-subject">Subject</label>
+            <select id="contact-subject" name="subject" required>
+              <option value="" disabled selected>Select a topic...</option>
+              <option value="bug">Something is not working</option>
+              <option value="data">Question about my data</option>
+              <option value="privacy">Privacy concern</option>
+              <option value="feedback">General feedback</option>
+              <option value="accessibility">Accessibility issue</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="contact-message">Message</label>
+            <textarea id="contact-message" name="message" placeholder="Describe your question or issue..." required maxlength="1200"></textarea>
+            <p class="contact-hint">Max 1200 characters.</p>
+          </div>
+
+          <div>
+            <label for="contact-email">Your email <span class="contact-email-hint">(optional = only if you want a reply)</span></label>
+            <input type="email" id="contact-email" name="email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+
+          <div>
+            <button type="submit" class="btn btn-primary" id="contact-submit">Send message</button>
+          </div>
+        </form>
+      </div>
+
+    </div><!-- /card -->
   </main>
 
   <script type="module">
     import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
+    import { getIdToken, getCurrentUser } from "/js/auth.js";
     renderNav("help");
     renderFooter();
     renderBloomieFab();
     renderModeBanner(document.getElementById("banner-area"));
 
+    // â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const tabs   = document.querySelectorAll(".help-tab");
+    const panels = document.querySelectorAll(".help-panel");
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => { t.classList.remove("active"); t.setAttribute("aria-selected","false"); });
+        panels.forEach(p => p.classList.remove("active"));
+        tab.classList.add("active");
+        tab.setAttribute("aria-selected","true");
+        document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+      });
+    });
+
+    // Open to anchor if URL hash matches a tab
+    const hash = location.hash.replace("#","");
+    const hashTab = document.querySelector(`.help-tab[data-tab="${hash}"]`);
+    if (hashTab) hashTab.click();
+
+    // â”€â”€ FAQ accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     document.querySelectorAll(".faq-item").forEach(item => {
       item.querySelector(".faq-q").addEventListener("click", () => {
         item.classList.toggle("open");
       });
     });
+
+    // â”€â”€ Glossary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const GLOSS_TERMS = [
+      { term: "Amenorrhea",                     def: "The absence of menstruation. Primary amenorrhea means a period has never started by age 16. Secondary amenorrhea means periods stopped for 3 or more months in someone who previously had them. Both can have many causes and are worth discussing with a doctor." },
+      { term: "Anovulation",                    def: "When the ovaries do not release an egg during a cycle. It can cause irregular or absent periods and is a common reason why some cycles feel 'off'. It can be related to stress, hormonal imbalances, or conditions like PCOS." },
+      { term: "Basal body temperature (BBT)",   def: "Your body's lowest resting temperature, measured first thing in the morning before getting up. BBT rises slightly after ovulation due to progesterone. Tracking it over time can help identify when ovulation has occurred." },
+      { term: "Confidence score",               def: "How certain Bloom is about your predicted phase and dates based on your available logs. More consistent logs usually increase confidence." },
+      { term: "Cervical mucus",                 def: "Fluid produced by the cervix that changes in texture and appearance throughout the cycle. Around ovulation it becomes clear and stretchy - similar to raw egg white - which is a sign of peak fertility." },
+      { term: "Contraception",                  def: "Methods used to prevent pregnancy. These include hormonal options (like the pill, patch, or injection), barrier methods (like condoms), long-acting devices (like the IUD), and emergency contraception. Each has different effects on the menstrual cycle." },
+      { term: "Cycle length",                   def: "The number of days from the first day of one period to the first day of the next. The average is 28 days, but 21-35 days is considered a normal range." },
+      { term: "Cycle phase estimate",           def: "Bloom's best estimate of your current phase (menstrual, follicular, ovulatory, or luteal) based on logged days and prediction logic." },
+      { term: "Dysmenorrhea",                   def: "The medical term for painful periods. Primary dysmenorrhea refers to cramping without an underlying condition. Secondary dysmenorrhea is caused by a condition such as endometriosis or fibroids. Severe pain that disrupts daily life is worth discussing with a doctor." },
+      { term: "EDD (Estimated Due Date)",       def: "The estimated date a pregnancy is expected to reach 40 weeks. It is calculated from the first day of the last menstrual period (LMP) and is an estimate - fewer than 5% of babies are born exactly on their EDD." },
+      { term: "Egg freezing",                   def: "A process where eggs are retrieved from the ovaries, frozen, and stored for future use. It is often chosen by people who want to preserve fertility before medical treatment or who are not yet ready for pregnancy." },
+      { term: "Endometrium",                    def: "The inner lining of the uterus. It thickens each cycle in preparation for a potential pregnancy. If no fertilisation occurs, it sheds - this is your period. In conditions like endometriosis, similar tissue grows outside the uterus." },
+      { term: "Estrogen",                       def: "A primary female sex hormone produced mainly by the ovaries. It drives the development of the uterine lining during the first half of the cycle, supports bone health, and influences mood, skin, and energy. Levels naturally fluctuate throughout the cycle." },
+      { term: "Fertile window",                 def: "The days each cycle when pregnancy is most possible - typically the 5 days before ovulation and the day of ovulation itself. Bloom estimates this window based on your cycle history." },
+      { term: "Fertility tracking",             def: "The practice of monitoring cycle signs - such as BBT, cervical mucus, and cycle length - to identify fertile days. It can be used to support conception or as a way to better understand your body." },
+      { term: "Follicular phase",               def: "The phase from the first day of your period until ovulation. The pituitary gland releases FSH (follicle-stimulating hormone), prompting follicles in the ovaries to develop. Oestrogen rises, thickening the uterine lining." },
+      { term: "Gestation",                      def: "The period of development from fertilisation to birth. In humans, a full-term pregnancy is approximately 40 weeks (or 9 months), counted from the first day of the last menstrual period." },
+      { term: "Hormonal imbalance",             def: "When hormones like estrogen, progesterone, or androgens are produced in amounts that are too high or too low. This can affect cycle regularity, mood, skin, weight, and fertility. Common causes include PCOS, thyroid conditions, and stress." },
+      { term: "Implantation",                   def: "When a fertilised egg attaches to the lining of the uterus, usually 6-12 days after ovulation. Successful implantation is the start of a pregnancy. Some people experience light spotting or mild cramping around this time." },
+      { term: "Implantation bleeding",          def: "Light spotting that can occur when a fertilised egg implants in the uterine lining. It is usually lighter and shorter than a period, often pink or brown in colour. Not everyone experiences it." },
+      { term: "Irregular cycles",               def: "Cycles that vary significantly in length from month to month, come more frequently than every 21 days, or less frequently than every 35 days. Many things can cause irregularity - stress, weight changes, hormonal shifts, and underlying conditions like PCOS." },
+      { term: "IUI (Intrauterine Insemination)", def: "A fertility treatment where sperm is placed directly into the uterus around the time of ovulation to increase the chances of fertilisation. It is often a first-line assisted reproduction option." },
+      { term: "IVF (In Vitro Fertilization)",   def: "A fertility treatment where eggs are retrieved from the ovaries, fertilised with sperm in a laboratory, and the resulting embryo is transferred to the uterus. It is used when other fertility treatments have not been successful or are not suitable." },
+      { term: "Logged period day",              def: "A day where you explicitly recorded flow in the Calendar. Logged period days are treated as factual entries and can override prediction-only assumptions." },
+      { term: "LMP (Last Menstrual Period)",    def: "The first day of your most recent period. Doctors use this date to estimate gestational age and calculate an EDD." },
+      { term: "Luteal phase",                   def: "The phase after ovulation until the start of the next period, typically 12-16 days. Progesterone rises to prepare the uterus for a potential pregnancy. If no implantation occurs, progesterone drops and menstruation begins." },
+      { term: "Menarche",                       def: "The first menstrual period. It typically occurs between ages 10 and 16 and signals the beginning of reproductive capacity." },
+      { term: "Menopause",                      def: "The point when menstruation has stopped for 12 consecutive months, marking the end of the reproductive years. The average age is 51. It is confirmed retrospectively after 12 period-free months." },
+      { term: "Miscarriage",                    def: "The natural loss of a pregnancy before 20 weeks. It is more common than many people realise, occurring in roughly 1 in 4 known pregnancies. Most are caused by chromosomal differences in the embryo and are not caused by anything the person did." },
+      { term: "Ovulation",                      def: "The release of a mature egg from an ovary. It typically occurs around day 14 of a 28-day cycle, though timing varies. The egg is viable for 12-24 hours; sperm can survive up to 5 days, making the window around ovulation the fertile period." },
+      { term: "Ovulation predictor kit (OPK)",  def: "A home test that detects the surge in luteinising hormone (LH) that occurs 24-36 hours before ovulation. A positive OPK result suggests ovulation is approaching and can help identify the most fertile days." },
+      { term: "PCOS (Polycystic Ovary Syndrome)", def: "A hormonal condition affecting the ovaries. It can cause irregular or absent periods, excess androgen (male hormones), and small fluid-filled sacs on the ovaries. It is one of the most common causes of irregular cycles." },
+      { term: "Perimenopause",                  def: "The transition period leading up to menopause, which can last several years. Hormones fluctuate, causing irregular periods, hot flushes, mood changes, and other symptoms." },
+      { term: "PMDD (Premenstrual Dysphoric Disorder)", def: "A severe form of PMS involving significant mood-related symptoms - such as depression, anxiety, or irritability - in the week or two before a period. Symptoms typically improve within a few days of the period starting. It is a recognised condition that responds well to treatment." },
+      { term: "PMS (Premenstrual Syndrome)",    def: "A combination of physical and emotional symptoms that occur in the 1-2 weeks before a period. Common symptoms include bloating, breast tenderness, mood changes, and fatigue. More severe cases may indicate PMDD." },
+      { term: "Predicted period",               def: "A projected future period range calculated from your cycle pattern. Predicted days may shift as you add new logs." },
+      { term: "Prediction window",              def: "A date range Bloom provides (instead of one exact day) when timing confidence is lower or cycle variation is higher." },
+      { term: "Progesterone",                   def: "A hormone produced by the ovaries after ovulation. It prepares the uterine lining for implantation and helps maintain early pregnancy. If pregnancy does not occur, progesterone drops and triggers menstruation." },
+      { term: "Session timeout",                def: "Automatic sign-out after extended inactivity for account safety. You are usually warned before logout so you can stay signed in." },
+    ].sort((a, b) => a.term.localeCompare(b.term));
+
+    const PER_PAGE = 10;
+    let glossPage = 1;
+    let glossQuery = "";
+    let glossLetter = "";
+
+    function glossFiltered() {
+      return GLOSS_TERMS.filter(({ term, def }) => {
+        const q = glossQuery.toLowerCase();
+        const l = glossLetter;
+        const matchesQuery = !q || term.toLowerCase().includes(q) || def.toLowerCase().includes(q);
+        const matchesLetter = !l || term.toUpperCase().startsWith(l);
+        return matchesQuery && matchesLetter;
+      });
+    }
+
+    function glossRender() {
+      const filtered = glossFiltered();
+      const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+      if (glossPage > totalPages) glossPage = totalPages;
+
+      const start = (glossPage - 1) * PER_PAGE;
+      const page  = filtered.slice(start, start + PER_PAGE);
+
+      const resultsEl    = document.getElementById("gloss-results");
+      const paginationEl = document.getElementById("gloss-pagination");
+
+      if (filtered.length === 0) {
+        resultsEl.innerHTML = `<div class="gloss-empty">No matching terms found.</div>`;
+        paginationEl.innerHTML = "";
+        return;
+      }
+
+      // Group page items by first letter
+      const groups = {};
+      page.forEach(item => {
+        const letter = item.term[0].toUpperCase();
+        if (!groups[letter]) groups[letter] = [];
+        groups[letter].push(item);
+      });
+
+      let html = "";
+      Object.keys(groups).sort().forEach(letter => {
+        html += `<div class="gloss-letter-group">
+          <div class="gloss-letter-heading">${letter}</div>
+          <div class="gloss-cards">
+            ${groups[letter].map(item => `
+              <div class="gloss-card">
+                <div class="gloss-card-term">${item.term}</div>
+                <p class="gloss-card-def">${item.def}</p>
+              </div>`).join("")}
+          </div>
+        </div>`;
+      });
+      resultsEl.innerHTML = html;
+
+      // Pagination
+      let pHtml = `<button class="gloss-page-btn" id="gloss-prev" ${glossPage === 1 ? "disabled" : ""}>&larr; Prev</button>`;
+      for (let i = 1; i <= totalPages; i++) {
+        pHtml += `<button class="gloss-page-btn ${i === glossPage ? "active" : ""}" data-page="${i}">${i}</button>`;
+      }
+      pHtml += `<button class="gloss-page-btn" id="gloss-next" ${glossPage === totalPages ? "disabled" : ""}>Next &rarr;</button>`;
+      paginationEl.innerHTML = pHtml;
+
+      paginationEl.querySelectorAll("[data-page]").forEach(btn => {
+        btn.addEventListener("click", () => { glossPage = +btn.dataset.page; glossRender(); });
+      });
+      const prevBtn = document.getElementById("gloss-prev");
+      const nextBtn = document.getElementById("gloss-next");
+      if (prevBtn) prevBtn.addEventListener("click", () => { glossPage--; glossRender(); });
+      if (nextBtn) nextBtn.addEventListener("click", () => { glossPage++; glossRender(); });
+    }
+
+    function glossBuildAlphaBar() {
+      const letters = [...new Set(GLOSS_TERMS.map(t => t.term[0].toUpperCase()))].sort();
+      const bar = document.getElementById("gloss-alpha-bar");
+      const allBtn = document.createElement("button");
+      allBtn.className = "gloss-alpha-btn active";
+      allBtn.textContent = "All";
+      allBtn.addEventListener("click", () => {
+        glossLetter = "";
+        glossPage = 1;
+        bar.querySelectorAll(".gloss-alpha-btn").forEach(b => b.classList.remove("active"));
+        allBtn.classList.add("active");
+        glossRender();
+      });
+      bar.appendChild(allBtn);
+
+      letters.forEach(l => {
+        const btn = document.createElement("button");
+        btn.className = "gloss-alpha-btn";
+        btn.textContent = l;
+        btn.addEventListener("click", () => {
+          glossLetter = l;
+          glossPage = 1;
+          bar.querySelectorAll(".gloss-alpha-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          glossRender();
+        });
+        bar.appendChild(btn);
+      });
+    }
+
+    glossBuildAlphaBar();
+    glossRender();
+
+    document.getElementById("gloss-search").addEventListener("input", e => {
+      glossQuery = e.target.value.trim();
+      glossPage = 1;
+      // Clear letter filter when searching
+      if (glossQuery) {
+        glossLetter = "";
+        document.querySelectorAll(".gloss-alpha-btn").forEach(b => b.classList.remove("active"));
+        document.querySelector(".gloss-alpha-btn").classList.add("active");
+      }
+      glossRender();
+    });
+
+    // â”€â”€ Contact form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    
+    const form      = document.getElementById("contact-form");
+    const successEl = document.getElementById("contact-success");
+    const errorEl   = document.getElementById("contact-error");
+    const submitBtn = document.getElementById("contact-submit");
+    const requestIdEl = document.getElementById("contact-request-id");
+    const sendAnotherBtn = document.getElementById("contact-send-another");
+    const API_BASE = typeof window.BLOOM_API_BASE === "string"
+      ? window.BLOOM_API_BASE.trim().replace(/\/+$/, "")
+      : "";
+    const CONTACT_ENDPOINT = `${API_BASE}/api/contact`;
+
+    if (form && successEl && errorEl && submitBtn && requestIdEl && sendAnotherBtn) {
+      sendAnotherBtn.addEventListener("click", () => {
+        successEl.classList.add("hidden");
+        errorEl.classList.add("hidden");
+        requestIdEl.textContent = "";
+        form.classList.remove("hidden");
+        form.reset();
+      });
+
+      form.addEventListener("submit", async e => {
+        e.preventDefault();
+        errorEl.classList.add("hidden");
+
+        const subject = document.getElementById("contact-subject").value;
+        const message = document.getElementById("contact-message").value.trim();
+        const email   = document.getElementById("contact-email").value.trim();
+        const name    = document.getElementById("contact-name").value.trim();
+
+        if (!subject) { showError("Please select a subject."); return; }
+        if (!message) { showError("Please enter a message."); return; }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Sending...";
+
+        try {
+          const token  = await getIdToken().catch(() => null);
+          const userId = getCurrentUser()?.uid ?? null;
+          const payload = { subject, message, ...(email && { email }), ...(name && { name }), ...(userId && { userId }) };
+          const headers = { "Content-Type": "application/json" };
+          if (token) headers.Authorization = `Bearer ${token}`;
+
+          const res = await fetch(CONTACT_ENDPOINT, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          });
+
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            showError(json.error || "We couldn't send your message right now. Please try again.");
+            return;
+          }
+
+          if (json.ok !== true || json.delivered !== true) {
+            const ref = json.requestId ? ` Reference ID: ${json.requestId}.` : "";
+            showError(`Your message could not be delivered to the helpdesk inbox.${ref}`);
+            return;
+          }
+
+          requestIdEl.textContent = json.requestId ? `Reference ID: ${json.requestId}` : "";
+          form.classList.add("hidden");
+          successEl.classList.remove("hidden");
+        } catch (_) {
+          showError("We couldn't send your message right now. Please try again.");
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Send message";
+        }
+      });
+    }
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove("hidden");
+    }
   </script>
 </body>
 </html>
+

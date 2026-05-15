@@ -2,23 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/bloom-logo.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bloom - Reproductive Health Support</title>
   <meta name="description" content="Bloom is a Jamaican-focused reproductive health support app. Track your cycle, learn about your body, and access guided health education.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
 
+  <style>
+    /* ── Entrance animations ─────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
 
-<style>
+    .anim-fade-up   { animation: fadeUp 0.6s ease both; }
+    .anim-fade-in   { animation: fadeIn 0.5s ease both; }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.22s; }
+    .delay-3 { animation-delay: 0.34s; }
+    .delay-4 { animation-delay: 0.46s; }
+
+    /* ── Hero ────────────────────────────────────────────────────── */
     .hero {
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      padding: 3rem 0 2rem;
+      padding: 3rem 1rem 2.5rem;
     }
     .hero-logo {
-      width: 160px;
+      width: 120px;
       height: auto;
       margin: 0 0 0.5rem;
       object-fit: contain;
@@ -27,18 +46,18 @@
     .hero-title {
       font-size: 3rem;
       font-weight: 800;
-      margin: 0 0 0.5rem;
-      color: var(--color-primary-dark);
+      margin: 0 0 0.75rem;
+      color: var(--color-primary-dark, #a04060);
       line-height: 1;
     }
-    @media (min-width: 768px) {
-      .hero-title { font-size: 3.75rem; }
-    }
-    .hero .tagline {
+    @media (min-width: 768px) { .hero-title { font-size: 3.75rem; } }
+
+.hero .tagline {
       font-size: 1.15rem;
       color: var(--color-text-muted);
       max-width: 500px;
       margin: 0 auto 2rem;
+      line-height: 1.6;
     }
     .hero-buttons {
       display: flex;
@@ -47,20 +66,259 @@
       gap: 0.75rem;
       margin-bottom: 2.5rem;
     }
-    .overview-card {
-      max-width: 700px;
-      margin: 0 auto 2rem;
-      text-align: left;
+
+    /* ── App preview carousel ────────────────────────────────────── */
+    .preview-section {
+      max-width: 860px;
+      margin: 0 auto 2.5rem;
+      padding: 0 1rem;
     }
-    .overview-card h2 {
+    .preview-section h2 {
       text-align: center;
-      margin-bottom: 1rem;
+      margin-bottom: 0.35rem;
     }
-    .overview-card p {
+    .preview-section .section-sub {
       text-align: center;
       color: var(--color-text-muted);
-      margin-bottom: 1rem;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
     }
+
+    .carousel {
+      position: relative;
+      overflow: hidden;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+      height: 520px;
+    }
+    @media (max-width: 640px) { .carousel { height: 580px; } }
+    .carousel-track {
+      display: flex;
+      height: 100%;
+      transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .carousel-slide {
+      min-width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--color-bg-soft, #fdf6f9);
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      padding: 1.75rem 2rem;
+      box-sizing: border-box;
+    }
+
+    /* Carousel navigation */
+    .carousel-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--color-bg-card, #fff);
+      border: 1px solid var(--color-border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-text);
+      z-index: 2;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .carousel-btn:hover { background: var(--color-primary, #D4749A); color: white; box-shadow: 0 4px 12px rgba(212,116,154,0.25); }
+    .carousel-btn.prev { left: 10px; }
+    .carousel-btn.next { right: 10px; }
+
+    .carousel-dots {
+      display: flex;
+      justify-content: center;
+      gap: 0.45rem;
+      margin-top: 1rem;
+    }
+    .carousel-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-border);
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+      padding: 0;
+    }
+    .carousel-dot.active {
+      background: var(--color-primary, #D4749A);
+      transform: scale(1.3);
+    }
+
+    /* ── Slide label ─────────────────────────────────────────────── */
+    .slide-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-primary, #D4749A);
+      margin-bottom: 0.6rem;
+    }
+    .slide-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin: 0 0 0.25rem;
+      color: var(--color-text);
+    }
+    .slide-desc {
+      font-size: 0.88rem;
+      color: var(--color-text-muted);
+      margin: 0 0 1.25rem;
+    }
+
+    /* ── CSS mockups ─────────────────────────────────────────────── */
+    .mockup {
+      background: var(--color-bg-card, #fff);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      font-size: 0.82rem;
+    }
+    .mockup-topbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: 0.85rem;
+    }
+    .mockup-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .mockup-dot.r { background: #ff6b6b; }
+    .mockup-dot.y { background: #ffd93d; }
+    .mockup-dot.g { background: #6bcb77; }
+    .mockup-url {
+      flex: 1;
+      background: var(--color-bg-soft, #f5f5f5);
+      border-radius: 6px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      font-family: monospace;
+    }
+
+    /* Dashboard mockup */
+    .dash-stat-row { display: flex; gap: 0.6rem; margin-bottom: 0.75rem; }
+    .dash-stat {
+      flex: 1;
+      background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+      border-radius: 8px;
+      padding: 0.55rem 0.6rem;
+      text-align: center;
+    }
+    .dash-stat-num { font-size: 1.2rem; font-weight: 800; color: #c2185b; }
+    .dash-stat-lbl { font-size: 0.67rem; color: #ad4472; margin-top: 0.1rem; }
+    .dash-phase-pill {
+      display: inline-block;
+      background: #f8c8db;
+      color: #c2185b;
+      border-radius: 999px;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin-bottom: 0.65rem;
+    }
+    .dash-insight {
+      background: var(--color-bg-soft, #fdf6f9);
+      border-radius: 8px;
+      padding: 0.55rem 0.7rem;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      margin-bottom: 0.5rem;
+      border-left: 3px solid #D4749A;
+    }
+
+    /* Calendar mockup */
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; font-weight: 700; font-size: 0.85rem; }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 32px);
+      grid-template-rows: repeat(auto-fill, 30px);
+      gap: 3px;
+      justify-content: center;
+    }
+    .cal-day {
+      width: 32px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+    }
+    .cal-day span { display: contents; }
+    .cal-day.header { font-weight: 800; color: var(--color-text); font-size: 0.65rem; }
+    .cal-day.period { background: #D4749A; color: white; }
+    .cal-day.fertile { background: #b2dfdb; color: #00796b; }
+    .cal-day.ov { background: #80cbc4; color: #004d40; font-weight: 800; }
+    .cal-day.today { outline: 2px solid #D4749A; outline-offset: -2px; }
+    .cal-day.luteal { background: var(--phase-luteal-bg); color: var(--phase-luteal); }
+
+    .cal-legend { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
+    .cal-legend-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--color-text-muted); }
+    .cal-legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .cal-legend-dot.period  { background: #D4749A; }
+    .cal-legend-dot.fertile { background: #b2dfdb; }
+    .cal-legend-dot.ov      { background: #80cbc4; }
+    .cal-legend-dot.luteal  { background: var(--phase-luteal); }
+
+    /* Chat mockup */
+    .chat-msgs { display: flex; flex-direction: column; gap: 0.55rem; }
+    .chat-msg { display: flex; gap: 0.45rem; align-items: flex-end; }
+    .chat-msg.user { flex-direction: row-reverse; }
+    .chat-bubble {
+      max-width: 75%;
+      padding: 0.45rem 0.75rem;
+      border-radius: 14px;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      background: var(--color-bg-soft, #f5f5f5);
+      border: 1px solid var(--color-border);
+    }
+    .chat-msg.user .chat-bubble {
+      background: #D4749A;
+      color: white;
+      border-color: #D4749A;
+    }
+    .chat-avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f8c8db, #D4749A);
+      flex-shrink: 0;
+    }
+    .chat-input-mock {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      background: var(--color-bg-soft, #f5f5f5);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      padding: 0.4rem 0.6rem 0.4rem 0.9rem;
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+    }
+    .chat-send-mock {
+      width: 24px; height: 24px;
+      background: #D4749A;
+      border-radius: 50%;
+      margin-left: auto;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Feature cards ───────────────────────────────────────────── */
     .features-grid {
       display: grid;
       grid-template-columns: 1fr;
@@ -68,65 +326,224 @@
       margin: 2rem auto;
       max-width: 800px;
     }
-    @media (min-width: 640px) {
-      .features-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (min-width: 900px) {
-      .features-grid { grid-template-columns: repeat(3, 1fr); }
-    }
+    @media (min-width: 640px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 900px) { .features-grid { grid-template-columns: repeat(3, 1fr); } }
+
     .feature-card {
       text-align: center;
       padding: 1.5rem;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+      cursor: default;
     }
-    .feature-card .card-icon {
-      margin: 0 auto 0.75rem;
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(212, 116, 154, 0.14);
     }
-    .feature-card h3 {
-      font-size: 1rem;
-      margin-bottom: 0.35rem;
-    }
-    .feature-card p {
-      font-size: 0.88rem;
-      color: var(--color-text-muted);
-      margin: 0;
-    }
-    .compare-section {
+    .feature-card .card-icon { margin: 0 auto 0.75rem; }
+    .feature-card h3 { font-size: 1rem; margin-bottom: 0.35rem; }
+    .feature-card p { font-size: 0.88rem; color: var(--color-text-muted); margin: 0; }
+
+    /* ── Overview & compare ──────────────────────────────────────── */
+    .overview-card {
       max-width: 700px;
       margin: 0 auto 2rem;
     }
-    .compare-section h2 {
-      text-align: center;
-      margin-bottom: 1rem;
-    }
+    .overview-card h2 { text-align: center; margin-bottom: 1rem; }
+    .overview-card p { text-align: center; color: var(--color-text-muted); margin-bottom: 1rem; }
+
+    .compare-section { max-width: 700px; margin: 0 auto 2rem; }
+    .compare-section h2 { text-align: center; margin-bottom: 1rem; }
+
     .disclaimer-card {
       max-width: 600px;
       margin: 0 auto 2rem;
       text-align: center;
-      border: 1px solid var(--color-warning);
+      border: 1px solid var(--color-warning, #f4a730);
       background: #FFFAF2;
     }
-    .disclaimer-card p {
-      margin: 0;
-      color: #7A5A10;
-      font-size: 0.92rem;
-    }
-    @media (min-width: 768px) {
-      .hero h1 { font-size: 3rem; }
+    .disclaimer-card p { margin: 0; color: #7A5A10; font-size: 0.92rem; }
+
+    .overview-list { color: var(--color-text); font-size: 0.95rem; line-height: 2; }
+
+    @media (max-width: 540px) {
+      .carousel-btn { display: none; }
     }
   </style>
-    <link rel="stylesheet" href="/css/main.css" />
-  </head>
+</head>
 <body>
   <main>
     <!-- Hero -->
     <section class="hero">
-      <img src="/assets/bloom-logo.png" alt="Bloom logo" class="hero-logo" />
-      <h1 class="hero-title">Bloom</h1>
-      <p class="tagline">Your Jamaican reproductive health companion. Track your cycle, understand your body, and access trusted health education.</p>
-      <div class="hero-buttons">
+      <img src="/assets/bloom-logo.png" alt="Bloom logo" class="hero-logo anim-fade-in" />
+      <h1 class="hero-title anim-fade-up delay-1">Bloom</h1>
+<p class="tagline anim-fade-up delay-2">Track your cycle, understand your body, and access trusted reproductive health education - rooted in the Caribbean experience.</p>
+      <div class="hero-buttons anim-fade-up delay-3">
         <a href="/pages/dashboard.html" class="btn btn-primary btn-lg" id="btn-anon">Continue Anonymously</a>
-        <a href="/pages/register.html" class="btn btn-secondary btn-lg">Create Account (18+)</a>
+        <a href="/pages/register.html" class="btn btn-secondary btn-lg">Create Account</a>
         <a href="/pages/login.html" class="btn btn-outline btn-lg">Login</a>
+      </div>
+    </section>
+    <div class="hero-accent-bar"></div>
+
+    <!-- App Preview Carousel -->
+    <section class="preview-section anim-fade-up delay-4">
+      <h2>See Bloom in action</h2>
+      <p class="section-sub">A guided tour of your key screens</p>
+
+      <div class="carousel" id="carousel">
+        <div class="carousel-track" id="carousel-track">
+
+          <!-- Slide 1: Dashboard -->
+          <div class="carousel-slide">
+            <div class="slide-label">Dashboard</div>
+            <div class="slide-title">Your cycle at a glance</div>
+            <p class="slide-desc">See your current cycle day, phase, and personalised insights the moment you open the app.</p>
+            <div class="mockup">
+              <div class="mockup-topbar">
+                <div class="mockup-dot r"></div>
+                <div class="mockup-dot y"></div>
+                <div class="mockup-dot g"></div>
+                <div class="mockup-url">bloom / dashboard</div>
+              </div>
+              <div class="dash-phase-pill">Follicular phase</div>
+              <div class="dash-stat-row">
+                <div class="dash-stat">
+                  <div class="dash-stat-num">Day 8</div>
+                  <div class="dash-stat-lbl">Current cycle day</div>
+                </div>
+                <div class="dash-stat">
+                  <div class="dash-stat-num">28d</div>
+                  <div class="dash-stat-lbl">Avg cycle length</div>
+                </div>
+                <div class="dash-stat">
+                  <div class="dash-stat-num">16</div>
+                  <div class="dash-stat-lbl">Days to next period</div>
+                </div>
+              </div>
+              <div class="dash-insight">Energy rising - oestrogen levels increase during the follicular phase.</div>
+              <div class="dash-insight">Fertile window approaching - ovulation estimated in ~6 days.</div>
+            </div>
+          </div>
+
+          <!-- Slide 2: Calendar -->
+          <div class="carousel-slide">
+            <div class="slide-label">Calendar</div>
+            <div class="slide-title">Log and visualise your cycle</div>
+            <p class="slide-desc">Tap any day to log flow, symptoms, and notes. Colour coding shows your phase at a glance.</p>
+            <div class="mockup">
+              <div class="mockup-topbar">
+                <div class="mockup-dot r"></div>
+                <div class="mockup-dot y"></div>
+                <div class="mockup-dot g"></div>
+                <div class="mockup-url">bloom / calendar</div>
+              </div>
+              <div class="cal-header">
+                <span>◀</span>
+                <span>March 2025</span>
+                <span>▶</span>
+              </div>
+              <div class="cal-grid">
+                <div class="cal-day header"><span>Su</span></div>
+                <div class="cal-day header"><span>Mo</span></div>
+                <div class="cal-day header"><span>Tu</span></div>
+                <div class="cal-day header"><span>We</span></div>
+                <div class="cal-day header"><span>Th</span></div>
+                <div class="cal-day header"><span>Fr</span></div>
+                <div class="cal-day header"><span>Sa</span></div>
+                <div class="cal-day"><span></span></div>
+                <div class="cal-day"><span></span></div>
+                <div class="cal-day"><span></span></div>
+                <div class="cal-day"><span></span></div>
+                <div class="cal-day"><span></span></div>
+                <div class="cal-day period"><span>1</span></div>
+                <div class="cal-day period"><span>2</span></div>
+                <div class="cal-day period"><span>3</span></div>
+                <div class="cal-day period"><span>4</span></div>
+                <div class="cal-day period"><span>5</span></div>
+                <div class="cal-day"><span>6</span></div>
+                <div class="cal-day"><span>7</span></div>
+                <div class="cal-day"><span>8</span></div>
+                <div class="cal-day today"><span>9</span></div>
+                <div class="cal-day"><span>10</span></div>
+                <div class="cal-day fertile"><span>11</span></div>
+                <div class="cal-day fertile"><span>12</span></div>
+                <div class="cal-day fertile"><span>13</span></div>
+                <div class="cal-day ov"><span>14</span></div>
+                <div class="cal-day fertile"><span>15</span></div>
+                <div class="cal-day fertile"><span>16</span></div>
+                <div class="cal-day luteal"><span>17</span></div>
+                <div class="cal-day luteal"><span>18</span></div>
+                <div class="cal-day luteal"><span>19</span></div>
+                <div class="cal-day luteal"><span>20</span></div>
+                <div class="cal-day luteal"><span>21</span></div>
+                <div class="cal-day luteal"><span>22</span></div>
+                <div class="cal-day luteal"><span>23</span></div>
+                <div class="cal-day luteal"><span>24</span></div>
+                <div class="cal-day luteal"><span>25</span></div>
+                <div class="cal-day"><span>26</span></div>
+                <div class="cal-day"><span>27</span></div>
+                <div class="cal-day"><span>28</span></div>
+                <div class="cal-day"><span>29</span></div>
+                <div class="cal-day"><span>30</span></div>
+                <div class="cal-day"><span>31</span></div>
+              </div>
+              <div class="cal-legend">
+                <span class="cal-legend-item"><span class="cal-legend-dot period"></span>Period</span>
+                <span class="cal-legend-item"><span class="cal-legend-dot fertile"></span>Fertile</span>
+                <span class="cal-legend-item"><span class="cal-legend-dot ov"></span>Ovulation</span>
+                <span class="cal-legend-item"><span class="cal-legend-dot luteal"></span>Luteal</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slide 3: Bloomie -->
+          <div class="carousel-slide">
+            <div class="slide-label">Bloomie Assistant</div>
+            <div class="slide-title">Educational support, any time</div>
+            <p class="slide-desc">Ask Bloomie about symptoms, your cycle, or reproductive health - get clear, non-diagnostic guidance.</p>
+            <div class="mockup">
+              <div class="mockup-topbar">
+                <div class="mockup-dot r"></div>
+                <div class="mockup-dot y"></div>
+                <div class="mockup-dot g"></div>
+                <div class="mockup-url">bloom / bloomie</div>
+              </div>
+              <div class="chat-msgs">
+                <div class="chat-msg">
+                  <div class="chat-avatar"></div>
+                  <div class="chat-bubble">Hi! I'm Bloomie 🌸 How can I help you today?</div>
+                </div>
+                <div class="chat-msg user">
+                  <div class="chat-bubble">I've been having bad cramps - is that normal?</div>
+                </div>
+                <div class="chat-msg">
+                  <div class="chat-avatar"></div>
+                  <div class="chat-bubble">Some cramping during your period is common and caused by uterine contractions. If cramps are severe or disrupting your daily life, it's worth speaking with a healthcare provider - it could sometimes indicate conditions like endometriosis.</div>
+                </div>
+              </div>
+              <div class="chat-input-mock">
+                Type a message…
+                <div class="chat-send-mock">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /carousel-track -->
+
+        <button type="button" class="carousel-btn prev" id="carousel-prev" aria-label="Previous slide">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button type="button" class="carousel-btn next" id="carousel-next" aria-label="Next slide">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div><!-- /carousel -->
+
+      <div class="carousel-dots" id="carousel-dots">
+        <button type="button" class="carousel-dot active" data-index="0" aria-label="Slide 1"></button>
+        <button type="button" class="carousel-dot" data-index="1" aria-label="Slide 2"></button>
+        <button type="button" class="carousel-dot" data-index="2" aria-label="Slide 3"></button>
       </div>
     </section>
 
@@ -134,7 +551,7 @@
     <section class="overview-card card">
       <h2>What is Bloom?</h2>
       <p>Bloom combines period and symptom tracking with guided health education. It supports menstruation, fertility awareness, and menopause/perimenopause symptom tracking for Jamaican communities.</p>
-      <ul style="color: var(--color-text); font-size: 0.95rem; line-height: 2;">
+      <ul class="overview-list">
         <li>Track your period, flow intensity, and symptoms day by day</li>
         <li>View your cycle on an interactive calendar</li>
         <li>Chat with Bloomie, our guided health assistant</li>
@@ -202,7 +619,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>Period & symptom tracking</td><td class="check">Yes</td><td class="check">Yes</td></tr>
+          <tr><td>Period &amp; symptom tracking</td><td class="check">Yes</td><td class="check">Yes</td></tr>
           <tr><td>Calendar view</td><td class="check">Yes</td><td class="check">Yes</td></tr>
           <tr><td>Educational pamphlets</td><td class="check">Yes</td><td class="check">Yes</td></tr>
           <tr><td>Clinic directory</td><td class="check">Yes</td><td class="check">Yes</td></tr>
@@ -226,12 +643,45 @@
     import { setMode } from '/js/mode.js';
     import { renderFooter } from '/js/utils.js';
 
-    // Set anon mode when clicking anonymous button
-    document.getElementById('btn-anon').addEventListener('click', (e) => {
-      setMode('anon');
+    document.getElementById('btn-anon').addEventListener('click', () => setMode('anon'));
+    renderFooter();
+
+    // ── Carousel ──────────────────────────────────────────────────
+    const track  = document.getElementById('carousel-track');
+    const dots   = document.querySelectorAll('.carousel-dot');
+    const total  = dots.length;
+    let current  = 0;
+    let timer;
+
+    function goTo(i) {
+      current = (i + total) % total;
+      track.style.transform = `translateX(-${current * 100}%)`;
+      dots.forEach((d, idx) => d.classList.toggle('active', idx === current));
+    }
+
+    function startAuto() {
+      clearInterval(timer);
+      timer = setInterval(() => goTo(current + 1), 4500);
+    }
+
+    document.getElementById('carousel-prev').addEventListener('click', () => { goTo(current - 1); startAuto(); });
+    document.getElementById('carousel-next').addEventListener('click', () => { goTo(current + 1); startAuto(); });
+    dots.forEach(d => d.addEventListener('click', () => { goTo(+d.dataset.index); startAuto(); }));
+
+    // Pause on hover
+    const carousel = document.getElementById('carousel');
+    carousel.addEventListener('mouseenter', () => clearInterval(timer));
+    carousel.addEventListener('mouseleave', startAuto);
+
+    // Touch/swipe support
+    let touchStartX = 0;
+    carousel.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    carousel.addEventListener('touchend', e => {
+      const dx = touchStartX - e.changedTouches[0].clientX;
+      if (Math.abs(dx) > 40) { goTo(dx > 0 ? current + 1 : current - 1); startAuto(); }
     });
 
-    renderFooter();
+    startAuto();
   </script>
 </body>
 </html>

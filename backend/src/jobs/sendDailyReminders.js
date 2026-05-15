@@ -1,6 +1,6 @@
 // src/jobs/sendDailyReminders.js
 import admin from "firebase-admin";
-import { db } from "../../firebaseAdmin.js";
+import { db } from "../firebaseAdmin.js";
 
 const TODAY = () => new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
@@ -22,7 +22,7 @@ async function sendToUser(uid, fcmTokens, title, body) {
         apns: { payload: { aps: { sound: "default" } } },
       });
     } catch (err) {
-      // Token is invalid/expired — mark for removal
+      // Token is invalid/expired - mark for removal
       if (
         err.code === "messaging/invalid-registration-token" ||
         err.code === "messaging/registration-token-not-registered"
@@ -64,7 +64,7 @@ async function markSentToday(uid, type) {
 }
 
 /**
- * Main job — runs daily.
+ * Main job - runs daily.
  * Reads all users with reminders enabled and sends appropriate notifications.
  */
 export async function runDailyRemindersJob() {
@@ -98,7 +98,7 @@ export async function runDailyRemindersJob() {
       const fcmTokens = userDoc.data()?.fcmTokens || [];
       if (fcmTokens.length === 0) continue;
 
-      // ── LOG_REMINDER — daily log nudge ──────────────────
+      // ── LOG_REMINDER - daily log nudge ──────────────────
       if (types.includes("LOG_REMINDER")) {
         const today = TODAY();
         const alreadyLogged = await db
@@ -114,7 +114,7 @@ export async function runDailyRemindersJob() {
         }
       }
 
-      // ── PERIOD_SOON — predict next period ───────────────
+      // ── PERIOD_SOON - predict next period ───────────────
       if (types.includes("PERIOD_SOON")) {
         if (!(await alreadySentToday(uid, "PERIOD_SOON"))) {
           // Get last cycle logs to estimate next period
@@ -129,8 +129,10 @@ export async function runDailyRemindersJob() {
 
           if (!logsSnap.empty) {
             const lastPeriodDate = new Date(logsSnap.docs[0].data().dateKey);
-            const userProfile = (await db.collection("users").doc(uid).get()).data()?.profile;
-            const avgCycle = userProfile?.avgCycleLength || 28;
+            const userDoc = await db.collection("users").doc(uid).get();
+            const userData = userDoc.data();
+            const avgCycle = userData?.healthProfile?.avgCycleLength || 28;
+
             const nextPeriod = new Date(lastPeriodDate);
             nextPeriod.setDate(nextPeriod.getDate() + avgCycle);
 
@@ -149,7 +151,7 @@ export async function runDailyRemindersJob() {
         }
       }
 
-      // ── FERTILE_WINDOW — estimate fertile window ─────────
+      // ── FERTILE_WINDOW - estimate fertile window ─────────
       if (types.includes("FERTILE_WINDOW")) {
         if (!(await alreadySentToday(uid, "FERTILE_WINDOW"))) {
           const logsSnap = await db
@@ -163,8 +165,9 @@ export async function runDailyRemindersJob() {
 
           if (!logsSnap.empty) {
             const lastPeriodDate = new Date(logsSnap.docs[0].data().dateKey);
-            const userProfile = (await db.collection("users").doc(uid).get()).data()?.profile;
-            const avgCycle = userProfile?.avgCycleLength || 28;
+            const userDoc = await db.collection("users").doc(uid).get();
+            const userData = userDoc.data();
+            const avgCycle = userData?.healthProfile?.avgCycleLength || 28;
 
             // Fertile window estimate: ovulation around day 14, fertile days 12-16
             const ovulationDay = new Date(lastPeriodDate);
@@ -190,7 +193,7 @@ export async function runDailyRemindersJob() {
         }
       }
 
-      // ── CHECK_IN — general wellness check ───────────────
+      // ── CHECK_IN - general wellness check ───────────────
       if (types.includes("CHECK_IN")) {
         if (!(await alreadySentToday(uid, "CHECK_IN"))) {
           await sendToUser(uid, fcmTokens, "Bloom 🌸", "How are you feeling today?");

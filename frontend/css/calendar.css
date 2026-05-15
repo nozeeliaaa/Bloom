@@ -1,17 +1,134 @@
 /* ===== CALENDAR PAGE STYLES ===== */
 
 :root{
-  /* Key + Calendar must use the same colors */
-  --period-logged: #e46a94;      /* solid pink */
-  --period-predicted: #f5b4c8;   /* pink stripe fill */
-  --ovulation: #3b82f6;          /* blue stripe fill */
-  --fertility: #93c5fd;          /* solid blue */
+  /* Key + Calendar must use the same colors = must match legend exactly */
+  --period-logged:    #e46a94;   /* Period   - solid pink            */
+  --period-predicted: #f5b4c8;   /* Predicted period - pink stripe   */
+  --ovulation:        #1A8080;   /* Ovulation - dark teal            */
+  --fertility:        #2dd4bf;   /* Fertile window - teal            */
+  --follicular-color: #60a5fa;   /* Follicular - periwinkle blue     */
+  --luteal-color:     var(--phase-luteal);   /* Luteal - purple          */
 }
 
 /* Wrapper */
 .calendar-wrapper {
   max-width: 600px;
   margin: 0 auto;
+}
+.calendar-wrapper--year {
+  max-width: 1040px;
+}
+.calendar-view-switch {
+  display: flex;
+  justify-content: center;
+  margin: 0.35rem 0 0.9rem;
+}
+.calendar-view-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, #ffffff);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg-subtle) 85%, #ffffff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.calendar-view-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 999px;
+  padding: 0.45rem 1.05rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  line-height: 1;
+  min-width: 86px;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+.calendar-view-btn:hover {
+  color: var(--color-primary-dark);
+}
+.calendar-view-btn.is-active {
+  background: #ffffff;
+  color: var(--color-primary-dark);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.08);
+}
+.calendar-year-view {
+  display: grid;
+  gap: 0.95rem;
+  grid-template-columns: 1fr;
+}
+.calendar-year-heading {
+  grid-column: 1 / -1;
+  margin: 0.3rem 0 -0.15rem;
+  text-align: center;
+  font-size: clamp(1.45rem, 4vw, 2.1rem);
+  color: var(--color-text);
+}
+@media (min-width: 700px) {
+  .calendar-year-view {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (min-width: 1080px) {
+  .calendar-year-view {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+.calendar-month-card {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg-card);
+  padding: 0.8rem;
+}
+.calendar-month-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0 0 0.6rem;
+  color: var(--color-text);
+}
+.calendar-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.28rem;
+}
+.calendar-mini-head {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  text-align: center;
+  text-transform: uppercase;
+}
+.calendar-mini-cell {
+  min-height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.calendar-mini-cell.empty {
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+.calendar-mini-cell.today {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+.calendar-mini-cell .day-number {
+  position: relative;
+  z-index: 2;
 }
 
 /* IMPORTANT: Needed for overlays */
@@ -64,7 +181,8 @@
    ========================================================= */
 
 /* ===== Logged period (SOLID PINK) ===== */
-.calendar-cell.logged-period {
+.calendar-cell.logged-period,
+.calendar-mini-cell.logged-period {
   background: color-mix(in srgb, var(--period-logged) 22%, white);
   border: 2px solid var(--period-logged);
   color: var(--color-text);
@@ -82,7 +200,8 @@
 */
 
 /* ===== Predicted Period (PINK STRIPES) ===== */
-.calendar-cell.predicted-period::after {
+.calendar-cell.predicted-period::after,
+.calendar-mini-cell.predicted-period::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -99,40 +218,42 @@
 }
 
 /* Keep the border consistent with predicted pink */
-.calendar-cell.predicted-period {
+.calendar-cell.predicted-period,
+.calendar-mini-cell.predicted-period {
   border: 2px solid var(--period-logged);
 }
 
-/* Optional “strike” to indicate predicted (you had this) */
-.calendar-cell.predicted-period .day-number {
-  text-decoration: line-through;
-  text-decoration-color: var(--period-logged);
-  text-decoration-thickness: 2px;
+.calendar-cell.predicted-period .day-number,
+.calendar-mini-cell.predicted-period .day-number {
+  text-decoration: none;
 }
 
-/* ===== Fertile window (SOLID BLUE) ===== */
-.calendar-cell.fertile-day {
+/* ===== Fertile window (SOLID TEAL) ===== */
+.calendar-cell.fertile-day,
+.calendar-mini-cell.fertile-day {
   background: color-mix(in srgb, var(--fertility) 40%, white);
   border: 2px solid var(--fertility);
 }
 
-/* ===== Ovulation (STRIPED BLUE) ===== */
-.calendar-cell.ovulation-day {
+/* ===== Ovulation (STRIPED TEAL) ===== */
+.calendar-cell.ovulation-day,
+.calendar-mini-cell.ovulation-day {
   border: 2px solid var(--ovulation);
   color: var(--color-text);
   font-weight: 700;
 }
 
-/* Blue stripes overlay for ovulation */
-.calendar-cell.ovulation-day::after {
+/* Teal stripes overlay for ovulation */
+.calendar-cell.ovulation-day::after,
+.calendar-mini-cell.ovulation-day::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: 12px;
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--ovulation) 28%, white),
-    color-mix(in srgb, var(--ovulation) 28%, white) 6px,
+    color-mix(in srgb, var(--ovulation) 35%, white),
+    color-mix(in srgb, var(--ovulation) 35%, white) 6px,
     transparent 6px,
     transparent 12px
   );
@@ -141,7 +262,8 @@
 }
 
 /* If both fertile + ovulation happen (rare), keep stronger border */
-.calendar-cell.fertile-day.ovulation-day {
+.calendar-cell.fertile-day.ovulation-day,
+.calendar-mini-cell.fertile-day.ovulation-day {
   border-color: var(--ovulation);
 }
 
@@ -156,18 +278,21 @@
   color: var(--color-text-muted);
 }
 
-[data-theme="dark"] .calendar-cell.logged-period {
+[data-theme="dark"] .calendar-cell.logged-period,
+[data-theme="dark"] .calendar-mini-cell.logged-period {
   background: color-mix(in srgb, var(--period-logged) 28%, transparent);
   border-color: var(--period-logged);
   color: var(--color-text);
 }
 
-[data-theme="dark"] .calendar-cell.predicted-period {
+[data-theme="dark"] .calendar-cell.predicted-period,
+[data-theme="dark"] .calendar-mini-cell.predicted-period {
   border-color: var(--period-logged);
   color: var(--color-text);
 }
 
-[data-theme="dark"] .calendar-cell.predicted-period::after {
+[data-theme="dark"] .calendar-cell.predicted-period::after,
+[data-theme="dark"] .calendar-mini-cell.predicted-period::after {
   background: repeating-linear-gradient(
     45deg,
     color-mix(in srgb, var(--period-predicted) 35%, transparent),
@@ -177,30 +302,35 @@
   );
 }
 
-[data-theme="dark"] .calendar-cell.predicted-period .day-number {
+[data-theme="dark"] .calendar-cell.predicted-period .day-number,
+[data-theme="dark"] .calendar-mini-cell.predicted-period .day-number {
   color: var(--color-text);
 }
 
-[data-theme="dark"] .calendar-cell.fertile-day {
+[data-theme="dark"] .calendar-cell.fertile-day,
+[data-theme="dark"] .calendar-mini-cell.fertile-day {
   background: color-mix(in srgb, var(--fertility) 25%, transparent);
   border-color: var(--fertility);
   color: var(--color-text);
 }
 
-[data-theme="dark"] .calendar-cell.ovulation-day {
+[data-theme="dark"] .calendar-cell.ovulation-day,
+[data-theme="dark"] .calendar-mini-cell.ovulation-day {
   border-color: var(--ovulation);
   color: var(--color-text);
 }
 
-[data-theme="dark"] .calendar-cell.ovulation-day .day-number {
-  color: #7dd3fc;
+[data-theme="dark"] .calendar-cell.ovulation-day .day-number,
+[data-theme="dark"] .calendar-mini-cell.ovulation-day .day-number {
+  color: #5eead4; /* teal-300 */
 }
 
-[data-theme="dark"] .calendar-cell.ovulation-day::after {
+[data-theme="dark"] .calendar-cell.ovulation-day::after,
+[data-theme="dark"] .calendar-mini-cell.ovulation-day::after {
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--ovulation) 30%, transparent),
-    color-mix(in srgb, var(--ovulation) 30%, transparent) 6px,
+    color-mix(in srgb, var(--ovulation) 35%, transparent),
+    color-mix(in srgb, var(--ovulation) 35%, transparent) 6px,
     transparent 6px,
     transparent 12px
   );
@@ -246,15 +376,14 @@
   border: 1px solid var(--color-border);
 }
 
-/* Logged = SOLID PINK */
+/* Logged period = SOLID PINK */
 .legend-logged {
   background: var(--period-logged);
   border-color: var(--period-logged);
 }
 
-/* Predicted = PINK STRIPES */
+/* Predicted period = PINK STRIPES */
 .legend-predicted {
-  position: relative;
   border-color: var(--period-logged);
   background: repeating-linear-gradient(
     45deg,
@@ -265,20 +394,25 @@
   );
 }
 
-/* Fertile = SOLID BLUE */
+/* Fertile window = SOLID TEAL */
 .legend-fertile {
   background: var(--fertility);
   border-color: var(--fertility);
 }
 
-/* Ovulation = BLUE STRIPES */
+/* Follicular = SOLID PERIWINKLE BLUE */
+.legend-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 40%, white);
+  border-color: var(--follicular-color);
+}
+
+/* Ovulation = TEAL STRIPES */
 .legend-ovulation {
-  position: relative;
   border-color: var(--ovulation);
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--ovulation) 28%, white),
-    color-mix(in srgb, var(--ovulation) 28%, white) 6px,
+    color-mix(in srgb, var(--ovulation) 35%, white),
+    color-mix(in srgb, var(--ovulation) 35%, white) 6px,
     transparent 6px,
     transparent 12px
   );
@@ -297,11 +431,16 @@
 [data-theme="dark"] .legend-ovulation {
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--ovulation) 25%, transparent),
-    color-mix(in srgb, var(--ovulation) 25%, transparent) 6px,
+    color-mix(in srgb, var(--ovulation) 35%, transparent),
+    color-mix(in srgb, var(--ovulation) 35%, transparent) 6px,
     transparent 6px,
     transparent 12px
   );
+}
+
+[data-theme="dark"] .legend-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 25%, transparent);
+  border-color: var(--follicular-color);
 }
 
 /* ===== Modal symptoms scroll ===== */
@@ -333,12 +472,12 @@
   border: 1px solid var(--color-border);
 }
 
-/* Make key swatches match calendar EXACTLY */
-.swatch-period{
+/* Make key swatches match calendar and legend EXACTLY */
+.swatch-period {
   background: var(--period-logged);
   border-color: var(--period-logged);
 }
-.swatch-predicted{
+.swatch-predicted {
   border-color: var(--period-logged);
   background: repeating-linear-gradient(
     45deg,
@@ -348,17 +487,21 @@
     transparent 12px
   );
 }
-.swatch-ovulation{
+.swatch-ovulation {
   border-color: var(--ovulation);
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--ovulation) 28%, white),
-    color-mix(in srgb, var(--ovulation) 28%, white) 6px,
+    color-mix(in srgb, var(--ovulation) 35%, white),
+    color-mix(in srgb, var(--ovulation) 35%, white) 6px,
     transparent 6px,
     transparent 12px
   );
 }
-.swatch-fertile{
+.swatch-fertile {
   background: var(--fertility);
   border-color: var(--fertility);
+}
+.swatch-follicular {
+  background: color-mix(in srgb, var(--follicular-color) 40%, white);
+  border-color: var(--follicular-color);
 }

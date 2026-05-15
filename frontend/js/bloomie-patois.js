@@ -5,22 +5,22 @@
  *
  * PREPROCESSING PIPELINE (4 stages):
  *
- *   Stage 1 — Phrase-level exact matching
+ *   Stage 1 - Phrase-level exact matching
  *             Multi-word Patois phrases → English equivalents.
  *             Processed first so idioms ("belly a kill mi") aren't broken up.
  *
- *   Stage 2 — Word-level exact matching
+ *   Stage 2 - Word-level exact matching
  *             Single Patois tokens → English equivalents (whole-word only).
  *
- *   Stage 3 — Fuzzy matching (Levenshtein distance)
+ *   Stage 3 - Fuzzy matching (Levenshtein distance)
  *             Catches near-misses: misspellings, regional spelling variation,
  *             elongation ("baad"), dropped letters ("bleedin"), transpositions
  *             ("peroid"). Uses dynamic threshold: distance ≤ 1 for short words
  *             (≤5 chars), distance ≤ 2 for longer words.
  *             This is the key answer to "what if her Patois doesn't match your
- *             dictionary exactly?" — it doesn't have to.
+ *             dictionary exactly?" - it doesn't have to.
  *
- *   Stage 4 — Intent boosters
+ *   Stage 4 - Intent boosters
  *             Appends extra scoring keywords for patterns that survive all three
  *             stages but still need a stronger signal in the scorer.
  *
@@ -30,7 +30,7 @@
  *   - Lalla & D'Costa's "Language in Exile" linguistic corpus
  *   - The JamCreole academic wordlist
  *   - Iterative testing with Jamaican users and community review
- *   It is not claimed to be exhaustive — Patois is a living language.
+ *   It is not claimed to be exhaustive - Patois is a living language.
  *   Fuzzy matching (Stage 3) is specifically designed to handle the variation
  *   that a fixed dictionary cannot.
  *
@@ -50,6 +50,12 @@
 
 const PHRASE_MAP = [
   // ── Greetings ──────────────────────────────────────────────────────────────
+  // Elongated/typo variants FIRST (more specific, caught before shorter base forms)
+  ["wah gwaann",         "what's going on"],
+  ["wah gwaaaan",        "what's going on"],
+  ["wagwaann",           "what's going on"],
+  ["wagwaaaan",          "what's going on"],
+  ["wha gwaan",          "what's going on"],
   ["wah gwaan",          "what's going on"],
   ["wagwaan",            "what's going on"],
   ["wha gwan",           "what's going on"],
@@ -59,8 +65,12 @@ const PHRASE_MAP = [
   ["irie",               "okay"],
 
   // ── Period / cycle ─────────────────────────────────────────────────────────
-  ["mi period nuh come",            "my period has not come"],
-  ["mi period nuh reach",           "my period has not come"],
+  // NOTE: outputs "it has not come" (pronoun form) so implicit_late fires in
+  // inferRoute instead of sym.late. sym.late would return null for late-alone;
+  // implicit_late routes to LATE_INTRO when no other symptoms are present.
+  ["nuh blood nuh come",            "it has not come"],
+  ["mi period nuh come",            "it has not come"],
+  ["mi period nuh reach",           "it has not come"],
   ["mi period late bad",            "my period is very late"],
   ["period nuh come yet",           "period has not come yet"],
   ["mi nuh get mi period",          "i have not gotten my period"],
@@ -80,6 +90,9 @@ const PHRASE_MAP = [
   ["pass clot",                     "passing clots"],
   ["a pass clot",                   "passing clots"],
   ["mi period late",                "my period is late"],
+  ["mi late",                       "my period is late"],
+  ["it nuh come yet",               "period has not come yet"],
+  ["period supposed to come",       "period is expected to come"],
   ["period nuh come",               "period hasn't come"],
   ["period nuh reach",              "period hasn't arrived"],
   ["period a play",                 "period is irregular"],
@@ -113,7 +126,9 @@ const PHRASE_MAP = [
 
   // ── Pain / cramps ──────────────────────────────────────────────────────────
   ["mi belly a hurt mi bad",        "i have stomach pain"],
-  ["mi belly a kill mi",            "i have stomach pain"],
+  // NOTE: "severe" in output triggers extractSeverity → severity="severe" →
+  // inferRoute pelvic+severe → PELVIC_PERSISTENT (guarded against medication-seeking).
+  ["mi belly a kill mi",            "i have severe cramps pelvic"],
   ["mi belly a murder mi",          "i have very severe stomach pain"],
   ["mi belly a cramp bad",          "i have severe cramps"],
   ["mi belly a cramp",              "i have cramps"],
@@ -140,10 +155,12 @@ const PHRASE_MAP = [
   ["hurt till mi cyaan move",       "pain so severe i cannot move"],
   ["barely managing",               "barely coping"],
   ["mi barely a manage",            "i can barely cope"],
-  ["mi a deal wid it",              "i am managing it"]
+  ["mi a deal wid it",              "i am managing it"],
 
   // ── Bleeding ──────────────────────────────────────────────────────────────
   ["bleeding bad",                  "bleeding heavily"],
+  ["period heavy like river",       "very heavy bleeding"],
+  ["mi period heavy like river",    "very heavy bleeding"],
   ["blood nuff",                    "a lot of blood"],
   ["bleed out",                     "bleeding heavily"],
   ["pad soaking",                   "soaking through pad"],
@@ -208,6 +225,7 @@ const PHRASE_MAP = [
   ["smell funny down deh",          "unusual odour"],
   ["smell off down there",          "unusual odour"],
   ["itchy down deh",                "vaginal itching"],
+  ["mi itching down deh",           "vaginal itching"],
   ["burning down deh",              "vaginal burning"],
   ["funny feeling down there",      "unusual vaginal sensation"],
 
@@ -219,6 +237,13 @@ const PHRASE_MAP = [
   ["mi feel off",                   "i feel off unwell"],
   ["mi sick",                       "i feel sick unwell"],
   ["mi nah feel right",             "i do not feel right"],
+  ["mi nuh feel right",             "i do not feel right"],
+  ["sumn off",                      "something is wrong with me unwell"],
+  ["cho man",                       "i am frustrated"],
+  ["mi a stress bad",               "i am very stressed anxious"],
+  ["wah going on wid me",           "what is going on with me i feel off unwell"],
+  ["wah gwan wid me",               "what is going on with me i feel off unwell"],
+  ["wah a gwaan wid me",            "what is going on with me i feel off unwell"],
 
   // ── Amenorrhea / missing periods (months) ─────────────────────────────────
   ["mi period nuh come fi months",      "my period has not come for months amenorrhea"],
@@ -252,6 +277,7 @@ const PHRASE_MAP = [
   // ── Postpartum ────────────────────────────────────────────────────────────
   ["mi just born baby",                 "i just gave birth postpartum"],
   ["mi just have baby",                 "i just had a baby postpartum"],
+  ["mi nuh feel happy after baby",      "i do not feel happy after baby postpartum low mood"],
   ["mi period nuh come back after baby","my period has not returned postpartum"],
   ["mi a breastfeed",                   "i am breastfeeding postpartum"],
   ["mi baby young still",               "my baby is young postpartum"],
@@ -264,6 +290,8 @@ const PHRASE_MAP = [
   ["mi have implant",                   "i have a birth control implant"],
   ["mi just start pill",                "i just started birth control pill"],
   ["mi stop take pill",                 "i stopped taking birth control pill"],
+  ["condom bruk",                       "condom broke unprotected sex"],
+  ["condom burst",                      "condom broke unprotected sex"],
 
   // ── Stress / lifestyle signals ────────────────────────────────────────────
   ["mi stress out bad",                 "i am very stressed lifestyle change"],
@@ -355,6 +383,13 @@ const PHRASE_MAP = [
   ["dat nuh make sense",                 "that doesn't make sense"],
   ["u confuse mi",                       "you're confusing me"],
   ["mi confuse",                         "i'm confused"],
+  ["look yah nuh",                       "wait hold on"],
+  ["look yah",                           "wait hold on"],
+  ["seh wah",                            "what do you mean"],
+  ["seh dat again",                      "say that again"],
+  ["kmt",                                "i am frustrated"],
+  ["kmt what",                           "what do you mean i am frustrated"],
+  ["cho man",                            "i am frustrated"],
 
   // ── Correction and disagreement ────────────────────────────────────────────
   ["dat nuh wah mi seh",                 "that's not what i said"],
@@ -367,6 +402,12 @@ const PHRASE_MAP = [
   ["mi nuh ask dat",                     "i didn't ask that"],
   ["u nuh answer mi question",           "you didn't answer my question"],
   ["answer mi question",                 "answer my question"],
+  ["mi scared fi tell mi mama",          "i am scared to tell my mom minor support"],
+  ["mi scared fi tell mommy",            "i am scared to tell my mom minor support"],
+  ["mi scared fi tell my mother",        "i am scared to tell my mother minor support"],
+  ["mi see bump after sex",              "i noticed genital bump after sex sti concern"],
+  ["mi see bump",                        "i noticed genital bump sti concern"],
+  ["trying 8 months no baby",            "trying to conceive for 8 months no pregnancy"],
   ["dat nuh helpful",                    "that's not helpful"],
   ["dat nuh help",                       "that doesn't help"],
 
@@ -399,7 +440,7 @@ const PHRASE_MAP = [
   ["mi wah start ova",                   "i want to start over"],
   ["start ova",                          "start over"],
   ["nuh mind",                           "never mind"],
-  ["forget dat",                         "forget that"],
+  ["figet dat",                         "forget that"],
 
   // ── General conversational Patois ──────────────────────────────────────────
   ["mi deh yah",                         "i'm here"],
@@ -414,6 +455,8 @@ const PHRASE_MAP = [
   ["tanks",                              "thanks"],
   ["bless",                              "thank you"],
   ["respect",                            "thank you"],
+  ["mi gov",                             "im okay"],
+
 
   // ── Asking for help ────────────────────────────────────────────────────────
   ["can u help mi",                      "can you help me"],
@@ -429,6 +472,7 @@ const PHRASE_MAP = [
   ["help mi",                            "help me"],
   ["wah fi do",                          "what to do"],
   ["how fi",                             "how to"],
+  ["just a small 2 2",                   "i have a question"],
 
   // ── Date / time uncertainty (Part 7) ──────────────────────────────────────
   ["mi cyaan remember",                  "i can't remember"],
@@ -449,6 +493,7 @@ const PHRASE_MAP = [
   ["mi forget",                          "i forgot"],
 
   // ── Negative states ────────────────────────────────────────────────────────
+  ["everyting feel wrong",               "everything feels wrong unwell"],
   ["sumn wrong wid mi",                  "something is wrong with me"],
   ["mi nuh know wah happen",             "i don't know what's happening"],
   ["mi feel sick bad",                   "i feel very sick"],
@@ -467,7 +512,7 @@ const PHRASE_MAP = [
   ["something is wrong",           "something is wrong with me unwell"],
   ["sumn wrong",                   "something is wrong with me unwell"],
   ["feel off",                     "feel unwell"],
-  ["not right",                    "not feeling right unwell"],
+  ["mi nuh right",                 "not feeling right unwell"],
   ["nuh feel right",               "not feeling right unwell"],
   ["it hurts there",               "pelvic pain"],
   ["hurts down there",             "pelvic pain lower abdomen"],
@@ -476,6 +521,10 @@ const PHRASE_MAP = [
   ["something is coming out",      "unusual discharge"],
   ["sumn a come out",              "unusual discharge"],
   ["sumn coming out",              "unusual discharge"],
+  ["discharge weird",              "unusual discharge"],
+  ["smell off",                    "discharge with odor unusual odour"],
+  ["back a hurt me",               "my lower back is hurting pelvic pain"],
+  ["belly a hurt me",              "i have stomach pain cramps"],
   ["it won't stop",                "bleeding won't stop continuing"],
   ["it nuh stop",                  "bleeding won't stop continuing"],
   ["i don't feel like myself",     "i feel sad low mood emotional"],
@@ -510,14 +559,15 @@ const PHRASE_MAP = [
 
 
   //Seeking help / clinic phrases
-  ["mi need help", "i need help"],
   ["mi need fi see doctor", "i need to see a doctor"],
   ["mi need fi go clinic", "i need to go to a clinic"],
   ["mi need fi go hospital", "i need to go to a hospital"],
   ["clinic open", "clinic is open"],
   ["clinic close", "clinic is closed"],
   ["weh di clinic deh", "where is the clinic"],
-  ["mi cyaan afford doctor", "i cannot afford a doctor"]
+  ["weh clinic deh near mi", "where is the clinic near me"],
+  ["weh mi can go", "where can i go for help care"],
+  ["mi cyaan afford doctor", "i cannot afford a doctor"],
 
 
   //Dismissive/minimising expressions
@@ -527,7 +577,94 @@ const PHRASE_MAP = [
   ["a nuttn", "it is nothing"],
   ["annuh nutn", "it is nothing"],
 
+  // ── Period arrived / started ───────────────────────────────────────────────
+  ["mi period come", "my period has started period came"],
+  ["mi period reach", "my period has started period came"],
+  ["mi period start", "my period has started period came"],
+  ["mi period come today", "my period started today period came"],
+
+  // ── Period missed / not seen ───────────────────────────────────────────────
+  ["mi miss mi period", "i missed my period late"],
+  ["mi nuh see mi period yet", "i have not seen my period yet late"],
+  ["mi nuh get mi period yet", "i have not gotten my period yet late"],
+
+  // ── Flow / heavy bleeding ──────────────────────────────────────────────────
+  ["mi flow heavy", "my flow is heavy heavy bleeding"],
+  ["mi flow nuff", "my flow is heavy heavy bleeding"],
+  ["blood clot inna mi period", "blood clots in my period heavy bleeding clots"],
+  ["clot inna mi period", "clots in my period heavy bleeding"],
+
+  // ── Cycle irregularity ────────────────────────────────────────────────────
+  ["mi cycle irregular", "my cycle is irregular irregular cycle"],
+  ["mi period nah come regular", "my period is not regular irregular cycle"],
+  ["mi period nuh come regular", "my period does not come regularly irregular cycle"],
+
+  // ── Pregnancy / fertility ─────────────────────────────────────────────────
+  ["coulda mi pregnant", "could i be pregnant pregnancy"],
+  ["could mi be pregnant", "could i be pregnant pregnancy"],
+  ["when mi fertile", "when am i fertile fertile window ovulation"],
+  ["when mi most fertile", "when am i most fertile fertile window ovulation"],
+  ["when mi can tek pregnancy test", "when can i take a pregnancy test"],
+  ["when can mi tek pregnancy test", "when can i take a pregnancy test"],
+  ["when can mi tek di test", "when can i take the pregnancy test"],
+
+  // ── Discharge changes ─────────────────────────────────────────────────────
+  ["mi discharge look different", "my discharge looks different unusual discharge"],
+  ["mi discharge change", "my discharge has changed unusual discharge"],
+  ["mi discharge nuh normal", "my discharge is not normal unusual discharge"],
+
+  // ── Breast symptoms ───────────────────────────────────────────────────────
+  ["mi breast dem sore", "my breasts are sore breast tenderness"],
+  ["mi breast sore", "my breasts are sore breast tenderness"],
+  ["mi breast hurt", "my breasts hurt breast tenderness"],
+  ["mi nipple sore", "my nipples are sore breast tenderness"],
+
+  // ── Headache ──────────────────────────────────────────────────────────────
+  ["mi head a hurt bad", "i have a severe headache head pain"],
+  ["mi head a hurt", "i have a headache head pain"],
+  ["mi head hurt bad", "my head hurts badly head pain"],
+  ["mi head hurt", "my head hurts head pain"],
+
+  // ── Skin / hormonal symptoms ──────────────────────────────────────────────
+  ["mi face a bruk out", "my face is breaking out acne skin hormones"],
+  ["mi face bruk out bad", "my face is breaking out badly acne skin hormones"],
+  ["mi skin a bruk out", "my skin is breaking out acne hormones"],
+
+  // ── Bloating / swelling ───────────────────────────────────────────────────
+  ["mi belly swell up", "my stomach is swollen bloated bloating"],
+  ["mi belly swell", "my stomach is swollen bloated bloating"],
+  ["mi feel bloated", "i feel bloated bloating"],
+
+  // ── Mood / emotional ──────────────────────────────────────────────────────
+  ["mi mood all over di place", "my mood is all over the place mood swings mood changes"],
+  ["mi mood swing bad", "my mood swings are bad mood swings"],
+  ["mi mood nuh stable", "my mood is not stable mood swings"],
+
+  // ── Understanding / confusion (triggers clarification repair) ────────────
+  ["mi nuh understand wah yuh mean", "i don't understand what you mean"],
+  ["mi nuh understand", "i don't understand"],
+
+  // ── App help ─────────────────────────────────────────────────────────────
+  ["how mi log period", "how do i log my period log period"],
+  ["how mi log mi period", "how do i log my period log period"],
+  ["how mi use di calendar", "how do i use the calendar app help"],
+  ["how mi use calendar", "how do i use the calendar app help"],
+  ["weh mi dashboard mean", "what does my dashboard mean app help"],
+  ["how fi export mi data", "how to export my data app help"],
+  ["how fi download mi data", "how to download my data app help"],
+
+  // ── What can Bloomie do ───────────────────────────────────────────────────
+  ["weh yuh can do", "what can you do"],
+  ["weh yuh can help mi wid", "what can you help with"],
+  ["weh yuh know bout", "what do you know about"],
+
+  // ── Seeking social / professional support ─────────────────────────────────
+  ["mi need fi talk to somebody", "i need to talk to someone support help"],
+  ["mi need fi talk to someone", "i need to talk to someone support help"],
+  ["mi waan talk to somebody", "i want to talk to someone support help"],
+
 ];
+
 
 
 
@@ -539,7 +676,9 @@ const WORD_MAP = [
   ["mi",        "i"],
   ["wi",        "we"],
   ["dem",       "they"],
-  ["im",        "him"],
+  // NOTE: "im" → "him" removed. "im" in English = "I'm" (first-person shorthand)
+  // and mangled inputs like "im pregnant" → "him pregnant". Patois third-person
+  // "im" is already handled by phrase-level maps ("him breed mi", etc.).
   ["har",       "her"],
   ["fi",        "for"],
   ["di",        "the"],
@@ -564,7 +703,7 @@ const WORD_MAP = [
   ["likkle",    "little"],
   ["lil",       "little"],
   ["nuff",      "a lot of"],
-  // FIX #1 & #3: Removed ["bad", "badly"] — it mapped "bad" universally,
+  // FIX #1 & #3: Removed ["bad", "badly"] - it mapped "bad" universally,
   // breaking severity patterns like "bleed bad", "cramp bad", "hurt bad"
   // in both extractSymptoms and extractSeverity after normalization.
   // Severity signals are handled by phrase-level maps ("cramp bad" → "severe cramps")
@@ -575,6 +714,7 @@ const WORD_MAP = [
   ["kno",       "know"],
   ["ting",      "thing"],
   ["tings",     "things"],
+  ["everyting", "everything"],
   ["nevah",     "never"],
   ["never",     "never"],
   ["come",      "come"],
@@ -627,6 +767,7 @@ const WORD_MAP = [
   // Medication-related tokens (residual after phrase-level processing)
   ["wah",       "what"],
   ["tek",       "take"],
+  ["kmt",       "frustrated"],
 
   // ── Health shorthand abbreviations ───────────────────────────────────────────
   ["bfp",       "positive pregnancy test"],
@@ -674,23 +815,23 @@ const WORD_MAP = [
 // ─── 3. FUZZY MATCHING (Damerau-Levenshtein + phonetic variants) ──────────────
 //
 // Pipeline for each user message token:
-//   1. PHONETIC_VARIANTS lookup  — fast O(1), catches known Jamaican/Caribbean
+//   1. PHONETIC_VARIANTS lookup  - fast O(1), catches known Jamaican/Caribbean
 //      spelling patterns that Levenshtein alone won't handle within threshold.
-//   2. Exact-match check against FUZZY_DICTIONARY — skip correction if already correct.
-//   3. Damerau-Levenshtein (OSA) — handles insertions, deletions, substitutions,
+//   2. Exact-match check against FUZZY_DICTIONARY - skip correction if already correct.
+//   3. Damerau-Levenshtein (OSA) - handles insertions, deletions, substitutions,
 //      and adjacent transpositions. Threshold based on max(token, dictWord) length:
-//        1–4 chars  → distance 0 (no fuzzy — "pad" must not match "pain")
+//        1–4 chars  → distance 0 (no fuzzy - "pad" must not match "pain")
 //        5–7 chars  → distance ≤ 1
 //        8–11 chars → distance ≤ 2
 //        12+ chars  → distance ≤ 3
-//   4. PROTECTED_TOKENS — valid Patois words, never corrected.
-//   5. Correction cache — Map keyed on token, avoids re-running Levenshtein.
+//   4. PROTECTED_TOKENS - valid Patois words, never corrected.
+//   5. Correction cache - Map keyed on token, avoids re-running Levenshtein.
 //
 // fuzzyCorrect() is exported and handles both single-token and full-sentence input.
 // When given a sentence (contains whitespace), it corrects each token independently
 // and rejoins. Called explicitly AFTER normalizePatois() in the pipeline.
 
-// ── Phonetic variants — run FIRST before Levenshtein ─────────────────────────
+// ── Phonetic variants - run FIRST before Levenshtein ─────────────────────────
 const PHONETIC_VARIANTS = {
   // Pregnancy
   "pregnat":        "pregnant",
@@ -808,7 +949,7 @@ const PHONETIC_VARIANTS = {
   "ectoppic":       "ectopic",
 };
 
-// ── Fuzzy dictionary — organized by category ──────────────────────────────────
+// ── Fuzzy dictionary - organized by category ──────────────────────────────────
 const FUZZY_DICTIONARY = {
   reproductive_core: [
     "spotting", "bleeding", "pregnant", "pregnancy", "period", "periods",
@@ -865,13 +1006,13 @@ const FUZZY_DICTIONARY = {
 const ALL_FUZZY_TERMS_ARRAY = [...new Set(Object.values(FUZZY_DICTIONARY).flat())];
 const ALL_FUZZY_TERMS = new Set(ALL_FUZZY_TERMS_ARRAY);
 
-// ── Protected Patois tokens — must never be fuzzy-corrected ───────────────────
+// ── Protected Patois tokens - must never be fuzzy-corrected ───────────────────
 const PROTECTED_TOKENS = new Set([
   "mi", "di", "fi", "nuh", "wah", "yuh", "dem", "seh", "deh", "ting",
   "man", "gal", "bad", "good", "real",
 ]);
 
-// ── Correction cache — avoids re-running Levenshtein for repeated tokens ──────
+// ── Correction cache - avoids re-running Levenshtein for repeated tokens ──────
 const _correctionCache = new Map();
 let _cacheHits = 0;
 
@@ -883,7 +1024,7 @@ export function _getFuzzyCacheHits() { return _cacheHits; }
 
 // ── Damerau-Levenshtein distance (Optimal String Alignment) ───────────────────
 // Handles insertions, deletions, substitutions, and adjacent transpositions.
-// Transpositions cost 1 — this is why "peroid" → "period" now works (dist 1).
+// Transpositions cost 1 - this is why "peroid" → "period" now works (dist 1).
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, (_, i) =>
@@ -907,7 +1048,7 @@ function levenshtein(a, b) {
 
 // ── Threshold by max(token, dictWord) length ───────────────────────────────────
 function getThreshold(maxLen) {
-  if (maxLen <= 4)  return 0;  // no fuzzy — "pad" must not match "pain"
+  if (maxLen <= 4)  return 0;  // no fuzzy - "pad" must not match "pain"
   if (maxLen <= 7)  return 1;
   if (maxLen <= 11) return 2;
   return 3;
@@ -922,10 +1063,10 @@ function _correctToken(token) {
     return phonetic;
   }
 
-  // 2. Exact match in dictionary — already correct, no change needed
+  // 2. Exact match in dictionary - already correct, no change needed
   if (ALL_FUZZY_TERMS.has(token)) return token;
 
-  // 3. Levenshtein — only for tokens ≥ 5 chars (short words too collision-prone)
+  // 3. Levenshtein - only for tokens ≥ 5 chars (short words too collision-prone)
   if (token.length < 5) return null;
 
   let bestMatch = null;
@@ -940,7 +1081,7 @@ function _correctToken(token) {
     const threshold = getThreshold(maxLen);
     if (threshold === 0) continue;
 
-    // Length-difference filter — eliminates most comparisons immediately
+    // Length-difference filter - eliminates most comparisons immediately
     if (Math.abs(token.length - term.length) > threshold) continue;
 
     const dist = levenshtein(token, term);
@@ -1003,88 +1144,15 @@ export function fuzzyCorrect(input) {
   return result;
 }
 
-// ─── 4. INTENT BOOSTERS ───────────────────────────────────────────────────────
-// After normalization, append extra scoring keywords for patterns that are
-// hard to capture with word-swaps alone.
-
-const INTENT_BOOSTERS = [
-  {
-    patterns: [/period.*not.*come|period.*late|missed.*period|\bno\b.*period/i],
-    boost: " late missed period",
-  },
-  {
-    // NOTE: boost must NOT include "pain" — combined with "severe" it triggers
-    // extractUrgency's severe.*pain pattern causing false escalation.
-    patterns: [/cramp|pelvic pain|stomach pain|belly pain|lower abdom/i],
-    boost: " cramp pelvic",
-  },
-  {
-    patterns: [/spotting|light bleed|brown discharge|pink discharge/i],
-    boost: " spotting light stain",
-  },
-  {
-    // NOTE: "missed period" removed from boost — it activated sym.late prematurely,
-    // causing the late+pregnancy combo rule to fire before spotting+pregnancy rules.
-    patterns: [/pregnant|pregnancy|positive test|might be pregnant/i],
-    boost: " pregnant pregnancy",
-  },
-  {
-    patterns: [/heavy bleed|soaking through|bleed through|passing clots/i],
-    boost: " heavy bleeding soaking",
-  },
-  {
-    patterns: [/mood|irritable|anxious|sad|overwhelmed|low mood|cry/i],
-    boost: " mood anxious sad irritable",
-  },
-  {
-    // NOTE: boost must NOT include "faint" — it is in extractUrgency's regex and
-    // causes false escalation when the user only mentions weakness (not fainting).
-    // "dizziness" and "lightheaded" are NOT urgency keywords so they are safe.
-    patterns: [/faint|dizzy|lightheaded|pass out/i],
-    boost: " dizzy lightheaded",
-  },
-  {
-    // Amenorrhea — periods missing for extended time
-    patterns: [/amenorrhea|period.*months|months.*period|period.*stopped|period.*absent|not.*had.*period|missed.*more.*period|period.*gone/i],
-    boost: " amenorrhea missing period months absent",
-  },
-  {
-    // TTC — trying to conceive context
-    patterns: [/trying to conceive|ttc|trying to get pregnant|want.*pregnant|fertile days|ovulation.*test/i],
-    boost: " ttc trying to conceive ovulation fertile",
-  },
-  {
-    // Postpartum context
-    patterns: [/postpartum|gave birth|had.*baby|after.*baby|breastfeeding|period.*return/i],
-    boost: " postpartum after birth breastfeeding",
-  },
-  {
-    // Lifestyle change signals that delay periods
-    patterns: [/stressed|stress|lost weight|gained weight|exercise.*intense|intensely|been sick|illness|travel|sleep.*poor|not sleeping/i],
-    boost: " lifestyle change stress weight exercise",
-  },
-  {
-    // Birth control context
-    patterns: [/birth control|on the pill|started pill|stopped pill|iud|implant|coil|bc/i],
-    boost: " birth control pill contraception",
-  },
-  {
-    // Emotional distress / fear
-    patterns: [/scared|afraid|worried|ashamed|embarrassed|frightened|fear|nervous.*about.*health/i],
-    boost: " scared worried emotional distress",
-  },
-];
-
-// ─── 5. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
+// ─── 4. MAIN EXPORT: normalizePatois ─────────────────────────────────────────
 
 /**
  * normalizePatois(rawText) → String
  *
- * Full 4-stage preprocessing pipeline:
+ * Full preprocessing pipeline:
  *   Stage 1: Phrase-level exact matching
  *   Stage 2: Word-level exact matching
  *   Stage 3: Fuzzy matching (Levenshtein) for near-miss Patois tokens
- *   Stage 4: Intent boosters
  *
  * @param  {string} rawText  - Raw text from the chat input
  * @returns {string}          - Normalized English text
@@ -1132,14 +1200,7 @@ export function normalizePatois(rawText) {
   // canonical pipeline order (normalizePatois → fuzzyCorrect → extractEntities).
   text = fuzzyCorrect(text) ?? text;
 
-  // ── Stage 4: intent boosters ──────────────────────────────────────────────
-  for (const booster of INTENT_BOOSTERS) {
-    if (booster.patterns.some((rx) => rx.test(text))) {
-      text += booster.boost;
-    }
-  }
-
-  return text;
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -1166,7 +1227,7 @@ export function detectPatois(rawText) {
   return PATOIS_SIGNALS.some((rx) => rx.test(t));
 }
 
-// ── Tone pattern arrays — each entry is one detectable signal ─────────────────
+// ── Tone pattern arrays - each entry is one detectable signal ─────────────────
 // Checking arrays (not a single combined regex) lets us COUNT how many signals
 // are present per category. The priority resolver then picks the highest-priority
 // category that has at least one match, resolving overlaps cleanly.
@@ -1206,7 +1267,7 @@ const EXHAUSTED_PATTERNS = [
   /\b(feel(?:ing)? like giving up|running on empty)\b/,
   /\b(burnt? out|nuh have no energy)\b/,
   /\b(feel(?:ing)? weak|body tired|mi body tired)\b/,
-  // "mi done" = exhausted; "mi done wid dis" = frustrated — negative lookahead separates them
+  // "mi done" = exhausted; "mi done wid dis" = frustrated - negative lookahead separates them
   /\bmi done(?!\s+wid)\b/,
 ];
 
@@ -1217,6 +1278,12 @@ const FRUSTRATED_PATTERNS = [
   /\b(every single|not again|happening again|keeps happening)\b/,
   /\b(i give up|pointless|waste of time|nothing works)\b/,
   /\b(nutten nuh work|mi done wid dis)\b/,
+  // Bot-directed frustration / dismissal
+  /\b(you can'?t help|you cant help|not helpful|can'?t help me)\b/,
+  /\b(you don'?t understand|you dont understand|you'?re useless)\b/,
+  /\b(whatever|nvm)\b/,
+  /\b(this is useless|useless app|this app is trash)\b/,
+  /\b(forget it|never.?mind)\b/,
 ];
 
 // "mi weak" is Patois laughing slang (≈ "I'm dead"), NOT a fatigue signal.
@@ -1240,7 +1307,7 @@ const CASUAL_PATTERNS = [
  *
  * confidence = true when resolved tone has 2+ phrase matches, OR when a single
  * strong distressed/angry/exhausted/frustrated signal fires (serious tones are
- * always considered confident — a single "scared" or "vex" is unambiguous).
+ * always considered confident - a single "scared" or "vex" is unambiguous).
  *
  * @param  {string} text - Raw user input
  * @returns {{ tone: string, scores: object, confidence: boolean }}
@@ -1249,7 +1316,7 @@ export function detectUserToneWithScores(text) {
   if (!text) return { tone: "neutral", scores: {}, confidence: false };
 
   const t = text.toLowerCase();
-  // Normalize for mixed Patois/English support — checked alongside raw text
+  // Normalize for mixed Patois/English support - checked alongside raw text
   const tn = normalizePatois(text).toLowerCase();
 
   // Test a pattern against both raw and normalized text
@@ -1264,7 +1331,7 @@ export function detectUserToneWithScores(text) {
   };
 
   // Priority: distressed > angry > exhausted > frustrated > casual > neutral.
-  // A single match is enough for any serious tone — "lol I'm scared" → distressed.
+  // A single match is enough for any serious tone - "lol I'm scared" → distressed.
   const SERIOUS = ["distressed", "angry", "exhausted", "frustrated"];
   for (const tone of SERIOUS) {
     if (scores[tone] >= 1) {
@@ -1272,7 +1339,7 @@ export function detectUserToneWithScores(text) {
     }
   }
 
-  // Casual: keyword match OR short message length — but ONLY when no serious
+  // Casual: keyword match OR short message length - but ONLY when no serious
   // tones were detected anywhere in the message. Fixes: "help me" (short but
   // distressed), short urgent messages under 40 chars staying distressed.
   const hasShortLength = t.trim().length <= 40;
@@ -1292,7 +1359,7 @@ export function detectUserToneWithScores(text) {
  *
  * Priority: distressed > angry > exhausted > frustrated > casual > neutral.
  * Runs normalizePatois() internally so mixed Patois/English messages are handled.
- * Short message length is a weak casual signal only — it never overrides a
+ * Short message length is a weak casual signal only - it never overrides a
  * distressed, angry, exhausted, or frustrated match.
  *
  * @param  {string} text  - Raw user input
@@ -1321,7 +1388,7 @@ export function updateSessionTone(ctx, text) {
   ctx.previousTone = ctx.currentTone;
 
   if (tone === "neutral" || (!confidence && tone === "casual")) {
-    // Ambiguous turn — hold the previous tone if one exists
+    // Ambiguous turn - hold the previous tone if one exists
     ctx.currentTone = ctx.previousTone || tone;
   } else {
     ctx.currentTone = tone;

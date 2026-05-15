@@ -131,7 +131,7 @@
       font-weight: 700;
       transition: background 0.12s ease;
     }
-    .list-link:hover { background: var(--color-secondary-light); }
+    .list-link:hover { background: var(--color-primary-lightest); }
     .list-link:last-child{ border-bottom:none; }
     .list-link-left {
       display: flex;
@@ -169,17 +169,15 @@
     }
     .legal-links a:hover{ color: var(--color-primary); }
 
-    .disclaimer-card{
-      margin-top: 1rem;
-      text-align:center;
+    .profile-header-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1.25rem;
+      flex-shrink: 0;
     }
 
-    .disclaimer-card p{
-      margin: 0;
-      font-size: 0.9rem;
-      color: var(--color-text-muted);
-      line-height: 1.6;
-    }
+
   </style>
 </head>
 
@@ -201,7 +199,10 @@
         </div>
       </div>
 
-      <a class="btn btn-outline" href="/pages/profile-view.html">View Profile</a>
+      <div class="profile-header-actions">
+        <button class="btn btn-outline btn-logout-profile" id="profile-logout-btn" type="button" hidden>Log out</button>
+        <a class="btn btn-outline" href="/pages/profile-view.html">View Profile</a>
+      </div>
     </div>
 
     <section class="card">
@@ -268,24 +269,26 @@
       </a>
     </div>
 
-    <div class="legal-links">
-      <a href="/pages/privacy.html">Privacy Policy</a>
-      <a href="/pages/terms.html">Terms of Use</a>
-      <a href="/pages/accessibility.html">Accessibility</a>
-    </div>
 
-    <div class="card disclaimer-card">
-      <p>
-        <strong>Disclaimer:</strong> Bloom is for educational tracking support and is not a substitute for professional medical advice.
-        If you have health concerns, consult a qualified healthcare provider.
-      </p>
-    </div>
   </main>
 
   <script type="module">
-    import { renderNav, renderFooter, renderModeBanner, showToast } from "/js/utils.js";
-    import { onAuthChange } from "/js/auth.js";
-    import { GOALS, getUserGoal, setUserGoal, goalLabel, goalDesc } from "/js/goals.js";
+    import { renderNav, renderFooter, renderModeBanner } from "/js/utils.js";
+    import { onAuthChange, logout, getIdToken } from "/js/auth.js";
+    import { GOALS, getUserGoal, setUserGoal, goalLabel, goalDesc, isGoalAgeLocked } from "/js/goals.js";
+
+    async function syncGoalToBackend(goalId) {
+      try {
+        const token = await getIdToken();
+        if (!token) return;
+        const apiBase = window.BLOOM_API_BASE || "";
+        await fetch(`${apiBase}/api/user/profile`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ goal: goalId }),
+        });
+      } catch (_) {}
+    }
 
     renderNav("profile");
     renderFooter();
@@ -296,7 +299,15 @@
     const LS_AVATAR  = "bloom_avatar";
 
     function loadProfile(){
-      try { return JSON.parse(localStorage.getItem(LS_PROFILE)) || {}; }
+      try {
+        const data = JSON.parse(localStorage.getItem(LS_PROFILE)) || {};
+        return {
+          ...(data.profile || {}),
+          ...(data.healthProfile || {}),
+          biometricProfile: data.biometricProfile || {},
+          phaseProfile: data.phaseProfile || {}
+        };
+      }
       catch { return {}; }
     }
 
@@ -314,7 +325,73 @@
         user ? "Signed in • View Profile to edit details" : "Not signed in • View Profile to edit details";
     }
 
-    onAuthChange(updateMiniProfile);
+    onAuthChange(async (user) => {
+      updateMiniProfile(user);
+
+      if (user) {
+        try {
+          const token = await getIdToken();
+          const apiBase = window.BLOOM_API_BASE || "";
+
+          const res = await fetch(`${apiBase}/api/user/profile`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const profile = data.profile || {};
+
+            // update localStorage with fresh backend data
+            const existing = (() => {
+              try { return JSON.parse(localStorage.getItem("bloom_profile")) || {}; }
+              catch { return {}; }
+            })();
+
+            const updated = {
+              ...existing,
+              profile: {
+                ...(existing.profile || {}),
+                nickname: profile.nickname || "",
+                yob: profile.yearOfBirth || ""
+              },
+              healthProfile: {
+                ...(existing.healthProfile || {}),
+                avgCycleLength: data.healthProfile?.avgCycleLength ?? existing.healthProfile?.avgCycleLength ?? null,
+                periodDuration: data.healthProfile?.periodDuration ?? existing.healthProfile?.periodDuration ?? null,
+                weightKg: data.healthProfile?.weightKg ?? existing.healthProfile?.weightKg ?? null,
+                heightCm: data.healthProfile?.heightCm ?? existing.healthProfile?.heightCm ?? null
+              },
+              biometricProfile: {
+                ...(existing.biometricProfile || {}),
+                sleepScore: data.biometricProfile?.sleepScore ?? existing.biometricProfile?.sleepScore ?? null,
+                stressLevel: data.biometricProfile?.stressLevel ?? existing.biometricProfile?.stressLevel ?? null,
+                activityLevel: data.biometricProfile?.activityLevel ?? existing.biometricProfile?.activityLevel ?? null
+              },
+              phaseProfile: {
+                ...(existing.phaseProfile || {}),
+                lastPeriodStart: data.phaseProfile?.lastPeriodStart ?? existing.phaseProfile?.lastPeriodStart ?? null,
+                phaseEstimation: data.phaseProfile?.phaseEstimation ?? existing.phaseProfile?.phaseEstimation ?? null
+              }
+            };
+
+            localStorage.setItem("bloom_profile", JSON.stringify(updated));
+
+            if (profile.avatar) {
+              localStorage.setItem("bloom_avatar", profile.avatar);
+            }
+
+            updateMiniProfile(user); // refresh UI
+          }
+        } catch (e) {
+          console.error("Profile sync failed", e);
+        }
+      }
+    });
+
+    document.getElementById("profile-logout-btn")?.addEventListener("click", async () => {
+      await logout();
+      window.location.href = "/pages/login.html";
+    });
 
     // Goal cards
     const grid = document.getElementById("goals-grid");
@@ -334,41 +411,42 @@
       grid.innerHTML = "";
 
       GOALS.forEach(g => {
+        const locked = isGoalAgeLocked(g.id);
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "goal-card" + (g.id === current ? " active" : "");
-        btn.innerHTML = `
-          <div class="goal-badge">${goalIcon(g.id)}</div>
-          <div>
-            <p class="goal-title">${g.title}</p>
-            <p class="goal-desc">${g.desc}</p>
-          </div>
-        `;
+        btn.className = "goal-card" + (g.id === current ? " active" : "") + (locked ? " goal-card--locked" : "");
+        btn.disabled = locked;
+        btn.innerHTML = locked
+          ? `
+            <div class="goal-badge">${goalIcon(g.id)}</div>
+            <div style="flex:1;">
+              <p class="goal-title">${g.title}</p>
+              <p class="goal-desc">${g.desc}</p>
+            </div>
+            <span style="
+              display:inline-flex;align-items:center;gap:0.3rem;
+              font-size:0.75rem;font-weight:700;color:var(--color-text-muted,#999);
+              background:var(--color-bg-subtle,#f5f5f5);
+              padding:0.2rem 0.55rem;border-radius:20px;white-space:nowrap;flex-shrink:0;
+            ">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              18+
+            </span>`
+          : `
+            <div class="goal-badge">${goalIcon(g.id)}</div>
+            <div>
+              <p class="goal-title">${g.title}</p>
+              <p class="goal-desc">${g.desc}</p>
+            </div>
+          `;
 
-        btn.addEventListener("click", () => {
-          const now = getUserGoal();
-          if (g.id === now) return;
-
-          // Special confirmation when leaving the pregnancy goal
-          if (now === "pregnancy") {
-            const ok = confirm(
-              "Are you no longer pregnant?\n\nSwitching away from the pregnancy goal will clear your saved LMP date and pregnancy tracking data. Your other logs will NOT be deleted.\n\nTap OK to confirm."
-            );
-            if (!ok) return;
-            // Clear pregnancy-specific data
-            localStorage.removeItem("bloom_lmp");
-          } else {
-            const ok = confirm(
-              `Switch goal to: "${g.title}"?\n\nYour previous logs will NOT be deleted.\nYour dashboard + tools will update based on this goal.`
-            );
-            if (!ok) return;
-          }
-
-          setUserGoal(g.id);
-          showToast("Goal updated. Your dashboard will now reflect this goal.");
-          renderGoals();
-          updateMeta();
-        });
+        if (!locked) {
+          btn.addEventListener("click", () => {
+            const now = getUserGoal();
+            if (g.id === now) return;
+            showGoalModal(g, now === "pregnancy");
+          });
+        }
 
         grid.appendChild(btn);
       });
@@ -384,6 +462,193 @@
           <a class="btn btn-outline" href="/pages/calendar.html">Open Calendar</a>
         </div>
       `;
+    }
+
+    function showGoalModal(goal, leavingPregnancy) {
+      const DASHBOARD_URL = "/pages/dashboard.html";
+      let redirectTimer = null;
+
+      // Build modal markup
+      const el = document.createElement("div");
+      el.innerHTML = `
+        <div id="gtm-overlay" style="
+          position:fixed;inset:0;z-index:9999;
+          background:rgba(0,0,0,0.48);
+          display:flex;align-items:center;justify-content:center;
+          padding:1rem;
+          opacity:0;transition:opacity 0.2s ease;
+        ">
+          <div id="gtm-card" style="
+            background:#fff;
+            border-radius:18px;
+            padding:2rem 1.75rem 1.75rem;
+            max-width:420px;width:100%;
+            box-shadow:0 24px 60px rgba(0,0,0,0.18);
+            text-align:center;
+            transform:translateY(14px);
+            transition:transform 0.22s ease;
+            color:#1a1a2e;
+          ">
+            <div id="gtm-icon" style="
+              width:56px;height:56px;border-radius:50%;
+              background:rgba(216,90,152,0.12);
+              color:#d85a98;
+              display:flex;align-items:center;justify-content:center;
+              margin:0 auto 1rem;
+            ">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M8 12l3 3 5-5"/>
+              </svg>
+            </div>
+            <h2 id="gtm-title" style="margin:0 0 0.5rem;font-size:1.2rem;font-weight:800;color:#1a1a2e;line-height:1.3;"></h2>
+            <p id="gtm-body" style="margin:0 0 0.25rem;font-size:0.95rem;color:#555;line-height:1.6;"></p>
+            <p id="gtm-warn" style="margin:0 0 0;font-size:0.88rem;color:#c0392b;line-height:1.5;"></p>
+            <div style="
+              background:rgba(216,90,152,0.07);
+              border-radius:10px;padding:0.75rem 1rem;
+              margin:1rem 0 1.4rem;
+              font-size:0.87rem;color:#555;
+              text-align:left;display:flex;gap:0.6rem;align-items:flex-start;
+            ">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d85a98" stroke-width="2" style="flex-shrink:0;margin-top:1px;">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              <span id="gtm-privacy">Your previous logs are still safe - we never delete your history. We do not share or sell your data.</span>
+            </div>
+            <div id="gtm-actions" style="display:flex;flex-direction:column;gap:0.6rem;"></div>
+          </div>
+        </div>
+      `;
+
+      // Store refs BEFORE appending (moving to DOM detaches from el)
+      const overlay  = el.querySelector("#gtm-overlay");
+      const card     = el.querySelector("#gtm-card");
+      const titleEl  = el.querySelector("#gtm-title");
+      const bodyEl   = el.querySelector("#gtm-body");
+      const warnEl   = el.querySelector("#gtm-warn");
+      const iconEl   = el.querySelector("#gtm-icon");
+      const actionsEl = el.querySelector("#gtm-actions");
+
+      // Clamp card height so it never overflows viewport
+      card.style.overflowY = "auto";
+      card.style.maxHeight = "90vh";
+
+      document.body.appendChild(overlay);
+
+      // Dark-mode: use CSS var for card bg if available
+      const cardBg   = getComputedStyle(document.documentElement).getPropertyValue("--color-card").trim();
+      const cardText = getComputedStyle(document.documentElement).getPropertyValue("--color-text").trim();
+      if (cardBg)   card.style.background = cardBg;
+      if (cardText) { card.style.color = cardText; titleEl.style.color = cardText; }
+
+      // Fade in
+      requestAnimationFrame(() => {
+        overlay.style.opacity = "1";
+        card.style.transform = "translateY(0)";
+      });
+
+      function completeGoalSwitch({ clearPregnancyData = false } = {}) {
+        if (clearPregnancyData) localStorage.removeItem("bloom_lmp");
+        setUserGoal(goal.id);
+        syncGoalToBackend(goal.id);
+        renderGoals();
+        updateMeta();
+        showSuccessAndRedirect();
+      }
+
+      function showConfirm() {
+        titleEl.textContent = `Switch to "${goal.title}"?`;
+        bodyEl.textContent  = "Your dashboard and tools will update, but your logs are always kept.";
+        warnEl.textContent = "";
+        if (leavingPregnancy) {
+          warnEl.textContent = "You will be asked to confirm whether this pregnancy has ended before we switch goals.";
+        }
+        actionsEl.innerHTML = "";
+
+        const confirmBtn = document.createElement("button");
+        confirmBtn.textContent = "Yes, switch goal";
+        confirmBtn.style.cssText = "padding:0.75rem 1rem;border-radius:10px;border:none;background:#d85a98;color:#fff;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;";
+        confirmBtn.onclick = () => {
+          if (leavingPregnancy) {
+            showPregnancyEndedCheck();
+            return;
+          }
+          completeGoalSwitch();
+        };
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.style.cssText = "padding:0.72rem 1rem;border-radius:10px;border:2px solid #ddd;background:transparent;color:#555;font-weight:700;font-size:1rem;cursor:pointer;font-family:inherit;";
+        cancelBtn.onclick = close;
+
+        actionsEl.appendChild(confirmBtn);
+        actionsEl.appendChild(cancelBtn);
+      }
+
+      function showPregnancyEndedCheck() {
+        titleEl.textContent = "Has your pregnancy ended?";
+        bodyEl.textContent = "Before switching away from pregnancy tracking, please confirm this.";
+        warnEl.textContent = "If yes, we will clear the saved LMP pregnancy date for safety.";
+        actionsEl.innerHTML = "";
+
+        const yesEndedBtn = document.createElement("button");
+        yesEndedBtn.textContent = "Yes, pregnancy has ended";
+        yesEndedBtn.style.cssText = "padding:0.75rem 1rem;border-radius:10px;border:none;background:#d85a98;color:#fff;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;";
+        yesEndedBtn.onclick = () => completeGoalSwitch({ clearPregnancyData: true });
+
+        const keepBtn = document.createElement("button");
+        keepBtn.textContent = "No, keep pregnancy goal";
+        keepBtn.style.cssText = "padding:0.72rem 1rem;border-radius:10px;border:2px solid #ddd;background:transparent;color:#555;font-weight:700;font-size:1rem;cursor:pointer;font-family:inherit;";
+        keepBtn.onclick = close;
+
+        const backBtn = document.createElement("button");
+        backBtn.textContent = "Back";
+        backBtn.style.cssText = "padding:0.72rem 1rem;border-radius:10px;border:2px solid #ddd;background:transparent;color:#555;font-weight:700;font-size:1rem;cursor:pointer;font-family:inherit;";
+        backBtn.onclick = showConfirm;
+
+        actionsEl.appendChild(yesEndedBtn);
+        actionsEl.appendChild(keepBtn);
+        actionsEl.appendChild(backBtn);
+      }
+
+      function showSuccessAndRedirect() {
+        titleEl.textContent = `Dashboard ready for "${goal.title}"`;
+        bodyEl.textContent  = "Your goal is updated. Taking you to your dashboard now...";
+        warnEl.textContent  = "";
+
+        // Swap icon to checkmark
+        iconEl.innerHTML = `
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        `;
+
+        actionsEl.innerHTML = "";
+
+        const dashBtn = document.createElement("a");
+        dashBtn.href = DASHBOARD_URL;
+        dashBtn.textContent = "Go now";
+        dashBtn.style.cssText = "padding:0.75rem 1rem;border-radius:10px;background:#d85a98;color:#fff;font-weight:800;font-size:1rem;text-align:center;text-decoration:none;display:block;";
+
+        actionsEl.appendChild(dashBtn);
+
+        clearTimeout(redirectTimer);
+        redirectTimer = setTimeout(() => {
+          window.location.href = DASHBOARD_URL;
+        }, 900);
+      }
+
+      function close() {
+        clearTimeout(redirectTimer);
+        overlay.style.opacity = "0";
+        card.style.transform = "translateY(14px)";
+        overlay.addEventListener("transitionend", () => overlay.remove(), { once: true });
+      }
+
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+      showConfirm();
     }
 
     renderGoals();

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/bloom-logo.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Educational Pamphlets - Bloom</title>
 
@@ -216,6 +217,8 @@
      * Sensitive pamphlets are hidden unless user enabled sensitive content in Settings.
      */
     import { renderNav, renderFooter, renderModeBanner } from '/js/utils.js';
+    import { getIdToken } from '/js/auth.js';
+    import { loadBloomPreferencesLocal } from '/js/bloom-storage.js';
 
     renderNav('pamphlets');
     renderFooter();
@@ -224,13 +227,88 @@
     let pamphlets = [];
     let activeCategory = 'all';
     let searchQuery = '';
+    let lastPdfOpen = { key: '', ts: 0 };
+    const API_BASE = typeof window.BLOOM_API_BASE === 'string' ? window.BLOOM_API_BASE : '';
+    const LOCAL_PAMPHLETS_URL = new URL('../data/pamphlets.json', import.meta.url).href;
+
+    function resolvePdfUrl(rawPdf) {
+      const raw = String(rawPdf || '').trim();
+      if (!raw) return '';
+      if (/^https?:\/\//i.test(raw)) return raw;
+      // Prefer same-origin static assets for pamphlet PDFs/images.
+      if (raw.startsWith('/assets/')) return raw;
+      if (raw.startsWith('/') && API_BASE) return `${API_BASE}${raw}`;
+      return raw;
+    }
+
+    function openPdfInNewTab(pdfUrl, key = '') {
+      const now = Date.now();
+      if (key && lastPdfOpen.key === key && now - lastPdfOpen.ts < 900) return;
+      lastPdfOpen = { key, ts: now };
+      window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    function isSensitiveContentEnabled() {
+      const prefs = loadBloomPreferencesLocal();
+      return canShowSensitiveFromLocalProfile(prefs);
+    }
+
+    function getProfileAge() {
+      try {
+        const profile = JSON.parse(localStorage.getItem('bloom_profile') || '{}');
+        const year = Number(profile.yearOfBirth ?? profile.yob);
+        if (!Number.isInteger(year)) return null;
+        const age = new Date().getFullYear() - year;
+        return age >= 0 && age < 120 ? age : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function canShowSensitiveFromLocalProfile(prefs) {
+      const age = getProfileAge();
+      return (age === null || age >= 18) && !prefs.hideSensitive;
+    }
+
+    async function authFetchOptions() {
+      const token = await getIdToken().catch(() => null);
+      return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    }
 
     async function init() {
-      const res = await fetch('/data/pamphlets.json');
-      pamphlets = await res.json();
+      const sensitiveEnabled = isSensitiveContentEnabled();
 
-      const sensitiveEnabled = localStorage.getItem('bloom_sensitive_enabled') === 'true';
-      if (!sensitiveEnabled) pamphlets = pamphlets.filter(p => !p.sensitive);
+      // Show spinner while loading
+      document.getElementById('pamphlet-grid').innerHTML = '<div class="spinner"></div>';
+
+      try {
+        const res = await fetch(
+          `${API_BASE}/catalog/pamphlets?sensitive=${sensitiveEnabled}`,
+          await authFetchOptions()
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const json = await res.json();
+
+        pamphlets = (json.pamphlets ?? [])
+          .filter(p => p.status === "published")
+          .filter(p => sensitiveEnabled || !p.sensitive);
+
+      } catch (_) {
+        try {
+          const res = await fetch(LOCAL_PAMPHLETS_URL);
+          const all = await res.json();
+
+          pamphlets = all
+            .filter(p => p.status === "published")
+            .filter(p => sensitiveEnabled || !p.sensitive);
+
+        } catch (_2) {
+          document.getElementById('pamphlet-grid').innerHTML =
+            '<p class="text-muted no-results">Could not load pamphlets. Please try again later.</p>';
+          return;
+        }
+      }
 
       buildCategoryFilters();
       renderGrid();
@@ -238,7 +316,11 @@
       if (window.location.hash) {
         const id = window.location.hash.slice(1);
         const pamphlet = pamphlets.find(p => p.id === id);
-        if (pamphlet && !pamphlet.pdf) openReader(pamphlet);
+        if (pamphlet) {
+          const pdfUrl = resolvePdfUrl(pamphlet.pdf);
+          if (pdfUrl) openPdfInNewTab(pdfUrl, `hash:${pamphlet.id || ''}`);
+          else openReader(pamphlet);
+        }
       }
 
       document.getElementById('pamphlet-search').addEventListener('input', (e) => {
@@ -300,18 +382,18 @@
       }
 
       grid.innerHTML = filtered.map(p => `
-        <div class="book-card${p.pdf ? ' is-pdf' : ''}" role="button" tabindex="0" data-id="${p.id}" aria-label="Open pamphlet ${p.title}">
+        <div class="book-card${p.pdf ? ' is-pdf' : ''}" role="button" tabindex="0" data-id="${p.id}" aria-label="Open pamphlet: ${p.title}">
           <span class="book-spine" aria-hidden="true"></span>
 
           <div class="book-top">
             <h3 class="book-title">${p.title}</h3>
-            <p class="book-summary">${p.summary}</p>
+            <p class="book-summary">${p.summary || ''}</p>
           </div>
 
           <div class="book-meta">
             <span class="badge badge-primary">${p.category}</span>
-            <span>${p.readTime} read</span>
-            ${p.pdf ? '<span class="badge">PDF</span>' : ''}
+            ${p.readTime ? `<span>${p.readTime} read</span>` : ''}
+            ${p.pdf ? '<span class="badge" title="PDF available">&#128196; PDF</span>' : ''}
             ${p.sensitive ? '<span class="badge badge-warning">Sensitive</span>' : ''}
           </div>
         </div>
@@ -322,8 +404,9 @@
         const open = () => {
           const pamphlet = pamphlets.find(p => p.id === card.dataset.id);
           if (!pamphlet) return;
-          if (pamphlet.pdf) {
-            window.open(pamphlet.pdf, '_blank', 'noopener');
+          const pdfUrl = resolvePdfUrl(pamphlet.pdf);
+          if (pdfUrl) {
+            openPdfInNewTab(pdfUrl, `card:${pamphlet.id || ''}`);
           } else {
             openReader(pamphlet);
           }
@@ -344,11 +427,16 @@
       document.getElementById('reader-view').classList.remove('hidden');
 
       document.getElementById('reader-title').textContent = pamphlet.title;
+      const pdfUrl = resolvePdfUrl(pamphlet.pdf);
       document.getElementById('reader-meta').innerHTML = `
         <span class="badge badge-primary">${pamphlet.category}</span>
-        <span>${pamphlet.readTime} read</span>
+        ${pamphlet.readTime ? `<span>${pamphlet.readTime} read</span>` : ''}
+        ${pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="margin-left:0.5rem;">&#128196; Download PDF</a>` : ''}
       `;
-      document.getElementById('reader-content').innerHTML = pamphlet.content;
+      document.getElementById('reader-content').innerHTML =
+        pamphlet.content ||
+        `<p class="text-muted">This pamphlet is currently available as a PDF only.</p>
+         ${pdfUrl ? `<p><a href="${pdfUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">&#128196; Open PDF</a></p>` : ''}`;
 
       window.location.hash = pamphlet.id;
       window.scrollTo(0, 0);

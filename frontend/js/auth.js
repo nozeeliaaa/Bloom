@@ -1,11 +1,11 @@
 /**
- * auth.js — Firebase Authentication Helpers (Frontend)
+ * auth.js - Firebase Authentication Helpers (Frontend)
  * - Login / Register / Logout
  * - Email verification enforcement
  * - Password reset flow
  * - Password strength validation
  * - Supplies ID token for backend API calls in account mode
- * - Fetches Firestore user role (admin/user) and stores in localStorage
+ * - Fetches backend user role (admin/user) and stores in localStorage
  */
 
 import {
@@ -15,14 +15,16 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut,
-} from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { getFirebaseAuth, getFirebaseDB } from "./firebase.js";
-import { setMode } from "./mode.js";
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getFirebaseAuth } from "./firebase.js";
+import { getMode, setMode } from "./mode.js";
 
 /** Local storage keys */
 const ROLE_KEY = "bloom_user_role";
 const IS_ADMIN_KEY = "bloom_is_admin";
+const ROLE_SYNCED_AT_KEY = "bloom_role_synced_at";
+const ROLE_SYNC_TTL_MS = 10 * 60 * 1000;
+const API_BASE = (typeof window !== "undefined" && window.BLOOM_API_BASE) || "";
 
 /** Returns current Firebase Auth instance */
 export function auth() {
@@ -38,10 +40,38 @@ export function getUser() {
 export const getCurrentUser = getUser;
 
 /** Get the Firebase ID token (for backend calls) */
-export async function getIdToken() {
-  const user = getUser();
+export async function getIdToken({ waitForAuthMs = 1200 } = {}) {
+  let user = getUser();
+
+  // On first page load there is a short window where currentUser is still null
+  // even though an account session exists. Wait briefly in account mode so
+  // backend calls don't incorrectly fall back to local/anon paths.
+  if (!user && getMode() === "account" && waitForAuthMs > 0) {
+    const a = auth();
+    if (a) {
+      user = await new Promise((resolve) => {
+        let settled = false;
+        let unsub = () => {};
+        let timer = null;
+        const finish = (u) => {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          try { unsub(); } catch (_) {}
+          resolve(u ?? null);
+        };
+        timer = setTimeout(() => finish(a.currentUser ?? null), waitForAuthMs);
+        unsub = onAuthStateChanged(a, (u) => finish(u));
+      });
+    }
+  }
+
   if (!user) return null;
-  return await user.getIdToken();
+  try {
+    return await user.getIdToken();
+  } catch (_) {
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────
@@ -92,28 +122,60 @@ export function getPasswordStrength(password) {
 // ─────────────────────────────────────────
 
 async function syncUserRole(user) {
-  try {
-    const db = getFirebaseDB();
-    const ref = doc(db, "users", user.uid);
-    const snap = await getDoc(ref);
+  const cached = localStorage.getItem(IS_ADMIN_KEY);
 
-    const role = snap.exists() ? snap.data()?.role : null;
+  try {
+    const token = await user.getIdToken();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    let res;
+
+    try {
+      res = await fetch(`${API_BASE}/api/user/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!res.ok) throw new Error(`Role sync failed with status ${res.status}`);
+
+    const data = await res.json().catch(() => ({}));
+
+    // Backend schema: role is top-level users/{uid}.role
+    // Keep nested fallback for older docs.
+    const role = data?.role ?? data?.profile?.role ?? "user";
 
     localStorage.setItem(ROLE_KEY, role || "user");
     localStorage.setItem(IS_ADMIN_KEY, role === "admin" ? "1" : "0");
+    localStorage.setItem(ROLE_SYNCED_AT_KEY, String(Date.now()));
 
     return role === "admin";
   } catch (e) {
-    localStorage.setItem(ROLE_KEY, "user");
-    localStorage.setItem(IS_ADMIN_KEY, "0");
-    console.warn("[auth] Could not sync role:", e);
-    return false;
+    // Do not downgrade an existing cached admin flag just because the network
+    // hiccupped. The backend still enforces admin access on every admin route.
+    if (cached !== "1" && cached !== "0") {
+      localStorage.setItem(ROLE_KEY, "user");
+      localStorage.setItem(IS_ADMIN_KEY, "0");
+    }
+    console.info("[auth] Role sync skipped; using cached role.");
+    return cached === "1";
   }
+}
+
+function syncUserRoleInBackground(user) {
+  if (!user) return;
+  const lastSync = Number(localStorage.getItem(ROLE_SYNCED_AT_KEY) || 0);
+  if (Date.now() - lastSync < ROLE_SYNC_TTL_MS) return;
+  // Role sync is useful for admin UI, but it should not block login or page load.
+  void syncUserRole(user);
 }
 
 function clearCachedRole() {
   localStorage.removeItem(ROLE_KEY);
   localStorage.removeItem(IS_ADMIN_KEY);
+  localStorage.removeItem(ROLE_SYNCED_AT_KEY);
 }
 
 export function isAdminCached() {
@@ -141,10 +203,10 @@ export function initAuthListener(onChange = null) {
     if (typeof onChange === "function") onChange(null);
     return;
   }
-  onAuthStateChanged(a, async (user) => {
+  onAuthStateChanged(a, (user) => {
     if (user) {
       setMode("account");
-      await syncUserRole(user);
+      syncUserRoleInBackground(user);
     } else {
       clearCachedRole();
     }
@@ -161,12 +223,13 @@ export function onAuthChange(callback) {
     if (typeof callback === "function") callback(null);
     return () => {};
   }
-  return onAuthStateChanged(a, async (user) => {
+  return onAuthStateChanged(a, (user) => {
     if (user) {
       setMode("account");
-      await syncUserRole(user);
+      syncUserRoleInBackground(user);
     } else {
       clearCachedRole();
+      setMode("anon");
     }
     if (typeof callback === "function") callback(user);
   });
@@ -181,7 +244,7 @@ export function onAuthChange(callback) {
  * - Enforces password strength
  * - Sends email verification automatically
  */
-export async function register(email, password) {
+export async function register(email, password, { skipVerificationEmail = false } = {}) {
   const { valid, errors } = validatePassword(password);
   if (!valid) {
     const err = new Error("Password does not meet requirements: " + errors.join(", "));
@@ -192,10 +255,12 @@ export async function register(email, password) {
 
   const res = await createUserWithEmailAndPassword(auth(), email, password);
 
-  await sendEmailVerification(res.user);
+  if (!skipVerificationEmail) {
+    await sendEmailVerification(res.user);
+  }
 
   setMode("account");
-  await syncUserRole(res.user);
+  syncUserRoleInBackground(res.user);
   return res.user;
 }
 
@@ -204,7 +269,7 @@ export async function register(email, password) {
 // ─────────────────────────────────────────
 
 /**
- * Login — blocks if email not verified.
+ * Login - blocks if email not verified.
  * Throws err.code = "auth/email-not-verified" so UI can offer resend.
  */
 export async function login(email, password) {
@@ -222,7 +287,9 @@ export async function login(email, password) {
   }
 
   setMode("account");
-  await syncUserRole(res.user);
+  // Role lookup uses Firestore and can be slow/quota-limited; it should not
+  // block a successful login. The nav/admin link will update when it resolves.
+  syncUserRoleInBackground(res.user);
   return res.user;
 }
 
@@ -256,7 +323,52 @@ export async function resendVerificationEmail(email, password) {
 // LOGOUT
 // ─────────────────────────────────────────
 
-export async function logout() {
+// All localStorage keys that belong to the signed-in user.
+// These must be cleared on logout so the next user starts with a clean slate.
+const USER_LOCAL_KEYS = [
+  "bloom_daily_logs",
+  "bloom_assistant_session",
+  "bloomie_state_v2",
+  "bloomieMemory",
+  "bloom_bloomie_memory",
+  "bloom_avatar",
+  "bloom_goal",
+  "bloom_onboarded",
+  "bloom_yob_locked",
+  "bloom_profile",
+  "bloom_lmp",
+  "bloom_user_name",
+  "bloom_notification_inbox",
+  "bloom_notified",
+  "bloom_preferences",
+  "bloom_show_mode_banner_once",
+  "bloom_last_activity_ts",
+  "bloom_game",
+  "bloom_consent_status",
+];
+
+export function clearLocalSessionData() {
   clearCachedRole();
+  USER_LOCAL_KEYS.forEach((key) => localStorage.removeItem(key));
+
+  // Remove cycle-state caches persisted in localStorage by older builds.
+  for (const key of Object.keys(localStorage)) {
+    if (
+      key.startsWith("bloom_cs_v1_") ||
+      key.startsWith("bloom_cs_v2_") ||
+      key.startsWith("bloom_biometric_cs_v1_")
+    ) {
+      localStorage.removeItem(key);
+    }
+  }
+
+  try {
+    sessionStorage.clear();
+  } catch (_) {}
+}
+
+export async function logout() {
+  clearLocalSessionData();
+  setMode("anon");
   await signOut(auth());
 }

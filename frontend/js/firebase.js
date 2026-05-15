@@ -1,13 +1,13 @@
 /**
- * Firebase initialization (Vite / npm SDK)
- * - Single source of truth (NO CDN imports)
+ * Firebase initialization
+ * - Uses browser-resolvable module URLs (works in static hosting + Vite dev)
  * - Sync exports for auth + db + messaging
  */
- 
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getMessaging, isSupported } from "firebase/messaging";
+
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getMessaging, isSupported } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging.js";
 import { firebaseConfig } from "./firebaseConfig.js";
  
 let app      = null;
@@ -33,7 +33,7 @@ async function initFirebase() {
  
   auth = getAuth(app);
   db   = getFirestore(app);
- 
+  window.auth = auth;
   // FCM is only supported in browsers that support service workers
   try {
     const supported = await isSupported();

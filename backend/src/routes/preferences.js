@@ -1,36 +1,74 @@
 /**
  * src/routes/preferences.js
  *
- * GET  /preferences      — load user preferences from Firestore
- * PUT  /preferences      — save user preferences to Firestore
+ * GET  /preferences      - load user preferences from Firestore
+ * PUT  /preferences      - save user preferences to Firestore
  */
 
 import express from "express";
 import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
-import { requireAuth } from "../middleware/auth.js";
+import { deriveAgeBand, requireAuth } from "../middleware/auth.js";
 import { logAudit, AUDIT_ACTIONS } from "../utils/auditLog.js";
-
 
 const router = express.Router();
 
-// Valid preference values for server-side validation
 const VALID_THEMES = ["light", "dark", "system"];
 const VALID_REMINDER_TYPES = ["PERIOD_SOON", "LOG_REMINDER", "CHECK_IN", "FERTILE_WINDOW"];
+
+async function getEffectiveAgeBand(req) {
+  if (req.user?.firestoreDegraded) return req.user?.ageBand ?? null;
+
+  try {
+    const snap = await db.collection("users").doc(req.user.uid).get();
+    const profile = snap.exists ? snap.data()?.profile || {} : {};
+    return deriveAgeBand(profile.yearOfBirth) || req.user?.ageBand || null;
+  } catch (_) {
+    return req.user?.ageBand ?? null;
+  }
+}
+
+function enforceMinorPreferences(ageBand, prefs = {}) {
+  if (ageBand !== "10-17") return prefs;
+  return {
+    ...prefs,
+    hideSensitive: true,
+    sensitiveContentLocked: true,
+  };
+}
+
+function isFirestoreQuotaError(err) {
+  const msg = String(err?.message || "").toLowerCase();
+  return err?.code === 8 || msg.includes("resource_exhausted") || msg.includes("quota exceeded");
+}
+
+function isValidTime(str) {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(str);
+}
 
 // ─── GET /preferences ────────────────────────────────────────────────────────
 router.get("/", requireAuth, async (req, res) => {
   try {
+    if (req.user?.firestoreDegraded) {
+      return res.json({ ok: true, preferences: null, degraded: true });
+    }
+
     const uid = req.user.uid;
+    const ageBand = await getEffectiveAgeBand(req);
     const doc = await db.collection("preferences").doc(uid).get();
 
     if (!doc.exists) {
-      return res.json({ ok: true, preferences: null }); // frontend uses defaults
+      return res.json({ ok: true, preferences: enforceMinorPreferences(ageBand, {}) });
     }
 
-    return res.json({ ok: true, preferences: doc.data() });
+    return res.json({ ok: true, preferences: enforceMinorPreferences(ageBand, doc.data()) });
   } catch (err) {
-    console.error("GET /preferences error:", err);
+    if (isFirestoreQuotaError(err)) {
+      console.warn("GET /preferences quota exceeded; returning degraded preferences payload");
+      return res.json({ ok: true, preferences: null, degraded: true });
+    }
+
+    console.error("GET /preferences error:", err?.message ?? err);
     return res.status(500).json({ error: "Failed to load preferences" });
   }
 });
@@ -41,8 +79,12 @@ router.put("/", requireAuth, async (req, res) => {
     const uid = req.user.uid;
     const body = req.body;
 
+    // Guard against malformed body
+    if (typeof body !== "object" || body === null) {
+      return res.status(400).json({ error: "Invalid request body" });
+    }
+
     if (body.pregnancyMode !== undefined && req.user.ageBand === "10-17") {
-      // Run the consent check manually for this field only
       const consentSnap = await db.collection("consents")
         .where("teenUid", "==", req.user.uid)
         .where("status", "==", "approved")
@@ -56,8 +98,9 @@ router.put("/", requireAuth, async (req, res) => {
         });
       }
     }
-    // Build a validated preferences object — never blindly store req.body
+
     const prefs = {};
+    const ageBand = await getEffectiveAgeBand(req);
 
     if (body.theme !== undefined) {
       if (!VALID_THEMES.includes(body.theme)) {
@@ -66,25 +109,52 @@ router.put("/", requireAuth, async (req, res) => {
       prefs.theme = body.theme;
     }
 
-    if (body.blurMode !== undefined)    prefs.blurMode    = body.blurMode    === true;
-    if (body.discreetMode !== undefined) prefs.discreetMode = body.discreetMode === true;
-    if (body.compact !== undefined)     prefs.compact     = body.compact     === true;
+    if (body.blurMode      !== undefined) prefs.blurMode      = body.blurMode      === true;
+    if (body.discreetMode  !== undefined) prefs.discreetMode  = body.discreetMode  === true;
+    if (body.compact       !== undefined) prefs.compact       = body.compact       === true;
     if (body.hideSensitive !== undefined) prefs.hideSensitive = body.hideSensitive === true;
+    if (ageBand === "10-17") {
+      prefs.hideSensitive = true;
+      prefs.sensitiveContentLocked = true;
+    }
 
     if (body.reminders !== undefined) {
       const r = body.reminders;
       prefs.reminders = {
         enabled:      r.enabled      === true,
         discreetCopy: r.discreetCopy === true,
-        types: Array.isArray(r.types)
-          ? r.types.filter(t => VALID_REMINDER_TYPES.includes(t))
-          : [],
       };
 
-      if (r.quietHours?.start && r.quietHours?.end) {
+      if (Array.isArray(r.types)) {
+        const invalidTypes = r.types.filter(t => !VALID_REMINDER_TYPES.includes(t));
+        if (invalidTypes.length) {
+          return res.status(400).json({
+            error: `Invalid reminder types: ${invalidTypes.join(", ")}`,
+          });
+        }
+        prefs.reminders.types = r.types;
+      } else {
+        prefs.reminders.types = [];
+      }
+
+      if (r.quietHours !== undefined) {
+        const { start, end } = r.quietHours || {};
+
+        if (!start || !end) {
+          return res.status(400).json({
+            error: "quietHours requires both start and end in HH:mm format",
+          });
+        }
+
+        if (!isValidTime(start) || !isValidTime(end)) {
+          return res.status(400).json({
+            error: "Invalid quietHours format. Use HH:mm (e.g. 09:00)",
+          });
+        }
+
         prefs.reminders.quietHours = {
-          start: String(r.quietHours.start).slice(0, 5),
-          end:   String(r.quietHours.end).slice(0, 5),
+          start,
+          end,
         };
       }
     }
@@ -99,7 +169,6 @@ router.put("/", requireAuth, async (req, res) => {
 
     await db.collection("preferences").doc(uid).set(prefs, { merge: true });
 
-    // Audit log
     await logAudit({
       actorUid:   uid,
       actorRole:  req.user.role,

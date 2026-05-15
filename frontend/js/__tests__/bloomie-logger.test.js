@@ -6,12 +6,12 @@
  * Tests for fire-and-forget analytics + safety event logging.
  *
  * Covers:
- *   logAnalyticsEvent — posts to correct endpoint
- *   logAnalyticsEvent — never throws on fetch reject
- *   logAnalyticsEvent — never throws on timeout (2 s race)
- *   anonymise()       — strips nums, month names, caps at 120 chars
- *   buildSessionMeta() — returns all correct fields from a ctx object
- *   logSafetyEvent    — regression: skips if not account-mode
+ *   logAnalyticsEvent - posts to correct endpoint
+ *   logAnalyticsEvent - never throws on fetch reject
+ *   logAnalyticsEvent - never throws on timeout (2 s race)
+ *   anonymise()       - strips nums, month names, caps at 120 chars
+ *   buildSessionMeta() - returns all correct fields from a ctx object
+ *   logSafetyEvent    - regression: logs safety events without account-mode auth
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -97,7 +97,7 @@ describe("logAnalyticsEvent", () => {
   });
 
   it("never throws on 2 s timeout (fetch never resolves)", async () => {
-    // fetch hangs forever — the 2000 ms race inside _sendAnalytics should reject
+    // fetch hangs forever - the 2000 ms race inside _sendAnalytics should reject
     // but the outer catch must swallow it
     global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
 
@@ -214,10 +214,18 @@ describe("logSafetyEvent", () => {
     vi.restoreAllMocks();
   });
 
-  it("does NOT call fetch when isAccountMode() is false (anonymous)", async () => {
-    // isAccountMode is mocked to return false at module level
+  it("logs anonymous safety events without an Authorization header", async () => {
     logSafetyEvent("urgent_trigger", { route: "HEAVY_URGENT" });
     await vi.runAllTimersAsync();
-    expect(fetch).not.toHaveBeenCalled();
+
+    expect(fetch).toHaveBeenCalledOnce();
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe("/api/bloomie-safety-log");
+    expect(opts.method).toBe("POST");
+    expect(opts.headers.Authorization).toBeUndefined();
+    expect(JSON.parse(opts.body)).toMatchObject({
+      type: "urgent_trigger",
+      route: "HEAVY_URGENT",
+    });
   });
 });

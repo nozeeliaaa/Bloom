@@ -1,6 +1,19 @@
 // src/validators/validateCycleLog.js
 
 const VALID_FLOW_LEVELS = [0, 1, 2, 3]; // 0=none, 1=light, 2=medium, 3=heavy
+const VALID_BIOMETRIC_LEVELS = ["low", "moderate", "high", "very_high"];
+
+function normalizeBiometricLevel(value) {
+  if (value === undefined || value === null || value === "") return null;
+
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return VALID_BIOMETRIC_LEVELS[value - 1] ?? null;
+  }
+
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return VALID_BIOMETRIC_LEVELS.includes(normalized) ? normalized : null;
+}
 
 /**
  * Validates the body of a PUT /cycle-logs/:dateKey request.
@@ -26,6 +39,34 @@ export function validateCycleLog(body) {
       return {
         valid: false,
         error: `flowLevel must be one of: ${VALID_FLOW_LEVELS.join(", ")} (0=none, 1=light, 2=medium, 3=heavy)`,
+      };
+    }
+  }
+
+  // --- sleepScore: integer 1..10 if present ---
+  if (body.sleepScore !== undefined && body.sleepScore !== null && body.sleepScore !== "") {
+    const sleep = Number(body.sleepScore);
+    if (!Number.isInteger(sleep) || sleep < 1 || sleep > 10) {
+      return { valid: false, error: "sleepScore must be an integer from 1 to 10" };
+    }
+  }
+
+  // --- stressLevel: low|moderate|high|very_high if present ---
+  if (body.stressLevel !== undefined && body.stressLevel !== null && body.stressLevel !== "") {
+    if (!normalizeBiometricLevel(body.stressLevel)) {
+      return {
+        valid: false,
+        error: `stressLevel must be one of: ${VALID_BIOMETRIC_LEVELS.join(", ")}`,
+      };
+    }
+  }
+
+  // --- activityLevel: low|moderate|high|very_high if present ---
+  if (body.activityLevel !== undefined && body.activityLevel !== null && body.activityLevel !== "") {
+    if (!normalizeBiometricLevel(body.activityLevel)) {
+      return {
+        valid: false,
+        error: `activityLevel must be one of: ${VALID_BIOMETRIC_LEVELS.join(", ")}`,
       };
     }
   }

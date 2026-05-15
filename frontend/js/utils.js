@@ -1,14 +1,50 @@
 /**
  * Shared utility functions: nav, footer, date helpers
  */
-import { isAccountMode } from "./mode.js";
+import { isAccountMode, isAnonMode } from "./mode.js";
+import { getUser } from "./auth.js";
+import { startSessionTimeoutGuard } from "./session-timeout.js";
 import { initTheme } from "./theme-manager.js";
+import { isOnboardingCompleteLocal } from "./onboarding.js";
 
-// ✅ Single source of truth for this key
+// Single source of truth for this key
 export const MODE_BANNER_ONCE_KEY = "bloom_show_mode_banner_once";
 
 // Initialize theme on every page load (prevents flash of wrong theme)
 initTheme();
+
+// Load symptom catalog at runtime so static hosting (Firebase web.app) does
+// not try to execute JSON as a JavaScript module.
+const SYMPTOM_DATA_CACHE_KEY = "bloom_symptom_catalog_v2";
+// Resolve via Vite so the JSON is emitted to dist even with publicDir disabled.
+const SYMPTOM_DATA_URL = new URL("../data/symptoms.json", import.meta.url).href;
+const BLOOM_LOGO_URL = new URL("../assets/bloom-logo.png", import.meta.url).href;
+
+async function loadSymptomCatalog() {
+  try {
+    const cached = sessionStorage.getItem(SYMPTOM_DATA_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch (_) {
+    // Ignore cache parse errors and fall through to network fetch.
+  }
+
+  try {
+    const res = await fetch(SYMPTOM_DATA_URL, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [];
+    try { sessionStorage.setItem(SYMPTOM_DATA_CACHE_KEY, JSON.stringify(list)); } catch (_) {}
+    return list;
+  } catch (err) {
+    console.warn("[utils] Failed to load symptoms.json:", err?.message || err);
+    return [];
+  }
+}
+
+const symptoms = await loadSymptomCatalog();
 
 /* ===== ICONS (inline SVG) ===== */
 export const ICONS = {
@@ -23,6 +59,7 @@ export const ICONS = {
   shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
   admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z"/><path d="M9 12l2 2 4-4"/></svg>`,
   bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+  help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
 };
 
 export function icon(name, size = 18) {
@@ -32,34 +69,43 @@ export function icon(name, size = 18) {
 
 /* ===== NAVIGATION ===== */
 export function renderNav(activePage = "") {
+  startSessionTimeoutGuard();
+
   const nav = document.createElement("nav");
   nav.className = "navbar";
   nav.setAttribute("role", "navigation");
   nav.setAttribute("aria-label", "Main navigation");
 
-  const links = [
+  const anon = isAnonMode();
+
+  const allLinks = [
     { href: "/pages/dashboard.html", label: "Dashboard", icon: "home", page: "dashboard" },
-    { href: "/pages/calendar.html", label: "Calendar", icon: "calendar", page: "calendar" },
-    { href: "/pages/assistant.html", label: "Bloomie", icon: "chat", page: "assistant" },
-    { href: "/pages/pamphlets.html", label: "Learn", icon: "book", page: "pamphlets" },
-    { href: "/pages/clinics.html", label: "Clinics", icon: "mapPin", page: "clinics" },
+    { href: "/pages/calendar.html",  label: "Calendar",  icon: "calendar", page: "calendar" },
+    { href: "/pages/assistant.html", label: "Bloomie",   icon: "chat", page: "assistant", accountOnly: true },
+    { href: "/pages/pamphlets.html", label: "Learn",     icon: "book", page: "pamphlets" },
+    { href: "/pages/clinics.html",   label: "Clinics",   icon: "mapPin", page: "clinics" },
   ];
+
+  const links = allLinks.filter(l => !l.accountOnly || !anon);
 
   // ✅ Admin link: account-only + cached flag set by auth.js
   const showAdmin = isAccountMode() && localStorage.getItem("bloom_is_admin") === "1";
   if (showAdmin) links.push({ href: "/pages/admin.html", label: "Admin", icon: "admin", page: "admin" });
 
   const avatar = localStorage.getItem("bloom_avatar") || "👤";
-  const profileBtn = `
-    <a href="/pages/profile.html" class="nav-avatar ${activePage === "profile" ? "active" : ""}" aria-label="Open profile">
-      <span class="nav-avatar-circle">${avatar}</span>
-    </a>
-  `;
+
+  // Account mode: avatar + logout button
+  // Anon mode: "Create an account" outline button
+  const profileSection = anon
+    ? `<a href="/pages/register.html" class="btn btn-outline btn-sm nav-login-btn">Create an account</a>`
+    : `<a href="/pages/profile.html" class="nav-avatar ${activePage === 'profile' ? 'active' : ''}" aria-label="Open profile">
+        <span class="nav-avatar-circle">${avatar}</span>
+      </a>`;
 
   nav.innerHTML = `
     <div class="navbar-inner">
       <a href="/index.html" class="navbar-brand" aria-label="Bloom home">
-        <img src="/assets/bloom-logo.png" alt="Bloom" class="navbar-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
+        <img src="${BLOOM_LOGO_URL}" alt="Bloom" class="navbar-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
         <span class="navbar-brand-text" style="display:none;">${icon("flower", 28)} Bloom</span>
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
@@ -88,12 +134,42 @@ export function renderNav(activePage = "") {
             <div id="notif-list" class="notif-list"></div>
           </div>
         </div>
-        ${profileBtn}
+        ${profileSection}
       </div>
     </div>
   `;
 
   document.body.prepend(nav);
+
+  const brandLink = nav.querySelector(".navbar-brand");
+  brandLink?.addEventListener("click", (e) => {
+    // Keep standard browser behavior for modified/middle clicks.
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+      return;
+    }
+
+    const homeHref = "/index.html";
+    let referrer = null;
+    try {
+      referrer = document.referrer ? new URL(document.referrer) : null;
+    } catch (_) {
+      referrer = null;
+    }
+    const current = window.location.href;
+    const sameOriginReferrer =
+      !!referrer &&
+      referrer.origin === window.location.origin &&
+      referrer.href !== current;
+
+    e.preventDefault();
+
+    if (sameOriginReferrer && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    window.location.href = homeHref;
+  });
 
   const toggle = nav.querySelector(".nav-toggle");
   const linkContainer = nav.querySelector(".navbar-links");
@@ -104,8 +180,46 @@ export function renderNav(activePage = "") {
   });
 
   linkContainer.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => linkContainer.classList.remove("open"));
+    a.addEventListener("click", () => {
+      linkContainer.classList.remove("open");
+      // Optional perf trace: records nav click timing for next page.
+      const perfOn =
+        localStorage.getItem("bloom_perf_debug") === "1" ||
+        new URLSearchParams(window.location.search).get("perf") === "1";
+      if (perfOn) {
+        try {
+          sessionStorage.setItem("bloom_nav_perf", JSON.stringify({
+            from: activePage || "unknown",
+            to: a.getAttribute("href") || "",
+            ts: Date.now(),
+          }));
+        } catch (_) {}
+      }
+    });
   });
+
+  // ── Back button (inject for non-primary pages) ───────────────────────────
+  const PRIMARY_PAGES = new Set(["dashboard", "calendar", "assistant", "pamphlets", "clinics", ""]);
+  if (!PRIMARY_PAGES.has(activePage)) {
+    const back = document.createElement("div");
+    back.className = "back-btn-wrap";
+    back.innerHTML = `
+      <button class="back-btn" type="button" aria-label="Go back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>`;
+    back.querySelector(".back-btn").addEventListener("click", () => {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = "/pages/dashboard.html";
+      }
+    });
+    // Insert at top of <main> if present, else after <nav>
+    const main = document.querySelector("main");
+    if (main) main.prepend(back);
+    else nav.insertAdjacentElement("afterend", back);
+  }
 
   // ── Notification bell logic ──────────────────────────────────────────────
   const INBOX_KEY = "bloom_notification_inbox";
@@ -206,6 +320,17 @@ export function renderFooter() {
   footer.setAttribute("role", "contentinfo");
   footer.innerHTML = `
     <p class="footer-disclaimer">${icon("shield", 14)} Bloom is an educational tool and does not provide medical diagnoses. Always consult a qualified healthcare provider for medical advice.</p>
+    <nav class="footer-legal" aria-label="Legal links">
+      <a href="/pages/privacy.html">Privacy Policy</a>
+      <span class="footer-legal-sep" aria-hidden="true">&middot;</span>
+      <a href="/pages/terms.html">Terms of Use</a>
+      <span class="footer-legal-sep" aria-hidden="true">&middot;</span>
+      <a href="/pages/accessibility.html">Accessibility</a>
+      <span class="footer-legal-sep" aria-hidden="true">&middot;</span>
+      <a href="/pages/cookie-policy.html">Cookie Policy</a>
+      <span class="footer-legal-sep" aria-hidden="true">&middot;</span>
+      <a href="/pages/about-us.html">About Us</a>
+    </nav>
   `;
   document.body.appendChild(footer);
 }
@@ -214,23 +339,20 @@ export function renderFooter() {
 export function renderModeBanner(container) {
   if (!container) return;
 
-  if (localStorage.getItem(MODE_BANNER_ONCE_KEY) !== "1") {
-    container.innerHTML = "";
+  // Consent status banner - shown to teens with a pending approval request
+  const _consentUser = getUser();
+  const _consentKey  = _consentUser ? `bloom_consent_status_${_consentUser.uid}` : null;
+  const consentStatus = _consentKey ? localStorage.getItem(_consentKey) : null;
+  if (consentStatus === "pending") {
+    container.innerHTML = `
+      <div class="banner banner-warning" role="status">
+        ⏳ Your account is waiting for guardian approval.
+        <a href="/pages/consent-pending.html" style="font-weight:700;margin-left:0.5rem;">View status</a>
+      </div>
+    `;
     return;
   }
 
-  localStorage.removeItem(MODE_BANNER_ONCE_KEY);
-
-  if (!isAccountMode()) {
-    container.innerHTML = "";
-    return;
-  }
-
-  container.innerHTML = `
-    <div class="banner banner-success">
-      ✅ Synced to cloud. Your data is backed up securely.
-    </div>
-  `;
 }
 
 /* ===== DATE HELPERS ===== */
@@ -267,20 +389,234 @@ export function getFirstDayOfWeek(year, month) {
 }
 
 /* ===== SYMPTOM LIST ===== */
-export const SYMPTOM_CATEGORIES = {
-  "Bleeding":       ["Vaginal bleeding", "Spotting", "Heavy flow", "Large clots"],
-  "Pain":           ["Cramps", "Pelvic pain", "Ovulation pain", "Headache", "Joint or muscle pain", "Breast tenderness"],
-  "Digestive":      ["Bloating", "Gassy", "Heartburn", "Nausea", "Constipation", "Diarrhea"],
-  "Discharge":      ["No discharge", "Sticky discharge", "Creamy discharge", "Egg-white discharge", "Unusual discharge"],
-  "Energy & Sleep": ["Fatigue", "Insomnia", "Brain fog", "Forgetfulness", "Poor concentration"],
-  "Mood":           ["Mood swings", "Irritability", "Anxiety", "Low mood", "Crying spells", "Calm", "Stressed"],
-  "Skin & Hair":    ["Acne", "Dry skin", "Hair thinning"],
-  "Temperature":    ["Hot flashes", "Night sweats", "Cold flashes", "Basal temp shift"],
-  "Cravings":       ["Sweet cravings", "Salty cravings", "Greasy food cravings", "Spicy food cravings", "Increased appetite", "Decreased appetite"],
-  "Physical":       ["Fluid retention", "Frequent urination", "Smell sensitivity", "Nasal congestion", "Weight change"],
-  "Social":         ["Sociable", "Withdrawn"],
-  "Cycle":          ["Missed period", "Irregular period"],
-  "Fertility":      ["Increased libido", "Decreased libido", "Cervical mucus change", "Vaginal dryness", "Pain during sex"],
+export const SYMPTOM_CATEGORIES = symptoms.reduce((acc, symptom) => {
+  const { category, label } = symptom;
+  if (!acc[category]) acc[category] = [];
+  acc[category].push(label);
+  return acc;
+}, {});
+
+/** Emoji icon for each symptom label - no external dependency */
+export const SYMPTOM_ICONS = {
+  // Blood Colour - coloured circles to match the actual shade
+  "Bright red blood":           "🔴",
+  "Dark red blood":             "🟥",
+  "Light red blood":            "🩷",
+  "Pink blood":                 "🩷",
+  "Brown blood":                "🟤",
+  "Black blood":                "⚫",
+  "Orange-tinged blood":        "🟠",
+  "Gray blood":                 "🩶",
+  // Pain
+  "Cramps":                     "😣",
+  "Pelvic pain":                "😣",
+  "Lower abdominal cramps":     "😣",
+  "Sharp pelvic pain":          "😣",
+  "Dull pelvic ache":           "😣",
+  "Lower back pain":            "🦴",
+  "Leg pain":                   "🦵",
+  "Ovulation pain":             "🌸",
+  "Headache":                   "🤕",
+  "Migraine":                   "🤕",
+  "Joint or muscle pain":       "💪",
+  "Stabbing pain":              "😣",
+  "Throbbing pain":             "😣",
+  "Radiating pain":             "😣",
+  "Pain on one side":           "😣",
+  "Pain worsens with movement": "😣",
+  "Pain during bowel movement": "😣",
+  "Pain during urination":      "😣",
+  "Breast tenderness":          "💗",
+  "Breast pain":                "💗",
+  "Nipple sensitivity":         "💗",
+  // Digestion
+  "Bloating":                   "🫃",
+  "Gassy":                      "💨",
+  "Heartburn":                  "🔥",
+  "Acid reflux":                "🔥",
+  "Indigestion":                "🔥",
+  "Nausea":                     "🤢",
+  "Vomiting":                   "🤮",
+  "Constipation":               "😖",
+  "Diarrhea":                   "🚽",
+  "Stomach cramps":             "😣",
+  "Excessive burping":          "💨",
+  "Abdominal pressure":         "😣",
+  "Early fullness":             "🫃",
+  "Loss of appetite":           "🙅",
+  // Discharge
+  "No discharge":               "💧",
+  "Sticky discharge":           "💧",
+  "Creamy discharge":           "🤍",
+  "Egg-white discharge":        "💦",
+  "Watery discharge":           "💦",
+  "Unusual discharge":          "⚠️",
+  "Thick or clumpy discharge":  "🤍",
+  "Yellow discharge":           "🟡",
+  "Green discharge":            "🟢",
+  "Gray discharge":             "🩶",
+  "Brown discharge":            "🟤",
+  "Blood-tinged discharge":     "🩸",
+  "Foul-smelling discharge":    "⚠️",
+  "Increased discharge volume": "💧",
+  "Decreased discharge volume": "💧",
+  // Energy
+  "Fatigue":                    "😴",
+  "Very low energy":            "😴",
+  "Low energy":                 "😴",
+  "Normal energy":              "⚡",
+  "High energy":                "⚡",
+  "Burst of energy":            "⚡",
+  "Energy crash":               "💤",
+  "Fatigue after meals":        "😴",
+  // Sleep
+  "Insomnia":                   "🌙",
+  "Difficulty falling asleep":  "🌙",
+  "Frequent waking":            "🌙",
+  "Oversleeping":               "😴",
+  "Restless sleep":             "😖",
+  "Vivid dreams":               "💭",
+  "Waking at same time":        "⏰",
+  "Difficulty staying asleep":  "🌙",
+  "Nightmares":                 "😱",
+  "Hormonal insomnia":          "🌙",
+  // Mind
+  "Brain fog":                  "🌫️",
+  "Forgetfulness":              "🧠",
+  "Poor concentration":         "🧠",
+  "Anxious thoughts":           "😰",
+  "Overwhelmed":                "😵",
+  "Irritable":                  "😠",
+  "Emotionally sensitive":      "💗",
+  "Unmotivated":                "😑",
+  "Restless":                   "😤",
+  "Mentally focused":           "💡",
+  "Distracted":                 "🌀",
+  "Intrusive thoughts":         "💭",
+  "Panic feelings":             "😱",
+  "Emotional numbness":         "😶",
+  "Hypersensitivity":           "💔",
+  "Self-critical":              "😞",
+  // Focus
+  "Highly productive":          "✅",
+  "Low productivity":           "📉",
+  "Procrastinating":            "⏰",
+  "Mentally clear":             "💡",
+  "Overwhelmed with tasks":     "😵",
+  "Decision fatigue":           "🤯",
+  // Mood
+  "Mood swings":                "🎭",
+  "Irritability":               "😠",
+  "Anxiety":                    "😰",
+  "Low mood":                   "😔",
+  "Crying spells":              "😢",
+  "Calm":                       "😌",
+  "Stressed":                   "😤",
+  // Skin
+  "Acne":                       "🔴",
+  "Dry skin":                   "🏜️",
+  "Oily skin":                  "✨",
+  "Glowing skin":               "✨",
+  "Skin sensitivity":           "🔴",
+  "Skin rash":                  "🔴",
+  "Cystic acne":                "🔴",
+  "Hormonal breakouts":         "🔴",
+  "Dull skin":                  "😶",
+  // Hair
+  "Hair thinning":              "🪮",
+  "Hair shedding":              "🪮",
+  "Oily hair":                  "💦",
+  "Dry hair":                   "🏜️",
+  // Temperature
+  "Hot flashes":                "🥵",
+  "Night sweats":               "💦",
+  "Cold flashes":               "🥶",
+  "Basal temp shift":           "🌡️",
+  "Elevated BBT":               "🌡️",
+  "Lower than normal BBT":      "🌡️",
+  "Feeling hot":                "🥵",
+  "Feeling cold":               "🥶",
+  "Chills":                     "🥶",
+  // Heart & Body
+  "Heart racing":               "💓",
+  "Palpitations":               "💓",
+  "Chest tightness":            "😮‍💨",
+  "Shortness of breath":        "😮‍💨",
+  "Dizziness":                  "😵‍💫",
+  "Lightheaded":                "😵‍💫",
+  "Faint feeling":              "😵",
+  // Hormonal
+  "Breast swelling":            "💗",
+  "Breast fullness":            "💗",
+  "Nipple discharge":           "💧",
+  "Increased sweating":         "💦",
+  "Body temperature change":    "🌡️",
+  "Facial puffiness":           "😶",
+  // Illness
+  "Sore throat":                "🤒",
+  "Fever":                      "🌡️",
+  "Chills with illness":        "🥶",
+  "Runny nose":                 "🤧",
+  "Cough":                      "😷",
+  "Feeling sick":               "🤒",
+  "Recovering from illness":    "💊",
+  // Cravings
+  "Sweet cravings":             "🍰",
+  "Salty cravings":             "🧂",
+  "Greasy food cravings":       "🍟",
+  "Spicy food cravings":        "🌶️",
+  "Increased appetite":         "🍽️",
+  "Decreased appetite":         "🙅",
+  "Chocolate cravings":         "🍫",
+  "Carb cravings":              "🍞",
+  "Dairy cravings":             "🥛",
+  "Cold food cravings":         "🧊",
+  "Warm food cravings":         "♨️",
+  "Caffeine craving":           "☕",
+  "No cravings":                "🚫",
+  "Random cravings":            "🎲",
+  // Physical
+  "Fluid retention":            "💧",
+  "Frequent urination":         "🚿",
+  "Smell sensitivity":          "👃",
+  "Nasal congestion":           "🤧",
+  // Urinary
+  "Urinary urgency":            "🚿",
+  "Burning urination":          "🔥",
+  "Urinary leakage":            "💧",
+  // Weight
+  "Weight gain":                "⚖️",
+  "Weight loss":                "⚖️",
+  "Water retention":            "💧",
+  "Feeling puffy":              "🫃",
+  // Stool
+  "Hard stool":                 "😖",
+  "Loose stool":                "🚽",
+  "Frequent bowel movements":   "🚽",
+  "Incomplete evacuation":      "😖",
+  "Painful bowel movement":     "😣",
+  "Mucus in stool":             "🤢",
+  "Urgency to go":              "🚽",
+  "Dark stool":                 "⚫",
+  "Light stool":                "🟡",
+  // Social
+  "Sociable":                   "🤝",
+  "Withdrawn":                  "🚶",
+  "Clingy":                     "🤗",
+  "Seeking reassurance":        "🤗",
+  "Easily annoyed":             "😠",
+  "Conflict avoidant":          "🚶",
+  "Low social energy":          "😔",
+  "High social energy":         "🤝",
+  "Feeling isolated":           "😔",
+  "Affectionate":               "💕",
+  "Distant":                    "🚶",
+  // Fertility
+  "Increased libido":           "💕",
+  "Decreased libido":           "💔",
+  "Cervical mucus change":      "💧",
+  "Vaginal dryness":            "🌵",
+  "Pain during sex":            "😟",
 };
 
 export const SYMPTOMS = Object.values(SYMPTOM_CATEGORIES).flat();
@@ -288,8 +624,7 @@ export const SYMPTOMS = Object.values(SYMPTOM_CATEGORIES).flat();
 export const FLOW_OPTIONS = ["none", "spotting", "light", "medium", "heavy"];
 
 export function getPostAuthRoute() {
-  const onboarded = localStorage.getItem("bloom_onboarded") === "1";
-  return onboarded ? "/pages/dashboard.html" : "/pages/survey.html";
+  return isOnboardingCompleteLocal() ? "/pages/dashboard.html" : "/pages/survey.html";
 }
 
 /* ===== MODAL HELPERS ===== */
@@ -347,6 +682,7 @@ style.textContent = `@keyframes slideIn { from { transform: translateY(20px); op
 document.head.appendChild(style);
 
 export function renderBloomieFab() {
+  if (isAnonMode()) return;
   if (document.getElementById("bloomie-fab")) return;
 
   const fab = document.createElement("button");
@@ -362,18 +698,19 @@ export function renderBloomieFab() {
   modal.innerHTML = `
     <div class="bloomie-modal-backdrop" data-close="1"></div>
     <div class="bloomie-modal-panel" role="dialog" aria-modal="true">
-      <div class="bloomie-modal-header">
-        <strong>Bloomie</strong>
-        <button class="bloomie-close" data-close="1" aria-label="Close">✕</button>
-      </div>
-      <iframe class="bloomie-frame" src="/pages/assistant.html" title="Bloomie chat"></iframe>
+      <button class="bloomie-close" data-close="1" aria-label="Close">&times;</button>
+      <iframe class="bloomie-frame" title="Bloomie chat" loading="lazy"></iframe>
     </div>
   `;
 
   document.body.appendChild(modal);
   document.body.appendChild(fab);
 
-  function open() { modal.classList.add("open"); }
+  function open() {
+    const frame = modal.querySelector(".bloomie-frame");
+    if (frame && !frame.src) frame.src = "/pages/assistant.html?embed=1";
+    modal.classList.add("open");
+  }
   function close() { modal.classList.remove("open"); }
 
   fab.addEventListener("click", open);

@@ -3,7 +3,7 @@
  * ─────────────────────────────────────────────────────────────
  * Shared utility functions for Bloom cycle and symptom engines.
  *
- * Canonical single source of truth — import from here instead of
+ * Canonical single source of truth - import from here instead of
  * defining local copies in each engine file.
  */
 

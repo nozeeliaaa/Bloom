@@ -49,7 +49,7 @@
       text-decoration: none;
       margin-bottom: 1.5rem;
     }
-    .brand-link svg { width: 24px; height: 24px; }
+    .brand-link img { height: 72px; width: auto; }
 
     .forgot-link {
       font-size: 0.85rem;
@@ -66,19 +66,11 @@
 <body>
   <main class="auth-page">
     <div class="card auth-card">
-      <a href="/pages/login.html" class="brand-link" aria-label="Bloom home">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 2c1.5 0 3 1.5 3 4s-1.5 4-3 4-3-1.5-3-4 1.5-4 3-4z" />
-          <path d="M22 12c0 1.5-1.5 3-4 3s-4-1.5-4-3 1.5-3 4-3 4 1.5 4 3z" />
-          <path d="M12 22c-1.5 0-3-1.5-3-4s1.5-4 3-4 3 1.5 3 4-1.5 4-3 4z" />
-          <path d="M2 12c0-1.5 1.5-3 4-3s4 1.5 4 3-1.5 3-4 3-4-1.5-4-3z" />
-        </svg>
-        Bloom
+      <a href="/pages/home.html" class="brand-link" aria-label="Bloom home">
+        <img src="/assets/bloom-logo.png" alt="Bloom" />
       </a>
 
-      <!-- ── Login panel ── -->
+      <!-- â”€â”€ Login panel â”€â”€ -->
       <div id="login-panel">
         <h1>Welcome Back</h1>
         <p class="subtitle">Log in to access your synced data and advanced features.</p>
@@ -115,14 +107,14 @@
         </form>
 
         <div class="auth-links">
-          <p>Don't have an account? <a href="/pages/register.html">Create one (18+)</a></p>
+          <p>Don't have an account? <a href="/pages/register.html">Create one</a></p>
           <p style="margin-top:0.75rem;">
             <a href="#" id="btn-anon">Continue anonymously instead</a>
           </p>
         </div>
       </div>
 
-      <!-- ── Password reset panel ── -->
+      <!-- â”€â”€ Password reset panel â”€â”€ -->
       <div id="reset-panel">
         <h1>Reset Password</h1>
         <p class="subtitle">Enter your email and we'll send a reset link.</p>
@@ -141,7 +133,7 @@
         </button>
 
         <div class="auth-links" style="margin-top:1rem;">
-          <a href="#" id="btn-back-login">← Back to login</a>
+          <a href="#" id="btn-back-login">&larr; Back to login</a>
         </div>
       </div>
     </div>
@@ -149,10 +141,16 @@
 
   <script type="module">
     import { showBloomLoader, runBloomLoader } from "/js/loadingOverlay.js";
-    import { login, sendPasswordReset, resendVerificationEmail } from '/js/auth.js';
+    import { login, sendPasswordReset, resendVerificationEmail, getIdToken } from '/js/auth.js';
     import { setMode } from '/js/mode.js';
     import { isFirebaseConfigured } from '/js/firebase.js';
     import { renderFooter } from '/js/utils.js';
+    import { setUserGoal } from '/js/goals.js';
+    import {
+      isOnboardingCompleteFromProfileData,
+      isOnboardingCompleteLocal,
+      markOnboardingCompleteLocal,
+    } from '/js/onboarding.js';
 
     renderFooter();
 
@@ -169,6 +167,23 @@
     let _unverifiedEmail = null;
     let _unverifiedPassword = null;
 
+    function getMailboxUrl(email) {
+      const domain = (email || '').split('@')[1]?.toLowerCase() || '';
+      if (domain === 'gmail.com' || domain === 'googlemail.com') return 'https://mail.google.com';
+      if (domain === 'yahoo.com' || domain.startsWith('yahoo.'))  return 'https://mail.yahoo.com';
+      if (['outlook.com','hotmail.com','live.com','msn.com','hotmail.co.uk','live.co.uk'].includes(domain)) return 'https://outlook.live.com';
+      if (['icloud.com','me.com','mac.com'].includes(domain)) return 'https://www.icloud.com/mail';
+      if (domain === 'aol.com') return 'https://mail.aol.com';
+      if (domain === 'protonmail.com' || domain === 'proton.me') return 'https://mail.proton.me';
+      return null;
+    }
+
+    function openInboxLink(email) {
+      const url = getMailboxUrl(email);
+      if (!url) return '';
+      return ` <a href="${url}" target="_blank" rel="noopener" style="font-weight:700;">Open my inbox &rarr;</a>`;
+    }
+
     function showError(msg) {
       errorMsg.textContent = msg;
       errorMsg.classList.remove('hidden');
@@ -182,14 +197,171 @@
       errorMsg.classList.add('hidden');
     }
 
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 6000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } catch (_) {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function hasProfileObject(value) {
+      return !!(value && typeof value === "object" && Object.keys(value).length > 0);
+    }
+
+    async function hasSavedCycleLogs(apiBase, headers) {
+      const res = await fetchWithTimeout(
+        `${apiBase}/api/logs?start=2000-01-01&end=2100-12-31`,
+        { headers },
+        3500
+      );
+      if (!res?.ok) return false;
+      const data = await res.json().catch(() => null);
+      return Array.isArray(data?.items) && data.items.length > 0;
+    }
+
     const goPostAuth = async () => {
-      const onboarded = localStorage.getItem('bloom_onboarded') === '1';
+      showBloomLoader({ message: "Preparing Bloom", sub: "Syncing your experience..." });
+
+      const fastRestore = (async () => {
+        let profileStatus = "indeterminate";
+        try {
+          const token = await getIdToken({ waitForAuthMs: 2500 });
+          if (!token) return "indeterminate";
+
+          const apiBase = window.BLOOM_API_BASE ?? '';
+          const headers = { Authorization: `Bearer ${token}` };
+          const [profileRes, prefsRes] = await Promise.all([
+            fetchWithTimeout(`${apiBase}/api/user/profile`, { headers }, 6000),
+            fetchWithTimeout(`${apiBase}/api/preferences`, { headers }, 3500),
+          ]);
+
+          if (profileRes?.ok) {
+            const data = await profileRes.json();
+            const profile = data && typeof data === "object" ? (data.profile || null) : null;
+            const healthProfile = data?.healthProfile || {};
+            const biometricProfile = data?.biometricProfile || {};
+            const completedOnboarding = isOnboardingCompleteFromProfileData(data);
+            const hasStoredProfile = hasProfileObject(profile);
+            profileStatus = data?.degraded ? "indeterminate" : (completedOnboarding ? "found" : "missing");
+
+            // Sync role immediately so the nav renders the Admin link on the next page
+            const role = data?.role ?? data?.profile?.role ?? "user";
+            localStorage.setItem("bloom_user_role", role || "user");
+            localStorage.setItem("bloom_is_admin", role === "admin" ? "1" : "0");
+            localStorage.setItem("bloom_role_synced_at", String(Date.now()));
+            if (completedOnboarding) {
+              markOnboardingCompleteLocal();
+            }
+            if (hasStoredProfile) {
+              let realGoal = profile.goal;
+              if (!realGoal || realGoal === "track_cycle") realGoal = "period";
+              else if (realGoal === "no_period") realGoal = "track_symptoms";
+              setUserGoal(realGoal);
+
+              const restored = {};
+              if (profile.nickname)       restored.nickname       = profile.nickname;
+              if (profile.yearOfBirth) {
+                restored.yob = profile.yearOfBirth;
+                restored.yearOfBirth = profile.yearOfBirth;
+              }
+              if (profile.ageBand) restored.ageBand = profile.ageBand;
+              const avgCycleLength = healthProfile.avgCycleLength;
+              const periodDuration = healthProfile.periodDuration;
+              const sleepScore = biometricProfile.sleepScore ?? healthProfile.sleepScore ?? profile.sleepScore;
+              const activityLevel = biometricProfile.activityLevel ?? profile.activityLevel;
+              const stressLevel = biometricProfile.stressLevel ?? profile.stressLevel;
+              const weightKg = healthProfile.weightKg;
+              const heightCm = healthProfile.heightCm;
+              const lmpDate = healthProfile.lmpDate ?? healthProfile.lmp ?? profile.lmpDate ?? profile.lmp ?? null;
+              if (avgCycleLength != null) restored.avgCycleLength = avgCycleLength;
+              if (periodDuration != null) restored.periodDuration = periodDuration;
+              if (sleepScore != null) restored.sleepScore = sleepScore;
+              if (activityLevel) restored.activityLevel = activityLevel;
+              if (stressLevel) restored.stressLevel = stressLevel;
+              if (weightKg != null) restored.weightKg = weightKg;
+              if (heightCm != null) restored.heightCm = heightCm;
+              if (profile.avatar) localStorage.setItem('bloom_avatar', profile.avatar);
+              if (realGoal === "pregnancy" && lmpDate) localStorage.setItem("bloom_lmp", lmpDate);
+              else localStorage.removeItem("bloom_lmp");
+              localStorage.setItem('bloom_profile', JSON.stringify(restored));
+            }
+          } else if (profileRes) {
+            console.error("[Bloom] profile fetch failed:", profileRes.status);
+          }
+
+          if (profileStatus === "missing" && await hasSavedCycleLogs(apiBase, headers)) {
+            markOnboardingCompleteLocal();
+            profileStatus = "found";
+          }
+
+          if (prefsRes?.ok) {
+            const prefsData = await prefsRes.json();
+            const prefs = prefsData?.preferences;
+            if (prefs) {
+              const local = {
+                hideSensitive: !!prefs.hideSensitive,
+                compact: !!prefs.compact,
+                reminders: !!(prefs.reminders?.enabled),
+                periodReminder: !!(prefs.reminders?.types?.includes('PERIOD_SOON')),
+                fertileAlert: !!(prefs.reminders?.types?.includes('FERTILE_WINDOW')),
+                discreetNotif: !!(prefs.reminders?.discreetCopy),
+              };
+              if (prefs.theme) local.theme = prefs.theme;
+              localStorage.setItem('bloom_preferences', JSON.stringify(local));
+            }
+          }
+        } catch (e) {
+          console.error("[Bloom] login restore error:", e);
+          return "indeterminate";
+        }
+        return profileStatus;
+      })();
+
+      await runBloomLoader({
+        minMs: 320,
+        tickMs: 80,
+        stepMin: 18,
+        stepMax: 30,
+      });
+
+      const restoreStatus = await fastRestore;
+
+      // Minor check - if under 18 without approved consent, send to consent-pending
+      try {
+        const restoredProfile = JSON.parse(localStorage.getItem('bloom_profile') || '{}');
+        const yob = restoredProfile.yob || restoredProfile.yearOfBirth;
+        if (yob) {
+          const age = new Date().getFullYear() - Number(yob);
+          if (age >= 10 && age <= 17) {
+            const tok = await getIdToken();
+            const apiBase = window.BLOOM_API_BASE ?? '';
+            const consentRes = await fetch(`${apiBase}/api/consent/status`, {
+              headers: { Authorization: `Bearer ${tok}` },
+            }).catch(() => null);
+            const consentData = consentRes?.ok ? await consentRes.json().catch(() => null) : null;
+            if (consentData?.status === 'denied') {
+              window.location.href = '/pages/consent-denied.html';
+              return;
+            }
+            if (!consentData || consentData.status !== 'approved') {
+              window.location.href = '/pages/consent-pending.html';
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+
+      const onboarded = isOnboardingCompleteLocal();
       const target = onboarded ? '/pages/dashboard.html' : '/pages/survey.html';
-      showBloomLoader({ message: "Preparing Bloom", sub: "Syncing your experience…" });
-      await runBloomLoader({ targetUrl: target });
+      window.location.href = target;
     };
 
-    // ── Login ──
+    // â”€â”€ Login â”€â”€
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.classList.add('hidden');
@@ -216,16 +388,19 @@
         await login(email, password);
         setMode('account');
         localStorage.setItem("bloom_show_mode_banner_once", "1");
-        goPostAuth();
+        await goPostAuth();
+        return;
 
       } catch (err) {
+        console.error("[Bloom] login error:", err?.code || err?.message || err);
         if (err.code === 'auth/email-not-verified') {
           // Show the resend verification notice
           _unverifiedEmail = email;
           _unverifiedPassword = password;
-          verifyText.textContent =
+          verifyText.innerHTML =
             `Your email (${email}) hasn't been verified yet. ` +
-            `Check your inbox/spam or resend the verification email below.`;
+            `Check your inbox or resend the verification email below.` +
+            openInboxLink(email);
           verifyNotice.classList.remove('hidden');
           errorMsg.classList.add('hidden');
 
@@ -235,8 +410,16 @@
               err.code === 'auth/wrong-password' ||
               err.code === 'auth/invalid-credential') {
             msg = 'Invalid email or password. Please try again.';
+          } else if (err.code === 'auth/user-disabled') {
+            msg = 'This account has been disabled. Ask an admin to enable it, or delete it if this email needs a new account.';
           } else if (err.code === 'auth/too-many-requests') {
             msg = 'Too many attempts. Please try again later.';
+          } else if (err.code === 'auth/network-request-failed') {
+            msg = 'Network error while signing in. Check your connection and try again.';
+          } else if (err.code === 'auth/invalid-api-key' || err.code === 'auth/app-not-authorized') {
+            msg = 'Authentication is temporarily unavailable due to app configuration. Please try again shortly.';
+          } else if (err.code) {
+            msg = `Login failed (${err.code}). Please try again.`;
           }
           showError(msg);
         }
@@ -246,7 +429,7 @@
       }
     });
 
-    // ── Resend verification ──
+    // â”€â”€ Resend verification â”€â”€
     document.getElementById('btn-resend').addEventListener('click', async () => {
       const btn = document.getElementById('btn-resend');
       if (!_unverifiedEmail || !_unverifiedPassword) {
@@ -254,11 +437,12 @@
         return;
       }
       btn.disabled = true;
-      btn.textContent = 'Sending…';
+      btn.textContent = 'Sending...';
       try {
         await resendVerificationEmail(_unverifiedEmail, _unverifiedPassword);
-        verifyText.textContent =
-          `Verification email resent to ${_unverifiedEmail}. Please check your inbox.`;
+        verifyText.innerHTML =
+          `Verification email resent to ${_unverifiedEmail}. Please check your inbox.` +
+          openInboxLink(_unverifiedEmail);
         btn.style.display = 'none';
       } catch (e) {
         showError('Could not resend. Please try again shortly.');
@@ -268,7 +452,7 @@
       }
     });
 
-    // ── Forgot password → show reset panel ──
+    // â”€â”€ Forgot password â†’ show reset panel â”€â”€
     document.getElementById('btn-forgot').addEventListener('click', (e) => {
       e.preventDefault();
       // Pre-fill reset email from whatever was typed in login
@@ -279,7 +463,7 @@
       resetPanel.style.display = 'block';
     });
 
-    // ── Send reset link ──
+    // â”€â”€ Send reset link â”€â”€
     document.getElementById('btn-send-reset').addEventListener('click', async () => {
       const btn        = document.getElementById('btn-send-reset');
       const resetError = document.getElementById('reset-error');
@@ -296,12 +480,13 @@
       }
 
       btn.disabled = true;
-      btn.textContent = 'Sending…';
+      btn.textContent = 'Sending...';
 
       try {
         await sendPasswordReset(email);
-        resetOk.textContent =
-          `Reset link sent to ${email}. Check your inbox (and spam folder).`;
+        resetOk.innerHTML =
+          `Reset link sent to ${email}. Check your inbox.` +
+          openInboxLink(email);
         resetOk.classList.remove('hidden');
         btn.style.display = 'none';
       } catch (err) {
@@ -319,7 +504,7 @@
       }
     });
 
-    // ── Back to login ──
+    // â”€â”€ Back to login â”€â”€
     document.getElementById('btn-back-login').addEventListener('click', (e) => {
       e.preventDefault();
       resetPanel.style.display = 'none';
@@ -329,7 +514,7 @@
       document.getElementById('btn-send-reset').style.display = '';
     });
 
-    // ── Anonymous ──
+    // â”€â”€ Anonymous â”€â”€
     document.getElementById('btn-anon').addEventListener('click', (e) => {
       e.preventDefault();
       setMode('anon');
@@ -338,3 +523,4 @@
   </script>
 </body>
 </html>
+

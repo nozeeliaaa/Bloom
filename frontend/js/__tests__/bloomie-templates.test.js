@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildGuidanceResponse, getStructuredSummary, getPhaseInsight, getToneOpener, hasMedicalSeriousness, CONCERN_PRIORITY } from "../bloomie-templates.js";
-import { extractUrgency } from "../bloomie-inference.js";
+import { extractEntities, extractUrgency } from "../bloomie-inference.js";
 import { createCtx } from "../bloomie-session.js";
 
 // Helper: build a minimal entities object
@@ -24,14 +24,14 @@ function entities(overrides = {}) {
   };
 }
 
-// ─── buildGuidanceResponse — scenario resolution via reason ──────────────────
+// ─── buildGuidanceResponse - scenario resolution via reason ──────────────────
 
-describe("buildGuidanceResponse — via inferredReason", () => {
+describe("buildGuidanceResponse - via inferredReason", () => {
   it("urgency_flag → urgent scenario, includes seek care line", () => {
     const res = buildGuidanceResponse(entities({ urgent: true }), "urgency_flag");
     expect(res).not.toBeNull();
     expect(res.scenario).toBe("urgent");
-    // Safety content must reach the user — phrase is now in a "One thing to watch for:" line
+    // Safety content must reach the user - phrase is now in a "One thing to watch for:" line
     expect(res.lines.some(l => /seek care now/i.test(l))).toBe(true);
   });
 
@@ -110,9 +110,9 @@ describe("buildGuidanceResponse — via inferredReason", () => {
   });
 });
 
-// ─── buildGuidanceResponse — entity fallback (no reason) ─────────────────────
+// ─── buildGuidanceResponse - entity fallback (no reason) ─────────────────────
 
-describe("buildGuidanceResponse — entity-based fallback", () => {
+describe("buildGuidanceResponse - entity-based fallback", () => {
   it("urgent flag → urgent scenario", () => {
     const res = buildGuidanceResponse(entities({ urgent: true }));
     expect(res.scenario).toBe("urgent");
@@ -165,10 +165,10 @@ describe("buildGuidanceResponse — entity-based fallback", () => {
 
 // ─── response structure ───────────────────────────────────────────────────────
 
-describe("buildGuidanceResponse — response structure", () => {
+describe("buildGuidanceResponse - response structure", () => {
   it("always includes disclaimer line", () => {
     const res = buildGuidanceResponse(entities({ symptoms: { late: true } }));
-    // Disclaimer is now "This is educational info, not a diagnosis — you know your body best 🩷"
+    // Disclaimer is now "This is educational info, not a diagnosis - you know your body best 🩷"
     expect(res.lines.at(-1)).toMatch(/educational info|educational information/i);
   });
 
@@ -196,6 +196,134 @@ describe("buildGuidanceResponse — response structure", () => {
   });
 });
 
+// ─── discharge + blood colour explanation layer ─────────────────────────────
+
+describe("buildGuidanceResponse - discharge and blood colour scenarios", () => {
+  it("maps a clear rush/stringy slime story to normal discharge education", () => {
+    const e = extractEntities("felt a rush, panty soaked, clear string slime");
+    expect(e.domainSelections.discharge).toEqual(expect.arrayContaining([
+      "watery", "eggwhite", "increased_volume",
+    ]));
+
+    const res = buildGuidanceResponse(e, "DISCHARGE_EXPLANATION");
+    const text = res.lines.join(" ");
+
+    expect(res.scenario).toBe("discharge_clear_watery");
+    expect(text).toMatch(/catch you off guard/i);
+    expect(text).toMatch(/cervical mucus|ovulation|estrogen/i);
+    expect(text).toMatch(/body doing its thing/i);
+    expect(text).not.toMatch(/Possible situation:|What this means:/i);
+  });
+
+  it("routes green or foul-smelling discharge to a check-in message", () => {
+    const e = extractEntities("greenish discharge and it smells bad");
+    expect(e.domainSelections.discharge).toEqual(expect.arrayContaining([
+      "green", "foul_smell",
+    ]));
+
+    const res = buildGuidanceResponse(e, "DISCHARGE_CONCERN");
+    const text = res.lines.join(" ");
+
+    expect(res.scenario).toBe("discharge_concern");
+    expect(text).toMatch(/imbalance|infection/i);
+    expect(text).toMatch(/provider|checked/i);
+  });
+
+  it("handles thick clumpy discharge without diagnosing", () => {
+    const e = extractEntities("thick white chunks like cottage cheese and itching");
+    const res = buildGuidanceResponse(e, "DISCHARGE_EXPLANATION");
+    const text = res.lines.join(" ");
+
+    expect(e.domainSelections.discharge).toContain("thick_clumpy");
+    expect(res.scenario).toBe("discharge_thick_clumpy");
+    expect(text).toMatch(/yeast overgrowth/i);
+    expect(text).toMatch(/not a diagnosis/i);
+    expect(text).not.toMatch(/you have|diagnosed/i);
+  });
+
+  it("explains darker blood colour as slower/older blood", () => {
+    const e = extractEntities("my blood is wine color");
+    const res = buildGuidanceResponse(e, "BLOOD_COLOUR_EXPLANATION");
+    const text = res.lines.join(" ");
+
+    expect(e.domainSelections.blood_colour).toContain("dark_red");
+    expect(res.scenario).toBe("blood_colour_dark_old");
+    expect(text).toMatch(/taken longer to leave|flow is slower/i);
+  });
+
+  it("flags gray blood colour as worth checking", () => {
+    const e = extractEntities("grey blood with a strong smell");
+    const res = buildGuidanceResponse(e, "BLOOD_COLOUR_EXPLANATION");
+    const text = res.lines.join(" ");
+
+    expect(e.domainSelections.blood_colour).toContain("gray");
+    expect(res.scenario).toBe("blood_colour_concern");
+    expect(text).toMatch(/less common|worth checking|get this checked/i);
+  });
+
+  it("still explains blood colour when only symptom flags survive merging", () => {
+    const res = buildGuidanceResponse(entities({
+      symptoms: {
+        blood_colour_any: true,
+        blood_colour_dark: true,
+      },
+    }));
+
+    expect(res).not.toBeNull();
+    expect(res.scenario).toBe("blood_colour_dark_old");
+    expect(res.lines.join(" ")).toMatch(/taken longer to leave|flow is slower/i);
+  });
+
+  it("handles natural period-colour wording like 'my period always black'", () => {
+    const e = extractEntities("my period always black");
+    const res = buildGuidanceResponse(e);
+
+    expect(res).not.toBeNull();
+    expect(res.scenario).toBe("blood_colour_dark_old");
+    expect(res.lines.join(" ")).toMatch(/taken longer to leave|flow is slower/i);
+  });
+});
+
+describe("buildGuidanceResponse - catalog symptom fallback", () => {
+  it("can still respond to social symptoms like feeling antisocial", () => {
+    const e = extractEntities("i'm feeling antisocial and withdrawn");
+    const res = buildGuidanceResponse(e);
+    const text = res?.lines.join(" ") || "";
+
+    expect(e.catalogMatches.map((m) => m.key)).toEqual(
+      expect.arrayContaining(["WITHDRAWN"])
+    );
+    expect(res).not.toBeNull();
+    expect(res.scenario).toBe("catalog_symptom_support");
+    expect(text).toMatch(/social/i);
+    expect(text).toMatch(/real symptom worth noticing|worth noticing/i);
+  });
+
+  it("can talk through mixed catalog symptoms even without a special route", () => {
+    const e = extractEntities("my breasts sore and i feel bloated");
+    const res = buildGuidanceResponse(e);
+    const text = res?.lines.join(" ") || "";
+
+    expect(e.catalogMatches.map((m) => m.key)).toEqual(
+      expect.arrayContaining(["BREAST_TENDERNESS", "BLOATING"])
+    );
+    expect(res).not.toBeNull();
+    expect(text).toMatch(/breast tenderness|bloating/i);
+    expect(text).toMatch(/together than in isolation|worth noticing/i);
+  });
+
+  it("can talk through mind and energy symptoms from the catalog", () => {
+    const e = extractEntities("I'm having brain fog, low energy, and headache");
+    const res = buildGuidanceResponse(e);
+
+    expect(e.catalogMatches.map((m) => m.key)).toEqual(
+      expect.arrayContaining(["BRAIN_FOG", "LOW_ENERGY", "HEADACHE"])
+    );
+    expect(res).not.toBeNull();
+    expect(res.lines.join(" ")).toMatch(/brain fog|low energy|headache/i);
+  });
+});
+
 // ─── getStructuredSummary ─────────────────────────────────────────────────────
 
 describe("getStructuredSummary", () => {
@@ -215,7 +343,7 @@ describe("getStructuredSummary", () => {
 
 // ─── getPhaseInsight ──────────────────────────────────────────────────────────
 
-describe("getPhaseInsight — null / missing inputs", () => {
+describe("getPhaseInsight - null / missing inputs", () => {
   it("returns null when phase is null", () => {
     expect(getPhaseInsight(null, "mood")).toBeNull();
   });
@@ -237,7 +365,7 @@ describe("getPhaseInsight — null / missing inputs", () => {
   });
 });
 
-describe("getPhaseInsight — luteal phase", () => {
+describe("getPhaseInsight - luteal phase", () => {
   it("luteal + mood returns a non-empty string mentioning progesterone", () => {
     const result = getPhaseInsight("luteal", "mood");
     expect(typeof result).toBe("string");
@@ -282,7 +410,7 @@ describe("getPhaseInsight — luteal phase", () => {
   });
 });
 
-describe("getPhaseInsight — menstrual phase", () => {
+describe("getPhaseInsight - menstrual phase", () => {
   it("menstrual + fatigue mentions iron or bleeding", () => {
     const result = getPhaseInsight("menstrual", "fatigue");
     expect(typeof result).toBe("string");
@@ -314,7 +442,7 @@ describe("getPhaseInsight — menstrual phase", () => {
   });
 });
 
-describe("getPhaseInsight — follicular phase", () => {
+describe("getPhaseInsight - follicular phase", () => {
   it("follicular + mood mentions estrogen", () => {
     const result = getPhaseInsight("follicular", "mood");
     expect(typeof result).toBe("string");
@@ -340,7 +468,7 @@ describe("getPhaseInsight — follicular phase", () => {
   });
 });
 
-describe("getPhaseInsight — ovulation phase", () => {
+describe("getPhaseInsight - ovulation phase", () => {
   it("ovulation + mood mentions estrogen or peaks", () => {
     const result = getPhaseInsight("ovulation", "mood");
     expect(typeof result).toBe("string");
@@ -366,9 +494,9 @@ describe("getPhaseInsight — ovulation phase", () => {
   });
 });
 
-// ─── getPhaseInsight — lowConfidence (softened phrasing) ──────────────────────
+// ─── getPhaseInsight - lowConfidence (softened phrasing) ──────────────────────
 
-describe("getPhaseInsight — lowConfidence=true produces softened language", () => {
+describe("getPhaseInsight - lowConfidence=true produces softened language", () => {
   it("luteal + mood: lowConfidence replaces hard 'In the luteal phase' opener", () => {
     const certain   = getPhaseInsight("luteal", "mood", false);
     const uncertain = getPhaseInsight("luteal", "mood", true);
@@ -398,8 +526,8 @@ describe("getPhaseInsight — lowConfidence=true produces softened language", ()
     expect(uncertain).toMatch(/around your period/i);
   });
 
-  it("menstrual + pain: lowConfidence softens 'Period cramps can happen when' (already soft — returns unchanged)", () => {
-    // menstrual+pain starts with 'Period cramps can happen when' — already uses 'can'
+  it("menstrual + pain: lowConfidence softens 'Period cramps can happen when' (already soft - returns unchanged)", () => {
+    // menstrual+pain starts with 'Period cramps can happen when' - already uses 'can'
     const certain   = getPhaseInsight("menstrual", "pain", false);
     const uncertain = getPhaseInsight("menstrual", "pain", true);
     // Both should contain the core content about prostaglandins
@@ -415,7 +543,7 @@ describe("getPhaseInsight — lowConfidence=true produces softened language", ()
     expect(uncertain).toMatch(/if you're in your follicular phase/i);
   });
 
-  it("ovulation + pain: already hedged with 'Some people feel' — unchanged by lowConfidence", () => {
+  it("ovulation + pain: already hedged with 'Some people feel' - unchanged by lowConfidence", () => {
     const certain   = getPhaseInsight("ovulation", "pain", false);
     const uncertain = getPhaseInsight("ovulation", "pain", true);
     // Both should start with the same soft phrasing
@@ -431,7 +559,7 @@ describe("getPhaseInsight — lowConfidence=true produces softened language", ()
 
 // ─── CONCERN_PRIORITY ─────────────────────────────────────────────────────────
 
-describe("CONCERN_PRIORITY — order and content", () => {
+describe("CONCERN_PRIORITY - order and content", () => {
   it("is an array", () => {
     expect(Array.isArray(CONCERN_PRIORITY)).toBe(true);
   });
@@ -474,9 +602,9 @@ describe("CONCERN_PRIORITY — order and content", () => {
   });
 });
 
-// ─── Safety override — extractUrgency blocks phase insights ───────────────────
+// ─── Safety override - extractUrgency blocks phase insights ───────────────────
 
-describe("safety override — extractUrgency detects urgency signals", () => {
+describe("safety override - extractUrgency detects urgency signals", () => {
   it("'soaking through' is recognised as urgent", () => {
     expect(extractUrgency("soaking through my pads")).toBe(true);
   });
@@ -506,9 +634,9 @@ describe("safety override — extractUrgency detects urgency signals", () => {
   });
 });
 
-// ─── Session memory — insightsGiven prevents repeated full explanations ────────
+// ─── Session memory - insightsGiven prevents repeated full explanations ────────
 
-describe("session memory — insightsGiven Set on createCtx()", () => {
+describe("session memory - insightsGiven Set on createCtx()", () => {
   it("fresh ctx has an empty insightsGiven Set", () => {
     const ctx = createCtx();
     expect(ctx.insightsGiven).toBeInstanceOf(Set);
@@ -564,13 +692,13 @@ describe("session memory — insightsGiven Set on createCtx()", () => {
   });
 });
 
-// ─── NEW: getToneOpener — repetition control ──────────────────────────────────
+// ─── NEW: getToneOpener - repetition control ──────────────────────────────────
 
-describe("getToneOpener — opener repetition control", () => {
+describe("getToneOpener - opener repetition control", () => {
   it("with ctx, tracks used openers and avoids repeats", () => {
     const ctx = createCtx();
     const seen = new Set();
-    // Call more times than pool size (6) — all first 6 should be distinct
+    // Call more times than pool size (6) - all first 6 should be distinct
     for (let i = 0; i < 6; i++) {
       const opener = getToneOpener("distressed", ctx);
       expect(opener.length).toBeGreaterThan(0);
@@ -602,9 +730,9 @@ describe("getToneOpener — opener repetition control", () => {
   });
 });
 
-// ─── NEW: hasMedicalSeriousness — medical override guard ─────────────────────
+// ─── NEW: hasMedicalSeriousness - medical override guard ─────────────────────
 
-describe("hasMedicalSeriousness — detects urgent medical content", () => {
+describe("hasMedicalSeriousness - detects urgent medical content", () => {
   it("heavy bleeding message → true", () => {
     expect(hasMedicalSeriousness("I'm heavy bleeding and soaking through")).toBe(true);
   });
@@ -632,7 +760,7 @@ describe("hasMedicalSeriousness — detects urgent medical content", () => {
 
 // ─── NEW: medical seriousness override blocks casual opener ───────────────────
 
-describe("getToneOpener — medical seriousness overrides casual opener", () => {
+describe("getToneOpener - medical seriousness overrides casual opener", () => {
   it("casual tone + heavy bleeding text → empty string (no casual opener)", () => {
     const opener = getToneOpener("casual", null, "I'm soaking through and bleeding heavy");
     expect(opener).toBe("");
@@ -652,16 +780,16 @@ describe("getToneOpener — medical seriousness overrides casual opener", () => 
 
   it("with ctx and medical content, casual opener still blocked and ctx.usedOpeners updated for non-casual tones", () => {
     const ctx = createCtx();
-    // Distressed + medically serious — should still return an opener and track it
+    // Distressed + medically serious - should still return an opener and track it
     const opener = getToneOpener("distressed", ctx, "I passed out and I'm scared");
     expect(opener.length).toBeGreaterThan(0);
     expect(ctx.usedOpeners.size).toBe(1);
   });
 });
 
-// ─── NEW: buildGuidanceResponse — tone blending ───────────────────────────────
+// ─── NEW: buildGuidanceResponse - tone blending ───────────────────────────────
 
-describe("buildGuidanceResponse — tone blending adjustments", () => {
+describe("buildGuidanceResponse - tone blending adjustments", () => {
   it("distressed tone adds grounding reassurance line before guidance", () => {
     const res = buildGuidanceResponse(
       entities({ symptoms: { late: true } }),
@@ -711,7 +839,7 @@ describe("buildGuidanceResponse — tone blending adjustments", () => {
     );
     expect(res).not.toBeNull();
     expect(res.scenario).toBe("urgent");
-    // Safety node — no reassurance prefix injected before the main content
+    // Safety node - no reassurance prefix injected before the main content
     // (lines[0] should be the situation line, not a separate reassurance)
     expect(res.lines[0]).not.toMatch(/right place.*we'll work through/i);
   });

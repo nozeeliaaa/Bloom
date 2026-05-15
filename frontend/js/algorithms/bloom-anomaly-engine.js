@@ -2,20 +2,20 @@
  * bloom-anomaly-engine.js
  *
  * Statistical anomaly detection for menstrual cycle timing.
- * Educational / wellness support only — not diagnostic.
+ * Educational / wellness support only - not diagnostic.
  *
  * --------------------------------------------------------------------
  * RESEARCH BASIS FOR THE THRESHOLDS IN THIS FILE
  * --------------------------------------------------------------------
  * 1) Clinical baseline for adult cycles:
- *    - Typical cycle length: 21–35 days
+ *    - Typical cycle length: 21-35 days
  *    - Typical bleeding duration: up to 7 days
  *    Source used in project notes/comments:
  *    - ACOG: Abnormal Uterine Bleeding FAQ
  *
  * 2) Personal cycle variability:
  *    - Large cohort work reports average within-person cycle variability
- *      around 4–6 days across many groups.
+ *      around 4-6 days across many groups.
  *    Source used in project notes/comments:
  *    - Li et al. (2023), PMC: Menstrual cycle length variation...
  *
@@ -29,8 +29,8 @@
  * --------------------------------------------------------------------
  * - absoluteResidualFloor = 4 days
  *   Why:
- *   A 1–3 day change can easily be ordinary biological fluctuation.
- *   Since population variability is often around 4–6 days, using 4 days
+ *   A 1-3 day change can easily be ordinary biological fluctuation.
+ *   Since population variability is often around 4-6 days, using 4 days
  *   as a minimum floor helps avoid over-flagging tiny shifts while still
  *   catching meaningful deviations early.
  *
@@ -608,7 +608,7 @@ export function detectDeviationClusterSignal({
  *
  * Why threshold ~7 days?
  * This is a practical rule-of-thumb marker for clearly irregular spread,
- * sitting above the smaller 4–6 day variability often seen in many groups.
+ * sitting above the smaller 4-6 day variability often seen in many groups.
  */
 export function detectHighVariabilitySignal({
   actualCycleLengths = [],
@@ -767,8 +767,8 @@ export function generateAnomalySignals({
       variability: "Standard deviation of cycle lengths",
     },
     referencesUsedInComments: [
-      "ACOG: typical adult cycle about 21–35 days; period duration up to 7 days",
-      "Li et al. 2023: within-person cycle variability often around 4–6 days",
+      "ACOG: typical adult cycle about 21-35 days; period duration up to 7 days",
+      "Li et al. 2023: within-person cycle variability often around 4-6 days",
       "NIST: z-score is standard deviations from the mean",
     ],
   };

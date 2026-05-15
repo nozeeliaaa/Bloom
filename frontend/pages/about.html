@@ -3,69 +3,411 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bloom — About</title>
+  <title>About Bloom</title>
 
-<link rel="stylesheet" href="../css/base.css">
-<link rel="stylesheet" href="../css/main.css">
-<link rel="stylesheet" href="../css/pages.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
 
+  <style>
+    /* ── Hero ── */
+    .about-hero {
+      text-align: center;
+      padding: 2.5rem 1rem 2rem;
+    }
+    .about-hero-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--color-primary-lightest);
+      border: 2px solid var(--color-primary-light);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+      margin-bottom: 1.1rem;
+    }
+    .about-hero h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--color-primary-dark);
+      margin: 0 0 0.5rem;
+    }
+    .about-hero-subtitle {
+      font-size: 1.05rem;
+      color: var(--color-text-muted);
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── Body prose card ── */
+    .about-prose p {
+      font-size: 0.97rem;
+      line-height: 1.75;
+      color: var(--color-text);
+      margin-bottom: 1rem;
+    }
+    .about-prose p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* ── Feature grid ── */
+    .about-features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 640px) {
+      .about-features { grid-template-columns: repeat(4, 1fr); }
+    }
+    .about-feature {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 1.25rem 0.75rem;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      text-align: center;
+    }
+    .about-feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius);
+      background: var(--color-primary-lightest);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+      flex-shrink: 0;
+    }
+    .about-feature-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--color-text);
+      line-height: 1.3;
+    }
+
+    /* ── Values list ── */
+    .about-values {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .about-values li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+    .about-values-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      flex-shrink: 0;
+      margin-top: 0.42rem;
+    }
+
+    /* ── Disclaimer box ── */
+    .about-disclaimer {
+      background: #fffbeb;
+      border: 1.5px solid #f59e0b;
+      border-left: 4px solid #f59e0b;
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+    [data-theme="dark"] .about-disclaimer {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: #f59e0b;
+    }
+    .about-disclaimer-icon {
+      color: #f59e0b;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .about-disclaimer-text {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--color-text);
+    }
+    .about-disclaimer-text strong {
+      display: block;
+      margin-bottom: 0.3rem;
+      color: #92600a;
+      font-size: 0.92rem;
+    }
+    [data-theme="dark"] .about-disclaimer-text strong {
+      color: #f59e0b;
+    }
+
+    /* ── Links grid ── */
+    .about-links {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+    @media (min-width: 480px) {
+      .about-links { grid-template-columns: repeat(3, 1fr); }
+    }
+    .about-link-card {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.9rem 1rem;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      text-decoration: none;
+      color: var(--color-text);
+      font-weight: 700;
+      font-size: 0.9rem;
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .about-link-card:hover {
+      border-color: var(--color-primary-light);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+    }
+    .about-link-card .card-icon {
+      flex-shrink: 0;
+    }
+    .about-link-meta {
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: var(--color-text-muted);
+      margin-top: 0.1rem;
+    }
+
+    /* ── Section heading ── */
+    .about-section-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--color-primary-dark);
+      margin: 0 0 1rem;
+    }
+
+    /* ── Spacing ── */
+    .about-mb {
+      margin-bottom: 1rem;
+    }
+  </style>
 </head>
+
 <body>
   <div id="banner-area"></div>
 
-  <main class="page">
-    <header class="page-header">
-      <div class="page-title">
-        <span class="title-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 2l1.3 3.8L17 5l-2.8 2.2L15 11l-3-1.9L9 11l.8-3.8L7 5l3.7.8L12 2zm0 11c-4.4 0-8 2.2-8 5v3h16v-3c0-2.8-3.6-5-8-5z"/></svg>
-        </span>
-        <h1>About Bloom</h1>
-      </div>
-      <p class="page-subtitle">Bloom supports cycle awareness for Jamaican users through simple tracking and educational insights.</p>
-    </header>
+  <main>
 
-    <section class="card">
-      <h2>Our Mission</h2>
+    <!-- Hero -->
+    <div class="about-hero">
+      <div class="about-hero-icon" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <h1>About Bloom</h1>
+      <p class="about-hero-subtitle">A reproductive health and cycle wellness platform built to help you understand your body, your cycle, and your health.</p>
+    </div>
+
+    <!-- What is Bloom -->
+    <div class="card about-prose about-mb">
+      <h2 class="about-section-title">What is Bloom?</h2>
       <p>
-        Bloom empowers individuals to understand their cycle, track patterns, and make informed health decisions in a supportive and private environment.
+        Bloom is a digital reproductive health and cycle wellness platform designed to help users better understand their bodies through tracking, education, and supportive guidance. The application was created to provide a more accessible, user-friendly, and culturally relevant approach to menstrual health management, with particular attention to the needs of users in the Caribbean.
       </p>
-    </section>
+      <p>
+        Bloom enables users to record and monitor important cycle-related information such as period dates, symptoms, and personal wellness data. Using this information, the platform offers cycle insights, phase awareness, and predictions intended to help users recognise patterns over time and make more informed decisions about their health and daily routines. In addition to tracking features, Bloom provides educational resources that explain menstrual and reproductive health topics in a clear and approachable way.
+      </p>
+      <p>
+        The platform also includes tools designed to create a more complete support experience, such as a chatbot for general guidance, a clinic finder to help users locate healthcare services, and educational pamphlets that promote awareness and informed self-management. Bloom aims to bridge the gap between health information and everyday accessibility by placing useful tools and resources into one supportive digital space.
+      </p>
+      <p>
+        At its core, Bloom is built on the belief that reproductive health information should be understandable, empowering, and easy to access. The platform is intended to support users in developing greater awareness of their cycles while encouraging informed conversations and responsible health-seeking behaviour.
+      </p>
+    </div>
 
-    <section class="card">
-      <h2>Our Values</h2>
-      <ul class="list-clean">
-        <li><strong>Privacy & Security</strong> — you control your data.</li>
-        <li><strong>Education & Transparency</strong> — clear explanations, no fear tactics.</li>
-        <li><strong>Empowerment through data</strong> — patterns that help you advocate for yourself.</li>
-        <li><strong>Inclusive design</strong> — accessible, culturally aware, easy to use.</li>
-      </ul>
-    </section>
+    <!-- Features -->
+    <div class="card about-mb">
+      <h2 class="about-section-title">What Bloom supports</h2>
+      <div class="about-features">
 
-    <section class="card">
-      <h2>Learn more</h2>
-      <div class="link-grid margin-top-small">
-        <a class="link-card" href="/pages/privacy.html">
-          <span class="mini-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4zm0 6a3 3 0 0 0-3 3v2H8v6h8v-6h-1v-2a3 3 0 0 0-3-3zm-1 5v-2a1 1 0 0 1 2 0v2h-2z"/></svg>
-          </span>
-          <div><strong>Privacy Policy</strong><div class="muted">How data is handled</div></div>
-        </a>
+        <div class="about-feature">
+          <div class="about-feature-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <span class="about-feature-label">Period &amp; Cycle Tracking</span>
+        </div>
 
-        <a class="link-card" href="/pages/terms.html">
-          <span class="mini-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M6 2h10l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm9 1.5V7h3.5L15 3.5zM8 10h10v2H8v-2zm0 4h10v2H8v-2zm0 4h7v2H8v-2z"/></svg>
-          </span>
-          <div><strong>Terms of Use</strong><div class="muted">Using Bloom responsibly</div></div>
-        </a>
+        <div class="about-feature">
+          <div class="about-feature-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </div>
+          <span class="about-feature-label">Trying to Conceive </span>
+        </div>
 
-        <a class="link-card" href="/pages/accessibility.html">
-          <span class="mini-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 7h10a1 1 0 0 1 0 2h-3l1 12a1 1 0 0 1-2 .2L12 15l-1 6.2a1 1 0 0 1-2-.2l1-12H7a1 1 0 0 1 0-2z"/></svg>
-          </span>
-          <div><strong>Accessibility</strong><div class="muted">Inclusive design notes</div></div>
-        </a>
+        <div class="about-feature">
+          <div class="about-feature-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <span class="about-feature-label">Pregnancy Tracking</span>
+        </div>
+
+        <div class="about-feature">
+          <div class="about-feature-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+          <span class="about-feature-label">Symptom Tracking</span>
+        </div>
+
+        <div class="about-feature">
+          <div class="about-feature-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <span class="about-feature-label">Phase &amp; Cycle Insights</span>
+        </div>
+
+        <div class="about-feature">
+          <div class="about-feature-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <span class="about-feature-label">Bloomie Chat Assistant</span>
+        </div>
+
+        <div class="about-feature">
+          <div class="about-feature-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+            </svg>
+          </div>
+          <span class="about-feature-label">Education &amp; Pamphlets</span>
+        </div>
+
+        <div class="about-feature">
+          <div class="about-feature-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+          <span class="about-feature-label">Clinic Finder</span>
+        </div>
+
       </div>
-    </section>
+    </div>
+
+    <!-- Values -->
+    <div class="card about-mb">
+      <h2 class="about-section-title">Our values</h2>
+      <ul class="about-values">
+        <li>
+          <span class="about-values-dot" aria-hidden="true"></span>
+          <span><strong>Privacy &amp; security</strong> - you own your data. It is never sold or shared without your consent.</span>
+        </li>
+        <li>
+          <span class="about-values-dot" aria-hidden="true"></span>
+          <span><strong>Education &amp; transparency</strong> - clear explanations, no fear tactics, no medical overreach.</span>
+        </li>
+        <li>
+          <span class="about-values-dot" aria-hidden="true"></span>
+          <span><strong>Empowerment through data</strong> - your patterns help you advocate for yourself with confidence.</span>
+        </li>
+        <li>
+          <span class="about-values-dot" aria-hidden="true"></span>
+          <span><strong>Inclusive, culturally aware design</strong> - accessible and relevant to users across the Caribbean and beyond.</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="about-disclaimer about-mb">
+      <span class="about-disclaimer-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </span>
+      <div class="about-disclaimer-text">
+        <strong>Important: Educational use only</strong>
+        Bloom is an educational and wellness-support platform only. It does not provide medical advice, diagnosis, or treatment, and it should not be used as a substitute for consultation with a licensed healthcare professional. If you have concerns about your health, please speak to a qualified provider.
+      </div>
+    </div>
+
+    <!-- Links -->
+    <div class="card">
+      <h2 class="about-section-title">Learn more</h2>
+      <div class="about-links">
+
+        <a class="about-link-card" href="/pages/privacy.html">
+          <div class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div>
+            Privacy Policy
+            <div class="about-link-meta">How your data is handled</div>
+          </div>
+        </a>
+
+        <a class="about-link-card" href="/pages/terms.html">
+          <div class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div>
+            Terms of Use
+            <div class="about-link-meta">Using Bloom responsibly</div>
+          </div>
+        </a>
+
+        <a class="about-link-card" href="/pages/accessibility.html">
+          <div class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="5" r="2"/><path d="M12 22V12m0 0 4 4m-4-4-4 4"/><path d="M6.5 11.5C8 8 10 7 12 7s4 1 5.5 4.5"/>
+            </svg>
+          </div>
+          <div>
+            Accessibility
+            <div class="about-link-meta">Our inclusive design commitment</div>
+          </div>
+        </a>
+
+        <a class="about-link-card" href="/pages/about-us.html">
+          <div class="card-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div>
+            About the Team
+            <div class="about-link-meta">Meet the people who built Bloom</div>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
   </main>
 
   <script type="module">

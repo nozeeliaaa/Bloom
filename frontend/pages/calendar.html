@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/bloom-logo.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Calendar - Bloom</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -126,6 +127,68 @@
       border-color: var(--color-primary);
       color: #fff;
     }
+    /* ── Custom / "Other" symptom section ── */
+    .custom-sym-input-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .custom-sym-input-row input { flex: 1; min-width: 0; }
+    .custom-sym-add-btn { flex-shrink: 0; white-space: nowrap; }
+    .custom-sym-meta {
+      margin: 0.3rem 0 0.55rem;
+      font-size: 0.79rem;
+      color: var(--color-text-muted);
+    }
+    .custom-symptom-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .custom-symptom-item {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 0.6rem 0.75rem;
+      background: var(--color-bg);
+    }
+    .custom-symptom-top {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+    .custom-symptom-name {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--color-text);
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .custom-sym-remove {
+      background: none;
+      border: none;
+      font-size: 1.05rem;
+      line-height: 1;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 0.1rem 0.25rem;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .custom-sym-remove:hover { color: var(--color-primary); background: rgba(0,0,0,0.05); }
+    .custom-sym-sev-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.35rem;
+    }
+    .custom-sym-sev-label {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      flex-shrink: 0;
+    }
+    .custom-symptom-note { margin-top: 0.35rem; }
 
     /* ── Prediction panel ── */
     .pred-section { margin-top: 1rem; }
@@ -148,7 +211,7 @@
     .phase-pill--active.phase-menstrual  { background: var(--phase-menstrual,  #e05c7a); }
     .phase-pill--active.phase-follicular { background: var(--phase-follicular, #5b9bd5); }
     .phase-pill--active.phase-ovulation  { background: var(--phase-ovulation,  #5ba865); }
-    .phase-pill--active.phase-luteal     { background: var(--phase-luteal,     #e8a838); }
+    .phase-pill--active.phase-luteal     { background: var(--phase-luteal,     #9c86d8); }
 
     /* Cycle cards */
     .pred-cycle-card { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 0.6rem; }
@@ -165,6 +228,39 @@
     .clear-logs-btn { flex-shrink: 0; margin-top: 0.25rem; }
     .severity-panel { display: none; }
     .severity-hint { font-weight: 400; color: var(--color-text-muted); font-size: 0.82rem; }
+
+    /* Daily biometrics */
+    .biometric-grid {
+      display: grid;
+      gap: 0.65rem;
+    }
+    .biometric-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .biometric-label {
+      font-size: 0.86rem;
+      color: var(--color-text);
+      font-weight: 700;
+    }
+    .biometric-value {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      font-weight: 700;
+      min-width: 80px;
+      text-align: right;
+    }
+    .biometric-slider {
+      width: 100%;
+      accent-color: var(--color-primary);
+    }
+    .biometric-note {
+      margin: 0.25rem 0 0;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
   </style>
     <link rel="stylesheet" href="/css/main.css" />
   </head>
@@ -194,6 +290,12 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
+      <div class="calendar-view-switch">
+        <div class="calendar-view-segment" role="tablist" aria-label="Calendar view">
+          <button type="button" class="calendar-view-btn is-active" id="view-month-btn" role="tab" aria-selected="true">Month</button>
+          <button type="button" class="calendar-view-btn" id="view-year-btn" role="tab" aria-selected="false">Year</button>
+        </div>
+      </div>
 
       <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Calendar">
         <div role="row">
@@ -206,6 +308,7 @@
           <div class="calendar-header-cell" role="columnheader">Sat</div>
         </div>
       </div>
+      <div id="calendar-year-view" class="calendar-year-view" hidden></div>
 
       <section class="card">
         <h3 class="key-heading">Key</h3>
@@ -232,9 +335,45 @@
       </div>
 
       <form id="log-form">
+        <div id="future-date-notice" class="future-date-notice" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Future date- flow cannot be logged ahead of time. You can still add notes.
+        </div>
+
         <div class="form-group">
           <label class="form-label">Flow</label>
           <div class="chip-group" id="flow-chips"></div>
+          <div class="chip-group" id="blood-clots-row">
+            <button type="button" class="chip" id="blood-clots-chip">🩸 Blood clots</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Daily biometrics</label>
+          <div class="biometric-grid">
+            <div>
+              <div class="biometric-row">
+                <span class="biometric-label">Sleep score</span>
+                <span class="biometric-value" id="sleep-score-value">Not set</span>
+              </div>
+              <input class="biometric-slider" type="range" id="sleep-score" min="1" max="10" step="1" value="7" aria-label="Sleep score" />
+            </div>
+            <div>
+              <div class="biometric-row">
+                <span class="biometric-label">Stress level</span>
+                <span class="biometric-value" id="stress-level-value">Not set</span>
+              </div>
+              <input class="biometric-slider" type="range" id="stress-level" min="1" max="4" step="1" value="2" aria-label="Stress level" />
+            </div>
+            <div>
+              <div class="biometric-row">
+                <span class="biometric-label">Activity level</span>
+                <span class="biometric-value" id="activity-level-value">Not set</span>
+              </div>
+              <input class="biometric-slider" type="range" id="activity-level" min="1" max="4" step="1" value="2" aria-label="Activity level" />
+            </div>
+          </div>
+          <p class="biometric-note">Quick daily check-in to support phase estimation.</p>
         </div>
 
         <div class="form-group">
@@ -250,6 +389,16 @@
         <div class="form-group severity-panel" id="severity-panel">
           <label class="form-label">Severity per symptom <span class="severity-hint">(1 = mild, 5 = severe)</span></label>
           <div class="severity-panel-list" id="symptom-severity-list"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Can't find your symptom?</label>
+          <div class="custom-sym-input-row">
+            <input type="text" class="form-input" id="other-symptom-input" maxlength="80" placeholder="e.g. Back pain, light sensitivity..." />
+            <button type="button" class="btn btn-primary btn-sm custom-sym-add-btn" id="add-other-symptom-btn">+ Add</button>
+          </div>
+          <p class="custom-sym-meta">Tracked in history | won't affect predictions</p>
+          <div class="custom-symptom-list" id="other-symptom-list"></div>
         </div>
 
         <div class="form-group">

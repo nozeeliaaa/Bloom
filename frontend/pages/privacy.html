@@ -3,45 +3,218 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bloom — Privacy Policy</title>
+  <title>Privacy Policy - Bloom</title>
 
-  <link rel="stylesheet" href="../css/base.css">
-<link rel="stylesheet" href="../css/main.css">
-<link rel="stylesheet" href="../css/pages.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css" />
 
+  <style>
+    .policy-shell {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .policy-shell h2 {
+      font-size: 1.15rem;
+      margin: 2rem 0 0.5rem;
+      color: var(--color-primary-dark, #b85c82);
+    }
+    .policy-shell h3 {
+      font-size: 1rem;
+      margin: 1.25rem 0 0.4rem;
+    }
+    .policy-shell p {
+      margin-bottom: 0.75rem;
+      line-height: 1.75;
+    }
+    .policy-shell ul, .policy-shell ol {
+      padding-left: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .policy-shell li {
+      margin-bottom: 0.35rem;
+      line-height: 1.65;
+    }
+    .policy-shell .no-list {
+      list-style: none;
+      padding-left: 0;
+    }
+    .policy-shell .no-list li::before {
+      content: "❌ ";
+    }
+    .policy-meta {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      margin-bottom: 1.5rem;
+    }
+    .policy-contact {
+      background: var(--color-primary-lightest, #fce4ec);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-top: 0.5rem;
+    }
+    .section-divider { margin: 2rem 0 0; }
+  </style>
 </head>
+
 <body>
   <div id="banner-area"></div>
 
-  <main class="page">
-    <header class="page-header">
-      <div class="page-title">
-        <span class="title-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4z"/></svg>
-        </span>
+  <main>
+    <div class="policy-shell">
+      <div class="page-header">
         <h1>Privacy Policy</h1>
+        <p class="policy-meta">Last Updated: February 21, 2026</p>
       </div>
-      <p class="page-subtitle">Placeholder page — you can replace this with a full policy later.</p>
-    </header>
 
-    <section class="card">
-      <h2>What we store (Demo)</h2>
-      <p>In this demo version, your cycle logs and preferences are stored locally in your browser using <strong>localStorage</strong>.</p>
-      <p class="muted">No cloud sync is enabled unless you add it.</p>
-    </section>
+      <div class="card">
 
-    <section class="card">
-      <h2>Sharing</h2>
-      <p>Bloom does not share your data automatically. Reports are downloaded only when you click the download button.</p>
-    </section>
+        <p>Bloom ("we," "our," or "us") is a Jamaican-developed reproductive health support application ("Service"). We are committed to protecting your privacy and safeguarding your personal and health information in accordance with the <strong>Jamaica Data Protection Act, 2020 (DPA 2020)</strong> and applicable international privacy standards.</p>
+        <p>We understand that menstrual and reproductive health information is deeply personal. Privacy and security are central to the design of Bloom.</p>
+
+        <hr class="section-divider">
+
+        <h2>1. Who We Are</h2>
+        <p>Bloom is a digital reproductive health and wellness platform developed and operated in Jamaica. The application supports users in understanding and managing their reproductive health through menstrual cycle tracking, symptom logging, personalised insights, and wellness support tools.</p>
+        <p>In accordance with the Jamaica Data Protection Act, 2020, Bloom acts as the <strong>Data Controller</strong> of your personal data and is responsible for determining how and why your information is collected, used, stored, and protected within the platform.</p>
+        <p>If you have any questions or concerns, contact us at <a href="mailto:bloomhelpdesk1@gmail.com">bloomhelpdesk1@gmail.com</a>. We will respond to all enquiries in a timely and respectful manner.</p>
+
+        <h2>2. Age Requirements &amp; Parental Consent</h2>
+        <p>Bloom is designed for users aged <strong>13 years and older</strong>.</p>
+
+        <h3>Minimum Age Requirement</h3>
+        <p>During account registration, all users must provide their date of birth. Users under 13 are not permitted to create an account. If we become aware that a user under 13 has created an account, the account and all associated data will be permanently deleted as soon as reasonably practicable.</p>
+
+        <h3>Users Aged 13-17</h3>
+        <p>Users between 13 and 17 years old may create an account <strong>only with verifiable parental or legal guardian consent</strong>. Upon registration, a consent request is sent to the guardian's email address. Full access is granted only after guardian approval. A parent or guardian may revoke consent at any time by contacting Bloom.</p>
+
+        <h3>Users 18 and Older</h3>
+        <p>Users aged 18 and older may provide consent on their own behalf and receive full access upon successful registration.</p>
+
+        <h2>3. Information We Collect</h2>
+        <p>We follow the principle of <strong>data minimisation</strong> under the DPA 2020. We collect only what is necessary to provide the Service.</p>
+
+        <h3>A. Account Information</h3>
+        <ul>
+          <li>Email address</li>
+          <li>Optional display name</li>
+          <li>Age band (13-17 or 18+)</li>
+          <li>Authentication credentials (managed securely via Firebase Authentication)</li>
+        </ul>
+        <p>We do not require your real name.</p>
+
+        <h3>B. Health &amp; Cycle Data (User-Provided)</h3>
+        <p>Bloom processes only the health information that you voluntarily enter, such as:</p>
+        <ul>
+          <li>Menstrual cycle dates</li>
+          <li>Period flow intensity</li>
+          <li>Symptoms (e.g., cramps, fatigue, mood changes)</li>
+          <li>Fertility logs (optional)</li>
+          <li>Birth control tracking (optional)</li>
+          <li>Notes (if enabled)</li>
+        </ul>
+        <p>We do not access your health data without your action.</p>
+
+        <h3>C. Technical &amp; Usage Data</h3>
+        <p>To ensure performance and security, we may collect device type, browser type, application performance logs, crash reports, and approximate location via IP address (for security purposes only). We do not collect precise location data.</p>
+
+        <h2>4. Legal Basis for Processing</h2>
+        <p>Under the Jamaica DPA 2020, we process personal data on the following bases:</p>
+        <ul>
+          <li>Your <strong>consent</strong> (for health data processing)</li>
+          <li><strong>Performance of a contract</strong> (to provide the Bloom service)</li>
+          <li><strong>Legal obligations</strong> (if required by law)</li>
+          <li><strong>Legitimate interests</strong> (security, fraud prevention, system stability)</li>
+        </ul>
+        <p>Sensitive health data is processed strictly based on explicit user consent.</p>
+
+        <h2>5. How We Use Your Information</h2>
+        <p>Bloom uses your data only to:</p>
+        <ul>
+          <li>Calculate menstrual cycle predictions and estimate ovulation and fertile windows</li>
+          <li>Provide conception-related timing insights</li>
+          <li>Identify irregular patterns in logged data</li>
+          <li>Generate pregnancy-related educational insights</li>
+          <li>Deliver reminders and notifications (if enabled)</li>
+          <li>Maintain system security and performance</li>
+        </ul>
+        <p><strong>Bloom does not provide medical diagnoses.</strong> All outputs are educational and informational only.</p>
+
+        <h2>6. Machine Learning &amp; Data Analytics</h2>
+        <p>Bloom uses statistical models to generate personalised cycle predictions, ovulation estimates, and fertility insights. Base models are developed using publicly available medical research, clinical guidance, and synthetic datasets.</p>
+        <p>Bloom may offer users the option to <strong>voluntarily contribute anonymised data</strong> to improve prediction accuracy. If you opt in, direct identifiers are permanently removed before processing, data is irreversibly anonymised or aggregated, and no re-identification mapping is retained.</p>
+        <ul class="no-list">
+          <li>We do not sell your health data.</li>
+          <li>We do not allow advertisers access to health data.</li>
+          <li>We do not allow third parties to train models using identifiable user health data.</li>
+          <li>We do not use identifiable personal health logs to train external AI systems.</li>
+        </ul>
+
+        <h2>7. Anonymous Mode</h2>
+        <p>Bloom offers an Anonymous Mode that allows access to core features without creating a fully identifiable account. In Anonymous Mode, no email or direct personal identifier is required. Anonymous records are logically separated from authenticated account databases and no internal mapping is maintained to connect them to identifiable accounts.</p>
+        <p>Certain features may be restricted in Anonymous Mode, including data export, guardian consent workflows, cross-device synchronisation, and account recovery.</p>
+
+        <h2>8. Data Sharing</h2>
+        <p>Bloom does not sell, rent, trade, or commercially exploit your personal or health data.</p>
+        <p>We use trusted third-party infrastructure providers that act solely as <strong>Data Processors</strong> under contract:</p>
+        <ul>
+          <li><strong>Firebase Authentication</strong> - secure login and password management</li>
+          <li><strong>Cloud Firestore</strong> - encrypted database storage</li>
+          <li><strong>Firebase Hosting</strong> - secure web app deployment</li>
+        </ul>
+        <p>Firebase does not own your data and is contractually restricted from using it for independent commercial purposes.</p>
+        <p>All data transmitted is protected using HTTPS/TLS. Data at rest is encrypted using AES-256. Bloom may disclose personal data only if required under Jamaican law (e.g., court order), limited to what is legally required.</p>
+
+        <h2>9. Data Security</h2>
+        <p>We protect your information through:</p>
+        <ul>
+          <li>HTTPS (TLS encryption) for data in transit</li>
+          <li>AES-256 encryption at rest via Firebase/Google Cloud</li>
+          <li>Firestore security rules restricting cross-user access</li>
+          <li>Role-based administrative access controls</li>
+          <li>Hashed and salted passwords (we never store plaintext passwords)</li>
+        </ul>
+        <p>Access to stored data is limited to authorised developers strictly for maintenance purposes, bound by confidentiality obligations.</p>
+
+        <h2>10. Data Retention &amp; Account Deletion</h2>
+        <p>Bloom retains personal and health data only while your account is active. When you <strong>delete your account</strong>:</p>
+        <ul>
+          <li>Your Firebase Authentication credentials are deleted immediately</li>
+          <li>All cycle logs, symptom entries, and health records are permanently deleted</li>
+          <li>All pseudonymised identifiers are destroyed</li>
+          <li>Any locally cached data is cleared</li>
+        </ul>
+        <p>This action <strong>cannot be undone</strong>. We do not keep shadow copies of your identifiable health logs.</p>
+        <p>Encrypted backup copies may persist temporarily within secure cloud infrastructure for disaster recovery but are not actively processed and are automatically purged.</p>
+
+        <h2>11. Your Rights Under the Jamaica DPA 2020</h2>
+        <p>You have the right to:</p>
+        <ul>
+          <li>Access your personal data</li>
+          <li>Correct inaccurate information</li>
+          <li>Withdraw consent</li>
+          <li>Request deletion</li>
+          <li>Object to processing in certain circumstances</li>
+          <li>Lodge a complaint with the Information Commissioner (Jamaica)</li>
+        </ul>
+        <p>To exercise your rights, contact us at <a href="mailto:bloomhelpdesk1@gmail.com">bloomhelpdesk1@gmail.com</a>.</p>
+
+        <h2>12. Security Breach Notification</h2>
+        <p>In the event of a data breach affecting your personal data, Bloom will investigate immediately, notify affected users where required, take corrective measures, and comply with reporting obligations under Jamaican law.</p>
+
+        <h2>13. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy to reflect legal changes, feature updates, or security improvements. Material changes will be communicated within the app with an updated effective date. Continued use of Bloom indicates acceptance of the updated policy.</p>
+
+        <h2>14. Contact Us</h2>
+        <div class="policy-contact">
+          <strong>Bloom</strong><br>
+          Email: <a href="mailto:bloomhelpdesk1@gmail.com">bloomhelpdesk1@gmail.com</a>
+        </div>
+
+      </div>
+    </div>
   </main>
 
-  <script type="module">
-    import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
-    renderNav("");
-    renderFooter();
-    renderBloomieFab();
-    renderModeBanner(document.getElementById("banner-area"));
-  </script>
+  <!-- No auth scripts on this page - it must be readable without logging in -->
 </body>
 </html>

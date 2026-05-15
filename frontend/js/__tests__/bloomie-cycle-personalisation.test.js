@@ -42,8 +42,10 @@ import { generateIntegratedSignals } from "../algorithms/bloom-symptom-engine.js
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 vi.mock("../db.js", () => ({
-  loadBloomieMemory: vi.fn().mockResolvedValue(null),
-  saveBloomieMemory: vi.fn().mockResolvedValue(),
+  loadBloomieMemory:      vi.fn().mockResolvedValue(null),
+  saveBloomieMemory:      vi.fn().mockResolvedValue(),
+  loadLocalBloomieMemory: vi.fn().mockReturnValue(null),
+  saveLocalBloomieMemory: vi.fn(),
 }));
 
 vi.mock("../auth.js", () => ({
@@ -51,10 +53,14 @@ vi.mock("../auth.js", () => ({
   getUser:     vi.fn().mockReturnValue(null),
 }));
 
-vi.mock("../bloomie-logger.js", () => ({
-  logSafetyEvent:    vi.fn(),
-  logAnalyticsEvent: vi.fn(),
-}));
+vi.mock("../bloomie-logger.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    logSafetyEvent:    vi.fn(),
+    logAnalyticsEvent: vi.fn(),
+  };
+});
 
 // Bypass Patois normalisation (non-iterable PHRASE_MAP in test env).
 vi.mock("../bloomie-patois.js", async (importOriginal) => {
@@ -155,14 +161,14 @@ afterEach(() => {
 });
 
 
-// ── 1. loggingGapPending — flag set and consumed at mount ─────────────────────
+// ── 1. loggingGapPending - flag set and consumed at mount ─────────────────────
 //
 // transition("START") is called synchronously at the end of initBloomieChat().
 // START's say() checks ctx.loggingGapPending and immediately sets it to false.
 // The flag is therefore always false after mount; we assert observable effects:
 // adviceGiven entry (proves the flag was set then consumed) and chatbox text.
 
-describe("loggingGapPending — flag set and consumed at mount", () => {
+describe("loggingGapPending - flag set and consumed at mount", () => {
   it("adviceGiven entry is set when SYMPTOM_LOGGING_GAP signal level is 'high'", () => {
     generateIntegratedSignals.mockReturnValueOnce({
       cycleSignals:   [],
@@ -221,13 +227,13 @@ describe("loggingGapPending — flag set and consumed at mount", () => {
 });
 
 
-// ── 2. buildCyclePersonalisationLine — via LATE_INTRO ────────────────────────
+// ── 2. buildCyclePersonalisationLine - via LATE_INTRO ────────────────────────
 //
 // buildCyclePersonalisationLine("late") is called inside LATE_INTRO's say().
 // To reach LATE_INTRO: suppress buildGuidanceResponse (template fires first for
-// health inputs) then send "my period is late" — inferRoute returns LATE_INTRO.
+// health inputs) then send "my period is late" - inferRoute returns LATE_INTRO.
 
-describe("buildCyclePersonalisationLine — variability line in LATE_INTRO", () => {
+describe("buildCyclePersonalisationLine - variability line in LATE_INTRO", () => {
   it("appends variability string when IRREGULAR_CYCLE signal + cycleVariability set", () => {
     generateIntegratedSignals.mockReturnValueOnce({
       cycleSignals:   [{ code: "IRREGULAR_CYCLE", level: "medium", show: true, message: null }],
@@ -257,7 +263,7 @@ describe("buildCyclePersonalisationLine — variability line in LATE_INTRO", () 
   });
 
   it("does not append variability line when urgency routes away from LATE_INTRO", () => {
-    // Trigger urgency escalation — bypasses LATE_INTRO entirely.
+    // Trigger urgency escalation - bypasses LATE_INTRO entirely.
     // buildCyclePersonalisationLine is never called when routing goes to HEAVY_URGENT.
     generateIntegratedSignals.mockReturnValueOnce({
       cycleSignals:   [{ code: "IRREGULAR_CYCLE", level: "medium", show: true, message: null }],
@@ -274,18 +280,38 @@ describe("buildCyclePersonalisationLine — variability line in LATE_INTRO", () 
   });
 });
 
+describe("shared cycle state consistency", () => {
+  it("uses the canonical nextPeriodDate from cycleData for overdue intro wording", () => {
+    vi.setSystemTime(new Date("2026-04-09T12:00:00"));
 
-// ── 3. buildSymptomPatternLine — via MOOD_INTRO → MOOD_SAFETY_CHECK ──────────
+    mountChat({
+      cycleData: {
+        lmp: "2026-01-13",
+        cycleLength: 71,
+        nextPeriodDate: "2026-03-23",
+        dayInCycle: 88,
+        phase: "late_luteal",
+        phaseLabel: "Late Luteal",
+      },
+      symptomHistory: STUB_HISTORY,
+    });
+
+    expect(getChatBoxText()).toMatch(/17 days overdue by estimate/i);
+  });
+});
+
+
+// ── 3. buildSymptomPatternLine - via MOOD_INTRO → MOOD_SAFETY_CHECK ──────────
 //
 // buildSymptomPatternLine is first called in MOOD_INTRO's onEnter() (gate node,
 // say: []). Clicking "mood" from START navigates:
 //   START → MOOD_INTRO (onEnter: buildSymptomPatternLine, say([line]), auto-timer)
-//         → MOOD_SAFETY_CHECK (say(): patternLine returns null — already in adviceGiven)
+//         → MOOD_SAFETY_CHECK (say(): patternLine returns null - already in adviceGiven)
 //
 // The patternLine from MOOD_INTRO fires at 500ms (firstBubbleMs). The timer for
 // MOOD_SAFETY_CHECK fires at 1300ms. advanceTimersByTime(10000) fires both.
 
-describe("buildSymptomPatternLine — pattern line in mood flow", () => {
+describe("buildSymptomPatternLine - pattern line in mood flow", () => {
   it("returns a pattern string the first time when signal and history match", () => {
     generateIntegratedSignals.mockReturnValueOnce({
       cycleSignals:   [],
@@ -296,7 +322,7 @@ describe("buildSymptomPatternLine — pattern line in mood flow", () => {
     clickButton("mood");   // START → MOOD_INTRO (onEnter) → MOOD_SAFETY_CHECK
 
     expect(getChatBoxText()).toMatch(
-      /tend to experience|tends to come up|tend to log/i
+      /looking at your logs|from what you've logged|pattern your body follows|tend to experience|tends? to come up|tend to log/i
     );
   });
 
@@ -323,7 +349,7 @@ describe("buildSymptomPatternLine — pattern line in mood flow", () => {
 
     const text = getChatBoxText();
     const matches = [...text.matchAll(/tend to experience|tends to come up|tend to log/gi)];
-    // Can appear at most once — MOOD_SAFETY_CHECK dedup guard prevents repeat.
+    // Can appear at most once - MOOD_SAFETY_CHECK dedup guard prevents repeat.
     expect(matches.length).toBeLessThanOrEqual(1);
   });
 
@@ -332,7 +358,7 @@ describe("buildSymptomPatternLine — pattern line in mood flow", () => {
       cycleSignals:   [],
       symptomSignals: [{ code: "SYMPTOMS_MATCH_PMS_PATTERN", level: "medium", show: true }],
     });
-    // Mount WITHOUT symptomHistory — history guard returns null immediately.
+    // Mount WITHOUT symptomHistory - history guard returns null immediately.
     mountChat({ symptomHistory: null });
 
     clickButton("mood");

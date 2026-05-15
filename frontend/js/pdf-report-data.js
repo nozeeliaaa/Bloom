@@ -1,16 +1,21 @@
 /**
- * pdf-report-data.js — Report Data Builder
+ * pdf-report-data.js - Report Data Builder
  *
  * Collects, normalises, sorts, and summarises all data required for the
  * Bloom cycle report PDF. The PDF renderer (report.js) receives clean, pre-
  * ordered structures and never performs sorting or business logic inline.
  *
  * Sorting contract:
- *   cyclesNewestFirst   — most recent period start first (for history table)
- *   symptomLog          — most recent date first (for symptom table)
- *   topSymptoms         — descending by occurrence count (for trends section)
- *   alerts              — ordered by severity (cycle outliers before lateness)
+ *   cyclesNewestFirst   - most recent period start first (for history table)
+ *   symptomLog          - most recent date first (for symptom table)
+ *   topSymptoms         - descending by occurrence count (for trends section)
+ *   alerts              - ordered by severity (cycle outliers before lateness)
  */
+
+import {
+  generateIntegratedSignals,
+  getBloomieSymptomContext,
+} from "./algorithms/bloom-symptom-engine.js";
 
 // ── Sorting utilities (exported for testing) ──────────────────────────────────
 
@@ -27,7 +32,7 @@ export function sortDatesAsc(dates) {
 /**
  * Sort an array of objects by a date-valued field, descending.
  * @param {Object[]} records
- * @param {string}   field  — key that holds an ISO date string
+ * @param {string}   field  - key that holds an ISO date string
  */
 export function sortRecordsDesc(records, field = "date") {
   return [...records].sort((a, b) =>
@@ -50,6 +55,10 @@ export function sortRecordsAsc(records, field = "date") {
  */
 export function sortByFrequencyDesc(freqMap) {
   return Object.entries(freqMap).sort(([, a], [, b]) => b - a);
+}
+
+function normalizeCustomSymptomText(text) {
+  return String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 // ── Date helpers (module-private) ─────────────────────────────────────────────
@@ -85,13 +94,21 @@ function isPeriodFlow(flow) {
   );
 }
 
+function isLoggedPeriodDay(entry) {
+  if (!entry) return false;
+  if (isPeriodFlow(entry.flow)) return true;
+  if (typeof entry.flowLevel === "number" && entry.flowLevel > 0) return true;
+  if (Number.isFinite(Number(entry.periodDay)) && Number(entry.periodDay) > 0) return true;
+  return entry.periodDay === true;
+}
+
 // ── Period-start detection ────────────────────────────────────────────────────
 // A period "start" is a day with period flow that has no period flow the day
 // before it. This mirrors the logic in phase.js and report.js exactly.
 
 function getPeriodStarts(logsByDate) {
   const allDays = Object.keys(logsByDate || {})
-    .filter((d) => isPeriodFlow(logsByDate[d]?.flow))
+    .filter((d) => isLoggedPeriodDay(logsByDate[d]))
     .sort();
   const daySet = new Set(allDays);
   return allDays.filter((d) => !daySet.has(addDays(d, -1)));
@@ -104,7 +121,7 @@ function getPeriodStarts(logsByDate) {
 function computePeriodLength(start, logsByDate) {
   let n = 0;
   let d = start;
-  while (isPeriodFlow(logsByDate[d]?.flow) && n < 14) {
+  while (isLoggedPeriodDay(logsByDate[d]) && n < 14) {
     n++;
     d = addDays(d, 1);
   }
@@ -165,6 +182,21 @@ function buildSymptomFrequency(logsByDate) {
   return freq;
 }
 
+function buildCustomSymptomFrequency(logsByDate) {
+  const freq = {};
+  for (const log of Object.values(logsByDate || {})) {
+    for (const item of log?.otherSymptoms || []) {
+      const key = normalizeCustomSymptomText(item?.text);
+      if (!key) continue;
+      if (!freq[key]) freq[key] = { label: item?.text || key, count: 0 };
+      freq[key].count += 1;
+    }
+  }
+  return Object.values(freq)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .map((row) => [row.label, row.count]);
+}
+
 // ── Narrative summary ─────────────────────────────────────────────────────────
 
 function buildNarrative(d) {
@@ -189,10 +221,10 @@ function buildNarrative(d) {
     const { tier, inTypicalRange, range, min, max } = d.regularity;
     if (tier === "tight") {
       if (inTypicalRange) {
-        parts.push("Your cycle has been very consistent — your period tends to arrive on a predictable schedule.");
+        parts.push("Your cycle has been very consistent - your period tends to arrive on a predictable schedule.");
       } else {
         parts.push(
-          "Your cycle is highly consistent and follows a reliable pattern — it falls outside the typical 21–35 day range, " +
+          "Your cycle is highly consistent and follows a reliable pattern - it falls outside the typical 21-35 day range, " +
           "but its consistency means it is predictable for you specifically."
         );
       }
@@ -201,7 +233,7 @@ function buildNarrative(d) {
         parts.push(`Your cycle lengths have varied by up to ${range} days, which is within a normal range for most people.`);
       } else {
         parts.push(
-          `Your cycle falls outside the typical 21–35 day range and shows some variation (${min}–${max} days). ` +
+          `Your cycle falls outside the typical 21-35 day range and shows some variation (${min}-${max} days). ` +
           `Tracking over time will help clarify whether this is a stable pattern for you.`
         );
       }
@@ -213,7 +245,7 @@ function buildNarrative(d) {
     }
   }
 
-  if (d.currentPhase && d.currentPhase !== "unknown" && d.confidence !== "low") {
+  if (d.currentPhase && d.currentPhase !== "unknown" && d.confidenceLevel?.toLowerCase() !== "low") {
     const phaseDesc = {
       menstrual:  "You are currently in your menstrual phase.",
       follicular: "You are currently in your follicular phase, when energy often starts to rise.",
@@ -228,7 +260,7 @@ function buildNarrative(d) {
     const daysUntil  = daysBetween(today, d.nextPeriodDate);
     if (daysUntil > 1) {
       parts.push(
-        `Your next period is expected around ${formatDateLong(d.nextPeriodDate)} — approximately ${daysUntil} day${daysUntil !== 1 ? "s" : ""} away.`
+        `Your next period is expected around ${formatDateLong(d.nextPeriodDate)} - approximately ${daysUntil} day${daysUntil !== 1 ? "s" : ""} away.`
       );
     } else if (daysUntil === 0 || daysUntil === 1) {
       parts.push("Your period is expected very soon based on your cycle history.");
@@ -256,7 +288,7 @@ function buildAlerts({ completedCycles, nextPeriodDate }) {
     alerts.push({
       title: "Cycle length outside typical range",
       body:
-        `${outliers.length} of your logged cycle${outliers.length !== 1 ? "s" : ""} fell outside the typical 21–35 day range. ` +
+        `${outliers.length} of your logged cycle${outliers.length !== 1 ? "s" : ""} fell outside the typical 21-35 day range. ` +
         `This is worth mentioning to your healthcare provider, especially if it is a recurring pattern.`,
     });
   }
@@ -278,7 +310,130 @@ function buildAlerts({ completedCycles, nextPeriodDate }) {
 }
 
 // ── "What This Means For You" interpretation ─────────────────────────────────
-// 3–4 sentences interpreting consistency, length context, and notable patterns.
+// 3-4 sentences interpreting consistency, length context, and notable patterns.
+
+const SIGNAL_PRIORITY = { high: 3, medium: 2, low: 1 };
+
+function symptomLabelToCode(label) {
+  return String(label || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function buildEngineSymptomHistory(logsByDate) {
+  return Object.entries(logsByDate || {})
+    .filter(([, log]) => Array.isArray(log?.symptoms) && log.symptoms.length > 0)
+    .map(([dateKey, log]) => ({
+      dateKey,
+      items: (log.symptoms || [])
+        .map((label) => {
+          const mapped = String(
+            log?.symptomCodes?.[label] ||
+            log?.symptomCodes?.[symptomLabelToCode(label)] ||
+            ""
+          ).trim().toUpperCase();
+          const code = mapped || symptomLabelToCode(label);
+          if (!code) return null;
+          const severity = Number(
+            log?.symptomSeverity?.[label] ??
+            log?.symptomSeverity?.[mapped] ??
+            log?.symptomSeverity?.[code] ??
+            3
+          );
+          return { code, severity: Number.isFinite(severity) ? severity : 3 };
+        })
+        .filter(Boolean),
+    }))
+    .filter((entry) => entry.items.length > 0)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
+function cleanSignalText(value) {
+  return String(value || "")
+    .replace(/\bdetected\b/gi, "noticed")
+    .trim();
+}
+
+function cleanSignal(signal) {
+  if (!signal) return null;
+  const level = String(signal.level || "low").toLowerCase();
+  const normalizedLevel = ["high", "medium", "low"].includes(level) ? level : "low";
+  const guidance = cleanSignalText(signal.guidance || (
+    normalizedLevel === "high"
+      ? "Track what happens next and consider checking in with a healthcare professional if this feels unusual for your body."
+      : ""
+  ));
+
+  return {
+    code: String(signal.code || ""),
+    level: normalizedLevel,
+    title: cleanSignalText(signal.title || "Bloom noticed something"),
+    message: cleanSignalText(signal.message || ""),
+    guidance,
+    category: signal.category || "cycle",
+  };
+}
+
+function buildSignalSummary({ logsByDate, cycleState, cycleLengths, lastPeriodStart, cyclesTracked }) {
+  const symptomHistory = buildEngineSymptomHistory(logsByDate);
+  if (!symptomHistory.length && !cycleLengths.length) {
+    return { signals: [], patternLine: null, guidanceLines: [] };
+  }
+
+  const today = new Date();
+  const todayKeyValue = todayKey();
+  const latestWithSymptoms = symptomHistory.find((entry) => entry.dateKey === todayKeyValue)
+    ?? symptomHistory[symptomHistory.length - 1]
+    ?? null;
+  const loggedSymptoms = latestWithSymptoms?.items || [];
+  const nextPeriodDate = cycleState?.nextPeriodDate ?? null;
+  const expectedNextPeriodWindow = nextPeriodDate
+    ? {
+        start: new Date(addDays(nextPeriodDate, -2) + "T00:00:00"),
+        end:   new Date(addDays(nextPeriodDate, 2) + "T00:00:00"),
+      }
+    : null;
+  const phaseMap = { late_luteal: "luteal", ovulatory: "ovulation" };
+  const phase = phaseMap[cycleState?.phase] ?? cycleState?.phase ?? null;
+
+  const integrated = generateIntegratedSignals({
+    expectedNextPeriodWindow,
+    today,
+    lastPeriodStart: lastPeriodStart ? new Date(lastPeriodStart + "T00:00:00") : null,
+    cycleLengths,
+    loggedSymptoms,
+    phase,
+    dayOfCycle: cycleState?.dayInCycle ?? null,
+    cycleCount: cyclesTracked,
+    symptomHistory,
+  });
+
+  const visible = [
+    ...(integrated?.cycleSignals || []),
+    ...(integrated?.symptomSignals || []),
+  ]
+    .filter((signal) => signal?.show !== false)
+    .map(cleanSignal)
+    .filter(Boolean)
+    .sort((a, b) => (SIGNAL_PRIORITY[b.level] || 0) - (SIGNAL_PRIORITY[a.level] || 0));
+
+  const mediumHigh = visible.filter((signal) => signal.level === "medium" || signal.level === "high");
+  const signals = (mediumHigh.length ? mediumHigh : visible.slice(0, 1)).slice(0, 3);
+  const bloomieContext = getBloomieSymptomContext(integrated?.symptomSignals || []);
+  const patternSignal = signals.find((signal) => String(signal.code).startsWith("SYMPTOMS_MATCH_"));
+
+  return {
+    signals,
+    patternLine: patternSignal
+      ? `${patternSignal.title}: ${patternSignal.message}`
+      : bloomieContext.patternDetected
+        ? `Bloom noticed ${String(bloomieContext.patternDetected).replace(/_/g, " ").toLowerCase()}.`
+        : null,
+    guidanceLines: [...new Set(signals.map((signal) => signal.guidance).filter(Boolean))].slice(0, 4),
+  };
+}
 
 function buildInterpretation(d) {
   if (!d.cyclesTracked) return null;
@@ -289,25 +444,25 @@ function buildInterpretation(d) {
   if (regularity?.tier === "tight") {
     if (regularity.inTypicalRange) {
       parts.push(
-        "Your cycle is highly consistent and falls within the typical range — this is one of the clearest signs of a stable, predictable pattern."
+        "Your cycle is highly consistent and falls within the typical range - this is one of the clearest signs of a stable, predictable pattern."
       );
     } else if (avgCycleLength > 35) {
       parts.push(
-        `Your cycle runs longer than the typical 21–35 day range, but it is highly consistent — it follows a reliable rhythm that is your own normal, even if it differs from textbook timing.`
+        `Your cycle runs longer than the typical 21-35 day range, but it is highly consistent - it follows a reliable rhythm that is your own normal, even if it differs from textbook timing.`
       );
     } else {
       parts.push(
-        `Your cycle is shorter than the typical range but highly consistent — it follows a reliable pattern that is your own normal.`
+        `Your cycle is shorter than the typical range but highly consistent - it follows a reliable pattern that is your own normal.`
       );
     }
   } else if (regularity?.tier === "moderate") {
     if (regularity.inTypicalRange) {
       parts.push(
-        "Your cycle falls within the typical 21–35 day range with some natural month-to-month variation — this is a common and healthy pattern."
+        "Your cycle falls within the typical 21-35 day range with some natural month-to-month variation - this is a common and healthy pattern."
       );
     } else {
       parts.push(
-        "Your cycle is outside the typical range and shows some variation from cycle to cycle — continued logging will help clarify whether this is a stable baseline for you."
+        "Your cycle is outside the typical range and shows some variation from cycle to cycle - continued logging will help clarify whether this is a stable baseline for you."
       );
     }
   } else if (regularity?.tier === "loose") {
@@ -323,14 +478,14 @@ function buildInterpretation(d) {
     } else if (avgPeriodLength <= 6) {
       parts.push(`Your periods typically last about ${avgPeriodLength} days, which is within the typical range.`);
     } else {
-      parts.push(`Your periods average about ${avgPeriodLength} days, which is on the longer side — if paired with heavy flow, this is worth noting when you speak with your provider.`);
+      parts.push(`Your periods average about ${avgPeriodLength} days, which is on the longer side - if paired with heavy flow, this is worth noting when you speak with your provider.`);
     }
   }
 
   // Day-in-cycle context for longer cycles
   if (dayInCycle && dayInCycle > 28 && avgCycleLength > 35) {
     parts.push(
-      `Being on day ${dayInCycle} of your cycle is completely expected given your longer cycle pattern — this is not a sign that something is wrong.`
+      `Being on day ${dayInCycle} of your cycle is completely expected given your longer cycle pattern - this is not a sign that something is wrong.`
     );
   }
 
@@ -338,7 +493,7 @@ function buildInterpretation(d) {
   if (topSymptoms?.length >= 3) {
     const top3 = topSymptoms.slice(0, 3).map(([s]) => s.toLowerCase()).join(", ");
     parts.push(
-      `Your most frequently logged symptoms — ${top3} — may be worth discussing with your provider if they are affecting your daily life.`
+      `Your most frequently logged symptoms - ${top3} - may be worth discussing with your provider if they are affecting your daily life.`
     );
   }
 
@@ -355,44 +510,44 @@ function buildPatternInsight(d) {
 
   if (regularity.tier === "tight" && !regularity.inTypicalRange && avgCycleLength > 35) {
     return (
-      "Your cycle is longer than average but highly consistent — this makes it predictable even if it doesn't follow typical timing, and is likely your body's natural rhythm."
+      "Your cycle is longer than average but highly consistent - this makes it predictable even if it doesn't follow typical timing, and is likely your body's natural rhythm."
     );
   }
   if (regularity.tier === "tight" && !regularity.inTypicalRange && avgCycleLength < 21) {
     return (
-      "Your cycle is shorter than average but very consistent — this predictable pattern is likely your body's natural rhythm, even though it differs from typical ranges."
+      "Your cycle is shorter than average but very consistent - this predictable pattern is likely your body's natural rhythm, even though it differs from typical ranges."
     );
   }
   if (regularity.tier === "tight" && regularity.inTypicalRange) {
     return (
-      "Your cycle is both regular and within the typical range — this is one of the clearest signs of a stable, predictable pattern."
+      "Your cycle is both regular and within the typical range - this is one of the clearest signs of a stable, predictable pattern."
     );
   }
   if (regularity.tier === "loose") {
     if (topSymptoms?.length >= 2) {
       return (
-        "Your cycle has shown notable variation alongside recurring symptoms — tracking both together gives your doctor the clearest picture of what is happening."
+        "Your cycle has shown notable variation alongside recurring symptoms - tracking both together gives your doctor the clearest picture of what is happening."
       );
     }
     return (
-      "Your cycle has been variable — continuing to log consistently will help reveal whether this is a stable pattern or something that shifts over time."
+      "Your cycle has been variable - continuing to log consistently will help reveal whether this is a stable pattern or something that shifts over time."
     );
   }
   // moderate
   if (!regularity.inTypicalRange) {
     return (
-      "Your cycle is outside the typical 21–35 day range but shows reasonable consistency — with more data, a clearer personal pattern will emerge."
+      "Your cycle is outside the typical 21-35 day range but shows reasonable consistency - with more data, a clearer personal pattern will emerge."
     );
   }
   return (
-    "Your cycle falls within the typical range with some natural month-to-month variation — this is a common and healthy pattern."
+    "Your cycle falls within the typical range with some natural month-to-month variation - this is a common and healthy pattern."
   );
 }
 
 // ── Date formatters (exported for use in report.js and the HTML preview) ──────
 
 export function formatDateLong(isoDate) {
-  if (!isoDate) return "—";
+  if (!isoDate) return "-";
   const [y, m, d] = isoDate.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric",
@@ -400,7 +555,7 @@ export function formatDateLong(isoDate) {
 }
 
 export function formatDateMed(isoDate) {
-  if (!isoDate) return "—";
+  if (!isoDate) return "-";
   const [y, m, d] = isoDate.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
@@ -410,24 +565,26 @@ export function formatDateMed(isoDate) {
 // ── Main builder ──────────────────────────────────────────────────────────────
 
 /**
- * buildReportData(logsByDate, cyclePhase, userName?)
+ * buildReportData(logsByDate, cycleState, userName?)
  *
- * Assembles all sections of the report from raw log data and the cycle-phase
- * computation result. Returns a single plain object — the PDF renderer and
- * the HTML preview both read from this same structure.
+ * Assembles all sections of the report from raw log data and the cycle state
+ * returned by fetchCycleState() (cycle-state.js). Returns a single plain
+ * object - the PDF renderer and the HTML preview both read from this.
  *
- * Data model inconsistency fixed here:
- *   The cloud API stores flow as `flowLevel` while localStorage uses `flow`.
- *   db.js normalises both into `flow` before returning from getAllLogs(), so
- *   by the time data reaches this builder everything uses `flow`. No special
- *   casing required here.
+ * cycleState shape (from fetchCycleState):
+ *   ready, phase, phaseLabel, dayInCycle, avgCycleLength, predictedCycleLength,
+ *   confidence {level, windowDays, message}, nextPeriodDate, ovulationDate,
+ *   fertileStart, fertileEnd, cyclesLogged, source ("backend"|"local")
  *
- * @param {Object}  logsByDate  — { "YYYY-MM-DD": { date, flow, notes, symptoms[], symptomSeverity } }
- * @param {Object}  cyclePhase  — result of computeCyclePhase(logs)
- * @param {string}  [userName]  — optional display name
+ * @param {Object}  logsByDate  - { "YYYY-MM-DD": { date, flow, notes, symptoms[], symptomSeverity, otherSymptoms[] } }
+ * @param {Object}  cycleState  - result of fetchCycleState(logs) from cycle-state.js
+ * @param {string}  [userName]  - optional display name
  * @returns {Object}
  */
-export function buildReportData(logsByDate, cyclePhase, userName = null) {
+export function buildReportData(logsByDate, cycleState, userName = null) {
+  // Normalise: cycleState.confidence may be an object {level,windowDays,message}
+  // or a legacy string. Always expose a flat confidenceLevel string.
+  const cyclePhase = cycleState; // alias for readability below
   const today        = todayKey();
   const periodStarts = getPeriodStarts(logsByDate);
 
@@ -477,10 +634,11 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
   // ── Symptom log: most recent first ───────────────────────────────────────
   const symptomLog = sortRecordsDesc(
     Object.entries(logsByDate)
-      .filter(([, log]) => log.symptoms?.length > 0 || log.notes)
+      .filter(([, log]) => log.symptoms?.length > 0 || log.otherSymptoms?.length > 0 || log.notes)
       .map(([date, log]) => ({
         date,
         symptoms: log.symptoms || [],
+        customSymptoms: (log.otherSymptoms || []).map((item) => item.text).filter(Boolean),
         notes:    log.notes    || "",
         severity: log.symptomSeverity || {},
       })),
@@ -489,16 +647,25 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
 
   // ── Symptom frequency: descending by count ────────────────────────────────
   const topSymptoms = sortByFrequencyDesc(buildSymptomFrequency(logsByDate));
+  const topCustomSymptoms = buildCustomSymptomFrequency(logsByDate);
 
-  // ── Phase & prediction values from computeCyclePhase ────────────────────
-  const currentPhase   = cyclePhase?.phase       ?? "unknown";
-  const phaseLabel     = cyclePhase?.phaseLabel  ?? null;
-  const confidence     = cyclePhase?.confidence  ?? "low";
-  const dayInCycle     = cyclePhase?.dayInCycle  ?? null;
-  const nextPeriodDate = cyclePhase?.nextPeriodDate ?? null;
-  const ovulationDate  = cyclePhase?.ovulationDate  ?? null;
-  const fertileStart   = cyclePhase?.fertileStart   ?? null;
-  const fertileEnd     = cyclePhase?.fertileEnd     ?? null;
+  // ── Phase & prediction values from cycleState ────────────────────────────
+  const currentPhase        = cyclePhase?.phase              ?? "unknown";
+  const phaseLabel          = cyclePhase?.phaseLabel         ?? null;
+  const dayInCycle          = cyclePhase?.dayInCycle         ?? null;
+  const nextPeriodDate      = cyclePhase?.nextPeriodDate     ?? null;
+  const ovulationDate       = cyclePhase?.ovulationDate      ?? null;
+  const fertileStart        = cyclePhase?.fertileStart       ?? null;
+  const fertileEnd          = cyclePhase?.fertileEnd         ?? null;
+  const predictedCycleLength= cyclePhase?.predictedCycleLength ?? null;
+  const source              = cyclePhase?.source             ?? "local";
+
+  // confidence may be an object {level, windowDays, message} or a legacy string
+  const rawConf        = cyclePhase?.confidence ?? "low";
+  const confidenceLevel   = (typeof rawConf === "object" ? rawConf.level  : rawConf) ?? "Low";
+  const confidenceMessage = (typeof rawConf === "object" ? rawConf.message : null);
+  // Keep the full object for the PDF generator
+  const confidence = rawConf;
 
   const lastPeriodStart = periodStarts.length
     ? periodStarts[periodStarts.length - 1]
@@ -510,7 +677,7 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
   const narrativePayload = {
     cyclesTracked, avgCycleLength, avgPeriodLength, regularity,
     lastPeriodStart, nextPeriodDate, currentPhase, phaseLabel,
-    confidence, dayInCycle,
+    confidence, confidenceLevel, dayInCycle,
   };
 
   const narrativeSummary = buildNarrative(narrativePayload);
@@ -524,6 +691,13 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
   const patternInsight  = buildPatternInsight({ cyclesTracked, regularity, avgCycleLength, topSymptoms });
 
   const alerts = buildAlerts({ completedCycles, nextPeriodDate });
+  const signalSummary = buildSignalSummary({
+    logsByDate,
+    cycleState: cyclePhase,
+    cycleLengths,
+    lastPeriodStart,
+    cyclesTracked,
+  });
 
   return {
     // Meta
@@ -533,6 +707,7 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
     // Summary stats
     avgCycleLength,
     avgPeriodLength,
+    predictedCycleLength,
     cyclesTracked,
     lastPeriodStart,
     nextPeriodDate,
@@ -543,19 +718,24 @@ export function buildReportData(logsByDate, cyclePhase, userName = null) {
     currentPhase,
     phaseLabel,
     confidence,
+    confidenceLevel,
+    confidenceMessage,
     dayInCycle,
+    source,           // "backend" (ML) or "local" (rule-based)
 
     // Pre-sorted tables (renderer must NOT re-sort these)
-    cyclesNewestFirst,   // history table  — most recent first
-    symptomLog,          // symptom table  — most recent first
-    topSymptoms,         // trends section — highest frequency first
+    cyclesNewestFirst,   // history table  - most recent first
+    symptomLog,          // symptom table  - most recent first
+    topSymptoms,         // trends section - highest frequency first
+    topCustomSymptoms,   // trends section - recurring free-text symptoms
 
     // Prose
     narrativeSummary,
-    interpretation,    // "What This Means For You" — 3-4 interpretive sentences
+    interpretation,    // "What This Means For You" - 3-4 interpretive sentences
     patternInsight,    // standout single-sentence insight for trends section
 
     // Alerts (only populated when warranted)
     alerts,
+    signalSummary,
   };
 }

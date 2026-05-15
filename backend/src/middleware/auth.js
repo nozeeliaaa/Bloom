@@ -1,8 +1,48 @@
-// backend/src/middleware/auth.js
 import { auth, db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 
-// ─── Main auth middleware ────────────────────────────────────────────────────
+function isFirebaseAuthTokenError(err) {
+  const code = String(err?.code || "");
+  const message = String(err?.message || "");
+  return (
+    code.startsWith("auth/") ||
+    /auth\/[a-z-]+|Firebase ID token|Decoding Firebase ID token|id token|token has expired|token has been revoked/i.test(message)
+  );
+}
+
+function isTransientFirebaseBackendError(err) {
+  const code = String(err?.code || "").toLowerCase();
+  const message = String(err?.message || "").toLowerCase();
+  return (
+    code === "unavailable" ||
+    code === "deadline-exceeded" ||
+    code === "resource-exhausted" ||
+    code === "internal" ||
+    code === "14" ||
+    code === "4" ||
+    message.includes("could not reach cloud firestore") ||
+    message.includes("firestore backend") ||
+    message.includes("deadline exceeded") ||
+    message.includes("service unavailable") ||
+    message.includes("etimedout") ||
+    message.includes("econnreset") ||
+    message.includes("enotfound")
+  );
+}
+
+function normalizeBiometricLevel(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized || null;
+}
+
+function deleteFieldValue() {
+  return typeof admin.firestore.FieldValue.delete === "function"
+    ? admin.firestore.FieldValue.delete()
+    : null;
+}
+
 export async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
 
@@ -18,20 +58,44 @@ export async function requireAuth(req, res, next) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      await userRef.set({
+      const defaultUserDocument = {
         role: "user",
+        email: decoded.email || null,
         profile: {
           nickname: null,
+          avatar: "👤",
           yearOfBirth: null,
           goal: null,
           mode: "account",
           consentSensitive: false,
           remindersEnabled: false,
           reminderTime: "09:00",
+          onboardingCompleted: false,
+        },
+        healthProfile: {
+          avgCycleLength: null,
+          periodDuration: null,
+          weightKg: null,
+          heightCm: null,
+          lmpDate: null,
+        },
+        biometricProfile: {
+          activityLevel: null,
+          sleepScore: null,
+          stressLevel: null,
+        },
+        game: {
+          xp: 0,
+          level: 1,
+          sessionsPlayed: 0,
         },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (typeof userRef.set === "function") {
+        await userRef.set(defaultUserDocument);
+      }
 
       req.user = {
         uid: decoded.uid,
@@ -45,54 +109,190 @@ export async function requireAuth(req, res, next) {
       return next();
     }
 
+    if (decoded.email_verified === false) {
+      // Allow through if the user has an approved guardian consent -
+      // this covers the window between consent approval and client token refresh
+      const hasApprovedConsent = await db
+        .collection("consents")
+        .where("teenUid", "==", decoded.uid)
+        .where("status", "==", "approved")
+        .limit(1)
+        .get()
+        .then(snap => !snap.empty)
+        .catch(() => false);
+
+      if (!hasApprovedConsent) {
+        return res.status(403).json({
+          error: "Email not verified",
+          code: "EMAIL_NOT_VERIFIED",
+        });
+      }
+      // Has approved consent - mark email verified in the background
+      // so future tokens come through without this extra DB read
+      getAuth().updateUser(decoded.uid, { emailVerified: true }).catch(() => {});
+    }
+
     const data = userDoc.data() || {};
+    if (data.disabled === true) {
+      return res.status(403).json({
+        error: "Account disabled",
+        code: "ACCOUNT_DISABLED",
+      });
+    }
+
+    const isAdminUser =
+      data.role === "admin"
+        ? (await db.collection("adminUsers").doc(decoded.uid).get()).exists
+        : false;
     const profile = data.profile || {};
+    const healthProfile = data.healthProfile || {};
+    const biometricProfile = data.biometricProfile || {};
+
+    if (!data.email && decoded.email) {
+      if (typeof userRef.set === "function") {
+        await userRef.set(
+          {
+            email: decoded.email,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+
+      data.email = decoded.email;
+    }
 
     const needsBackfill =
       !data.role ||
       !data.profile ||
-      data.profile.nickname === undefined ||
-      data.profile.yearOfBirth === undefined ||
-      data.profile.goal === undefined ||
-      data.profile.mode === undefined ||
-      data.profile.consentSensitive === undefined ||
-      data.profile.remindersEnabled === undefined ||
-      data.profile.reminderTime === undefined ||
-      data.profile.role !== undefined ||
-      data.profile.goal === "track_cycle";
+      !data.healthProfile ||
+      !data.game ||
+      profile.nickname === undefined ||
+      profile.avatar === undefined ||
+      profile.yearOfBirth === undefined ||
+      profile.goal === undefined ||
+      profile.mode === undefined ||
+      profile.consentSensitive === undefined ||
+      profile.remindersEnabled === undefined ||
+      profile.reminderTime === undefined ||
+      profile.role !== undefined ||
+      profile.avgCycleLength !== undefined ||
+      profile.periodDuration !== undefined ||
+      profile.sleepScore !== undefined ||
+      profile.activityLevel !== undefined ||
+      profile.stressLevel !== undefined ||
+      profile.weightKg !== undefined ||
+      profile.heightCm !== undefined ||
+      profile.lmpDate !== undefined ||
+      profile.lmp !== undefined ||
+      healthProfile.sleepScore !== undefined ||
+      healthProfile.lmpDate === undefined ||
+      healthProfile.lmp !== undefined ||
+      !data.biometricProfile ||
+      biometricProfile.activityLevel === undefined ||
+      biometricProfile.sleepScore === undefined ||
+      biometricProfile.stressLevel === undefined ||
+      profile.goal === "track_cycle";
 
     if (needsBackfill) {
-      const normalizedGoal =
-        profile.goal === "track_cycle" ? null : (profile.goal ?? null);
-
       const backfill = {
         role: data.role || "user",
+        email: data.email || decoded.email || null,
         profile: {
           nickname: profile.nickname ?? null,
+          avatar: profile.avatar ?? "👤",
           yearOfBirth: profile.yearOfBirth ?? null,
-          goal: normalizedGoal,
+          goal:
+            profile.goal === "track_cycle"
+              ? "period"
+              : profile.goal === "no_period"
+              ? "track_symptoms"
+              : (profile.goal ?? "period"),
           mode: profile.mode ?? "account",
           consentSensitive: profile.consentSensitive ?? false,
           remindersEnabled: profile.remindersEnabled ?? false,
           reminderTime: profile.reminderTime ?? "09:00",
+          role: deleteFieldValue(),
+          avgCycleLength: deleteFieldValue(),
+          periodDuration: deleteFieldValue(),
+          sleepScore: deleteFieldValue(),
+          activityLevel: deleteFieldValue(),
+          stressLevel: deleteFieldValue(),
+          weightKg: deleteFieldValue(),
+          heightCm: deleteFieldValue(),
+          lmpDate: deleteFieldValue(),
+          lmp: deleteFieldValue(),
+        },
+        healthProfile: {
+          avgCycleLength:
+            healthProfile.avgCycleLength ?? profile.avgCycleLength ?? null,
+          periodDuration:
+            healthProfile.periodDuration ?? profile.periodDuration ?? null,
+          weightKg:
+            healthProfile.weightKg ?? profile.weightKg ?? null,
+          heightCm:
+            healthProfile.heightCm ?? profile.heightCm ?? null,
+          lmpDate:
+            healthProfile.lmpDate ?? healthProfile.lmp ?? profile.lmpDate ?? profile.lmp ?? null,
+          lmp: deleteFieldValue(),
+          sleepScore: deleteFieldValue(),
+        },
+        biometricProfile: {
+          activityLevel:
+            normalizeBiometricLevel(biometricProfile.activityLevel ?? profile.activityLevel),
+          sleepScore:
+            biometricProfile.sleepScore ?? healthProfile.sleepScore ?? profile.sleepScore ?? null,
+          stressLevel:
+            normalizeBiometricLevel(biometricProfile.stressLevel ?? profile.stressLevel),
+        },
+        game: {
+          xp: data.game?.xp ?? 0,
+          level: data.game?.level ?? 1,
+          sessionsPlayed: data.game?.sessionsPlayed ?? 0,
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
-      await userRef.set(backfill, { merge: true });
+      try {
+        if (typeof userRef.set === "function") {
+          await userRef.set(backfill, { merge: true });
+        }
 
-      data.role = backfill.role;
-      data.profile = backfill.profile;
+        data.role = backfill.role;
+        data.email = backfill.email;
+        data.profile = backfill.profile;
+        data.healthProfile = backfill.healthProfile;
+        data.biometricProfile = backfill.biometricProfile;
+        data.game = backfill.game;
+      } catch (backfillErr) {
+        console.warn("requireAuth backfill skipped:", backfillErr?.message || backfillErr);
+      }
     }
 
     const safeProfile = data.profile || {};
     const ageBand = deriveAgeBand(safeProfile.yearOfBirth);
 
+    if (safeProfile.yearOfBirth && safeProfile.ageBand !== ageBand) {
+      if (typeof userRef.set === "function") {
+        await userRef.set(
+          {
+            profile: { ageBand },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+      data.profile = {
+        ...safeProfile,
+        ageBand,
+      };
+    }
+
     req.user = {
       uid: decoded.uid,
       email: decoded.email || null,
       email_verified: !!decoded.email_verified,
-      role: decoded.role || data.role || "user",
+      role: isAdminUser ? "admin" : (decoded.role || data.role || "user"),
       ageBand,
       yob: safeProfile.yearOfBirth || null,
     };
@@ -100,11 +300,57 @@ export async function requireAuth(req, res, next) {
     return next();
   } catch (err) {
     console.error("requireAuth error:", err);
-    return res.status(401).json({ error: "Invalid token" });
+    if (isFirebaseAuthTokenError(err)) {
+      return res.status(401).json({
+        error: "Invalid token",
+        code: err.code || "auth/invalid-token",
+      });
+    }
+
+    if (isTransientFirebaseBackendError(err)) {
+      return res.status(503).json({
+        error: "Authentication temporarily unavailable",
+        code: "AUTH_BACKEND_UNAVAILABLE",
+      });
+    }
+
+    return res.status(500).json({
+      error: "Authentication check failed",
+      code: "AUTH_CHECK_FAILED",
+    });
   }
 }
 
-// ─── Role gate middleware ────────────────────────────────────────────────────
+/**
+ * Lightweight auth middleware that accepts unverified emails.
+ * Use only on routes that must work before email verification
+ * (e.g. consent/request, consent/status for new minor accounts).
+ */
+export async function requireAuthUnverified(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing token" });
+  }
+  const token = header.split(" ")[1];
+  try {
+    const decoded = await auth.verifyIdToken(token);
+    req.user = {
+      uid: decoded.uid,
+      email: decoded.email || null,
+      email_verified: !!decoded.email_verified,
+      role: "user",
+      ageBand: null,
+      yob: null,
+    };
+    return next();
+  } catch (err) {
+    if (isFirebaseAuthTokenError(err)) {
+      return res.status(401).json({ error: "Invalid token", code: err.code || "auth/invalid-token" });
+    }
+    return res.status(500).json({ error: "Authentication check failed" });
+  }
+}
+
 export function requireRole(...allowed) {
   const allowedSet = new Set(allowed);
   return (req, res, next) => {
@@ -116,7 +362,6 @@ export function requireRole(...allowed) {
   };
 }
 
-// ─── Sensitive access gate ───────────────────────────────────────────────────
 export async function requireSensitiveAccess(req, res, next) {
   try {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
@@ -145,7 +390,6 @@ export async function requireSensitiveAccess(req, res, next) {
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 export function deriveAgeBand(yob) {
   if (!yob) return null;
   const year = Number(yob);

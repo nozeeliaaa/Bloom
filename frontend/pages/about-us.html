@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About Us - Bloom</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+
+  <style>
+    /* ── Hero ── */
+    .aboutus-hero {
+      text-align: center;
+      padding: 2.5rem 1rem 2rem;
+    }
+    .aboutus-hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--color-primary-lightest);
+      color: var(--color-primary-dark);
+      border: 1px solid var(--color-primary-light);
+      border-radius: 999px;
+      padding: 0.3rem 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .aboutus-hero h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--color-primary-dark);
+      margin: 0 0 0.5rem;
+    }
+    .aboutus-hero-subtitle {
+      font-size: 1rem;
+      color: var(--color-text-muted);
+      max-width: 500px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── Prose ── */
+    .aboutus-prose p {
+      font-size: 0.97rem;
+      line-height: 1.78;
+      color: var(--color-text);
+      margin-bottom: 1rem;
+    }
+    .aboutus-prose p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* ── Section heading ── */
+    .aboutus-section-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--color-primary-dark);
+      margin: 0 0 0.3rem;
+    }
+    .aboutus-section-sub {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      margin: 0 0 1.5rem;
+    }
+
+    /* ── Team grid ── */
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+    }
+    @media (min-width: 640px) {
+      .team-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    /* ── Team card ── */
+    .team-card {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 0.6rem;
+      transition: box-shadow 0.15s;
+    }
+    .team-card:hover {
+      box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+    }
+
+    /* ── Avatar ── */
+    .team-avatar-wrap {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      flex-shrink: 0;
+    }
+    .team-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2.5px solid var(--color-primary-light);
+      background: var(--color-primary-lightest);
+      display: block;
+    }
+    .team-avatar-fallback {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--color-primary-lightest);
+      border: 2.5px solid var(--color-primary-light);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .team-avatar-fallback.visible {
+      display: flex;
+    }
+
+    /* ── Card text ── */
+    .team-name {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--color-text);
+      margin: 0;
+    }
+    .team-role {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      background: var(--color-primary-lightest);
+      border-radius: 999px;
+      padding: 0.15rem 0.65rem;
+    }
+    .team-bio {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    /* ── Closing quote strip ── */
+    .aboutus-quote {
+      border-left: 3px solid var(--color-primary-light);
+      padding: 0.75rem 1.1rem;
+      background: var(--color-primary-lightest);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-size: 0.95rem;
+      font-style: italic;
+      color: var(--color-primary-dark);
+      line-height: 1.65;
+    }
+
+    /* ── Spacing utility ── */
+    .aboutus-mb {
+      margin-bottom: 1rem;
+    }
+
+    /* ── Links section ── */
+    .aboutus-links-heading {
+      margin-bottom: 1rem;
+    }
+    .aboutus-links-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="banner-area"></div>
+
+  <main>
+
+    <!-- Hero -->
+    <div class="aboutus-hero">
+      <div class="aboutus-hero-badge" aria-hidden="true">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        The Team
+      </div>
+      <h1>About Us</h1>
+      <p class="aboutus-hero-subtitle">The student innovators behind Bloom.</p>
+    </div>
+
+    <!-- Our story -->
+    <div class="card aboutus-prose aboutus-mb">
+      <h2 class="aboutus-section-title">Who we are</h2>
+      <p>
+        Bloom was developed by a team of student innovators who are passionate about using technology to create meaningful, people-centred solutions. As Computer Science students, we recognised the need for a digital platform that could support reproductive health awareness in a way that is informative, accessible, and relevant to the lives of users, particularly within the Caribbean context.
+      </p>
+      <p>
+        Our team created Bloom with the goal of combining thoughtful design, practical functionality, and educational value into one unified platform. We wanted to build more than just a tracking tool. We wanted to create a supportive digital environment where users could learn about their cycles, access health resources, and feel more empowered in understanding their reproductive wellness.
+      </p>
+      <p>
+        The development of Bloom reflects our commitment to solving real-world problems through technology. We approached this project with a strong focus on user experience, accessibility, and ethical design. Every feature within Bloom was developed with care to ensure that the platform remains clear, supportive, and easy to use while still addressing an important area of personal health.
+      </p>
+    </div>
+
+    <!-- Team -->
+    <div class="card aboutus-mb">
+      <h2 class="aboutus-section-title">Meet the team</h2>
+      <p class="aboutus-section-sub">The four people who planned, designed, and built Bloom.</p>
+
+      <div class="team-grid">
+
+        <!-- Jahzara Rose -->
+        <div class="team-card">
+          <div class="team-avatar-wrap">
+            <img
+              class="team-avatar"
+              src="/assets/team/jahzara.jpg"
+              alt="Photo of Jahzara Rose"
+              onerror="this.style.display='none';this.nextElementSibling.classList.add('visible');"
+            />
+            <div class="team-avatar-fallback" aria-hidden="true">J</div>
+          </div>
+          <p class="team-name">Jahzara Rose</p>
+          <span class="team-role">Frontend Developer</span>
+        </div>
+
+        <!-- Nozeelia Blair -->
+        <div class="team-card">
+          <div class="team-avatar-wrap">
+            <img
+              class="team-avatar"
+              src="/assets/team/nozeelia.jpg"
+              alt="Photo of Nozeelia Blair"
+              onerror="this.style.display='none';this.nextElementSibling.classList.add('visible');"
+            />
+            <div class="team-avatar-fallback" aria-hidden="true">N</div>
+          </div>
+          <p class="team-name">Nozeelia Blair</p>
+          <span class="team-role">Chatbot Developer</span>
+        </div>
+
+        <!-- Reneece Bartley -->
+        <div class="team-card">
+          <div class="team-avatar-wrap">
+            <img
+              class="team-avatar"
+              src="/assets/team/reneece.jpg"
+              alt="Photo of Reneece Bartley"
+              onerror="this.style.display='none';this.nextElementSibling.classList.add('visible');"
+            />
+            <div class="team-avatar-fallback" aria-hidden="true">R</div>
+          </div>
+          <p class="team-name">Reneece Bartley</p>
+          <span class="team-role">ML &amp; Algorithms</span>
+        </div>
+
+        <!-- Samantha Brown -->
+        <div class="team-card">
+          <div class="team-avatar-wrap">
+            <img
+              class="team-avatar"
+              src="/assets/team/samantha.jpg"
+              alt="Photo of Samantha Brown"
+              onerror="this.style.display='none';this.nextElementSibling.classList.add('visible');"
+            />
+            <div class="team-avatar-fallback" aria-hidden="true">S</div>
+          </div>
+          <p class="team-name">Samantha Brown</p>
+          <span class="team-role">Backend Developer</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Closing -->
+    <div class="card aboutus-mb">
+      <blockquote class="aboutus-quote">
+        Together, we contributed to the planning, design, and development of Bloom as a platform that promotes awareness, education, and better access to reproductive health support. Through this project, we hope to make a positive impact by showing how technology can be used to address health-related challenges in an inclusive and meaningful way.
+      </blockquote>
+    </div>
+
+  </main>
+
+  <script type="module">
+    import { renderNav, renderFooter, renderModeBanner, renderBloomieFab } from "/js/utils.js";
+    renderNav("about-us");
+    renderFooter();
+    renderBloomieFab();
+    renderModeBanner(document.getElementById("banner-area"));
+  </script>
+</body>
+</html>

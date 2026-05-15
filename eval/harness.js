@@ -7,10 +7,10 @@
  * Runs all cases from eval/cases.js through the full Bloomie pipeline and
  * computes four metrics:
  *
- *   1. Routing accuracy     — correct route / total routing cases
- *   2. Red-flag recall      — urgent cases correctly flagged / total urgent cases
- *   3. False reassurance    — urgent cases missed / total urgent cases (target: 0%)
- *   4. Fallback quality     — OOS/gibberish correctly handled / total fallback cases
+ *   1. Routing accuracy     - correct route / total routing cases
+ *   2. Red-flag recall      - urgent cases correctly flagged / total urgent cases
+ *   3. False reassurance    - urgent cases missed / total urgent cases (target: 0%)
+ *   4. Fallback quality     - OOS/gibberish correctly handled / total fallback cases
  *
  * Usage:
  *   node eval/harness.js
@@ -40,7 +40,7 @@ const CAT_FILTER   = args.includes("--category") ? args[args.indexOf("--category
 
 // ─── Pipeline runner ──────────────────────────────────────────────────────────
 
-// Full pipeline normalization (mirrors assistant.js steps 3–6):
+// Full pipeline normalization (mirrors assistant.js steps 3-6):
 //   normalizePatois → fuzzyCorrect → collapseRepeatedLetters → expandShorthand → normalizeText
 function pipelineNormalize(rawInput) {
   const p1 = normalizePatois(rawInput);
@@ -155,7 +155,7 @@ function evaluateCase(c) {
     checks.push({ name: "confidence", pass, expected: exp.confidence, got: result.confidence?.tier });
   }
 
-  // Check: cumulative escalation (multi-turn case — uses c.history field)
+  // Check: cumulative escalation (multi-turn case - uses c.history field)
   if (exp.cumulativeEscalation !== undefined) {
     const cumResult = runMultiTurnCumulative(c.history || [], c.input);
     const pass = cumResult.escalate === exp.cumulativeEscalation;
@@ -170,7 +170,7 @@ function evaluateCase(c) {
 // ─── Metric computation ───────────────────────────────────────────────────────
 
 function computeMetrics(evaluated) {
-  // 1. Routing accuracy — routing + edge cases with expected.route
+  // 1. Routing accuracy - routing + edge cases with expected.route
   const routingCases = evaluated.filter(c =>
     (c.category === "routing" || c.category === "edge") &&
     c.expected.route !== undefined
@@ -179,13 +179,13 @@ function computeMetrics(evaluated) {
     c.checks.find(ch => ch.name === "route")?.pass
   ).length;
 
-  // 2. Red-flag recall — all red_flag cases + any case with expected.urgent = true
+  // 2. Red-flag recall - all red_flag cases + any case with expected.urgent = true
   const redFlagCases = evaluated.filter(c =>
     c.category === "red_flag" || c.expected.urgent === true
   );
   const redFlagCaught = redFlagCases.filter(c => c.result.urgent === true).length;
 
-  // 3. False reassurance — urgent cases where urgent was NOT caught.
+  // 3. False reassurance - urgent cases where urgent was NOT caught.
   //    Exclude cumulative-escalation-only cases (single-turn pipeline cannot flag them
   //    as urgent by design; urgency is only detectable across turns via checkCumulativeRisk).
   const falseReassurance = redFlagCases.filter(c =>
@@ -193,7 +193,7 @@ function computeMetrics(evaluated) {
     !(c.expected.cumulativeEscalation !== undefined && c.expected.urgent === undefined)
   ).length;
 
-  // 4. Fallback quality — fallback cases with gibberish or noRoute checks
+  // 4. Fallback quality - fallback cases with gibberish or noRoute checks
   const fallbackCases = evaluated.filter(c => c.category === "fallback");
   const fallbackCorrect = fallbackCases.filter(c => c.passed).length;
 

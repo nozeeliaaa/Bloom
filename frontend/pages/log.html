@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/bloom-logo.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Log History - Bloom</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,6 +32,17 @@
       color: var(--color-text-muted);
       font-style: italic;
       margin-top: 0.35rem;
+    }
+    .log-entry-custom {
+      margin-top: 0.45rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .badge-custom {
+      background: #eef5f7;
+      color: #23546a;
+      border: 1px solid #c7dde5;
     }
     .log-empty {
       text-align: center;
@@ -83,6 +95,7 @@
      */
     import { renderNav, renderFooter, renderModeBanner, formatDate } from '/js/utils.js';
     import { getAllLogs } from '/js/db.js';
+    import { collectCustomSymptomRecurrence } from '/js/custom-symptoms.js';
 
     renderNav('log');
     renderFooter();
@@ -105,6 +118,8 @@
       const container = document.getElementById('log-list');
       const flowFilter = document.getElementById('filter-flow').value;
       const sortOrder = document.getElementById('filter-sort').value;
+      const recurrence = collectCustomSymptomRecurrence(Object.fromEntries(allEntries), 30);
+      const recurrenceMap = new Map(recurrence.map((row) => [row.normalizedText, row.count]));
 
       // Filter
       let filtered = allEntries;
@@ -135,6 +150,14 @@
           ? `<div class="log-entry-symptoms">${data.symptoms.map(s => `<span class="badge badge-primary">${s}</span>`).join('')}</div>`
           : '';
 
+        const customSymptoms = Array.isArray(data.otherSymptoms) && data.otherSymptoms.length
+          ? `<div class="log-entry-custom">${data.otherSymptoms.map(item => {
+              const count = recurrenceMap.get((item.normalizedText || item.text || '').trim().toLowerCase().replace(/\s+/g, ' ')) || 0;
+              const recur = count > 1 ? ` · logged ${count} times in the last month` : '';
+              return `<span class="badge badge-custom">Custom: ${item.text}${recur}</span>`;
+            }).join('')}</div>`
+          : '';
+
         const severity = data.severity && data.severity > 1
           ? `<span class="badge badge-warning">Severity: ${data.severity}/5</span>`
           : '';
@@ -151,6 +174,7 @@
                 ${flowBadge} ${severity}
               </div>
               ${symptoms}
+              ${customSymptoms}
               ${notes}
             </div>
           </div>`;

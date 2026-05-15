@@ -7,24 +7,31 @@
  * reviewed === false, ordered by ts descending, limited to 50.
  *
  * Access control: redirects anyone who is not authenticated + admin to the
- * dashboard — same gate pattern as admin.js.
+ * dashboard - same gate pattern as admin.js.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { renderNav, renderFooter, renderModeBanner } from "./utils.js";
-import { onAuthChange, isAdminCached } from "./auth.js";
+import { onAuthChange, isAdminCached, getIdToken } from "./auth.js";
 import { isAccountMode } from "./mode.js";
-import { getFirebaseDB } from "./firebase.js";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
+
+const API = window.BLOOM_API_BASE + "/api/admin";
+
+async function api(method, path) {
+  const token = await getIdToken();
+  const res = await fetch(API + path, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
 
 // ─── Feedback state ───────────────────────────────────────────────────────────
 let allFeedbackDocs = [];
@@ -57,9 +64,6 @@ onAuthChange(async (user) => {
     loadLogs();
     loadFeedback();
   });
-  document.getElementById("type-filter")?.addEventListener("change", () => {
-    renderTable(getFilteredDocs());
-  });
 });
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -73,28 +77,14 @@ async function loadLogs() {
   const tableEl   = document.getElementById("safety-table");
   const emptyEl   = document.getElementById("safety-empty");
 
-  // Reset state
   errorEl.style.display   = "none";
   loadingEl.style.display = "block";
   tableEl.style.display   = "none";
   emptyEl.style.display   = "none";
 
-  const db = getFirebaseDB();
-  if (!db) {
-    loadingEl.style.display = "none";
-    showError("Firebase is not configured — cannot load safety logs.");
-    return;
-  }
-
   try {
-    const q = query(
-      collection(db, "bloomieSafetyLogs"),
-      where("reviewed", "==", false),
-      orderBy("ts", "desc"),
-      limit(50),
-    );
-    const snap = await getDocs(q);
-    allDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const { logs } = await api("GET", "/safety-logs");
+    allDocs = logs;
   } catch (err) {
     loadingEl.style.display = "none";
     showError(`Failed to load safety logs: ${err.message}`);
@@ -102,14 +92,9 @@ async function loadLogs() {
   }
 
   loadingEl.style.display = "none";
-  renderTable(getFilteredDocs());
+  renderTable(allDocs);
 }
 
-// ─── Filtering ────────────────────────────────────────────────────────────────
-function getFilteredDocs() {
-  const type = document.getElementById("type-filter")?.value ?? "";
-  return type ? allDocs.filter((d) => d.type === type) : allDocs;
-}
 
 // ─── Rendering ────────────────────────────────────────────────────────────────
 function renderTable(docs) {
@@ -134,22 +119,28 @@ function renderTable(docs) {
     const typeBadge = typeBadgeClass(d.type);
     const riskBadge = riskBadgeClass(d.riskLevel);
 
-    // Route column: urgent_trigger/oos_fallback → d.route; escalation → d.fromNode
-    const routeText = d.route || d.fromNode || "—";
+    // Route column: prefer explicit route, then fromNode; for oos_fallback fall
+    // back to the OOS category so the column is never just "-".
+    const routeText = d.route || d.fromNode
+      || (d.type === "oos_fallback" ? d.category || "oos" : "-");
+
+    // Topic column: use stored topic; for oos_fallback derive a hint from category.
+    const topicText = d.topic
+      || (d.type === "oos_fallback" && d.category ? `[${d.category}]` : "-");
 
     return `
       <tr data-id="${esc(d.id)}">
         <td class="col-ts">${esc(ts)}</td>
         <td>
-          <span class="admin-badge ${esc(typeBadge)}">${esc(d.type || "—")}</span>
+          <span class="admin-badge ${esc(typeBadge)}">${esc(friendlyType(d.type))}</span>
         </td>
         <td class="col-input" title="${esc(d.input || "")}">${esc(truncate(d.input, 90))}</td>
         <td class="col-route"><code>${esc(routeText)}</code></td>
-        <td>${esc(d.topic || "—")}</td>
+        <td>${esc(topicText)}</td>
         <td>
           ${d.riskLevel
             ? `<span class="admin-badge ${esc(riskBadge)}">${esc(d.riskLevel)}</span>`
-            : `<span class="text-muted">—</span>`}
+            : `<span class="text-muted">-</span>`}
         </td>
         <td style="white-space:nowrap;">
           <button
@@ -174,13 +165,11 @@ async function markReviewed(btn) {
   btn.disabled    = true;
   btn.textContent = "Saving…";
 
-  const db = getFirebaseDB();
   try {
-    await updateDoc(doc(db, "bloomieSafetyLogs", id), { reviewed: true });
-    // Animate the row out, then remove from state and re-render
+    await api("PATCH", `/safety-logs/${id}/reviewed`);
     if (row) row.classList.add("row-reviewed");
     allDocs = allDocs.filter((d) => d.id !== id);
-    setTimeout(() => renderTable(getFilteredDocs()), 400);
+    setTimeout(() => renderTable(allDocs), 400);
   } catch (err) {
     btn.disabled    = false;
     btn.textContent = "Mark reviewed";
@@ -206,13 +195,13 @@ function esc(val) {
 }
 
 function truncate(str, max) {
-  if (!str) return "—";
+  if (!str) return "-";
   return str.length > max ? str.slice(0, max) + "…" : str;
 }
 
 /** Format a Firestore Timestamp or ISO string for display. */
 function formatTs(ts) {
-  if (!ts) return "—";
+  if (!ts) return "-";
   const d = ts?.toDate ? ts.toDate() : new Date(ts);
   if (Number.isNaN(d.getTime())) return String(ts);
   return d.toLocaleString(undefined, {
@@ -225,6 +214,13 @@ function typeBadgeClass(type) {
   if (type === "urgent_trigger") return "admin-badge--danger";
   if (type === "escalation")     return "admin-badge--warning";
   return "admin-badge--neutral";
+}
+
+function friendlyType(type) {
+  if (type === "urgent_trigger") return "Urgent Trigger";
+  if (type === "escalation")     return "Escalation";
+  if (type === "oos_fallback")   return "OOS Fallback";
+  return type || "-";
 }
 
 function riskBadgeClass(level) {
@@ -248,23 +244,9 @@ async function loadFeedback() {
   tableEl.style.display   = "none";
   emptyEl.style.display   = "none";
 
-  const db = getFirebaseDB();
-  if (!db) {
-    loadingEl.style.display = "none";
-    errorEl.textContent   = "Firebase is not configured — cannot load feedback.";
-    errorEl.style.display = "block";
-    return;
-  }
-
   try {
-    const q = query(
-      collection(db, "bloomieFeedback"),
-      where("feedbackType", "==", "thumbs_down"),
-      orderBy("createdAt", "desc"),
-      limit(50),
-    );
-    const snap = await getDocs(q);
-    allFeedbackDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const { feedback } = await api("GET", "/feedback-review");
+    allFeedbackDocs = feedback;
   } catch (err) {
     loadingEl.style.display = "none";
     errorEl.textContent   = `Failed to load feedback: ${err.message}`;
@@ -297,21 +279,26 @@ function renderFeedbackTable(docs) {
 
   tbody.innerHTML = docs.map((d) => {
     const ts      = formatTs(d.createdAt);
-    const nodeId  = esc(d.nodeId  || "—");
-    const flow    = esc(d.flowName || "—");
+    const nodeId  = esc(d.nodeId  || "-");
+    const flow    = esc(d.flowName || "-");
     const msgText = esc(truncate(d.messageText, 120));
-    const comment = esc(d.comment || "—");
+    const comment = esc(d.comment || "-");
+    const isThumbsUp = d.feedbackType === "thumbs_up";
+    const ratingBadge = d.feedbackType
+      ? `<span class="admin-badge ${isThumbsUp ? "admin-badge--primary" : "admin-badge--danger"}">${isThumbsUp ? "👍 Up" : "👎 Down"}</span>`
+      : "-";
 
     // Render conversation slice as compact turn list
     const slice = Array.isArray(d.conversationSlice)
       ? d.conversationSlice
           .map((m) => `<span class="feedback-turn feedback-turn--${esc(m.from)}">${esc(m.from)}: ${esc(truncate(m.text, 80))}</span>`)
           .join("")
-      : "—";
+      : "-";
 
     return `
       <tr>
         <td class="col-ts">${esc(ts)}</td>
+        <td>${ratingBadge}</td>
         <td><code>${nodeId}</code></td>
         <td>${flow}</td>
         <td class="col-input" title="${esc(d.messageText || "")}">${msgText}</td>
